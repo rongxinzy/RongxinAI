@@ -18,7 +18,11 @@ import { ExpertAvatar } from '../../expert/expertAvatars';
 import AskUserQuestionCard from '../../cowork/AskUserQuestionCard';
 import { WorkingIndicator } from '../../cowork/components/WorkingIndicator';
 import type { ConversationTurn, NoticeTurnPart, ToolTurnPart } from '../model/types';
-import { getToolDisplayName, getToolInputSummary } from '../tools/toolFormatters';
+import {
+  getToolCategoryActionLabel,
+  getToolDisplayName,
+  getToolInputSummary,
+} from '../tools/toolFormatters';
 import { ToolGroupView } from '../tools/ToolGroupView';
 import { ToolPartView } from '../tools/ToolPartView';
 import { AssistantTextPartView } from './AssistantTextPartView';
@@ -120,7 +124,10 @@ const resolveBottomActivity = (turn: ConversationTurn): BottomActivityState | nu
       }
     } else if (part.kind === 'tool_group') {
       for (const nested of part.parts) {
-        if (nested.phase === 'input-streaming' || nested.phase === 'running') {
+        if (
+          nested.kind === 'tool' &&
+          (nested.phase === 'input-streaming' || nested.phase === 'running')
+        ) {
           activeTool = nested;
         }
       }
@@ -130,6 +137,12 @@ const resolveBottomActivity = (turn: ConversationTurn): BottomActivityState | nu
 
   const lastPart = turn.parts[turn.parts.length - 1];
   if (lastPart?.kind === 'reasoning' && lastPart.isStreaming) return null;
+  if (
+    lastPart?.kind === 'tool_group' &&
+    lastPart.parts.some(nested => nested.kind === 'reasoning' && nested.isStreaming)
+  ) {
+    return null;
+  }
   if (lastPart?.kind === 'text' && lastPart.isStreaming && lastPart.message.content.trim()) {
     return null;
   }
@@ -150,16 +163,7 @@ const renderBottomActivity = (activity: BottomActivityState | null): React.React
     );
   }
   const { tool } = activity;
-  const actionLabel =
-    tool.category === 'file-write'
-      ? i18nService.t('coworkExecutionWrite')
-      : tool.category === 'file-read'
-        ? i18nService.t('coworkExecutionRead')
-        : tool.category === 'shell'
-          ? i18nService.t('coworkExecutionCommand')
-          : tool.category === 'search'
-            ? i18nService.t('coworkExecutionSearch')
-            : i18nService.t('coworkExecutionTool');
+  const actionLabel = getToolCategoryActionLabel(tool.category);
   const displayName = getToolDisplayName(tool.toolName);
   const statusLabel =
     tool.category === 'other' ||
@@ -246,7 +250,14 @@ export const TurnView: React.FC<TurnViewProps> = React.memo(
                         />
                       );
                     case 'tool_group':
-                      return <ToolGroupView key={part.id} group={part} forceExpand={forceExpand} />;
+                      return (
+                        <ToolGroupView
+                          key={part.id}
+                          group={part}
+                          forceExpand={forceExpand}
+                          onRespondToPermission={onRespondToPermission}
+                        />
+                      );
                     case 'question':
                       return onRespondToQuestion ? (
                         <AskUserQuestionCard

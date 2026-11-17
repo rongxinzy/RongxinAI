@@ -3,7 +3,12 @@ import { describe, expect, test } from 'vitest';
 import { CoworkPermissionOrigin } from '../../../../shared/cowork/constants';
 import { CoworkToolActivityPhase } from '../../../../shared/cowork/toolActivity';
 import type { CoworkMessage, CoworkPermissionRequest } from '../../../types/cowork';
-import { createSessionTurnsSelector, projectSessionToTurns } from './projectTurns';
+import {
+  createSessionTurnsSelector,
+  groupContiguousActivityParts,
+  groupPartByType,
+  projectSessionToTurns,
+} from './projectTurns';
 
 const makeMsg = (
   partial: Partial<CoworkMessage> & Pick<CoworkMessage, 'id' | 'type'>,
@@ -14,9 +19,15 @@ const makeMsg = (
 });
 
 describe('projectSessionToTurns', () => {
-  test('groups consecutive read-only tool calls into a single tool_group', () => {
+  test('groups contiguous reasoning and tool calls into a single tool_group and breaks on text', () => {
     const messages: CoworkMessage[] = [
       makeMsg({ id: 'u1', type: 'user', content: 'Inspect repo' }),
+      makeMsg({
+        id: 'th1',
+        type: 'assistant',
+        content: 'Let me inspect the files first',
+        metadata: { isThinking: true },
+      }),
       makeMsg({
         id: 't1',
         type: 'tool_use',
@@ -48,13 +59,123 @@ describe('projectSessionToTurns', () => {
 
     expect(turns).toHaveLength(1);
     const [turn] = turns;
-    expect(turn.parts.map(p => p.kind)).toEqual(['tool_group', 'tool', 'text']);
+    expect(turn.parts.map(p => p.kind)).toEqual(['tool_group', 'text']);
     const group = turn.parts[0];
     if (group?.kind === 'tool_group') {
-      expect(group.parts).toHaveLength(2);
-      expect(group.parts.map(p => p.toolName)).toEqual(['read', 'grep']);
+      expect(group.parts).toHaveLength(4);
+      expect(group.parts.map(p => (p.kind === 'reasoning' ? 'reasoning' : p.toolName))).toEqual([
+        'reasoning',
+        'read',
+        'grep',
+        'edit',
+      ]);
+      expect(group.hasError).toBe(false);
+      expect(group.hasApproval).toBe(false);
     }
     expect(turn.copyText).toBe('Done!');
+  });
+
+  test('keeps single isolated reasoning or tool parts flat without wrapping in a group', () => {
+    const messages: CoworkMessage[] = [
+      makeMsg({ id: 'u1', type: 'user', content: 'Check once' }),
+      makeMsg({
+        id: 'th1',
+        type: 'assistant',
+        content: 'Thinking',
+        metadata: { isThinking: true },
+      }),
+      makeMsg({ id: 'a1', type: 'assistant', content: 'Interim note' }),
+      makeMsg({
+        id: 't1',
+        type: 'tool_use',
+        metadata: { toolName: 'read', toolUseId: 'c1', toolInput: { path: 'a.ts' } },
+      }),
+      makeMsg({ id: 'r1', type: 'tool_result', content: 'ok', metadata: { toolUseId: 'c1' } }),
+      makeMsg({ id: 'a2', type: 'assistant', content: 'Final answer' }),
+    ];
+
+    const { turns } = projectSessionToTurns({
+      messages,
+      toolActivities: [],
+      artifacts: [],
+      previewableTypes: new Set(),
+      isStreaming: false,
+    });
+
+    expect(turns[0]?.parts.map(p => p.kind)).toEqual(['reasoning', 'text', 'tool', 'text']);
+  });
+
+  test('propagates hasError and hasApproval onto grouped parts and turns', () => {
+    const messages: CoworkMessage[] = [
+      makeMsg({ id: 'u1', type: 'user', content: 'Run commands' }),
+      makeMsg({
+        id: 'th1',
+        type: 'assistant',
+        content: 'Planning',
+        metadata: { isThinking: true },
+      }),
+      makeMsg({
+        id: 't1',
+        type: 'tool_use',
+        metadata: { toolName: 'bash', toolUseId: 'c1', toolInput: { command: 'npm test' } },
+      }),
+      makeMsg({
+        id: 'r1',
+        type: 'tool_result',
+        content: 'exit 1',
+        metadata: { toolUseId: 'c1', isError: true },
+      }),
+    ];
+
+    const { turns } = projectSessionToTurns({
+      messages,
+      toolActivities: [],
+      artifacts: [],
+      previewableTypes: new Set(),
+      isStreaming: false,
+    });
+
+    expect(turns[0]?.hasError).toBe(true);
+    const group = turns[0]?.parts[0];
+    expect(group?.kind).toBe('tool_group');
+    if (group?.kind === 'tool_group') {
+      expect(group.hasError).toBe(true);
+      expect(group.hasApproval).toBe(false);
+    }
+
+    const custom = groupContiguousActivityParts(
+      [
+        {
+          kind: 'reasoning',
+          id: 'reasoning:1',
+          message: makeMsg({ id: 'th1', type: 'assistant', content: 'x' }),
+          isStreaming: false,
+          isComplete: true,
+        },
+        {
+          kind: 'tool',
+          id: 'tool:1',
+          toolCallId: '1',
+          toolName: 'read',
+          category: 'file-read',
+          readOnly: true,
+          phase: 'output-available',
+          isError: false,
+        },
+        {
+          kind: 'tool',
+          id: 'tool:2',
+          toolCallId: '2',
+          toolName: 'bash',
+          category: 'shell',
+          readOnly: false,
+          phase: 'output-available',
+          isError: false,
+        },
+      ],
+      groupPartByType({ tool: ['group-tool'] }),
+    );
+    expect(custom.map(p => p.kind)).toEqual(['reasoning', 'tool_group']);
   });
 
   test('binds pending permission directly to the matching open tool part', () => {

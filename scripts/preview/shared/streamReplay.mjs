@@ -121,7 +121,9 @@ export async function runStreamReplay(
             '[data-tool-state], [data-tool-name], [data-slot="tool"], .is-assistant, .theme-fold-reasoning',
           ),
         ];
-        const thinkingIndex = items.findIndex(node => node.matches('.theme-fold-reasoning'));
+        const thinkingIndex = items.findIndex(node =>
+          node.matches('.theme-fold-reasoning, [data-has-reasoning="true"]'),
+        );
         const toolIndex = items.findIndex(node =>
           node.matches('[data-tool-state], [data-tool-name], [data-slot="tool"]'),
         );

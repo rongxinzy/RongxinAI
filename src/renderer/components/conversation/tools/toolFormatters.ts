@@ -1,5 +1,6 @@
 import type { SourceItem } from '@shared/components/conversation';
 import { i18nService } from '../../../services/i18n';
+import type { ToolCategory } from '../model/types';
 
 const MAX_STRUCTURED_FORMAT_CHARS = 100_000;
 const TOOL_RESULT_COLLAPSE_LINE_LIMIT = 200;
@@ -92,6 +93,23 @@ export function getToolDisplayName(toolName: string | undefined): string {
       return 'Skill Script';
     default:
       return toolName;
+  }
+}
+
+export function getToolCategoryActionLabel(category: ToolCategory): string {
+  switch (category) {
+    case 'file-write':
+      return i18nService.t('coworkExecutionWrite');
+    case 'file-read':
+      return i18nService.t('coworkExecutionRead');
+    case 'shell':
+      return i18nService.t('coworkExecutionCommand');
+    case 'search':
+      return i18nService.t('coworkExecutionSearch');
+    case 'web':
+      return i18nService.t('coworkExecutionFetch');
+    default:
+      return i18nService.t('coworkExecutionTool');
   }
 }
 

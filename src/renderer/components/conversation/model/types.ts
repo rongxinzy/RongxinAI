@@ -59,10 +59,14 @@ export interface ToolTurnPart {
   pendingPermission?: CoworkPermissionRequest | null;
 }
 
+export type ActivityGroupItemPart = ReasoningTurnPart | ToolTurnPart;
+
 export interface ToolGroupTurnPart {
   kind: 'tool_group';
   id: string;
-  parts: ToolTurnPart[];
+  parts: ActivityGroupItemPart[];
+  hasError: boolean;
+  hasApproval: boolean;
 }
 
 interface QuestionTurnPart {

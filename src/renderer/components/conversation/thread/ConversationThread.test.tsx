@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -84,6 +84,13 @@ describe('ConversationThread', () => {
     expect(log).not.toBeNull();
     const scroller = container.querySelector('[role="log"] .cowork-conversation-scroll');
     expect(scroller).not.toBeNull();
+
+    const collapsedGroupTrigger = container.querySelector('[data-slot="tool"]');
+    expect(collapsedGroupTrigger).not.toBeNull();
+    expect(collapsedGroupTrigger?.getAttribute('aria-expanded')).toBe('false');
+    expect(collapsedGroupTrigger?.getAttribute('data-has-reasoning')).toBe('true');
+
+    fireEvent.click(collapsedGroupTrigger!);
 
     const orderedNodes = Array.from(
       container.querySelectorAll(
@@ -230,6 +237,48 @@ describe('ConversationThread', () => {
       <ConversationThread turns={postToolTurns} skills={[]} scrollContainerRef={scrollRef} />,
     );
     expect(postToolView.container.querySelector('[role="status"]')).not.toBeNull();
+  });
+
+  test('omits the bottom waiting indicator while grouped reasoning is actively streaming after a tool', () => {
+    const { turns } = projectSessionToTurns({
+      messages: [
+        { id: 'u-grouped-think', type: 'user', content: 'Inspect and reason', timestamp: 1000 },
+        {
+          id: 'tu-grouped-think',
+          type: 'tool_use',
+          content: '',
+          timestamp: 1001,
+          metadata: { toolName: 'bash', toolUseId: 'c1', toolInput: { command: 'ls' } },
+        },
+        {
+          id: 'tr-grouped-think',
+          type: 'tool_result',
+          content: 'ok',
+          timestamp: 1002,
+          metadata: { toolUseId: 'c1', toolResult: 'ok' },
+        },
+        {
+          id: 'th-grouped-think',
+          type: 'assistant',
+          content: 'Reviewing output...',
+          timestamp: 1003,
+          metadata: { isThinking: true, isStreaming: true, isFinal: false },
+        },
+      ],
+      toolActivities: [],
+      artifacts: [],
+      previewableTypes: new Set(),
+      isStreaming: true,
+    });
+
+    const scrollRef = React.createRef<HTMLDivElement | null>();
+    const { container } = render(
+      <ConversationThread turns={turns} skills={[]} scrollContainerRef={scrollRef} />,
+    );
+
+    const groupTrigger = container.querySelector('[data-slot="tool"]');
+    expect(groupTrigger?.textContent).toContain(i18nService.t('codingAgentReasoningActive'));
+    expect(container.querySelector('[role="status"]')).toBeNull();
   });
 
   test('virtualizes long sessions to a bounded DOM window while keeping full static rendering for export', () => {

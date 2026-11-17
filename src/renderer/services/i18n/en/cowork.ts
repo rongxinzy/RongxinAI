@@ -190,6 +190,7 @@ export const enCowork: Record<string, string> = {
   coworkToolNoErrorDetail: 'Failed (no error details)',
   coworkStepsExploring: 'Exploring',
   coworkStepsExploredCount: 'Explored {count} steps',
+  coworkActivityGroupSteps: '{count} steps',
   coworkTurnJumpLabel: 'Jump to turn',
   coworkTodosTitle: 'Todo List',
   coworkTodoItems: 'items',

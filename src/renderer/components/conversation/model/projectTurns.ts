@@ -14,7 +14,14 @@ import type {
   CoworkPermissionRequest,
 } from '../../../types/cowork';
 import { getToolResultDisplay } from '../tools/toolFormatters';
-import type { ConversationTurn, ToolCategory, ToolPhase, ToolTurnPart, TurnPart } from './types';
+import type {
+  ActivityGroupItemPart,
+  ConversationTurn,
+  ToolCategory,
+  ToolPhase,
+  ToolTurnPart,
+  TurnPart,
+} from './types';
 
 interface ToolClassification {
   category: ToolCategory;
@@ -102,37 +109,74 @@ const matchPermissionToTool = (
   return sameNameOpen.length === 1 ? sameNameOpen[0] : null;
 };
 
-const groupConsecutiveReadOnlyTools = (parts: TurnPart[]): TurnPart[] => {
+type PartGroupBy = (part: TurnPart) => readonly string[] | null;
+
+/**
+ * Ports `assistant-ui`'s `groupPartByType`: maps each part kind to synthetic
+ * `"group-*"` keys (or `null` when standalone).
+ */
+export const groupPartByType = (
+  mapping: Partial<Record<TurnPart['kind'], readonly string[]>>,
+): PartGroupBy => {
+  return part => mapping[part.kind] ?? null;
+};
+
+const defaultActivityGroupBy = groupPartByType({
+  reasoning: ['group-activity'],
+  tool: ['group-activity'],
+});
+
+const isGroupableActivityPart = (part: TurnPart): part is ActivityGroupItemPart =>
+  part.kind === 'reasoning' || part.kind === 'tool';
+
+/**
+ * Coalesces contiguous ranges of reasoning and tool parts matching the same
+ * `groupBy` key (1:1 with `assistant-ui` `GroupedParts`), unwrapping runs
+ * shorter than `minGroupSize` (2) so isolated items render flat.
+ */
+export const groupContiguousActivityParts = (
+  parts: TurnPart[],
+  groupBy: PartGroupBy = defaultActivityGroupBy,
+  minGroupSize = 2,
+): TurnPart[] => {
   const result: TurnPart[] = [];
-  let buffer: ToolTurnPart[] = [];
+  let currentKey: string | null = null;
+  let buffer: ActivityGroupItemPart[] = [];
 
   const flush = () => {
     if (buffer.length === 0) return;
-    if (buffer.length === 1) {
-      result.push(buffer[0]);
+    if (buffer.length < minGroupSize) {
+      result.push(...buffer);
     } else {
       result.push({
         kind: 'tool_group',
         id: `group:${buffer[0].id}`,
         parts: buffer,
+        hasError: buffer.some(item => item.kind === 'tool' && item.isError),
+        hasApproval: buffer.some(
+          item => item.kind === 'tool' && item.phase === 'approval-requested',
+        ),
       });
     }
+    currentKey = null;
     buffer = [];
   };
 
   for (const part of parts) {
-    const groupable =
-      part.kind === 'tool' &&
-      part.readOnly &&
-      part.phase !== 'approval-requested' &&
-      part.phase !== 'output-error' &&
-      part.phase !== 'output-denied';
-    if (groupable) {
-      buffer.push(part);
-    } else {
-      flush();
-      result.push(part);
+    const rawKey = groupBy(part)?.[0] ?? null;
+    const key = typeof rawKey === 'string' && rawKey.startsWith('group-') ? rawKey : null;
+    if (key !== null && isGroupableActivityPart(part)) {
+      if (currentKey === key) {
+        buffer.push(part);
+      } else {
+        flush();
+        currentKey = key;
+        buffer = [part];
+      }
+      continue;
     }
+    flush();
+    result.push(part);
   }
   flush();
   return result;
@@ -471,7 +515,7 @@ const finalizeTurnState = (
     return part;
   });
 
-  const groupedParts = groupConsecutiveReadOnlyTools(settledParts);
+  const groupedParts = groupContiguousActivityParts(settledParts);
   const lastTextPart = [...groupedParts]
     .reverse()
     .find(
@@ -485,10 +529,15 @@ const finalizeTurnState = (
 
   const hasApproval = groupedParts.some(
     part =>
-      (part.kind === 'tool' && part.phase === 'approval-requested') || part.kind === 'question',
+      (part.kind === 'tool' && part.phase === 'approval-requested') ||
+      (part.kind === 'tool_group' && part.hasApproval) ||
+      part.kind === 'question',
   );
   const hasError = groupedParts.some(
-    part => (part.kind === 'tool' && part.isError) || (part.kind === 'notice' && part.isError),
+    part =>
+      (part.kind === 'tool' && part.isError) ||
+      (part.kind === 'tool_group' && part.hasError) ||
+      (part.kind === 'notice' && part.isError),
   );
 
   return {
