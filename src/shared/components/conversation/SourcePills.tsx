@@ -40,9 +40,9 @@ export function SourcePills({ sources, className }: SourcePillsProps) {
             title={source.snippet ? `${label} — ${source.snippet}` : source.url}
             className="theme-conversation-source inline-flex max-w-60 items-center gap-1.5"
           >
-            <Globe className="theme-conversation-icon shrink-0" />
+            <Globe className="size-3.5 shrink-0 text-muted-foreground" />
             <span className="truncate">{label}</span>
-            <ExternalLink className="theme-conversation-icon shrink-0" />
+            <ExternalLink className="size-3 shrink-0 opacity-60" />
           </a>
         );
       })}

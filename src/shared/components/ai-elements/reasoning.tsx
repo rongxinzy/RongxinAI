@@ -140,17 +140,11 @@ export const Reasoning = memo(
     return (
       <ReasoningContext.Provider value={contextValue}>
         <Collapsible
-          className={cn('not-prose', showConnector ? 'relative mb-0' : 'mb-4', className)}
+          className={cn('not-prose', className)}
           onOpenChange={handleOpenChange}
           open={isOpen}
           {...props}
         >
-          {showConnector && isOpen && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute top-9 bottom-0 left-2 w-px bg-border"
-            />
-          )}
           {children}
         </Collapsible>
       </ReasoningContext.Provider>
@@ -187,18 +181,18 @@ export const ReasoningTrigger = memo(
 
     return (
       <CollapsibleTrigger
-        className={cn('theme-fold-reasoning flex w-full items-center gap-2', className)}
+        className={cn(
+          'theme-fold-reasoning -mx-2 flex w-fit max-w-full items-center gap-2',
+          className,
+        )}
         {...props}
       >
         {children ?? (
           <>
-            <BrainIcon className="size-4" />
+            <BrainIcon className="theme-conversation-icon shrink-0" />
             {getThinkingMessage(isStreaming, duration)}
             <ChevronDownIcon
-              className={cn(
-                'size-4 transition-transform motion-reduce:transition-none',
-                isOpen ? 'rotate-180' : 'rotate-0',
-              )}
+              className={cn('theme-chat-tool-chevron shrink-0', isOpen ? 'rotate-180' : 'rotate-0')}
             />
           </>
         )}
@@ -254,8 +248,12 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
     }
   }, [text, isStreaming]);
 
+  const proseClassName =
+    'size-full text-inherit [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>p+p]:mt-2';
+
   const base = (
     <Streamdown
+      className={proseClassName}
       mode="streaming"
       parseIncompleteMarkdown={isStreaming}
       isAnimating={isStreaming}
@@ -269,6 +267,7 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
   const content = RICH_CONTENT_PATTERN.test(text) ? (
     <React.Suspense fallback={base}>
       <RichMessageResponse
+        className={proseClassName}
         mode="streaming"
         parseIncompleteMarkdown={isStreaming}
         isAnimating={isStreaming}
@@ -283,8 +282,8 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
   return (
     <CollapsibleContent
       className={cn(
-        'theme-reasoning-panel mt-4',
-        showConnector && 'theme-reasoning-panel-indented',
+        'theme-reasoning-panel pt-1 pb-1.5',
+        showConnector && 'theme-reasoning-panel-indented ml-2',
         className,
       )}
       {...props}

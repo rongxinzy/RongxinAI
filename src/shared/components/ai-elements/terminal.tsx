@@ -42,9 +42,12 @@ export const TerminalHeader = ({ className, children, ...props }: TerminalHeader
 export type TerminalTitleProps = HTMLAttributes<HTMLDivElement>;
 
 export const TerminalTitle = ({ className, children, ...props }: TerminalTitleProps) => (
-  <div className={cn('theme-terminal-title flex items-center gap-2', className)} {...props}>
-    <TerminalIcon className="size-4" />
-    {children ?? 'Terminal'}
+  <div
+    className={cn('theme-terminal-title flex min-w-0 flex-1 items-center gap-2', className)}
+    {...props}
+  >
+    <TerminalIcon className="size-3.5 shrink-0" />
+    <span className="min-w-0 truncate">{children ?? 'Terminal'}</span>
   </div>
 );
 
@@ -64,10 +67,10 @@ const TerminalStatus = ({ className, children, ...props }: TerminalStatusProps) 
   );
 };
 
-type TerminalActionsProps = HTMLAttributes<HTMLDivElement>;
+export type TerminalActionsProps = HTMLAttributes<HTMLDivElement>;
 
-const TerminalActions = ({ className, children, ...props }: TerminalActionsProps) => (
-  <div className={cn('flex items-center gap-1', className)} {...props}>
+export const TerminalActions = ({ className, children, ...props }: TerminalActionsProps) => (
+  <div className={cn('flex shrink-0 items-center gap-1', className)} {...props}>
     {children}
   </div>
 );
@@ -78,7 +81,7 @@ type TerminalCopyButtonProps = ComponentProps<typeof Button> & {
   timeout?: number;
 };
 
-const TerminalCopyButton = ({
+export const TerminalCopyButton = ({
   onCopy,
   onError,
   timeout = 2000,
@@ -119,7 +122,7 @@ const TerminalCopyButton = ({
     <Button
       className={cn('theme-page-terminal-button-variant-1 shrink-0', className)}
       onClick={copyToClipboard}
-      size="icon"
+      size="icon-xs"
       variant="ghost"
       {...props}
     >

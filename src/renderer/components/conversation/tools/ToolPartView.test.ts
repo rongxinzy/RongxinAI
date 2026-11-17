@@ -66,3 +66,24 @@ test('shell failures and empty error payloads stay visible cleanly', () => {
   ).toBeGreaterThanOrEqual(0);
   expect(view.container.textContent).toMatch(/error|失败|No error details/i);
 });
+
+test('renders python_execute code as a Python code block instead of raw escaped JSON', () => {
+  const pythonFail: ToolTurnPart = {
+    kind: 'tool',
+    id: 'tool-python-fail',
+    toolCallId: 'call-python-fail',
+    toolName: 'python_execute',
+    category: 'python',
+    readOnly: false,
+    phase: 'output-error',
+    isError: true,
+    input: { code: 'import math\nprint(math.pi)', timeoutMs: 60000 },
+    output: 'ENOENT: job-runner.exe missing',
+  };
+
+  const view = render(createElement(ToolPartView, { part: pythonFail, forceExpand: true }));
+  expect(view.container.textContent).toContain('import math');
+  expect(view.container.textContent).toContain('print(math.pi)');
+  expect(view.container.textContent).not.toContain('"timeoutMs"');
+  expect(view.container.textContent).toContain('ENOENT: job-runner.exe missing');
+});

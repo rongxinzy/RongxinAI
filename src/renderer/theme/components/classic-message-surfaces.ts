@@ -15,11 +15,19 @@ export function classicMessageSurfaces() {
     'reasoning-panel': recipe({
       base: {
         'font-size': 'var(--zy-component-text-sm)',
-        color: 'var(--muted-foreground)',
+        'line-height': '1.6',
+        color: 'var(--zy-text-muted)',
         'outline-style': 'none',
       },
     }),
-    'reasoning-panel-indented': recipe({ base: { 'padding-left': '1rem' } }),
+    'reasoning-panel-indented': recipe({
+      base: {
+        'padding-left': '1rem',
+        'border-left-width': '1px',
+        'border-style': 'solid',
+        'border-left-color': 'var(--zy-border)',
+      },
+    }),
     'reasoning-panel-open': recipe({
       base: motion,
       motionStart: { opacity: '0' },
@@ -92,6 +100,9 @@ export function classicMessageSurfaces() {
         'border-radius': 'var(--zy-style-radius-2xl)',
         'border-bottom-right-radius': 'var(--zy-style-radius-md)',
         'background-color': 'var(--secondary)',
+        'border-width': '1px',
+        'border-style': 'solid',
+        'border-color': 'var(--zy-border)',
         'font-size': 'var(--zy-component-text-sm)',
         color: 'var(--foreground)',
       },

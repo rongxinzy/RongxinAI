@@ -216,9 +216,9 @@ export const TurnView: React.FC<TurnViewProps> = React.memo(
         ) : null}
 
         {hasAssistantBody ? (
-          <div data-export-role="assistant-block" className="group/turn py-2">
+          <div data-export-role="assistant-block" className="group/turn pt-2 pb-4">
             <div className="mx-auto w-full max-w-4xl min-w-[320px]">
-              <div className="flex min-w-0 flex-col gap-3 py-2">
+              <div className="flex min-w-0 flex-col gap-2.5">
                 {primaryExpert ? (
                   <div className="flex items-center gap-2 theme-conversation-heading">
                     <ExpertAvatar
@@ -272,7 +272,7 @@ export const TurnView: React.FC<TurnViewProps> = React.memo(
                   </div>
                 ) : null}
 
-                {turn.copyText ? (
+                {!turn.isStreaming && turn.copyText ? (
                   <MessageActions align="start" visible={forceExpand}>
                     <CopyResponseButton content={turn.copyText} />
                   </MessageActions>

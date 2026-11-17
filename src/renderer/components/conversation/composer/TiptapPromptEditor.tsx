@@ -407,7 +407,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
                 <span
                   key={skill.id}
                   data-skill-token={skill.id}
-                  className="theme-conversation-skill-token inline-flex max-w-44 select-none items-center gap-1"
+                  className="theme-conversation-skill-chip inline-flex max-w-44 select-none items-center gap-1"
                 >
                   {skill.iconUrl ? (
                     <img
@@ -423,7 +423,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
                   <span className="truncate">{label}</span>
                   <Button
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-xs"
                     type="button"
                     aria-label={`${i18nService.t('clearSkill')} ${label}`}
                     title={i18nService.t('clearSkill')}

@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 import { i18nService } from '../../../renderer/services/i18n';
 import { ToolState } from './constants';
-import { Tool, ToolContent, ToolHeader, ToolOutput } from './tool';
+import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from './tool';
 
 vi.mock('./code-block', () => ({
   CodeBlock: ({ code }: { code: string }) => createElement('pre', null, code),
@@ -60,4 +60,29 @@ test('preserves multiline output and displays a tool error only once', () => {
   expect(screen.getByText('first second').textContent).toBe('first\nsecond');
   rerender(createElement(ToolOutput, { output: undefined, errorText: 'command refused' }));
   expect(screen.getAllByText('command refused')).toHaveLength(1);
+});
+
+test('formats short scalar inputs cleanly and keeps completed status quiet without explicit label', () => {
+  i18nService.setLanguage('zh', { persist: false });
+  const { container } = render(
+    createElement(
+      Tool,
+      { open: true, onOpenChange: () => {} },
+      createElement(ToolHeader, {
+        type: 'dynamic-tool',
+        toolName: 'grep',
+        state: ToolState.OutputAvailable,
+        summary: 'ToolPartView',
+      }),
+      createElement(
+        ToolContent,
+        null,
+        createElement(ToolInput, { input: { pattern: 'ToolPartView', path: 'src' } }),
+      ),
+    ),
+  );
+  expect(container.querySelector('.theme-conversation-tool-params')).not.toBeNull();
+  expect(screen.getByText('pattern')).toBeVisible();
+  expect(screen.getByText('src')).toBeVisible();
+  expect(screen.queryByText(i18nService.t('codingAgentToolCompleted'))).toBeNull();
 });

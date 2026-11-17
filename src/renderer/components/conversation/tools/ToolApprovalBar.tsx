@@ -78,7 +78,17 @@ export function ToolApprovalBar({ permission, onRespond }: ToolApprovalBarProps)
       aria-label={i18nService.t('codingAgentPermissionEvent')}
       className="theme-conversation-approval flex flex-wrap items-center justify-between gap-2"
     >
-      <span className="theme-conversation-meta">{i18nService.t('codingAgentPermissionEvent')}</span>
+      <div className="flex items-center gap-2">
+        <span className="theme-conversation-meta">
+          {i18nService.t('codingAgentPermissionEvent')}
+        </span>
+        <span className="hidden items-center gap-1 sm:inline-flex" aria-hidden="true">
+          <kbd className="theme-shell-kbd">Esc</kbd>
+          <kbd className="theme-shell-kbd">
+            {window.electron.platform === 'darwin' ? '⌘↵' : 'Ctrl↵'}
+          </kbd>
+        </span>
+      </div>
       <div className="flex items-center gap-2">
         <Button type="button" variant="ghost" size="sm" disabled={isPending} onClick={handleDeny}>
           {i18nService.t('coworkDeny')}
