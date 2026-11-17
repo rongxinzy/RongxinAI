@@ -20,6 +20,7 @@ import type {
 } from '../../../services/modelSettings/providerErrorClassifier';
 import type { ConsolidatedProviderPreset } from '../../../services/modelSettings/providerPresets';
 import { ProviderErrorBanner } from './ProviderErrorBanner';
+import { formatContextTokens } from './modelContextValue';
 
 export function WizardStepSelectPreset({
   searchQuery,
@@ -269,6 +270,7 @@ export function WizardStepConfigureConnection({
 export function WizardStepSelectModels({
   allModelCandidates,
   selectedModels,
+  discoveredModelContexts,
   customModelInput,
   setAsDefault,
   contextInput,
@@ -283,6 +285,7 @@ export function WizardStepSelectModels({
 }: {
   allModelCandidates: string[];
   selectedModels: string[];
+  discoveredModelContexts?: Record<string, number>;
   customModelInput: string;
   setAsDefault: boolean;
   contextInput: string;
@@ -339,18 +342,26 @@ export function WizardStepSelectModels({
       </div>
 
       <div className="max-h-56 divide-y divide-border overflow-y-auto rounded-lg border border-border">
-        {allModelCandidates.map(modelId => (
-          <label
-            key={modelId}
-            className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted/40"
-          >
-            <Checkbox
-              checked={selectedModels.includes(modelId)}
-              onCheckedChange={next => onToggleModel(modelId, Boolean(next))}
-            />
-            <span className="min-w-0 flex-1 truncate font-mono text-xs">{modelId}</span>
-          </label>
-        ))}
+        {allModelCandidates.map(modelId => {
+          const detectedContext = discoveredModelContexts?.[modelId];
+          return (
+            <label
+              key={modelId}
+              className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted/40"
+            >
+              <Checkbox
+                checked={selectedModels.includes(modelId)}
+                onCheckedChange={next => onToggleModel(modelId, Boolean(next))}
+              />
+              <span className="min-w-0 flex-1 truncate font-mono text-xs">{modelId}</span>
+              {detectedContext ? (
+                <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                  {formatContextTokens(detectedContext).toUpperCase()}
+                </span>
+              ) : null}
+            </label>
+          );
+        })}
       </div>
 
       <label className="flex cursor-pointer items-center gap-2.5 text-sm">

@@ -134,6 +134,20 @@ describe('StreamingMarkdownResponse local paths', () => {
 });
 
 describe('StreamingMarkdownResponse rendering stability', () => {
+  test('formats incomplete Markdown live during streaming and matches static final text', () => {
+    const { container, rerender } = render(
+      <StreamingMarkdownResponse content={'### 标题\n\n**加粗文本'} isStreaming />,
+    );
+    expect(container.querySelector('[data-streamdown="heading-3"]')).not.toBeNull();
+    expect(container.querySelector('[data-streamdown="strong"]')).not.toBeNull();
+    const streamed = container.textContent;
+
+    rerender(
+      <StreamingMarkdownResponse content={'### 标题\n\n**加粗文本**'} isStreaming={false} />,
+    );
+    expect(container.textContent).toBe(streamed);
+  });
+
   test('keeps reference-style text consistent between streaming and final rendering', () => {
     const padding = 'context paragraph\n\n'.repeat(600);
     const content = `[label][ref]\n\n${padding}[ref]: https://example.com\n\n${padding}`;
@@ -146,7 +160,7 @@ describe('StreamingMarkdownResponse rendering stability', () => {
     expect(container.textContent).toBe(streamed);
   });
 
-  test('coalesces large tail layout updates but applies rewrites immediately', () => {
+  test('coalesces large layout updates above 32KB but applies rewrites immediately', () => {
     vi.useFakeTimers();
     try {
       const initial = 'word 🚀 '.repeat(6_000);
@@ -154,16 +168,38 @@ describe('StreamingMarkdownResponse rendering stability', () => {
         <StreamingMarkdownResponse content={initial} isStreaming />,
         { wrapper: StrictMode },
       );
-      const tail = container.querySelector('.whitespace-pre-wrap');
       const appended = `${initial}next`;
       rerender(<StreamingMarkdownResponse content={appended} isStreaming />);
-      expect(tail?.textContent).toBe(initial);
+      expect(container.textContent).toBe(initial.trim());
       act(() => vi.advanceTimersByTime(48));
-      expect(tail?.textContent).toBe(appended);
+      expect(container.textContent).toBe(appended.trim());
 
       const rewritten = 'rewritten '.repeat(4_000);
       rerender(<StreamingMarkdownResponse content={rewritten} isStreaming />);
-      expect(tail?.textContent).toBe(rewritten);
+      expect(container.textContent).toBe(rewritten.trim());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('never flashes empty content when streaming crosses the 32KB threshold', () => {
+    vi.useFakeTimers();
+    try {
+      const belowThreshold = 'a'.repeat(30_000);
+      const { container, rerender } = render(
+        <StreamingMarkdownResponse content={belowThreshold} isStreaming />,
+      );
+      expect(container.textContent?.length).toBe(30_000);
+
+      const aboveThreshold = `${belowThreshold}${'b'.repeat(4_000)}`;
+      rerender(<StreamingMarkdownResponse content={aboveThreshold} isStreaming />);
+      expect(container.textContent?.length).toBe(34_000);
+
+      const further = `${aboveThreshold}tail`;
+      rerender(<StreamingMarkdownResponse content={further} isStreaming />);
+      expect(container.textContent?.length).toBe(34_000);
+      act(() => vi.advanceTimersByTime(48));
+      expect(container.textContent?.length).toBe(34_004);
     } finally {
       vi.useRealTimers();
     }

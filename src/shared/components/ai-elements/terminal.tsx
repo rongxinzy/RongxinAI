@@ -28,24 +28,21 @@ const TerminalContext = createContext<TerminalContextType>({
   output: '',
 });
 
-type TerminalHeaderProps = HTMLAttributes<HTMLDivElement>;
+export type TerminalHeaderProps = HTMLAttributes<HTMLDivElement>;
 
-const TerminalHeader = ({ className, children, ...props }: TerminalHeaderProps) => (
+export const TerminalHeader = ({ className, children, ...props }: TerminalHeaderProps) => (
   <div
-    className={cn(
-      'flex items-center justify-between border-zinc-800 border-b px-4 py-2',
-      className,
-    )}
+    className={cn('theme-terminal-header flex items-center justify-between', className)}
     {...props}
   >
     {children}
   </div>
 );
 
-type TerminalTitleProps = HTMLAttributes<HTMLDivElement>;
+export type TerminalTitleProps = HTMLAttributes<HTMLDivElement>;
 
-const TerminalTitle = ({ className, children, ...props }: TerminalTitleProps) => (
-  <div className={cn('flex items-center gap-2 text-sm text-zinc-400', className)} {...props}>
+export const TerminalTitle = ({ className, children, ...props }: TerminalTitleProps) => (
+  <div className={cn('theme-terminal-title flex items-center gap-2', className)} {...props}>
     <TerminalIcon className="size-4" />
     {children ?? 'Terminal'}
   </div>
@@ -61,7 +58,7 @@ const TerminalStatus = ({ className, children, ...props }: TerminalStatusProps) 
   }
 
   return (
-    <div className={cn('flex items-center gap-2 text-xs text-zinc-400', className)} {...props}>
+    <div className={cn('theme-conversation-meta flex items-center gap-2', className)} {...props}>
       {children}
     </div>
   );
@@ -153,9 +150,9 @@ const TerminalClearButton = ({ children, className, ...props }: TerminalClearBut
   );
 };
 
-type TerminalContentProps = HTMLAttributes<HTMLDivElement>;
+export type TerminalContentProps = HTMLAttributes<HTMLDivElement>;
 
-const TerminalContent = ({ className, children, ...props }: TerminalContentProps) => {
+export const TerminalContent = ({ className, children, ...props }: TerminalContentProps) => {
   const { output, isStreaming, autoScroll } = useContext(TerminalContext);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -167,16 +164,14 @@ const TerminalContent = ({ className, children, ...props }: TerminalContentProps
 
   return (
     <div
-      className={cn('max-h-96 overflow-auto p-4 font-mono text-sm leading-relaxed', className)}
+      className={cn('theme-terminal-content max-h-96 overflow-auto', className)}
       ref={containerRef}
       {...props}
     >
       {children ?? (
         <pre className="whitespace-pre-wrap wrap-break-word">
           <Ansi>{output}</Ansi>
-          {isStreaming && (
-            <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-zinc-100" />
-          )}
+          {isStreaming && <span className="theme-terminal-cursor ml-0.5 inline-block" />}
         </pre>
       )}
     </div>
@@ -207,10 +202,7 @@ export const Terminal = ({
   return (
     <TerminalContext.Provider value={contextValue}>
       <div
-        className={cn(
-          'flex flex-col overflow-hidden rounded-lg border bg-zinc-950 text-zinc-100',
-          className,
-        )}
+        className={cn('theme-terminal-root flex flex-col overflow-hidden', className)}
         {...props}
       >
         {children ?? (

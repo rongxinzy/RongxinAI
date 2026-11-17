@@ -1,5 +1,28 @@
 import { CoworkArtifactRole, type CoworkArtifactType } from './artifacts';
 
+/** File types that represent user-facing deliverables (documents, web pages,
+ * visuals, 3D models) rather than helper source files, plain logs, or
+ * unsupported binary inputs. */
+const DELIVERABLE_ARTIFACT_TYPES: ReadonlySet<CoworkArtifactType> = new Set([
+  'html',
+  'svg',
+  'mermaid',
+  'image',
+  'markdown',
+  'document',
+  'model',
+]);
+
+export function getRecordedArtifactClassification(
+  type: CoworkArtifactType,
+  isInternalState: boolean,
+): { role: CoworkArtifactRole; declared: boolean } {
+  if (!isInternalState && DELIVERABLE_ARTIFACT_TYPES.has(type)) {
+    return { role: CoworkArtifactRole.Deliverable, declared: true };
+  }
+  return { role: CoworkArtifactRole.Intermediate, declared: false };
+}
+
 export const ArtifactTypeByLanguage: Readonly<Record<string, CoworkArtifactType>> = {
   html: 'html',
   svg: 'svg',

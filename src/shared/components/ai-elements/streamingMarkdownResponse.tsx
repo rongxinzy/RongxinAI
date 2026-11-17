@@ -1,22 +1,17 @@
 /**
- * Cowork streaming — render entry (single downstream throttle for Markdown cost).
+ * Cowork streaming — render entry (native Streamdown 2.7 block memoization + remend).
  *
- * Flow: Pi delta → translator → coalescer → IPC → LiveTextStore → **this file** (Streamdown stable blocks + plain tail).
- * While streaming: parse only closed prefix; growing tail is plain text (no per-token Shiki/Markdown).
+ * Flow: Pi delta → translator → coalescer → IPC → LiveTextStore → Streamdown (mode="streaming").
+ * Streamdown 2.7 splits blocks natively, memoizes completed blocks, repairs incomplete
+ * syntax via remend, and defers Shiki tokenization while code fences are open.
  *
- * Invariants: one render-side throttle; finalized messages use full StaticMarkdownBlock.
- * History: per-token full Markdown parse caused renderer jank; full-snapshot IPC (#1115) caused O(N²) main→renderer bytes.
- *
- * **禁止**流式期间对每个 token 全量 Markdown 重解析；**禁止**依赖 IPC 全文快照驱动本组件更新。
  * Architecture: docs/architecture/streaming.md
  */
 import { MessageResponse } from '@shared/components/ai-elements/message';
-import { useStreamingTextSegments } from '@shared/components/ai-elements/streamingText';
-
-import type { StreamingTextSegments } from '@shared/components/ai-elements/streamingText';
 import type { ComponentProps, MouseEvent, ReactNode } from 'react';
 import { memo, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { StreamdownContext } from 'streamdown';
+import { localImageRehypePlugins, MarkdownLocalImage } from './markdownLocalImages';
 
 import {
   isLocalPathCandidate,
@@ -158,42 +153,65 @@ const LocalAwareAnchor = ({
   );
 };
 
-const StaticMarkdownBlock = memo(function StaticMarkdownBlock({
+const MarkdownContentBlock = memo(function MarkdownContentBlock({
   content,
   cwd,
-  enabled,
+  isStreaming,
 }: {
   content: string;
   cwd: string | undefined;
-  enabled: boolean;
+  isStreaming: boolean;
 }) {
+  const localPathEnabled = !isStreaming;
   const components = useMemo(
     () => ({
-      a: (props: AnchorProps) => <LocalAwareAnchor {...props} cwd={cwd} enabled={enabled} />,
+      a: (props: AnchorProps) => (
+        <LocalAwareAnchor {...props} cwd={cwd} enabled={localPathEnabled} />
+      ),
       inlineCode: (props: InlineCodeProps) => (
-        <LocalAwareInlineCode {...props} cwd={cwd} enabled={enabled} />
+        <LocalAwareInlineCode {...props} cwd={cwd} enabled={localPathEnabled} />
+      ),
+      img: (props: ComponentProps<'img'> & { node?: unknown }) => (
+        <MarkdownLocalImage {...props} cwd={cwd} enabled={localPathEnabled} />
       ),
     }),
-    [cwd, enabled],
+    [cwd, localPathEnabled],
   );
-  return <MessageResponse components={components}>{content}</MessageResponse>;
+  return (
+    <MessageResponse
+      mode="streaming"
+      parseIncompleteMarkdown={isStreaming}
+      isAnimating={isStreaming}
+      components={components}
+      rehypePlugins={localImageRehypePlugins}
+    >
+      {content}
+    </MessageResponse>
+  );
 });
 
-const LARGE_STREAMING_TAIL_CHARACTERS = 32_768;
-const LARGE_STREAMING_TAIL_UPDATE_MS = 48;
+const LARGE_STREAMING_CHARACTERS = 32_768;
+const LARGE_STREAMING_UPDATE_MS = 48;
 
-const useStreamingTailContent = (content: string, sourceContent: string): string => {
+const useThrottledStreamingContent = (content: string, isStreaming: boolean): string => {
   const [visibleContent, setVisibleContent] = useState(content);
-  const previousContentRef = useRef({ tail: content, source: sourceContent });
+  const previousContentRef = useRef(content);
   const lastUpdateAtRef = useRef(0);
+  const wasThrottledRef = useRef(false);
   const previous = previousContentRef.current;
-  const isRewrite =
-    !sourceContent.startsWith(previous.source) || !content.startsWith(previous.tail);
+  const isRewrite = !content.startsWith(previous);
+  const shouldThrottle = isStreaming && !isRewrite && content.length >= LARGE_STREAMING_CHARACTERS;
 
   useEffect(() => {
-    previousContentRef.current = { tail: content, source: sourceContent };
-    if (isRewrite || content.length < LARGE_STREAMING_TAIL_CHARACTERS) {
+    previousContentRef.current = content;
+    if (!shouldThrottle) {
+      wasThrottledRef.current = false;
       lastUpdateAtRef.current = 0;
+      return;
+    }
+    if (!wasThrottledRef.current) {
+      wasThrottledRef.current = true;
+      lastUpdateAtRef.current = performance.now();
       setVisibleContent(content);
       return;
     }
@@ -203,26 +221,16 @@ const useStreamingTailContent = (content: string, sourceContent: string): string
         lastUpdateAtRef.current = performance.now();
         setVisibleContent(content);
       },
-      Math.max(0, LARGE_STREAMING_TAIL_UPDATE_MS - elapsed),
+      Math.max(0, LARGE_STREAMING_UPDATE_MS - elapsed),
     );
     return () => window.clearTimeout(timer);
-  }, [content, sourceContent, isRewrite]);
+  }, [content, shouldThrottle]);
 
-  return isRewrite || content.length < LARGE_STREAMING_TAIL_CHARACTERS ? content : visibleContent;
-};
-
-/** 流式尾段：纯文本，不做 Markdown/Shiki 重解析。 */
-const StreamingPlainTail = ({
-  content,
-  sourceContent,
-}: {
-  content: string;
-  sourceContent: string;
-}) => {
-  const visibleContent = useStreamingTailContent(content, sourceContent);
-  return (
-    <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{visibleContent}</div>
-  );
+  return shouldThrottle &&
+    visibleContent.length >= LARGE_STREAMING_CHARACTERS &&
+    content.startsWith(visibleContent)
+    ? visibleContent
+    : content;
 };
 
 export const StreamingMarkdownResponse = ({
@@ -234,26 +242,8 @@ export const StreamingMarkdownResponse = ({
   isStreaming: boolean;
   cwd?: string;
 }) => {
-  const { committed, tail }: StreamingTextSegments = useStreamingTextSegments(content, isStreaming);
+  const renderedContent = useThrottledStreamingContent(content, isStreaming);
+  if (!renderedContent) return null;
 
-  // 流结束后整段走完整 Markdown（含代码高亮 / 本地路径解析）。
-  if (!isStreaming) {
-    return <StaticMarkdownBlock content={content} cwd={cwd} enabled />;
-  }
-
-  // 流式中：只对已闭合的稳定块跑 Streamdown；正在增长的 tail 用纯文本。
-  // 否则每个 token + 逐字 reveal 都会重解析 Markdown，16G 机器上易把渲染进程拖到「未响应」。
-  if (!committed && !tail) {
-    return null;
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      {committed ? (
-        // 流式中的已提交块不发本地路径 IPC，流结束后统一解析。
-        <StaticMarkdownBlock content={committed} cwd={cwd} enabled={false} />
-      ) : null}
-      {tail ? <StreamingPlainTail content={tail} sourceContent={content} /> : null}
-    </div>
-  );
+  return <MarkdownContentBlock content={renderedContent} cwd={cwd} isStreaming={isStreaming} />;
 };

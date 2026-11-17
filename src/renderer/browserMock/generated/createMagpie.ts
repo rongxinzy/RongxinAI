@@ -130,6 +130,7 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
       return {
         ok: true,
         discoveredModels: [],
+        discoveredModelContexts: {},
       };
     },
     diagnostics: async () => {

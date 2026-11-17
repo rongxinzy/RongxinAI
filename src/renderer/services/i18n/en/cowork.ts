@@ -1,5 +1,6 @@
 // Cowork sessions
 export const enCowork: Record<string, string> = {
+  coworkConversationTurns: 'Conversation turns',
   coworkQueueTitle: 'Pending messages',
   coworkQueueCount: '{count} pending',
   coworkQueueEmpty: 'Queue is empty',
@@ -187,6 +188,9 @@ export const enCowork: Record<string, string> = {
   coworkToolResultCollapse: 'Show less',
   coworkToolRunning: 'Running...',
   coworkToolNoErrorDetail: 'Failed (no error details)',
+  coworkStepsExploring: 'Exploring',
+  coworkStepsExploredCount: 'Explored {count} steps',
+  coworkTurnJumpLabel: 'Jump to turn',
   coworkTodosTitle: 'Todo List',
   coworkTodoItems: 'items',
   coworkTodoCompleted: 'completed',

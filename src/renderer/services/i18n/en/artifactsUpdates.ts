@@ -21,6 +21,7 @@ export const enArtifactsUpdates: Record<string, string> = {
   artifactResizePreview: 'Resize preview',
   artifactNoPreview: 'No preview available',
   artifactImageAlt: 'Image',
+  artifactImageRetry: 'Retry',
   artifactFiles: 'Files',
   artifactFileList: 'File List',
   artifactEmptyFiles: 'No files in this session',

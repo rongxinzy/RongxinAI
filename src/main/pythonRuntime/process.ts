@@ -9,6 +9,28 @@ export type ProcessResult = {
 };
 const MAX_OUTPUT = 1024 * 1024;
 
+/** Fails closed on Windows when `job-runner.exe` is missing or inaccessible. */
+export async function assertWindowsJobRunnerAvailable(
+  jobRunnerPath: string | undefined,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  if (platform !== 'win32') return;
+  if (!jobRunnerPath) {
+    throw new Error('The Windows Python Job Object helper is missing.');
+  }
+  try {
+    await access(jobRunnerPath);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      throw new Error(
+        `The Windows Python Job Object helper is missing (${jobRunnerPath}). Run "bun run python:build:job-runner" in development or reinstall the application.`,
+      );
+    }
+    throw error;
+  }
+}
+
 /** No shell. Windows cannot execute without the real Job Object owner. */
 export async function runProcess(
   command: string,
@@ -21,10 +43,7 @@ export async function runProcess(
   },
 ): Promise<ProcessResult> {
   options.signal.throwIfAborted();
-  if (process.platform === 'win32') {
-    if (!options.jobRunnerPath) throw new Error('The Windows Python Job Object helper is missing.');
-    await access(options.jobRunnerPath);
-  }
+  await assertWindowsJobRunnerAvailable(options.jobRunnerPath);
   return new Promise((resolve, reject) => {
     const supervisorPath =
       process.platform !== 'win32' ? process.env.ZHIYUAN_PYTHON_RUNNER_ENTRY : undefined;

@@ -52,6 +52,8 @@ export class LiveTextStore {
   private readonly entries = new Map<string, LiveTextEntry>();
   private readonly resyncingSessions = new Set<string>();
   private readonly listeners = new Set<Listener>();
+  private readonly messageListeners = new Map<string, Set<Listener>>();
+  private readonly dirtyMessageIds = new Set<string>();
   private notifyScheduled = false;
 
   constructor(private readonly notifyScheduler: NotifyScheduler = defaultNotifyScheduler) {}
@@ -59,6 +61,22 @@ export class LiveTextStore {
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /** Subscribes to updates for a single messageId; other streaming messages will not wake this listener. */
+  subscribeMessage(messageId: string, listener: Listener): () => void {
+    let bucket = this.messageListeners.get(messageId);
+    if (!bucket) {
+      bucket = new Set<Listener>();
+      this.messageListeners.set(messageId, bucket);
+    }
+    bucket.add(listener);
+    return () => {
+      const current = this.messageListeners.get(messageId);
+      if (!current) return;
+      current.delete(listener);
+      if (current.size === 0) this.messageListeners.delete(messageId);
+    };
   }
 
   getSnapshot(messageId: string): string | undefined {
@@ -77,38 +95,38 @@ export class LiveTextStore {
     entry.parts.clear();
     entry.awaitingBase = false;
     this.rebuildText(entry);
-    this.scheduleNotify();
+    this.scheduleNotify(messageId);
   }
 
   clear(messageId: string): void {
-    if (this.entries.delete(messageId)) this.scheduleNotify();
+    if (this.entries.delete(messageId)) this.scheduleNotify(messageId);
   }
 
   resetSession(sessionId: string): void {
     this.resyncingSessions.add(sessionId);
-    let touched = false;
-    for (const entry of this.entries.values()) {
+    const touchedIds: string[] = [];
+    for (const [messageId, entry] of this.entries) {
       if (entry.sessionId !== sessionId) continue;
       entry.base = '';
       entry.parts.clear();
       entry.text = '';
       entry.awaitingBase = true;
-      touched = true;
+      touchedIds.push(messageId);
     }
-    if (touched) this.scheduleNotify();
+    if (touchedIds.length > 0) this.scheduleNotify(...touchedIds);
   }
 
   endSessionResync(sessionId: string): void {
     this.resyncingSessions.delete(sessionId);
-    let touched = false;
+    const touchedIds: string[] = [];
     for (const [messageId, entry] of this.entries) {
       if (entry.sessionId !== sessionId || !entry.awaitingBase) continue;
       // No base snapshot arrived: the message is no longer streaming, so its
       // display falls back to the committed Redux content.
       this.entries.delete(messageId);
-      touched = true;
+      touchedIds.push(messageId);
     }
-    if (touched) this.scheduleNotify();
+    if (touchedIds.length > 0) this.scheduleNotify(...touchedIds);
   }
 
   applyChunk(messageId: string, chunk: UIMessageChunk, sessionId?: string): void {
@@ -133,7 +151,7 @@ export class LiveTextStore {
         break;
       case 'text-delta':
       case 'reasoning-delta':
-        this.appendDelta(entry, chunk.id, chunk.delta);
+        this.appendDelta(messageId, entry, chunk.id, chunk.delta);
         break;
       case 'text-end':
       case 'reasoning-end':
@@ -143,7 +161,12 @@ export class LiveTextStore {
     }
   }
 
-  private appendDelta(entry: LiveTextEntry, partId: string, delta: string): void {
+  private appendDelta(
+    messageId: string,
+    entry: LiveTextEntry,
+    partId: string,
+    delta: string,
+  ): void {
     // The main process already truncates at the cap; this is a belt-and-braces
     // renderer bound — text is clipped to the cap and later deltas dropped.
     if (delta.length === 0 || entry.text.length >= CoworkRunPolicy.MaximumContentCharacters) return;
@@ -161,7 +184,7 @@ export class LiveTextStore {
       // A delta landed on an interleaved part; rebuild in insertion order.
       this.rebuildText(entry);
     }
-    this.scheduleNotify();
+    this.scheduleNotify(messageId);
   }
 
   private rebuildText(entry: LiveTextEntry): void {
@@ -192,26 +215,37 @@ export class LiveTextStore {
       awaitingBase: sessionId !== undefined && this.resyncingSessions.has(sessionId),
     };
     this.entries.set(messageId, entry);
-    if (this.evictOverflow()) this.scheduleNotify();
+    const evictedIds = this.evictOverflow();
+    if (evictedIds.length > 0) this.scheduleNotify(...evictedIds);
     return entry;
   }
 
-  private evictOverflow(): boolean {
-    let evicted = false;
+  private evictOverflow(): string[] {
+    const evicted: string[] = [];
     while (this.entries.size > MAX_ENTRIES) {
       const oldest = this.entries.keys().next().value;
       if (oldest === undefined) break;
       this.entries.delete(oldest);
-      evicted = true;
+      evicted.push(oldest);
     }
     return evicted;
   }
 
-  private scheduleNotify(): void {
+  private scheduleNotify(...messageIds: string[]): void {
+    for (const messageId of messageIds) {
+      this.dirtyMessageIds.add(messageId);
+    }
     if (this.notifyScheduled) return;
     this.notifyScheduled = true;
     this.notifyScheduler.schedule(() => {
       this.notifyScheduled = false;
+      const dirty = Array.from(this.dirtyMessageIds);
+      this.dirtyMessageIds.clear();
+      for (const messageId of dirty) {
+        const bucket = this.messageListeners.get(messageId);
+        if (!bucket) continue;
+        for (const listener of bucket) listener();
+      }
       for (const listener of this.listeners) listener();
     });
   }

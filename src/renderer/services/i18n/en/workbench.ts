@@ -222,6 +222,7 @@ export const enWorkbench: Record<string, string> = {
   workbenchTaskLoadFailed: 'Failed to load the task trace',
   workbenchTaskActionFailed: 'Task action failed',
   workbenchTaskStatusRunning: 'Running',
+  workbenchTaskStatusWaitingApproval: 'Waiting for approval',
   workbenchTaskStatusFailed: 'Failed',
   workbenchTaskStatusCancelled: 'Cancelled',
   workbenchTaskStatusSettled: 'Execution ended',

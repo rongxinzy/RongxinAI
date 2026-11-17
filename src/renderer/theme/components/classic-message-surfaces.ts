@@ -8,8 +8,8 @@ export function classicMessageSurfaces() {
   };
   const motion = {
     'animation-name': 'component-motion',
-    'animation-duration': '150ms',
-    'animation-timing-function': 'ease',
+    'animation-duration': '160ms',
+    'animation-timing-function': 'cubic-bezier(0.2, 0, 0, 1)',
   };
   return {
     'reasoning-panel': recipe({
@@ -22,13 +22,13 @@ export function classicMessageSurfaces() {
     'reasoning-panel-indented': recipe({ base: { 'padding-left': '1rem' } }),
     'reasoning-panel-open': recipe({
       base: motion,
-      motionStart: { opacity: '0', translate: '0 -0.5rem' },
-      motionEnd: { opacity: '1', translate: '0 0' },
+      motionStart: { opacity: '0' },
+      motionEnd: { opacity: '1' },
     }),
     'reasoning-panel-closed': recipe({
       base: motion,
-      motionStart: { opacity: '1', translate: '0 0' },
-      motionEnd: { opacity: '0', translate: '0 -0.5rem' },
+      motionStart: { opacity: '1' },
+      motionEnd: { opacity: '0' },
     }),
     'message-body': recipe({ base: { 'font-size': 'var(--zy-component-text-sm)' } }),
     'message-role-user': recipe({

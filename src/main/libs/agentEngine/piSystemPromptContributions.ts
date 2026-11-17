@@ -11,7 +11,7 @@
  */
 import { SessionSummarySystemPrompt } from '../../sessionSummary/tool';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
-import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
+import { getPiPythonEnvSystemPrompt, PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
 
 export interface PiSystemPromptContext {
   /** Whether the session is a direct Chat lane without Work orchestration. */
@@ -50,7 +50,8 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     id: 'python-runtime',
     requiresHostTools: true,
     requiresFileTools: true,
-    prompt: PiPythonEnvSystemPrompt,
+    prompt: context =>
+      context.platform ? getPiPythonEnvSystemPrompt(context.platform) : PiPythonEnvSystemPrompt,
   },
   {
     id: 'session-summary',

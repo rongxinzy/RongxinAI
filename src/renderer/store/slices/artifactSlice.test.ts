@@ -646,4 +646,26 @@ describe('artifact reducer', () => {
     expect(state.isPanelOpen).toBe(true);
     expect(state.selectedArtifactId).toBe('fresh');
   });
+
+  test('togglePanel previews the sole intermediate artifact when no deliverables exist', () => {
+    let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({
+          id: 'script-1',
+          type: 'code',
+          title: 'analyze.py',
+          fileName: 'analyze.py',
+          filePath: 'D:/workspace/analyze.py',
+          role: ArtifactRole.Intermediate,
+        }),
+      }),
+    );
+
+    state = artifactReducer(state, togglePanel());
+    expect(state.isPanelOpen).toBe(true);
+    expect(state.selectedArtifactId).toBe('script-1');
+  });
 });

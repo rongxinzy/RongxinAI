@@ -11,8 +11,8 @@ import type { DynamicToolUIPart, ToolUIPart } from 'ai';
 import {
   CheckCircleIcon,
   ChevronDownIcon,
-  CircleIcon,
   ClockIcon,
+  Loader2Icon,
   WrenchIcon,
   XCircleIcon,
 } from 'lucide-react';
@@ -63,8 +63,8 @@ const statusLabelKeys: Record<ToolPart['state'], string> = {
 const statusIcons: Record<ToolPart['state'], ReactNode> = {
   [ToolState.ApprovalRequested]: <ClockIcon />,
   [ToolState.ApprovalResponded]: <CheckCircleIcon />,
-  [ToolState.InputAvailable]: <ClockIcon />,
-  [ToolState.InputStreaming]: <CircleIcon />,
+  [ToolState.InputAvailable]: <Loader2Icon className="animate-spin motion-reduce:animate-none" />,
+  [ToolState.InputStreaming]: <Loader2Icon className="animate-spin motion-reduce:animate-none" />,
   [ToolState.OutputAvailable]: <CheckCircleIcon />,
   [ToolState.OutputDenied]: <XCircleIcon />,
   [ToolState.OutputError]: <XCircleIcon />,

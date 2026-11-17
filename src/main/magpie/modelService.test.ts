@@ -193,4 +193,64 @@ describe('fallback chains and observability', () => {
     service.recordError('429 Rate limited', 'custom-openai');
     expect(recordError).toHaveBeenCalledWith('429 Rate limited', 'custom-openai');
   });
+
+  it('drops unconfigured 1M catalog guesses on private/LAN endpoints while preserving explicit contexts', async () => {
+    const status: MagpieStatus = {
+      state: 'running',
+      version: 'test',
+      gatewayUrl: 'http://127.0.0.1:1234',
+    };
+    const backend = {
+      status: () => status,
+      models: vi.fn(async () => [
+        { id: 'lan-selfhost/qwen3-coder', context_window: 1_000_000 },
+        { id: 'lan-configured/qwen3-coder', context_window: 1_000_000 },
+        { id: 'cloud-official/qwen3-coder', context_window: 1_000_000 },
+      ]),
+      providers: vi.fn(async () => [
+        {
+          id: 'lan-selfhost',
+          name: 'LAN Model',
+          api: 'openai-completions' as const,
+          baseUrl: 'http://172.18.5.188:3000/v1',
+          models: ['qwen3-coder'],
+          off: false,
+          hasKey: true,
+        },
+        {
+          id: 'lan-configured',
+          name: 'Configured LAN Model',
+          api: 'openai-completions' as const,
+          baseUrl: 'http://192.168.1.10:8000/v1',
+          models: ['qwen3-coder'],
+          contexts: { 'qwen3-coder': 1_000_000 },
+          off: false,
+          hasKey: true,
+        },
+        {
+          id: 'cloud-official',
+          name: 'Cloud',
+          api: 'openai-completions' as const,
+          baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          models: ['qwen3-coder'],
+          off: false,
+          hasKey: true,
+        },
+      ]),
+    };
+    const service = new MagpieModelService(backend, {
+      readDefaultModelId: () => 'lan-selfhost/qwen3-coder',
+      writeDefaultModelId: () => {},
+    });
+    const catalog = await service.catalog();
+    expect(
+      catalog.models.find(m => m.id === 'lan-selfhost/qwen3-coder')?.context_window,
+    ).toBeUndefined();
+    expect(catalog.models.find(m => m.id === 'lan-configured/qwen3-coder')?.context_window).toBe(
+      1_000_000,
+    );
+    expect(catalog.models.find(m => m.id === 'cloud-official/qwen3-coder')?.context_window).toBe(
+      1_000_000,
+    );
+  });
 });

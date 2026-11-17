@@ -3,6 +3,7 @@
 
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { ensureWindowsJobRunner } = require('./python-runtime/ensure-job-runner.cjs');
 
 const root = path.resolve(__dirname, '..');
 const enterprise = process.argv.includes('--enterprise');
@@ -21,6 +22,8 @@ function run(command, args) {
     throw new Error(`${command} failed: ${result.error?.message || result.status}`);
   }
 }
+
+ensureWindowsJobRunner({ projectRoot: root });
 
 for (const task of [
   'channel:runtime:win-x64',

@@ -60,7 +60,7 @@ import { getBranding } from '../../shared/branding';
 import { DB_FILENAME } from '../appConstants';
 import { startSqliteDiagnostics } from '../sqliteDiagnostics';
 import { SqliteBackupManager } from '../libs/sqliteBackup/sqliteBackupManager';
-import { isAllowedLocalfilePath } from '../localfilePathValidation';
+import { isAllowedLocalfilePath, resolveLocalfileRequestPath } from '../localfilePathValidation';
 import { ActivityService } from '../activity/activityService';
 import { ActivitySource, ActivityStatus } from '../../shared/activity/constants';
 import { registerWorkbenchTaskIpcHandlers } from '../workbenchTask/ipc';
@@ -162,16 +162,14 @@ export const initApp = async (): Promise<void> => {
     // 注册 localfile:// 自定义协议，用于安全加载本地图片
     protocol.handle('localfile', request => {
       try {
-        const url = new URL(request.url);
-        let targetPath = decodeURIComponent(url.pathname);
-        if (process.platform === 'win32' && /^\/[a-zA-Z]:/.test(targetPath)) {
-          targetPath = targetPath.slice(1);
-        }
-        const resolvedPath = path.resolve(targetPath);
+        const resolvedPath = resolveLocalfileRequestPath(request.url);
         const allowedImageRoot = getCoworkImageRoot();
 
         if (!isAllowedLocalfilePath(resolvedPath, allowedImageRoot)) {
-          console.warn('[LocalfileProtocol] Blocked unauthorized file access attempt:', targetPath);
+          console.warn(
+            '[LocalfileProtocol] Blocked unauthorized file access attempt:',
+            resolvedPath,
+          );
           return new Response('Forbidden', { status: 403 });
         }
 

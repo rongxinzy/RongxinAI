@@ -324,11 +324,13 @@ const artifactSlice = createSlice({
       state.panelSuppressed = false;
       // 2026/09/17 lixiang  打开面板且仅有一个交付物时，直接进入该文件预览
       if (!state.activeSessionId) return;
-      const deliverables = (state.artifactsBySession[state.activeSessionId] ?? []).filter(
+      const sessionArtifacts = state.artifactsBySession[state.activeSessionId] ?? [];
+      const deliverables = sessionArtifacts.filter(
         artifact => artifact.role === ArtifactRole.Deliverable,
       );
-      if (deliverables.length === 1) {
-        state.selectedArtifactId = deliverables[deliverables.length - 1].id;
+      const candidates = deliverables.length > 0 ? deliverables : sessionArtifacts;
+      if (candidates.length === 1) {
+        state.selectedArtifactId = candidates[0].id;
         state.panelView = ArtifactPanelView.Preview;
         state.activeTab = 'preview';
       }

@@ -32,8 +32,10 @@ describe('parseCodeBlockArtifacts', () => {
       'session',
     );
     expect(code.role).toBe(ArtifactRole.Intermediate);
+    expect(code.declared).toBe(false);
     expect(code.source).toBe('codeblock');
     expect(explicit.role).toBe(ArtifactRole.Deliverable);
+    expect(explicit.declared).toBe(true);
     expect(explicit.title).toBe('Slides');
     expect(explicit.content).toBe('<h1>hi</h1>');
   });

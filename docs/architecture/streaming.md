@@ -28,8 +28,15 @@ coworkStreamPipeline.ts  PiUiEventSequenceTracker → LiveTextStore (chunks appl
 LiveTextStore            base + ordered parts, held outside Redux
         │
         ▼
-AssistantBubble / ThinkingItem (useLiveMessageText) → StreamingMarkdownResponse
-                         stable committed blocks + plain tail (the only renderer throttle)
+SessionStage             lazy-loaded boundary (isolates Streamdown / Shiki / KaTeX / Mermaid from cold home startup)
+                         projectSessionToTurns → ordered ConversationTurn / TurnPart projection
+        │
+        ▼
+ConversationThread       @tanstack/react-virtual (anchorTo: 'end', followOnAppend: true) +
+                         TurnView → AssistantTextPartView / ThinkingPartView
+                         per-message LiveTextStore subscription (useLiveMessageText) →
+                         StreamingMarkdownResponse / Reasoning (Streamdown 2.7 block memoization + remend;
+                         48 ms trailing throttle when ≥ 32,768 chars)
         │
         ▼
 Redux / SQLite           final MessageUpdate / markFinalAnswer — once per message, not per token
@@ -71,14 +78,19 @@ Wired from `coworkService.setupStreamListeners`: `PiUiEventSequenceTracker` → 
 ### Live text & render
 
 - `LiveTextStore` keeps per message a `base` (last authoritative snapshot) plus `parts` in insertion order; cached text is capped at 2M, entries are capped (256), and `awaitingBase` drops increments until a resync base lands. Streaming text never lives in Redux.
-- `AssistantBubble` and `TurnBlock`'s `ThinkingItem` subscribe via `useLiveMessageText`; a streaming answer with an empty body still renders (fully blank → `AssistantBubble` returns `null`).
-- `StreamingMarkdownResponse` is the **only** renderer throttle: the segmenter scans only appended input and commits stable Markdown prefixes in 8192-character batches to one Streamdown context; the growing tail stays plain text, with 48 ms trailing DOM updates once it exceeds 32768 characters (short text and rewrites remain immediate). The full response is re-parsed once on finalize.
+- **Cold-start isolation & Turn/Part projection:** `ConversationStage` renders the lightweight Home + composer shell and lazy-loads `SessionStage` (`src/renderer/components/conversation/SessionStage.tsx`), keeping Streamdown, Shiki, KaTeX, Mermaid, and `@pierre/diffs` out of the cold startup bundle. `SessionStage` projects flat messages and live tool activities into ordered `ConversationTurn` / `TurnPart` structures via pure `projectSessionToTurns` (`src/renderer/components/conversation/model/projectTurns.ts`).
+- **Scroll anchoring & part-level isolation:** `ConversationThread` (`src/renderer/components/conversation/thread/ConversationThread.tsx`) delegates virtual mounting, prepend anchoring, follow-on-append, and bottom tracking exclusively to `@tanstack/react-virtual` Chat mode (`anchorTo: 'end'`, `followOnAppend: true`, `scrollEndThreshold: 80`, `scrollToEnd()`, `scrollToIndex()`, `isAtEnd()`), while `isExporting` switches to a static full-DOM path for stitched screenshots (paired with `TurnNavigator` for multi-turn jump links). Each `TurnView` renders ordered parts (`ThinkingPartView`, `AssistantTextPartView`, `ToolPartView` / `ToolGroupView`, approval cards, deliverable preview cards) plus a bottom activity indicator while streaming/running tools.
+- `HistoryScrollAnchor` takes a pre-mutation React snapshot only when older history is prepended while the reader has escaped the tail. It compensates through the existing stick-to-bottom owner's setter; ordinary streaming and tail following remain owned by that library.
+- Home, cold loading and active sessions share one `StageComposer` portal and editor instance. Slot moves retain focus/selection; draft identity changes flush pending input before the debounce is cancelled.
+- Final local Markdown images normalize image AST URLs before the unchanged sanitizer, decode URI paths once for main-process resolution, then use the controlled `localfile:` protocol. No local-path IPC is added to live token streaming; external image URLs and link safety stay intact. File-backed image artifacts use the same protocol without buffering image base64 in Redux.
+- `AssistantTextPartView` and `ThinkingPartView` wrap `React.memo` and subscribe strictly to their own `part.message.id` via `useLiveMessageText`; an assistant text segment with empty content returns `null` until non-whitespace text arrives.
+- `StreamingMarkdownResponse` (`src/shared/components/ai-elements/streamingMarkdownResponse.tsx`) and `Reasoning` (`src/shared/components/ai-elements/reasoning.tsx`) use **Streamdown 2.7** natively (`mode="streaming"`, `parseIncompleteMarkdown={isStreaming}`, `isAnimating={isStreaming}`) with native block-level memoization, `remend` syntax repair, deferred Shiki highlighting for open fences, and lazy on-demand loading of `RichMessageResponse` (`src/shared/components/ai-elements/message.tsx`). Above `LARGE_STREAMING_CHARACTERS` (32,768 chars), `useThrottledStreamingContent` applies a `48 ms` trailing update throttle (short text and rewrites stay immediate).
 
 ## Invariants
 
 1. **Increments on the wire:** routine streaming uses `StreamPart` events with `text-delta` / `reasoning-delta`; per-event payload size must not grow with total message length (G1/G3).
 2. **Merge once upstream:** only `UiMessageChunkCoalescer` may batch deltas before IPC.
-3. **Throttle once downstream:** only the LiveTextStore rAF notification + `StreamingMarkdownResponse` reduce render frequency. The throttled in-process `messageUpdate` bus and the SQLite growth checkpoints are not on the UI IPC path and do not count as UI throttles.
+3. **Throttle once downstream:** only `LiveTextStore` rAF notification + `StreamingMarkdownResponse` (`useThrottledStreamingContent` ≥ 32,768 chars at `48 ms`) + Streamdown native block memoization reduce render frequency. The throttled in-process `messageUpdate` bus and the SQLite growth checkpoints are not on the UI IPC path and do not count as UI throttles.
 4. **Snapshots are exceptional:** full text on IPC only for non-prefix rewrites, 2M truncation, gap/attach resync, and terminal state — never for ordinary token streaming. Streaming snapshots (`isStreaming: true`) are LiveTextStore bases, not Redux commits.
 5. **Terminal text exactly once:** the final body reaches the renderer once per message; duplicates degrade to metadata-only updates.
 
@@ -103,7 +115,7 @@ Wired from `coworkService.setupStreamListeners`: `PiUiEventSequenceTracker` → 
 - **禁止**在 `UiMessageChunkCoalescer` 之外增加第二层发送端节流/合并。
 - **禁止**通过 IPC 把全文快照当作常规流式更新（非终态 `MessageUpdate` / 逐 token 大段 `ContentPatch`）。
 - **禁止**把 runtime 非终态 `messageUpdate` 转发到 UI IPC（forwarder 必须丢弃）。
-- **禁止**在渲染端对每个 token 全量重跑 Markdown/Shiki（稳定块 + plain tail 是唯一节流）。
+- **禁止**在渲染端绕过 Streamdown 块级 memo 对每个 token 全量重跑 Markdown/Shiki，或把冷启动主包与流式富文本（Shiki/KaTeX/Mermaid）强绑定。
 - **禁止**放宽 G1–G4 / C1–C10 断言来掩盖回归；修链路，不修测试。
 
 ## Porting notes

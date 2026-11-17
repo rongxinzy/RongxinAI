@@ -79,6 +79,7 @@ export function parseCodeBlockArtifacts(
       language: getInlineArtifactLanguage(type, language),
       source: 'codeblock',
       role: getInlineArtifactRole(isExplicitArtifact),
+      declared: isExplicitArtifact,
       createdAt: Date.now(),
     });
   }

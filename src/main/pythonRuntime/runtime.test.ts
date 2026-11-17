@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { bundledRuntimeId } from './bundledRuntime';
 import { resolvePreinstalledRuntime, validatePackages } from './runtime';
-import { isolatedEnvironment, runProcess } from './process';
+import { assertWindowsJobRunnerAvailable, isolatedEnvironment, runProcess } from './process';
 import type { PythonRunnerRequest } from '../../shared/pythonRuntime';
 
 const requestWith = (preinstalled?: PythonRunnerRequest['preinstalledRuntime']) =>
@@ -97,4 +97,16 @@ test('present bundled executables resolve as absolute paths with their runtime i
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('missing Windows job-runner helper fails closed with a build hint', async () => {
+  await expect(assertWindowsJobRunnerAvailable(undefined, 'win32')).rejects.toThrow(
+    'Windows Python Job Object helper is missing',
+  );
+  await expect(
+    assertWindowsJobRunnerAvailable(
+      '/nonexistent/resources/python-runtime/job-runner.exe',
+      'win32',
+    ),
+  ).rejects.toThrow('bun run python:build:job-runner');
 });

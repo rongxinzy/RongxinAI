@@ -24,7 +24,6 @@ import { i18nService } from '@/services/i18n';
 import { showAppToast } from '@/services/toastNotification';
 import type { RootState } from '@/store';
 import {
-  addArtifact,
   ArtifactLayoutMode,
   ArtifactPanelView,
   closePanel,
@@ -49,57 +48,16 @@ import {
 import { PREVIEWABLE_ARTIFACT_TYPES } from '@/types/artifact';
 
 import ArtifactRenderer from './ArtifactRenderer';
+import { ArtifactSourcePreview } from './ArtifactSourcePreview';
+import { buildBrowserHtml, isDelimitedArtifact } from './artifactPreviewPolicy';
+import { useArtifactPreviewContent } from './useArtifactPreviewContent';
 import { toLocalFileUrl } from './artifactFileUrl';
 import FileDirectoryView from './FileDirectoryView';
 import ArtifactPanelResizeHandle from './ArtifactPanelResizeHandle';
-import { invalidateArtifactFile, loadArtifactFileWithRetry } from '@/services/artifactFileLoader';
-import { MAX_PREVIEW_HTML_CHARS } from './renderers/constants';
-
-// Same code-split as ArtifactRenderer — avoid static import pulling Shiki into the main chunk.
-const CodeRenderer = React.lazy(() => import('./renderers/CodeRenderer'));
-const codeRendererFallback = (
-  <div className="h-full min-h-0 p-4" aria-busy="true">
-    <Skeleton className="theme-scene-preview-loading h-full w-full" />
-  </div>
-);
 
 const t = (key: string) => i18nService.t(key);
 
 const BROWSER_OPENABLE_TYPES = new Set<ArtifactType>(['html', 'svg', 'mermaid']);
-const PANEL_LOADED_ARTIFACT_TYPES = new Set<ArtifactType>([
-  'mermaid',
-  'svg',
-  'image',
-  'code',
-  'markdown',
-  'text',
-]);
-
-function isDelimitedArtifact(artifact: Artifact): boolean {
-  const name = (artifact.fileName || artifact.filePath || artifact.title || '').toLowerCase();
-  return name.endsWith('.csv') || name.endsWith('.tsv');
-}
-
-function buildBrowserHtml(artifact: Artifact): string | null {
-  switch (artifact.type) {
-    case 'html':
-      return artifact.content;
-    case 'svg':
-      return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${artifact.title}</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f5f5f5}</style></head><body>${artifact.content}</body></html>`;
-    case 'mermaid':
-      return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${artifact.title}</title><script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><\/script><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff;font-family:system-ui,sans-serif}</style></head><body><pre class="mermaid">${escapeHtml(artifact.content)}</pre><script>mermaid.initialize({startOnLoad:true,theme:'default',securityLevel:'loose'});<\/script></body></html>`;
-    default:
-      return null;
-  }
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 interface ArtifactPanelProps {
   sessionId: string | null;
@@ -136,13 +94,17 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [loadingArtifactId, setLoadingArtifactId] = useState<string | null>(null);
-  const [artifactLoadError, setArtifactLoadError] = useState<string | null>(null);
   const isMac = window.electron.platform === 'darwin';
   const isTopLevelPanel = layoutMode === ArtifactLayoutMode.Workspace || isFullscreen;
 
+  const hasDeliverableArtifacts = artifacts.some(
+    artifact => artifact.role === ArtifactRole.Deliverable,
+  );
   const visibleArtifacts = artifacts.filter(
-    artifact => showIntermediateArtifacts || artifact.role === ArtifactRole.Deliverable,
+    artifact =>
+      showIntermediateArtifacts ||
+      !hasDeliverableArtifacts ||
+      artifact.role === ArtifactRole.Deliverable,
   );
   const previewableArtifacts = visibleArtifacts.filter(a => PREVIEWABLE_ARTIFACT_TYPES.has(a.type));
   const artifactPreviewMode = selectedArtifact
@@ -160,55 +122,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   const isCodeView = displayedTab === 'code';
   const hasLocalFilePreview = Boolean(selectedArtifact?.filePath) && !isCodeView;
 
-  useEffect(() => {
-    if (
-      panelView !== ArtifactPanelView.Preview ||
-      !selectedArtifact ||
-      selectedArtifact.content ||
-      !selectedArtifact.filePath ||
-      (!PANEL_LOADED_ARTIFACT_TYPES.has(selectedArtifact.type) &&
-        !(isCodeView && selectedArtifact.type === 'html'))
-    ) {
-      setLoadingArtifactId(null);
-      setArtifactLoadError(null);
-      return undefined;
-    }
-
-    let cancelled = false;
-    const artifactId = selectedArtifact.id;
-    setLoadingArtifactId(artifactId);
-    setArtifactLoadError(null);
-
-    loadArtifactFileWithRetry(selectedArtifact, cwd)
-      .then(loaded => {
-        if (cancelled) return;
-        if (!loaded) {
-          setArtifactLoadError(artifactId);
-          return;
-        }
-        dispatch(
-          addArtifact({
-            sessionId: selectedArtifact.sessionId,
-            artifact: { ...selectedArtifact, content: loaded.content, filePath: loaded.filePath },
-          }),
-        );
-        // An oversized page has no usable preview: show its source instead of a
-        // blank notice, so a saved web page can never take over the app.
-        if (selectedArtifact.type === 'html' && loaded.content.length > MAX_PREVIEW_HTML_CHARS) {
-          dispatch(setActiveTab('code'));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setArtifactLoadError(artifactId);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingArtifactId(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [cwd, dispatch, isCodeView, panelView, selectedArtifact]);
+  const { loadingArtifactId, artifactLoadError, imageRevision, handleRefresh } =
+    useArtifactPreviewContent({ artifact: selectedArtifact, cwd, isCodeView, panelView });
 
   const intermediateToggle = (
     <Button
@@ -348,31 +263,6 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
       window.electron?.shell?.openPath(resolveArtifactPath(selectedArtifact.filePath));
     }
   }, [selectedArtifact]);
-
-  const handleRefresh = useCallback(async () => {
-    if (!selectedArtifact?.filePath) return;
-    invalidateArtifactFile(selectedArtifact.filePath);
-    try {
-      const loaded = await loadArtifactFileWithRetry({ ...selectedArtifact, content: '' }, cwd, {
-        forceRefresh: true,
-      });
-      if (loaded) {
-        dispatch(
-          addArtifact({
-            sessionId: selectedArtifact.sessionId,
-            artifact: { ...selectedArtifact, content: loaded.content, filePath: loaded.filePath },
-          }),
-        );
-        // An oversized page has no usable preview: show its source instead of a
-        // blank notice, so a saved web page can never take over the app.
-        if (selectedArtifact.type === 'html' && loaded.content.length > MAX_PREVIEW_HTML_CHARS) {
-          dispatch(setActiveTab('code'));
-        }
-      }
-    } catch {
-      // File unreadable or missing
-    }
-  }, [cwd, dispatch, selectedArtifact]);
 
   return (
     <>
@@ -603,11 +493,11 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                       : selectedArtifact
                   }
                   sessionArtifacts={artifacts}
+                  cwd={cwd}
+                  imageRevision={imageRevision}
                 />
               ) : (
-                <React.Suspense fallback={codeRendererFallback}>
-                  <CodeRenderer artifact={selectedArtifact} />
-                </React.Suspense>
+                <ArtifactSourcePreview artifact={selectedArtifact} />
               )}
             </div>
           </div>

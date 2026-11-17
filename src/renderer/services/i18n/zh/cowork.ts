@@ -1,5 +1,6 @@
 // Cowork 会话
 export const zhCowork: Record<string, string> = {
+  coworkConversationTurns: '对话轮次',
   coworkQueueTitle: '\u5f85\u5904\u7406\u6d88\u606f',
   coworkQueueCount: '{count} \u6761\u5f85\u5904\u7406\u6d88\u606f',
   coworkQueueEmpty: '\u961f\u5217\u4e3a\u7a7a',
@@ -179,6 +180,9 @@ export const zhCowork: Record<string, string> = {
   coworkToolResultCollapse: '收起',
   coworkToolRunning: '执行中',
   coworkToolNoErrorDetail: '执行失败（无详细错误输出）',
+  coworkStepsExploring: '正在探索',
+  coworkStepsExploredCount: '已探索 {count} 个步骤',
+  coworkTurnJumpLabel: '跳转到此轮',
   coworkTodosTitle: '待办事项',
   coworkTodoItems: '项',
   coworkTodoCompleted: '已完成',

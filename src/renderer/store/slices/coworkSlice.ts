@@ -39,6 +39,8 @@ interface CoworkState {
   currentSession: CoworkSession | null;
   loadingSessionId: string | null;
   draftPrompts: Record<string, string>;
+  /** Keyed by draftKey (sessionId or '__home__'), stores serialized Tiptap JSON documents. */
+  draftPromptDocs: Record<string, Record<string, unknown>>;
   /** Keyed by draftKey (sessionId or '__home__'), stores pending attachments */
   draftAttachments: Record<string, DraftAttachment[]>;
   unreadSessionIds: string[];
@@ -63,6 +65,7 @@ const initialState: CoworkState = {
   currentSession: null,
   loadingSessionId: null,
   draftPrompts: {},
+  draftPromptDocs: {},
   draftAttachments: {},
   unreadSessionIds: [],
   streamingSessionIds: [],
@@ -419,12 +422,25 @@ const coworkSlice = createSlice({
       }
     },
 
-    setDraftPrompt(state, action: PayloadAction<{ sessionId: string; draft: string }>) {
-      const { sessionId, draft } = action.payload;
+    setDraftPrompt(
+      state,
+      action: PayloadAction<{
+        sessionId: string;
+        draft: string;
+        doc?: Record<string, unknown> | null;
+      }>,
+    ) {
+      const { sessionId, draft, doc } = action.payload;
       if (draft) {
         state.draftPrompts[sessionId] = draft;
+        if (doc) {
+          state.draftPromptDocs[sessionId] = doc;
+        } else {
+          delete state.draftPromptDocs[sessionId];
+        }
       } else {
         delete state.draftPrompts[sessionId];
+        delete state.draftPromptDocs[sessionId];
       }
     },
 
@@ -481,6 +497,13 @@ const coworkSlice = createSlice({
             state.draftPrompts[action.payload.id] = state.draftPrompts[temporarySessionId];
           }
           delete state.draftPrompts[temporarySessionId];
+          if (
+            state.draftPromptDocs[temporarySessionId] &&
+            !state.draftPromptDocs[action.payload.id]
+          ) {
+            state.draftPromptDocs[action.payload.id] = state.draftPromptDocs[temporarySessionId];
+          }
+          delete state.draftPromptDocs[temporarySessionId];
           if (
             state.draftAttachments[temporarySessionId] &&
             !state.draftAttachments[action.payload.id]
@@ -555,6 +578,7 @@ const coworkSlice = createSlice({
     deleteSession(state, action: PayloadAction<string>) {
       delete state.draftAttachments[action.payload];
       delete state.draftPrompts[action.payload];
+      delete state.draftPromptDocs[action.payload];
       removeSessionFromState(state, action.payload);
       state.chatSessions = state.chatSessions.filter(session => session.id !== action.payload);
       setSessionStreaming(state, action.payload, false);
@@ -567,6 +591,7 @@ const coworkSlice = createSlice({
       for (const sessionId of action.payload) {
         delete state.draftAttachments[sessionId];
         delete state.draftPrompts[sessionId];
+        delete state.draftPromptDocs[sessionId];
         setSessionStreaming(state, sessionId, false);
       }
     },

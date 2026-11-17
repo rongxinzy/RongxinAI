@@ -83,16 +83,6 @@ export const createCoworkTerminalErrorMessage = (
   },
 });
 
-/** Persist Direct Chat failures as canonical terminal errors for TurnBlock. */
-export const createDirectChatErrorMessage = (
-  error: unknown,
-  timestamp = Date.now(),
-): CoworkMessage => {
-  const raw = error instanceof Error ? error.message : String(error ?? 'Unknown error');
-  const message = extractUserFacingErrorMessage(raw);
-  return createCoworkTerminalErrorMessage(resolveCoworkTerminalError(message), timestamp);
-};
-
 /** Terminal error bubble text; prefer metadata.error and unwrap JSON payloads. */
 export const getTerminalErrorDisplayText = (message: CoworkMessage): string => {
   if (typeof message.metadata?.error === 'string' && message.metadata.error.trim()) {

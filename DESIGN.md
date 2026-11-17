@@ -17,6 +17,7 @@
 | v4.0 Quiet Studio | 2026-10-20 | 用户审阅主界面截图后授权重定规范。以参考实现为代码标杆。 |
 | v4.0.1 | 2026-10-24 | 用户确认保留三段模型设置；修正元信息对比度与深色字阶，使规范与实现重新对齐。 |
 | v4.1.0 | 2026-11-14 | 用户授权全面重构设置页与模型配置：单页零标签模型页、统一 `ModelPicker`、分步添加服务商向导、拆分桌面伙伴/用量/隐私/高级页、AISphere 更名为「组织平台」并并入模型页、下线 Discord/Telegram、全站统一用「您」及人话术语表。 |
+| v4.2.0 | 2026-11-16 | 用户授权彻底重构对话页（一步跨向绿地架构）：单一 `ConversationStage`（首页与会话共享常驻 Composer）、Pi 原生 `Turn / Part[]` 投影（RTK `createSelector` 分层派生）、原生 Streamdown 流式排版 + TanStack Virtual 原生聊天模式（`anchorTo: 'end'` / `followOnAppend: true`）与静态导出全量渲染、`Steps` 只读工具聚合、语义化工具卡片（含 `@pierre/diffs`）、Tiptap 富文本/提及输入核。 |
 
 ## 一、诊断：v3 主界面为什么不像大厂作品
 
@@ -595,7 +596,32 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 ---
 
+---
+
+## 十四、2026-11-16 对话页绿地重构（Conversation Surface v4.2）
+
+在后端执行全面收归 Pi 原生运行时之后，本轮根据用户授权将对话页一步跨向绿地目标架构，消除早期多运行时兼容、启发式分组与 8KB 纯文本截断带来的割裂感：
+
+1. **单一连续舞台（`ConversationStage`）**：取消首页与会话页的树分离；空白新建态展示时段问候语、输入岛与轻量引导项，发送首轮消息后就地切入对话流，底部输入区保持挂载不闪烁、不丢失焦点与草稿。
+2. **一等公民 `Turn / Part[]` 投影与降噪**：按时间顺序直接呈现实体（思考、回答正文、工具调用、连续只读步骤、行内提问、交付物芯片、中断/错误通知）；移除每轮重复的默认标签头部，时间戳与复制/重编辑等次要动作仅在 hover / focus-within 时出现。
+3. **流畅流式与自动贴底**：使用 `streamdown` 原生分块记忆与残缺语法补全替代 8KB 纯文本滞后批处理；主对话滚动容器由 `@tanstack/react-virtual` 原生聊天模式（`anchorTo: 'end'`、`followOnAppend: true`、`scrollEndThreshold: 80`、`measureElement`、`scrollToEnd`、`scrollToIndex`、`isAtEnd`）独占管理虚拟挂载、历史前插锚定、自动贴底与回底按钮，停止手工多层争抢 `scrollTop`；截图导出使用独立的静态全量渲染路径。
+4. **语义化工具展示与连续步骤折叠**：
+   - `read` / `grep` / `find` / `ls` 等连续只读工具自动聚合成可折叠的 `Steps` 时间线（运行中显示当前探测步骤，完成后折叠为步骤摘要）。
+   - `bash` 使用终端输出行；`edit` / `write` 展开使用 `@pierre/diffs` 展示 Shiki 代码 diff；联网检索展示来源胶囊（`Source`）；等待批准的权限请求直接在对应工具行内就地展开预览并常显审批操作，支持 `⌘↵` 允许与 `Esc` 拒绝。
+5. **Tiptap 富文本与提及输入核**：使用 Tiptap（ProseMirror）+ Mention 扩展取代手写 `contenteditable`，统一承载中文 IME 组合输入、原子 Skill 胶囊、`/` 指令与 `@` 文件引用。
+6. **规范与共享契约对齐**：所有新增对话零件归口 `src/shared/components/conversation/`（纯展示，不依赖 Redux/IPC），遵守 Quiet Studio 颜色与按钮规范，`coding/` 与 `companion/` 共用的 `ai-elements` 原语保持接口连续或平滑过渡。
+
+实现约束与本轮验收：
+
+- 首页、冷加载与会话使用同一编辑器实例；槽位切换不得重建文档，切换草稿身份前须落下尚未触发防抖的输入。
+- 提及候选优先处理 Enter/Tab/方向键，候选选择不提交任务；历史前插保留可见消息的阅读锚点。
+- `Steps`、来源、轮次导航、提及菜单、状态与图片操作使用注册的 conversation hooks 和双主题 recipe；轮次导航复用 32px 共享按钮，不做宽度动画。折叠仅淡入淡出，不做高度动画。
+- 本地图片通过既有受控协议展示，原图保留内容色彩；错误文案走 i18n，切换文件不沿用旧错误，重试重新加载源文件。
+- 验收记录、回归用例与新增截图见 [PR #1463 设计与图片预览验收](docs/design/pr-1463-acceptance.zh-CN.md)，不覆盖既有基准截图。
+
+---
+
 **Design Authority**：本文件是知远智能体前端设计的唯一事实来源。偏离本文件须取得用户明确授权并同步更新本文件。
 
-**Version**: 4.1.0
-**Last Updated**: 2026-11-14
+**Version**: 4.2.0
+**Last Updated**: 2026-11-16

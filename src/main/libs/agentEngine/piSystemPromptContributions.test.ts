@@ -52,8 +52,10 @@ describe('piSystemPromptContributions', () => {
   });
 
   it('registers only non-duplicative cross-tool and run-mode policies', () => {
-    const registeredPrompts = PiSystemPromptContributions.map(contribution =>
-      typeof contribution.prompt === 'string' ? contribution.prompt : null,
+    const resolvedPrompts = PiSystemPromptContributions.map(contribution =>
+      typeof contribution.prompt === 'function'
+        ? contribution.prompt(FULL_CONTEXT)
+        : contribution.prompt,
     );
     expect(PiSystemPromptContributions.map(c => c.id)).toEqual([
       'unattended-execution',
@@ -65,8 +67,15 @@ describe('piSystemPromptContributions', () => {
       PiPythonEnvSystemPrompt,
       SessionSummarySystemPrompt,
     ]) {
-      expect(registeredPrompts).toContain(policy);
+      expect(resolvedPrompts).toContain(policy);
     }
+  });
+
+  it('adapts the managed Python shell hint for Windows PowerShell vs POSIX Bash', () => {
+    const winPrompts = collectPiSystemPromptContributions({ ...FULL_CONTEXT, platform: 'win32' });
+    const macPrompts = collectPiSystemPromptContributions({ ...FULL_CONTEXT, platform: 'darwin' });
+    expect(winPrompts.join('\n')).toContain('In PowerShell');
+    expect(macPrompts.join('\n')).toContain('In Bash');
   });
 
   it('gates file-tool policies off when file tools are disabled', () => {

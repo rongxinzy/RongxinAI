@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
-import { act, renderHook } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import React from 'react';
 import { beforeEach, expect, test } from 'vitest';
 
 import {
+  PersistentToggleNamespaceProvider,
   resolveStableSessionKey,
   setPersistentToggleNamespace,
   usePersistentToggle,
@@ -94,4 +96,83 @@ test('preserves stable session key and toggle memory when a temp-* session is pr
   expect(resolveStableSessionKey('real-session-1001')).toBe('temp-1001');
   const realHook = renderHook(() => usePersistentToggle('reasoning-promoted', false));
   expect(realHook.result.current[0]).toBe(true);
+});
+
+test('PersistentToggleNamespaceProvider isolates concurrent sessions from global namespace', () => {
+  setPersistentToggleNamespace('global-session');
+  const wrapperA = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(
+      PersistentToggleNamespaceProvider,
+      { namespace: 'modal-session-a' },
+      children,
+    );
+  const wrapperB = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(
+      PersistentToggleNamespaceProvider,
+      { namespace: 'modal-session-b' },
+      children,
+    );
+
+  const first = renderHook(() => usePersistentToggle('tool-open:call-1', false), {
+    wrapper: wrapperA,
+  });
+  expect(first.result.current[0]).toBe(false);
+  act(() => {
+    first.result.current[1](true);
+  });
+  first.unmount();
+
+  // Different session stays closed
+  const second = renderHook(() => usePersistentToggle('tool-open:call-1', false), {
+    wrapper: wrapperB,
+  });
+  expect(second.result.current[0]).toBe(false);
+  second.unmount();
+
+  // Same session preserves expanded state across unmount/remount
+  const remountedA = renderHook(() => usePersistentToggle('tool-open:call-1', false), {
+    wrapper: wrapperA,
+  });
+  expect(remountedA.result.current[0]).toBe(true);
+});
+
+test('PersistentToggleNamespaceProvider preserves expanded child state on temp-* promotion frame', () => {
+  const observed: boolean[] = [];
+  const Child = () => {
+    const [open, setOpen] = usePersistentToggle('tool-open:call-promote', false);
+    observed.push(open);
+    return React.createElement(
+      'button',
+      { type: 'button', onClick: () => setOpen(true) },
+      open ? 'open' : 'closed',
+    );
+  };
+  const Harness = ({ namespace }: { namespace: string }) =>
+    React.createElement(
+      PersistentToggleNamespaceProvider,
+      { namespace },
+      React.createElement(Child),
+    );
+
+  const view = render(React.createElement(Harness, { namespace: 'temp-live-1' }));
+  expect(screen.getByRole('button').textContent).toBe('closed');
+  fireEvent.click(screen.getByRole('button'));
+  expect(screen.getByRole('button').textContent).toBe('open');
+
+  observed.length = 0;
+  view.rerender(React.createElement(Harness, { namespace: 'real-live-1' }));
+  expect(screen.getByRole('button').textContent).toBe('open');
+  expect(observed.every(Boolean)).toBe(true);
+  expect(resolveStableSessionKey('real-live-1')).toBe('temp-live-1');
+  view.unmount();
+
+  const remounted = renderHook(() => usePersistentToggle('tool-open:call-promote', false), {
+    wrapper: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        PersistentToggleNamespaceProvider,
+        { namespace: 'real-live-1' },
+        children,
+      ),
+  });
+  expect(remounted.result.current[0]).toBe(true);
 });

@@ -77,8 +77,8 @@ test('write tool records a workspace file resolved against the workspace root', 
     messageId: 'm-result-1',
     toolCallId: 'call-1',
     runId: 'run-1',
-    role: 'intermediate',
-    declared: false,
+    role: 'deliverable',
+    declared: true,
   });
   expect(events).toHaveLength(1);
   expect(events[0].scopeId).toBe('session-1');
@@ -109,7 +109,11 @@ test('edit tool records even though the old message-reparse heuristics missed it
   });
 
   expect(ledger.list('session-1')).toHaveLength(1);
-  expect(ledger.list('session-1')[0]).toMatchObject({ filePath: target, declared: false });
+  expect(ledger.list('session-1')[0]).toMatchObject({
+    filePath: target,
+    role: 'deliverable',
+    declared: true,
+  });
   recorder.dispose();
 });
 
@@ -139,6 +143,8 @@ test('a bash-made document is caught by the debounced workspace diff', async () 
     type: 'document',
     filePath: path.join(root, 'export.docx'),
     content: '',
+    role: 'deliverable',
+    declared: true,
     // Attributed to the tool result that produced the file, not the final
     // answer: the debounced diff anchors there and the settle diff skips it.
     messageId: 'm-result-1',
@@ -170,9 +176,49 @@ test('an outside-workspace write is recorded', async () => {
   expect(artifacts).toHaveLength(1);
   expect(artifacts[0]).toMatchObject({
     filePath: outsideFile,
-    role: 'intermediate',
+    role: 'deliverable',
+    declared: true,
     title: 'deliverable.html',
     content: '<h1>hi</h1>',
+  });
+  recorder.dispose();
+});
+
+test('keeps helper code files intermediate while promoting powershell-produced html deliverables', async () => {
+  const { root, ledger, recorder } = await createWorkspace();
+
+  recorder.onRunStart('run-1');
+  await recorder.flushDiffs();
+
+  recorder.onToolStart('call-py', 'write', { file_path: 'build_report.py', content: 'print(1)' });
+  await fs.writeFile(path.join(root, 'build_report.py'), 'print(1)', 'utf8');
+  recorder.onToolEnd({
+    toolCallId: 'call-py',
+    toolName: 'write',
+    args: { file_path: 'build_report.py', content: 'print(1)' },
+    isError: false,
+    resultMessageId: 'm-py',
+  });
+
+  await fs.writeFile(path.join(root, 'dashboard.html'), '<h1>ok</h1>', 'utf8');
+  recorder.onToolEnd({
+    toolCallId: 'call-ps',
+    toolName: 'powershell',
+    args: { command: 'python build_report.py' },
+    isError: false,
+    resultMessageId: 'm-ps',
+  });
+  await recorder.flushDiffs();
+
+  const artifacts = ledger.list('session-1');
+  expect(artifacts).toHaveLength(2);
+  expect(artifacts.find(item => item.fileName === 'build_report.py')).toMatchObject({
+    role: 'intermediate',
+    declared: false,
+  });
+  expect(artifacts.find(item => item.fileName === 'dashboard.html')).toMatchObject({
+    role: 'deliverable',
+    declared: true,
   });
   recorder.dispose();
 });

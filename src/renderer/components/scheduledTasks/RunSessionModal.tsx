@@ -1,3 +1,4 @@
+import { DiffWorkerPoolProvider } from '@shared/components/conversation';
 import { Button } from '@shared/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@shared/components/ui/dialog';
 import { Spinner } from '@shared/components/ui/spinner';
@@ -6,9 +7,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { i18nService } from '../../services/i18n';
 import type { CoworkSession } from '../../types/cowork';
-import { TurnBlock } from '../cowork/components/TurnBlock';
-import { UserBubble } from '../cowork/components/UserBubble';
-import { buildConversationTurns, buildDisplayItems } from '../cowork/helpers/messageGrouping';
+import { projectSessionToTurns } from '../conversation/model/projectTurns';
+import { TurnView } from '../conversation/thread/TurnView';
+import { PersistentToggleNamespaceProvider } from '../cowork/hooks/usePersistentToggle';
 
 interface RunSessionModalProps {
   sessionId?: string | null;
@@ -144,11 +145,17 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({
     }
   };
 
-  const displayItems = useMemo(
-    () => buildDisplayItems(session?.messages ?? []),
+  const { turns } = useMemo(
+    () =>
+      projectSessionToTurns({
+        messages: session?.messages ?? [],
+        toolActivities: [],
+        artifacts: [],
+        previewableTypes: new Set(),
+        isStreaming: false,
+      }),
     [session?.messages],
   );
-  const turns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
 
   return (
     <Dialog
@@ -201,20 +208,15 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({
           )}
 
           {!loading && !error && turns.length > 0 && (
-            <div className="py-2">
-              {turns.map(turn => {
-                const showAssistantBlock = turn.assistantItems.length > 0;
-
-                return (
-                  <React.Fragment key={turn.id}>
-                    {turn.userMessage && <UserBubble message={turn.userMessage} skills={[]} />}
-                    {showAssistantBlock && (
-                      <TurnBlock turn={turn} showTypingIndicator={false} showCopyButtons={true} />
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </div>
+            <PersistentToggleNamespaceProvider namespace={session?.id ?? ''}>
+              <DiffWorkerPoolProvider>
+                <div className="py-2">
+                  {turns.map(turn => (
+                    <TurnView key={turn.id} turn={turn} skills={[]} cwd={session?.cwd} />
+                  ))}
+                </div>
+              </DiffWorkerPoolProvider>
+            </PersistentToggleNamespaceProvider>
           )}
         </div>
       </DialogContent>

@@ -213,6 +213,26 @@ describe('PiRuntimeAdapter', () => {
       });
     });
 
+    it('uses additive tool modifiers so platform defaultTools are preserved and excludes bash on win32', async () => {
+      const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+      try {
+        await adapter.startSession('additive-tools-win', 'Hello Pi');
+      } finally {
+        if (originalPlatform) {
+          Object.defineProperty(process, 'platform', originalPlatform);
+        }
+      }
+
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        tools?: string[];
+        excludeTools?: string[];
+      };
+      expect(sessionOptions.tools).toEqual(expect.arrayContaining(['+grep', '+find', '+ls']));
+      expect(sessionOptions.tools?.every(entry => entry.startsWith('+'))).toBe(true);
+      expect(sessionOptions.excludeTools).toEqual(['bash']);
+    });
+
     it('always routes work sessions through Pi builtin MCP extension', async () => {
       adapter.setMcpServerManager({
         toolManifest: [],

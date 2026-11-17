@@ -220,6 +220,7 @@ export const zhWorkbench: Record<string, string> = {
   workbenchTaskLoadFailed: '加载任务轨迹失败',
   workbenchTaskActionFailed: '任务操作失败',
   workbenchTaskStatusRunning: '执行中',
+  workbenchTaskStatusWaitingApproval: '等待确认',
   workbenchTaskStatusFailed: '失败',
   workbenchTaskStatusCancelled: '已取消',
   workbenchTaskStatusSettled: '执行已结束',
