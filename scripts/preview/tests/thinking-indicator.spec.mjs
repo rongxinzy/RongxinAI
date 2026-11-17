@@ -9,6 +9,7 @@ const indicator = (page, variant) =>
 async function openWaitingCodingTurn(page, baseURL, theme, reducedMotion = 'reduce') {
   await page.emulateMedia({ colorScheme: theme, reducedMotion });
   await home(page, baseURL, previewSearch({ scenario: 'coding' }));
+  await page.waitForFunction(() => window.__previewCoworkStreamReady === true);
   await page.evaluate(
     async ({ theme, messageKind, completedStatus }) => {
       const { themeService } = await import(
@@ -71,6 +72,47 @@ async function pixelColor(canvas) {
   });
 }
 
+async function expectRoundSilhouette(canvas, size) {
+  const bounds = await canvas.evaluate(element => {
+    const { width, height } = element;
+    const pixels = element.getContext('2d').getImageData(0, 0, width, height).data;
+    let left = width;
+    let top = height;
+    let right = -1;
+    let bottom = -1;
+    const quadrants = [0, 0, 0, 0];
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if (pixels[(y * width + x) * 4 + 3] < 32) continue;
+        left = Math.min(left, x);
+        top = Math.min(top, y);
+        right = Math.max(right, x);
+        bottom = Math.max(bottom, y);
+        quadrants[(y >= height / 2 ? 2 : 0) + (x >= width / 2 ? 1 : 0)] += 1;
+      }
+    }
+    return {
+      left,
+      top,
+      right,
+      bottom,
+      width: right - left + 1,
+      height: bottom - top + 1,
+      quadrants,
+    };
+  });
+  expect(bounds.width / bounds.height).toBeGreaterThanOrEqual(0.85);
+  expect(bounds.width / bounds.height).toBeLessThanOrEqual(1.18);
+  for (const diameter of [bounds.width, bounds.height]) {
+    expect(diameter).toBeGreaterThanOrEqual(size * 0.7);
+    expect(diameter).toBeLessThanOrEqual(size);
+  }
+  expect(Math.abs((bounds.left + bounds.right + 1) / 2 - size / 2)).toBeLessThanOrEqual(size * 0.1);
+  expect(Math.abs((bounds.top + bounds.bottom + 1) / 2 - size / 2)).toBeLessThanOrEqual(size * 0.1);
+  expect(bounds.quadrants.every(count => count > 2)).toBe(true);
+  return bounds;
+}
+
 async function applyRecipe(page, { theme, variant, color, size }) {
   await page.evaluate(
     async ({ theme, variant, color, size }) => {
@@ -121,6 +163,10 @@ for (const theme of ['light', 'dark']) {
     const companion = indicator(page, 'companion');
     await expectSquare(companion, 32);
     await expect.poll(async () => (await pixelColor(companion)).count).toBeGreaterThan(0);
+    await expectRoundSilhouette(companion, 32);
+    await companion.screenshot({
+      path: testInfo.outputPath(`thinking-${theme}-companion-32px.png`),
+    });
     await page.screenshot({
       path: testInfo.outputPath(`thinking-${theme}-companion-1280x800.png`),
     });
@@ -214,47 +260,66 @@ for (const theme of ['light', 'dark']) {
   });
 }
 
-test('thinking animation stops on completion and under reduced motion', async ({
-  page,
-  baseURL,
-}) => {
-  const failures = [];
-  attachConsoleGuards(page, failures, 'thinking motion');
-  await openWaitingCodingTurn(page, baseURL, 'light', 'no-preference');
-  const companion = indicator(page, 'companion');
-  const firstCompanion = await bitmap(companion);
-  await expect.poll(() => bitmap(companion)).not.toBe(firstCompanion);
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.waitForTimeout(100);
-  const reducedCompanion = await bitmap(companion);
-  await page.waitForTimeout(120);
-  expect(await bitmap(companion)).toBe(reducedCompanion);
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await expect.poll(() => bitmap(companion)).not.toBe(reducedCompanion);
+for (const theme of ['light', 'dark']) {
+  test(`thinking animation settles into a complete sphere and respects reduced motion in ${theme}`, async ({
+    page,
+    baseURL,
+  }, testInfo) => {
+    const failures = [];
+    attachConsoleGuards(page, failures, 'thinking motion');
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openWaitingCodingTurn(page, baseURL, theme, 'no-preference');
+    const companion = indicator(page, 'companion');
+    const firstCompanion = await bitmap(companion);
+    await expect.poll(() => bitmap(companion)).not.toBe(firstCompanion);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.waitForTimeout(100);
+    const reducedCompanion = await bitmap(companion);
+    await page.waitForTimeout(120);
+    expect(await bitmap(companion)).toBe(reducedCompanion);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await expect.poll(() => bitmap(companion)).not.toBe(reducedCompanion);
 
-  await page.evaluate(() => window.__thinkingIndicatorPreview.showReasoning());
-  const inline = indicator(page, 'inline');
-  await expect(inline).toBeVisible();
-  const inlineNode = await inline.elementHandle();
-  const firstInline = await bitmap(inline);
-  await expect.poll(() => bitmap(inline)).not.toBe(firstInline);
-  await page.evaluate(() => window.__thinkingIndicatorPreview.showReasoning(true));
-  await page.waitForTimeout(100);
-  const pausedInline = await bitmap(inline);
-  await page.waitForTimeout(160);
-  expect(await bitmap(inline)).toBe(pausedInline);
-  expect(await inline.evaluate((node, previous) => node === previous, inlineNode)).toBe(true);
-  await applyRecipe(page, { theme: 'light', variant: 'inline', color: '#176b31' });
-  await expect.poll(() => bitmap(inline)).not.toBe(pausedInline);
-  const recoloredPausedInline = await bitmap(inline);
-  await page.waitForTimeout(160);
-  expect(await bitmap(inline)).toBe(recoloredPausedInline);
-  await page.evaluate(() => window.__thinkingIndicatorPreview.showReasoning());
-  await expect.poll(() => bitmap(inline)).not.toBe(recoloredPausedInline);
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.waitForTimeout(100);
-  const reducedInline = await bitmap(inline);
-  await page.waitForTimeout(160);
-  expect(await bitmap(inline)).toBe(reducedInline);
-  expect(failures).toEqual([]);
-});
+    await page.evaluate(() => window.__thinkingIndicatorPreview.showReasoning());
+    const inline = indicator(page, 'inline');
+    await expect(inline).toBeVisible();
+    const inlineNode = await inline.elementHandle();
+    const firstInline = await bitmap(inline);
+    await expect.poll(() => bitmap(inline)).not.toBe(firstInline);
+    await page.evaluate(() => window.__thinkingIndicatorPreview.showReasoning(true));
+    await page.waitForTimeout(100);
+    const pausedInline = await bitmap(inline);
+    await page.waitForTimeout(160);
+    expect(await bitmap(inline)).toBe(pausedInline);
+    expect(await inline.evaluate((node, previous) => node === previous, inlineNode)).toBe(true);
+    const bounds = await expectRoundSilhouette(inline, 20);
+    testInfo.annotations.push({ type: 'settledSphereBounds', description: JSON.stringify(bounds) });
+    await page.screenshot({ path: testInfo.outputPath(`thinking-${theme}-settled-1280x800.png`) });
+    await page
+      .locator('.theme-fold-reasoning')
+      .first()
+      .screenshot({
+        path: testInfo.outputPath(`thinking-${theme}-settled-reasoning.png`),
+      });
+    await page.evaluate(() => window.__thinkingIndicatorPreview.showReasoning());
+    await expect.poll(() => bitmap(inline)).not.toBe(pausedInline);
+    await page.waitForTimeout(140);
+    await page.evaluate(() => window.__thinkingIndicatorPreview.showReasoning(true));
+    await expect.poll(() => bitmap(inline)).toBe(pausedInline);
+    expect(await inline.evaluate((node, previous) => node === previous, inlineNode)).toBe(true);
+    await applyRecipe(page, { theme, variant: 'inline', color: '#176b31' });
+    await expect.poll(() => bitmap(inline)).not.toBe(pausedInline);
+    const recoloredPausedInline = await bitmap(inline);
+    await page.waitForTimeout(160);
+    expect(await bitmap(inline)).toBe(recoloredPausedInline);
+    await page.evaluate(() => window.__thinkingIndicatorPreview.showReasoning());
+    await expect.poll(() => bitmap(inline)).not.toBe(recoloredPausedInline);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.waitForTimeout(100);
+    const reducedInline = await bitmap(inline);
+    await page.waitForTimeout(160);
+    expect(await bitmap(inline)).toBe(reducedInline);
+    expect(reducedInline).toBe(recoloredPausedInline);
+    expect(failures).toEqual([]);
+  });
+}
