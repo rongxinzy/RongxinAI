@@ -23,16 +23,28 @@ export const CodingParticipants = ({
     [profiles],
   );
 
+  const profileTotals = new Map<string, number>();
+  for (const lane of lanes) {
+    const profile = profilesById.get(lane.profileId);
+    if (!profile) continue;
+    profileTotals.set(profile.name, (profileTotals.get(profile.name) ?? 0) + 1);
+  }
+  const profileSeen = new Map<string, number>();
+
   const items = lanes.flatMap(lane => {
     const profile = profilesById.get(lane.profileId);
     if (!profile) return [];
+    const seenIndex = (profileSeen.get(profile.name) ?? 0) + 1;
+    profileSeen.set(profile.name, seenIndex);
+    const totalForProfile = profileTotals.get(profile.name) ?? 1;
+    const displayLabel = totalForProfile > 1 ? `${profile.name} #${seenIndex}` : profile.name;
     return [
       {
         value: lane.id,
         label: (
           <span className="inline-flex items-center gap-1.5">
             <Bot className="size-4" />
-            <span className="max-w-24 truncate">{profile.name}</span>
+            <span className="max-w-28 truncate">{displayLabel}</span>
           </span>
         ),
       },

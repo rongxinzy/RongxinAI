@@ -1,5 +1,5 @@
 /**
- * Cowork queue IPC: list, enqueue, update, delete, steer and follow-up
+ * Cowork queue IPC: list and enqueue
  * (work package I: domain-owned registration with injected deps).
  */
 import { handleIpcContract } from '../ipc/handleIpcContract';
@@ -71,54 +71,6 @@ export const registerCoworkQueueIpc = (deps: CoworkQueueIpcDeps): void => {
         return {
           success: false as const,
           error: error instanceof Error ? error.message : 'Failed to enqueue pending message',
-        };
-      }
-    },
-
-    updatePendingMessage: (_event, input) => {
-      try {
-        return deps
-          .getPiRuntimeAdapter()
-          .updatePendingMessage(input.sessionId, input.itemId, input.text);
-      } catch (error) {
-        return {
-          success: false as const,
-          error: error instanceof Error ? error.message : 'Failed to update pending message',
-        };
-      }
-    },
-
-    deletePendingMessage: (_event, input) => {
-      try {
-        return deps.getPiRuntimeAdapter().deletePendingMessage(input.sessionId, input.itemId);
-      } catch (error) {
-        return {
-          success: false as const,
-          error: error instanceof Error ? error.message : 'Failed to delete pending message',
-        };
-      }
-    },
-
-    steerPendingMessage: async (_event, input) => {
-      try {
-        return await deps.getPiRuntimeAdapter().steerPendingMessage(input.sessionId, input.itemId);
-      } catch (error) {
-        return {
-          success: false as const,
-          error: error instanceof Error ? error.message : 'Failed to steer pending message',
-        };
-      }
-    },
-
-    followUpPendingMessage: async (_event, input) => {
-      try {
-        return await deps
-          .getPiRuntimeAdapter()
-          .followUpPendingMessage(input.sessionId, input.itemId);
-      } catch (error) {
-        return {
-          success: false as const,
-          error: error instanceof Error ? error.message : 'Failed to send follow-up message',
         };
       }
     },

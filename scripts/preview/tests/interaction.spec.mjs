@@ -22,6 +22,7 @@ test('streams a mock reply in the default scenario', async ({ page, baseURL }) =
   await page.keyboard.type('Add a percent key');
   await page.keyboard.press('Enter');
   await expect(page.getByText('Browser preview reply is ready')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('textbox').last()).toHaveText('', { timeout: 5_000 });
 
   const problem = await page.evaluate(async () => {
     const directory = await window.electron.dialog.selectDirectory();

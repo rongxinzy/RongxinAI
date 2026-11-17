@@ -29,7 +29,7 @@
   --zy-syntax-shiki-token-string: #10B981;
   --zy-syntax-shiki-token-keyword: #8B5CF6;
   --zy-syntax-shiki-token-comment: #64748B;
-  --zy-syntax-shiki-background: rgba(255, 255, 255, 0.95);
+  --zy-syntax-shiki-background: #F4F5F7;
   --zy-syntax-shiki-foreground: #0A1628;
   --zy-syntax-codemirror-18: #FB923C;
   --zy-syntax-codemirror-17: #14B8A6;
@@ -337,7 +337,7 @@
   --zy-syntax-shiki-token-string: #34D399;
   --zy-syntax-shiki-token-keyword: #A78BFA;
   --zy-syntax-shiki-token-comment: #94A3B8;
-  --zy-syntax-shiki-background: rgba(15, 20, 30, 0.95);
+  --zy-syntax-shiki-background: #121316;
   --zy-syntax-shiki-foreground: #E8EBF0;
   --zy-syntax-codemirror-18: #FDBA74;
   --zy-syntax-codemirror-17: #2DD4BF;
@@ -1118,8 +1118,8 @@
   animation-iteration-count: infinite;
 }
 :where(:root, [data-theme]) :where(.theme-run-indicator) {
-  height: 1.5rem;
-  padding-inline: 1rem;
+  height: 2rem;
+  padding-inline: 0.5rem;
   font-size: var(--zy-component-text-xs);
   line-height: 1;
   color: var(--muted-foreground);
@@ -1879,34 +1879,40 @@
 }
 :where(:root, [data-theme]) :where(.theme-badge) {
   --zy-control-icon-size: 0.75rem;
-  height: 1.25rem;
+  height: 1.375rem;
   gap: 0.25rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
+  padding: 0 0.5rem;
+  border-radius: var(--zy-style-radius-md);
   border-style: solid;
   border-width: 1px;
   border-color: transparent;
   font-size: var(--zy-component-text-xs);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
   font-weight: var(--zy-component-font-weight-medium);
   transition-property: color, background-color, border-color, box-shadow;
-  transition-duration: 150ms;
-  line-height: var(--zy-component-text-xs--line-height);
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 :where(:root, [data-theme]) :where(.theme-badge-default) {
-  background-color: var(--primary);
-  color: var(--primary-foreground);
+  background-color: var(--zy-primary-muted);
+  border-color: color-mix(in oklab, var(--primary) 24%, transparent);
+  color: var(--primary);
 }
 :where(:root, [data-theme]) :where(.theme-badge-secondary) {
   background-color: var(--secondary);
-  color: var(--secondary-foreground);
+  border-color: var(--zy-border);
+  color: var(--muted-foreground);
 }
 :where(:root, [data-theme]) :where(.theme-badge-destructive) {
   background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent);
+  border-color: color-mix(in oklab, var(--destructive) 24%, transparent);
   color: var(--destructive);
 }
 :where(:root, [data-theme]) :where(.theme-badge-outline) {
-  border-color: var(--border);
-  color: var(--foreground);
+  border-color: var(--zy-input-border);
+  background-color: transparent;
+  color: var(--muted-foreground);
 }
 :where(:root, [data-theme]) :where(.theme-badge-link) {
   color: var(--primary);
@@ -3143,7 +3149,10 @@
   padding: 0.75rem;
 }
 :where(:root, [data-theme]) :where(.theme-page-task-template-gallery-card-1) {
-  transition-property: background-color;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  transition-property: background-color, border-color;
   transition-duration: 120ms;
   box-shadow: none;
 }
@@ -3363,24 +3372,24 @@
   opacity: 0.46;
 }
 :where(:root, [data-theme]) :where(.theme-page-artifact-badge-button-variant-1) {
-  border-color: var(--zy-primary);
-  background-color: color-mix(in oklab, var(--zy-primary) 10%, transparent);
-  color: var(--zy-primary);
+  border-color: var(--zy-input-border);
+  background-color: var(--sidebar-accent);
+  color: var(--foreground);
 }
 :where(:root, [data-theme]) :where(.theme-page-artifact-badge-button-variant-2) {
   border-color: var(--zy-border);
-  background-color: var(--zy-surface);
-  color: var(--zy-foreground);
+  background-color: var(--card);
+  color: var(--muted-foreground);
 }
 :where(:root, [data-theme]) :where(.theme-page-artifact-badge-button-variant-3) {
-  gap: 0.5rem;
-  padding-inline: 0.75rem;
-  padding-block: 0.375rem;
+  gap: 0.375rem;
+  padding-inline: 0.625rem;
   border-radius: var(--zy-style-radius-lg);
   font-size: var(--zy-component-text-sm);
-  transition-property: color, background-color, border-color, box-shadow;
-  transition-duration: 150ms;
-  height: auto;
+  transition-property: color, background-color, border-color;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  height: 2rem;
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-page-artifact-panel-button-variant-1) {
@@ -3912,14 +3921,14 @@
   padding-inline: 1rem;
 }
 :where(:root, [data-theme]) :where(.theme-page-terminal-button-variant-1) {
-  height: 1.75rem;
-  width: 1.75rem;
-  color: var(--zy-component-palette-zinc-400);
+  height: 1.5rem;
+  width: 1.5rem;
+  color: var(--zy-text-muted);
 }
 :where(:root, [data-theme]) :where(.theme-page-terminal-button-variant-2) {
-  height: 1.75rem;
-  width: 1.75rem;
-  color: var(--zy-component-palette-zinc-400);
+  height: 1.5rem;
+  width: 1.5rem;
+  color: var(--zy-text-muted);
 }
 :where(:root, [data-theme]) :where(.theme-page-command-dialog-content-variant-1) {
   border-radius: var(--zy-style-radius-xl);
@@ -3929,6 +3938,311 @@
   height: 2rem;
   background-color: var(--zy-background);
   box-shadow: none;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-meta) {
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-status) {
+  font-size: var(--zy-component-text-sm);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-sm--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-heading) {
+  font-size: var(--zy-component-text-sm);
+  color: var(--foreground);
+  font-weight: 600;
+  line-height: var(--zy-component-text-sm--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-icon) {
+  width: 1rem;
+  height: 1rem;
+  color: var(--muted-foreground);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-avatar) {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  border-width: 0;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-editor) {
+  min-height: 3rem;
+  font-size: var(--zy-component-text-base);
+  color: var(--foreground);
+  line-height: 1.5;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-editor .is-editor-empty:first-child)::before {
+  color: var(--zy-text-muted);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-editor-shell) {
+  padding-inline: 0.75rem;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-skill-token) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  height: 1.5rem;
+  padding-inline: 0.5rem;
+  border-radius: var(--zy-style-radius-md);
+  background-color: var(--secondary);
+  font-size: var(--zy-component-text-xs);
+  font-weight: var(--zy-component-font-weight-medium);
+  line-height: 1;
+  color: var(--foreground);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-skill-chip) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  transition-property: color, background-color, box-shadow, opacity;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  height: 1.75rem;
+  padding-inline: 0.5rem 0.25rem;
+  border-radius: var(--zy-style-radius-lg);
+  background-color: var(--secondary);
+  font-size: var(--zy-component-text-xs);
+  font-weight: var(--zy-component-font-weight-medium);
+  line-height: 1;
+  color: var(--foreground);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-mention-list) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  width: 18rem;
+  padding: 0.25rem;
+  border-radius: var(--zy-style-radius-lg);
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: var(--zy-style-shadow-lg);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-diff) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  border-radius: var(--zy-style-radius-lg);
+  background-color: var(--background);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-code-fallback) {
+  font-size: var(--zy-component-text-sm);
+  color: var(--foreground);
+  font-family: var(--zy-style-font-mono);
+  padding: 0.75rem;
+  background-color: var(--muted);
+  line-height: var(--zy-component-text-sm--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-source) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  transition-property: color, background-color, box-shadow, opacity;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  height: 1.75rem;
+  padding-inline: 0.625rem;
+  border-radius: 9999px;
+  background-color: var(--card);
+  font-weight: var(--zy-component-font-weight-medium);
+  outline-style: none;
+  line-height: var(--zy-component-text-xs--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-steps) {
+  font-size: var(--zy-component-text-sm);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-steps-trigger) {
+  font-size: var(--zy-component-text-sm);
+  color: var(--muted-foreground);
+  min-height: 2rem;
+  line-height: var(--zy-component-text-sm--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-steps-rail) {
+  border-left-width: 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-left: 1rem;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-steps-item) {
+  padding-block: 0.125rem;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-actions) {
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  transition-property: color, background-color, box-shadow, opacity;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  opacity: 0;
+  line-height: var(--zy-component-text-xs--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-actions[data-visible="true"]) {
+  opacity: 1;
+}
+:where(:root, [data-theme]) :where(.group\/turn:is(:hover,:focus-within) .theme-conversation-actions) {
+  opacity: 1;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-turn-marker) {
+  transition-property: color, background-color, box-shadow, opacity;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  width: 0.5rem;
+  height: 0.125rem;
+  border-radius: 9999px;
+  background-color: var(--muted-foreground);
+}
+:where(:root, [data-theme]) :where([aria-current="step"] > .theme-conversation-turn-marker) {
+  width: 1rem;
+  background-color: var(--foreground);
+}
+:where(:root, [data-theme]) :where([data-turn-state="streaming"] > .theme-conversation-turn-marker) {
+  width: 1rem;
+  background-color: var(--primary);
+}
+:where(:root, [data-theme]) :where([data-turn-state="approval"] > .theme-conversation-turn-marker) {
+  width: 1rem;
+  background-color: var(--zy-warning);
+}
+:where(:root, [data-theme]) :where([data-turn-state="error"] > .theme-conversation-turn-marker) {
+  width: 1rem;
+  background-color: var(--destructive);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-approval) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--zy-input-border);
+  border-radius: var(--zy-style-radius-lg);
+  background-color: var(--card);
+  padding-inline: 0.75rem;
+  padding-block: 0.5rem;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-tool-error) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: color-mix(in oklab, var(--zy-destructive) 24%, var(--zy-border));
+  background-color: color-mix(in oklab, var(--zy-destructive) 6%, transparent);
+  border-radius: var(--zy-style-radius-lg);
+  padding-inline: 0.75rem;
+  padding-block: 0.5rem;
+  font-size: var(--zy-component-text-xs);
+  line-height: 1.6;
+  font-family: var(--zy-style-font-mono);
+  color: var(--zy-destructive);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-tool-params) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: var(--zy-style-radius-lg);
+  background-color: var(--zy-surface);
+  padding-inline: 0.75rem;
+  padding-block: 0.5rem;
+  font-size: var(--zy-component-text-xs);
+  line-height: 1.6;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-stats-trigger) {
+  font-size: var(--zy-component-text-xs);
+  color: var(--zy-text-muted);
+  transition-property: color, background-color, box-shadow, opacity;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  height: 1.5rem;
+  padding-inline: 0.5rem;
+  border-radius: var(--zy-style-radius-md);
+  font-weight: var(--zy-component-font-weight-normal);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-image-action) {
+  transition-property: color, background-color, box-shadow, opacity;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  border-width: 0;
+  border-radius: var(--zy-style-radius-xl);
+  padding: 0;
+  background-color: transparent;
+  outline-style: none;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-image) {
+  border-radius: var(--zy-style-radius-xl);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-image-status) {
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  padding: 1rem;
+  line-height: var(--zy-component-text-xs--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-image-stage) {
+  padding: 1rem;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-notice) {
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: var(--zy-style-radius-lg);
+  background-color: var(--card);
+  padding-inline: 0.625rem;
+  padding-block: 0.375rem;
+  line-height: var(--zy-component-text-xs--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-drop) {
+  font-size: var(--zy-component-text-sm);
+  color: var(--foreground);
+  border-radius: inherit;
+  background-color: var(--secondary);
+  font-weight: 500;
+  line-height: var(--zy-component-text-sm--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-conversation-toolbar-pending) {
+  opacity: 0.5;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-submit-empty) {
+  opacity: 0.5;
+}
+:where(:root, [data-theme]) :where(.theme-fold-panel) {
+  transition-property: opacity;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+:where(:root, [data-theme]) :where(.theme-terminal-root) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: var(--zy-style-radius-lg);
+  background-color: var(--zy-surface);
+  color: var(--foreground);
+}
+:where(:root, [data-theme]) :where(.theme-terminal-header) {
+  border-bottom-width: 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.75rem;
+  padding-block: 0.375rem;
+}
+:where(:root, [data-theme]) :where(.theme-terminal-title) {
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  font-family: var(--zy-style-font-mono);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-terminal-content) {
+  font-size: var(--zy-component-text-xs);
+  color: var(--foreground);
+  font-family: var(--zy-style-font-mono);
+  padding: 0.75rem;
+  line-height: 1.6;
+}
+:where(:root, [data-theme]) :where(.theme-terminal-cursor) {
+  width: 0.5rem;
+  height: 1rem;
+  background-color: var(--foreground);
 }
 :where(:root, [data-theme]) :where(.theme-part-coding-agent-manager-dialog-header-1) {
   border-bottom-width: 0px;
@@ -4085,11 +4399,16 @@
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-fold-reasoning) {
-  min-height: 2.25rem;
+  min-height: 2rem;
+  padding-inline: 0.5rem;
+  padding-block: 0.25rem;
+  border-radius: var(--zy-style-radius-lg);
   font-size: var(--zy-component-text-sm);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--muted-foreground);
-  transition-property: color, background-color, border-color, box-shadow;
-  transition-duration: 150ms;
+  transition-property: color, background-color;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-message-body) {
@@ -4105,22 +4424,25 @@
 }
 :where(:root, [data-theme]) :where(.theme-reasoning-panel) {
   font-size: var(--zy-component-text-sm);
-  color: var(--muted-foreground);
+  line-height: 1.6;
+  color: var(--zy-text-muted);
   outline-style: none;
-  line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-reasoning-panel-indented) {
   padding-left: 1rem;
+  border-left-width: 1px;
+  border-style: solid;
+  border-left-color: var(--zy-border);
 }
-:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-state="open"]) {
+:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-open]) {
   animation-name: zy-component-reasoning-panel-open-1su47v9;
-  animation-duration: 150ms;
-  animation-timing-function: ease;
+  animation-duration: 160ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
-:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-state="closed"]) {
+:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-closed]) {
   animation-name: zy-component-reasoning-panel-closed-1su47v9;
-  animation-duration: 150ms;
-  animation-timing-function: ease;
+  animation-duration: 160ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 :where(:root, [data-theme]) :where(.theme-input-submit) {
   border-radius: 9999px;
@@ -4409,6 +4731,19 @@
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   border-bottom-width: 1px;
   border-color: color-mix(in oklab, var(--border) 70%, transparent);
+}
+:where(:root, [data-theme]) :where(.theme-surface-pending-content) {
+  min-height: 2rem;
+  padding-inline: 0.75rem;
+  font-size: var(--zy-component-text-sm);
+  line-height: 1.25rem;
+  font-weight: 500;
+  color: var(--foreground);
+}
+:where(:root, [data-theme]) :where(.theme-surface-pending-icon) {
+  width: 1rem;
+  height: 1rem;
+  color: var(--muted-foreground);
 }
 :where(:root, [data-theme]) :where(.theme-surface-pending-selected) {
   background-color: color-mix(in oklab, var(--accent) 40%, transparent);
@@ -4845,13 +5180,14 @@
 :where(:root, [data-theme]) :where(.theme-prompt-expert-chip) {
   padding-inline: 0.5rem;
   font-size: var(--zy-component-text-sm);
-  height: 1.75rem;
-  border-radius: 9999px;
+  height: 2rem;
+  border-radius: var(--zy-style-radius-lg);
   background-color: transparent;
   font-weight: var(--zy-component-font-weight-medium);
   color: var(--foreground);
-  transition-property: color, background-color, border-color, box-shadow;
-  transition-duration: 150ms;
+  transition-property: color, background-color;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-prompt-skills-action) {
@@ -4895,6 +5231,9 @@
   line-height: 1.625;
   border-radius: var(--zy-style-radius-2xl);
   background-color: var(--secondary);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
   font-size: var(--zy-component-text-sm);
   color: var(--foreground);
 }
@@ -5011,36 +5350,44 @@
 :where(:root, [data-theme]) :where(.theme-chat-tool-trigger) {
   min-height: 2rem;
   padding-inline: 0.5rem;
-  padding-block: 0.375rem;
-  border-radius: var(--zy-style-radius-md);
+  padding-block: 0.25rem;
+  border-radius: var(--zy-style-radius-lg);
   color: var(--muted-foreground);
   text-align: left;
   transition-property: color, background-color;
-  transition-duration: 150ms;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 :where(:root, [data-theme]) :where(.theme-chat-tool-icon) {
   width: 1rem;
   height: 1rem;
+  color: var(--zy-text-muted);
 }
 :where(:root, [data-theme]) :where(.theme-chat-tool-title) {
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-medium);
+  color: var(--foreground);
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-chat-tool-summary) {
   font-size: var(--zy-component-text-xs);
-  color: var(--muted-foreground);
+  font-family: var(--zy-style-font-mono);
+  color: var(--zy-text-muted);
   line-height: var(--zy-component-text-xs--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-chat-tool-status) {
+  --zy-control-icon-size: 0.875rem;
   height: auto;
   padding: 0px;
   border-width: 0px;
   border-radius: 0px;
   background-color: transparent;
   box-shadow: none;
-  color: var(--muted-foreground);
+  font-size: var(--zy-component-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--zy-text-muted);
   font-weight: var(--zy-component-font-weight-normal);
+  line-height: var(--zy-component-text-xs--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-chat-tool-status[data-tool-state="approval-requested"], .theme-chat-tool-status[data-tool-state="output-denied"]) {
   color: var(--zy-warning);
@@ -5051,20 +5398,22 @@
 :where(:root, [data-theme]) :where(.theme-chat-tool-chevron) {
   width: 1rem;
   height: 1rem;
+  color: var(--zy-text-muted);
   rotate: 0deg;
-  transition-property: rotate;
-  transition-duration: 150ms;
+  transition-property: rotate, color;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 :where(:root, [data-theme]) :where(.theme-chat-tool-trigger[aria-expanded="true"] .theme-chat-tool-chevron) {
   rotate: 180deg;
 }
 :where(:root, [data-theme]) :where(.theme-chat-tool-content) {
   padding-left: 1rem;
-  padding-top: 0.5rem;
-  padding-bottom: 0.75rem;
+  padding-top: 0.375rem;
+  padding-bottom: 0.5rem;
   border-left-width: 1px;
   border-style: solid;
-  border-left-color: var(--zy-border-subtle);
+  border-left-color: var(--zy-border);
   color: var(--foreground);
 }
 :where(:root, [data-theme]) :where(.theme-chat-tool-label) {
@@ -6063,13 +6412,16 @@
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-page-artifact-badge-button-variant-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-primary) 10%, transparent);
-  color: var(--zy-primary);
+  background-color: var(--sidebar-accent);
+  border-color: var(--zy-input-border);
+  color: var(--foreground);
 }
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-page-artifact-badge-button-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--zy-surface-raised);
+  background-color: var(--accent);
+  border-color: var(--zy-input-border);
+  color: var(--foreground);
 }
 }
 @media (hover: hover) {
@@ -6276,14 +6628,39 @@
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-page-terminal-button-variant-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--zy-component-palette-zinc-800);
-  color: var(--zy-component-palette-zinc-100);
+  background-color: var(--accent);
+  color: var(--foreground);
 }
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-page-terminal-button-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--zy-component-palette-zinc-800);
-  color: var(--zy-component-palette-zinc-100);
+  background-color: var(--accent);
+  color: var(--foreground);
+}
+}
+@media (hover: hover) {
+:where(:root, [data-theme]) :where(.theme-conversation-skill-chip):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  background-color: var(--accent);
+  border-color: var(--zy-input-border);
+}
+}
+@media (hover: hover) {
+:where(:root, [data-theme]) :where(.theme-conversation-source):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  background-color: var(--accent);
+  border-color: var(--zy-input-border);
+  color: var(--foreground);
+}
+}
+@media (hover: hover) {
+:where(:root, [data-theme]) :where(.theme-conversation-steps-trigger):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  background-color: var(--accent);
+  color: var(--foreground);
+}
+}
+@media (hover: hover) {
+:where(:root, [data-theme]) :where(.theme-conversation-stats-trigger):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  background-color: var(--accent);
+  color: var(--foreground);
 }
 }
 @media (hover: hover) {
@@ -6298,6 +6675,7 @@
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-fold-reasoning):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  background-color: var(--accent);
   color: var(--foreground);
 }
 }
@@ -6502,6 +6880,11 @@
 }
 }
 @media (hover: hover) {
+:where(:root, [data-theme]) :where(.theme-prompt-expert-chip):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  background-color: var(--accent);
+}
+}
+@media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-prompt-skills-action):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: var(--zy-surface-raised);
   color: var(--primary);
@@ -6524,7 +6907,7 @@
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-chat-tool-trigger):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--zy-surface-raised);
+  background-color: var(--accent);
   color: var(--foreground);
 }
 }
@@ -6821,6 +7204,12 @@
   outline-style: none;
   box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary);
 }
+:where(:root, [data-theme]) :where(.theme-fold-reasoning):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus) {
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--ring);
+  outline-offset: 1px;
+}
 :where(:root, [data-theme]) :where(.theme-page-active-mcp-badge-dropdown-menu-item-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus:hover) {
   background-color: var(--muted);
 }
@@ -6962,10 +7351,10 @@
 }
 :where(:root, [data-theme]) :where(.theme-badge):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 50%, transparent);
 }
 :where(:root, [data-theme]) :where(.theme-badge-destructive):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 :where(:root, [data-theme]) :where(.theme-card:is([role="button"], a[href], button)):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   outline-width: 2px;
@@ -7020,6 +7409,24 @@
 }
 :where(:root, [data-theme]) :where(.theme-page-todo-view-input-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   box-shadow: none;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-source):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--ring);
+  outline-offset: 2px;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-stats-trigger):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--ring);
+  outline-offset: 2px;
+}
+:where(:root, [data-theme]) :where(.theme-conversation-image-action):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--ring);
+  outline-offset: 2px;
 }
 :where(:root, [data-theme]) :where(.theme-input-submit):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   outline-color: var(--ring);
@@ -7100,7 +7507,7 @@
   outline-style: solid;
   outline-width: 2px;
   outline-color: var(--ring);
-  outline-offset: 2px;
+  outline-offset: 1px;
 }
 :where(:root, [data-theme]) :where(.theme-shell-sidebar .theme-button-navigation, .theme-shell-sidebar .chat-skill-shortcut):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   outline-color: var(--ring);
@@ -7176,7 +7583,7 @@
 }
 :where(:root, [data-theme]) :where(.theme-badge):where(:is([aria-invalid="true"], [data-invalid])) {
   border-color: var(--destructive);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 :where(:root, [data-theme]) :where(.theme-input):where(:is([aria-invalid="true"], [data-invalid])) {
   border-color: var(--zy-state-destructive-border);
@@ -7333,6 +7740,9 @@
 :where(:root, [data-theme]) :where(.theme-sheet-content[data-side="right"]):where([data-starting-style]) {
   translate: 2.5rem 0;
 }
+:where(:root, [data-theme]) :where(.theme-fold-panel):where([data-starting-style]) {
+  opacity: 0;
+}
 :where(:root, [data-theme]) :where(.theme-select-content):where([data-ending-style]) {
   opacity: 0;
   scale: 0.95;
@@ -7380,6 +7790,9 @@
 }
 :where(:root, [data-theme]) :where(.theme-sheet-content[data-side="right"]):where([data-ending-style]) {
   translate: 2.5rem 0;
+}
+:where(:root, [data-theme]) :where(.theme-fold-panel):where([data-ending-style]) {
+  opacity: 0;
 }
 :where(:root, [data-theme]) :where(.theme-welcome-screen):where([data-ending-style]) {
   opacity: 0;
@@ -7493,21 +7906,17 @@ to {
 @keyframes zy-component-reasoning-panel-open-1su47v9 {
 from {
   opacity: 0;
-  translate: 0 -0.5rem;
 }
 to {
   opacity: 1;
-  translate: 0 0;
 }
 }
 @keyframes zy-component-reasoning-panel-closed-1su47v9 {
 from {
   opacity: 1;
-  translate: 0 0;
 }
 to {
   opacity: 0;
-  translate: 0 -0.5rem;
 }
 }
 @keyframes zy-component-legacy-modal-backdrop-1su47v9 {
@@ -8163,6 +8572,50 @@ to {
 :where(:root, [data-theme]) :where(.theme-page-terminal-button-variant-2),
 :where(:root, [data-theme]) :where(.theme-page-command-dialog-content-variant-1),
 :where(:root, [data-theme]) :where(.theme-page-sidebar-input-variant-1),
+:where(:root, [data-theme]) :where(.theme-conversation-meta),
+:where(:root, [data-theme]) :where(.theme-conversation-status),
+:where(:root, [data-theme]) :where(.theme-conversation-heading),
+:where(:root, [data-theme]) :where(.theme-conversation-icon),
+:where(:root, [data-theme]) :where(.theme-conversation-avatar),
+:where(:root, [data-theme]) :where(.theme-conversation-editor),
+:where(:root, [data-theme]) :where(.theme-conversation-editor .is-editor-empty:first-child)::before,
+:where(:root, [data-theme]) :where(.theme-conversation-editor-shell),
+:where(:root, [data-theme]) :where(.theme-conversation-skill-token),
+:where(:root, [data-theme]) :where(.theme-conversation-skill-chip),
+:where(:root, [data-theme]) :where(.theme-conversation-mention-list),
+:where(:root, [data-theme]) :where(.theme-conversation-diff),
+:where(:root, [data-theme]) :where(.theme-conversation-code-fallback),
+:where(:root, [data-theme]) :where(.theme-conversation-source),
+:where(:root, [data-theme]) :where(.theme-conversation-steps),
+:where(:root, [data-theme]) :where(.theme-conversation-steps-trigger),
+:where(:root, [data-theme]) :where(.theme-conversation-steps-rail),
+:where(:root, [data-theme]) :where(.theme-conversation-steps-item),
+:where(:root, [data-theme]) :where(.theme-conversation-actions),
+:where(:root, [data-theme]) :where(.theme-conversation-actions[data-visible="true"]),
+:where(:root, [data-theme]) :where(.group\/turn:is(:hover,:focus-within) .theme-conversation-actions),
+:where(:root, [data-theme]) :where(.theme-conversation-turn-marker),
+:where(:root, [data-theme]) :where([aria-current="step"] > .theme-conversation-turn-marker),
+:where(:root, [data-theme]) :where([data-turn-state="streaming"] > .theme-conversation-turn-marker),
+:where(:root, [data-theme]) :where([data-turn-state="approval"] > .theme-conversation-turn-marker),
+:where(:root, [data-theme]) :where([data-turn-state="error"] > .theme-conversation-turn-marker),
+:where(:root, [data-theme]) :where(.theme-conversation-approval),
+:where(:root, [data-theme]) :where(.theme-conversation-tool-error),
+:where(:root, [data-theme]) :where(.theme-conversation-tool-params),
+:where(:root, [data-theme]) :where(.theme-conversation-stats-trigger),
+:where(:root, [data-theme]) :where(.theme-conversation-image-action),
+:where(:root, [data-theme]) :where(.theme-conversation-image),
+:where(:root, [data-theme]) :where(.theme-conversation-image-status),
+:where(:root, [data-theme]) :where(.theme-conversation-image-stage),
+:where(:root, [data-theme]) :where(.theme-conversation-notice),
+:where(:root, [data-theme]) :where(.theme-conversation-drop),
+:where(:root, [data-theme]) :where(.theme-conversation-toolbar-pending),
+:where(:root, [data-theme]) :where(.theme-conversation-submit-empty),
+:where(:root, [data-theme]) :where(.theme-fold-panel),
+:where(:root, [data-theme]) :where(.theme-terminal-root),
+:where(:root, [data-theme]) :where(.theme-terminal-header),
+:where(:root, [data-theme]) :where(.theme-terminal-title),
+:where(:root, [data-theme]) :where(.theme-terminal-content),
+:where(:root, [data-theme]) :where(.theme-terminal-cursor),
 :where(:root, [data-theme]) :where(.theme-part-coding-agent-manager-dialog-header-1),
 :where(:root, [data-theme]) :where(.theme-part-coding-agent-manager-dialog-footer-1),
 :where(:root, [data-theme]) :where(.theme-part-session-expert-picker-command-1),
@@ -8205,8 +8658,8 @@ to {
 :where(:root, [data-theme]) :where(.theme-queue-body-completed),
 :where(:root, [data-theme]) :where(.theme-reasoning-panel),
 :where(:root, [data-theme]) :where(.theme-reasoning-panel-indented),
-:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-state="open"]),
-:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-state="closed"]),
+:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-open]),
+:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-closed]),
 :where(:root, [data-theme]) :where(.theme-input-submit),
 :where(:root, [data-theme]) :where(.theme-control-content-height),
 :where(:root, [data-theme]) :where(.theme-button svg:not([class*="size-"])),
@@ -8280,6 +8733,8 @@ to {
 :where(:root, [data-theme]) :where(.theme-surface-image-overlay),
 :where(:root, [data-theme]) :where(.theme-surface-skill-editor),
 :where(:root, [data-theme]) :where(.theme-surface-pending-row),
+:where(:root, [data-theme]) :where(.theme-surface-pending-content),
+:where(:root, [data-theme]) :where(.theme-surface-pending-icon),
 :where(:root, [data-theme]) :where(.theme-surface-pending-selected),
 :where(:root, [data-theme]) :where(.theme-surface-pending-failed),
 :where(:root, [data-theme]) :where(.theme-surface-market-link),

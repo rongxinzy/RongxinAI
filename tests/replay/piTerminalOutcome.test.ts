@@ -64,11 +64,9 @@ test.each([PiAssistantStopReason.Length, PiAssistantStopReason.Stop])(
       });
       expect(error).not.toHaveBeenCalled();
       expect(complete).toHaveBeenCalledOnce();
-      expect(complete).toHaveBeenCalledWith(session.id, {});
+      expect(complete).toHaveBeenCalledWith(session.id);
       expect(requests).toBe(1);
     } finally {
-      // Context-usage metadata is intentionally persisted on the next timer tick.
-      await new Promise(resolve => setTimeout(resolve, 0));
       adapter.stopAllSessions();
       gateway.dispose();
       await store.close();

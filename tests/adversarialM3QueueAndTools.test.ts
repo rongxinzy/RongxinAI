@@ -197,7 +197,7 @@ describe('Adversarial M3 Verification: Queue Thinning, Session Stats, Context Ed
         persistImageAttachments: vi.fn((_id: string, imgs: any) => imgs),
         recovery: {
           imageInputVerdictForActive: vi.fn(() => ImageInputVerdict.Supported),
-          recordImagePrompt: vi.fn(),
+          reportOmittedImages: vi.fn(),
         },
         getOcrCommandFor: vi.fn(),
         getStore: vi.fn(() => mockStore),
@@ -206,66 +206,6 @@ describe('Adversarial M3 Verification: Queue Thinning, Session Stats, Context Ed
       } as unknown as PiRuntimeAdapterHost;
 
       queueController = new PiRuntimeQueueController(mockHost);
-    });
-
-    it('steers middle item, clears native queue, and restores remaining items in strict FIFO order with metadata', async () => {
-      const item1 = queueController.enqueuePendingMessage(
-        sessionId,
-        'Item 1',
-        undefined,
-        undefined,
-        ['skill-1'],
-      );
-      const item2 = queueController.enqueuePendingMessage(sessionId, 'Item 2 to steer', [
-        { name: 'img.png', mimeType: 'image/png', base64Data: 'abc' },
-      ]);
-      const item3 = queueController.enqueuePendingMessage(sessionId, 'Item 3', undefined, [
-        { name: 'doc.txt', path: '/doc.txt', extension: 'TXT' },
-      ]);
-
-      expect(item1.success && item2.success && item3.success).toBe(true);
-      expect(queueController.list(sessionId)).toHaveLength(3);
-
-      mockPiSession.clearQueue.mockClear();
-      mockPiSession.sendUserMessage.mockClear();
-      mockPiSession.prompt.mockClear();
-
-      // Steer item 2
-      const steerResult = await queueController.steerPendingMessage(sessionId, item2.item!.id);
-      expect(steerResult.success).toBe(true);
-
-      // Verify native queue was cleared
-      expect(mockPiSession.clearQueue).toHaveBeenCalledTimes(1);
-
-      // Verify steer prompt was dispatched with image
-      expect(mockPiSession.sendUserMessage).toHaveBeenCalledWith(expect.anything(), {
-        deliverAs: 'steer',
-      });
-
-      // Verify remaining items (item 1, item 3) were re-enqueued in order
-      const remaining = queueController.list(sessionId);
-      expect(remaining).toHaveLength(2);
-      expect(remaining[0].id).toBe(item1.item!.id);
-      expect(remaining[1].id).toBe(item3.item!.id);
-    });
-
-    it('recovers sidecar state and re-enqueues follow-ups when native steer dispatch rejects', async () => {
-      const item1 = queueController.enqueuePendingMessage(sessionId, 'Follow-up 1');
-      const item2 = queueController.enqueuePendingMessage(sessionId, 'Follow-up 2');
-
-      // Make next prompt fail
-      mockPiSession.prompt.mockRejectedValueOnce(new Error('Steer rejected by LLM pipeline'));
-
-      const steerResult = await queueController.steerPendingMessage(sessionId, item1.item!.id);
-      expect(steerResult.success).toBe(false);
-      expect(steerResult.error).toContain('Steer rejected by LLM pipeline');
-
-      // item1 should be restored with Failed status
-      const list = queueController.list(sessionId);
-      expect(list).toHaveLength(2);
-      const restored1 = list.find(i => i.id === item1.item!.id);
-      expect(restored1?.status).toBe(CoworkQueueItemStatus.Failed);
-      expect(restored1?.error).toContain('Steer rejected');
     });
 
     it('drops queued control actions when turnFailed is set, preventing stale control execution', async () => {
@@ -279,7 +219,7 @@ describe('Adversarial M3 Verification: Queue Thinning, Session Stats, Context Ed
       activeSession.isRunning = false;
       activeSession.turnFailed = true;
 
-      await queueController.flushFollowUpQueue(sessionId, activeSession);
+      await queueController.flushControlActions(sessionId, activeSession);
 
       expect(controlActionExecuted).toBe(false);
       expect(queueController.hasQueuedControlActions(sessionId)).toBe(false);

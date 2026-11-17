@@ -21,8 +21,6 @@ export interface PiSystemPromptContext {
   fileToolsEnabled: boolean;
   /** Resolved session output budget. */
   maxOutputTokens: number;
-  /** Runtime platform, used for platform-specific tool contracts. */
-  platform?: NodeJS.Platform;
   /** Whether the current run has no foreground user interaction. */
   unattended?: boolean;
 }

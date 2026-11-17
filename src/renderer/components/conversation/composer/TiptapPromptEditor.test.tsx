@@ -1,0 +1,146 @@
+// @vitest-environment jsdom
+
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
+const reduxState = vi.hoisted(() => ({
+  dispatch: vi.fn(),
+  activeSkillIds: [] as string[],
+  skills: [
+    {
+      id: 'deep-research',
+      name: 'Deep Research',
+      displayName: '深度调研',
+      description: 'Research topics thoroughly',
+      enabled: true,
+    },
+  ],
+  quickActions: [] as unknown[],
+  selectedActionId: null as string | null,
+}));
+
+vi.mock('react-redux', () => ({
+  useDispatch: () => reduxState.dispatch,
+  useSelector: (selector: (state: unknown) => unknown) =>
+    selector({
+      skill: { activeSkillIds: reduxState.activeSkillIds, skills: reduxState.skills },
+      quickAction: {
+        actions: reduxState.quickActions,
+        selectedActionId: reduxState.selectedActionId,
+      },
+    }),
+}));
+
+import { TiptapPromptEditor } from './TiptapPromptEditor';
+
+beforeEach(() => {
+  reduxState.dispatch.mockClear();
+  reduxState.activeSkillIds = [];
+});
+
+describe('TiptapPromptEditor', () => {
+  test('renders textbox with aria-multiline and syncs external value changes', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <TiptapPromptEditor value="hello world" onChange={onChange} placeholder="Ask anything" />,
+    );
+
+    const textbox = screen.getByRole('textbox');
+    expect(textbox.getAttribute('aria-multiline')).toBe('true');
+    expect(textbox.getAttribute('aria-label')).toBe('Ask anything');
+    expect(textbox.textContent).toContain('hello world');
+
+    rerender(
+      <TiptapPromptEditor value="updated prompt" onChange={onChange} placeholder="Ask anything" />,
+    );
+    expect(textbox.textContent).toContain('updated prompt');
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  test('renders active skill pills and allows removal via button click', () => {
+    reduxState.activeSkillIds = ['deep-research'];
+    render(<TiptapPromptEditor value="" onChange={vi.fn()} placeholder="Ask" />);
+
+    const token = document.querySelector('[data-skill-token="deep-research"]');
+    expect(token).not.toBeNull();
+    const removeButton = token?.querySelector('button');
+    expect(removeButton).not.toBeNull();
+    fireEvent.click(removeButton!);
+
+    expect(reduxState.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: 'deep-research' }),
+    );
+  });
+
+  test('ignores Enter during IME composition and delegates non-composing Enter', () => {
+    const onKeyDown = vi.fn();
+    render(<TiptapPromptEditor value="测试" onChange={vi.fn()} onKeyDown={onKeyDown} />);
+    const textbox = screen.getByRole('textbox');
+
+    fireEvent.keyDown(textbox, { key: 'Enter', isComposing: true, keyCode: 229 });
+    expect(onKeyDown).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(textbox, { key: 'Enter', isComposing: false });
+    expect(onKeyDown).toHaveBeenCalledTimes(1);
+  });
+
+  test('restores and preserves rich mention node attrs across draftDoc replacements', () => {
+    const onChange = vi.fn();
+    const initialDoc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Inspect ' },
+            {
+              type: 'mention',
+              attrs: {
+                id: '/tmp/report.png',
+                label: 'report.png',
+                kind: 'file',
+                path: '/tmp/report.png',
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { rerender } = render(
+      <TiptapPromptEditor
+        value="Inspect @report.png"
+        draftDoc={initialDoc}
+        externalVersion={1}
+        onChange={onChange}
+      />,
+    );
+
+    const mentionEl = document.querySelector('[data-mention-kind="file"]');
+    expect(mentionEl).not.toBeNull();
+    expect(mentionEl?.getAttribute('data-id')).toBe('/tmp/report.png');
+
+    rerender(
+      <TiptapPromptEditor
+        value="Plain switched session"
+        draftDoc={null}
+        externalVersion={2}
+        onChange={onChange}
+      />,
+    );
+    expect(document.querySelector('[data-mention-kind="file"]')).toBeNull();
+    expect(screen.getByRole('textbox').textContent).toContain('Plain switched session');
+
+    rerender(
+      <TiptapPromptEditor
+        value="Inspect @report.png"
+        draftDoc={initialDoc}
+        externalVersion={3}
+        onChange={onChange}
+      />,
+    );
+    const restored = document.querySelector('[data-mention-kind="file"]');
+    expect(restored?.getAttribute('data-id')).toBe('/tmp/report.png');
+    expect(restored?.getAttribute('data-label')).toBe('report.png');
+  });
+});

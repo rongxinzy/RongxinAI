@@ -467,6 +467,33 @@ export const CodingWorkbenchView = ({
         }
         actions={
           <>
+            <CodingGitQuickActions
+              target={{
+                workspaceRoot,
+                laneId: activeLane?.id ?? undefined,
+                sourceRoot: gitSourceRoot,
+              }}
+              refreshKey={gitRefreshKey}
+              onOpenReview={() => {
+                openSidePanelTab(CodingSidePanelView.Review);
+                if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
+              }}
+            />
+            {!desktopSidePanelOpen && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={i18nService.t('codingAgentSidePanel')}
+                aria-pressed={false}
+                onClick={() => {
+                  restoreSidePanel();
+                  if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
+                }}
+              >
+                <PanelRight />
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={() => setAgentManagerOpen(true)}>
               <Bot className="mr-1 size-4" />
               {i18nService.t('codingAgentManageButton')}
@@ -520,37 +547,6 @@ export const CodingWorkbenchView = ({
               events={activeEvents}
               isStreaming={activeLane?.status === CodingLaneStatus.Running}
               cwd={workspaceRoot}
-              headerActions={
-                <>
-                  <CodingGitQuickActions
-                    target={{
-                      workspaceRoot,
-                      laneId: activeLane?.id ?? undefined,
-                      sourceRoot: gitSourceRoot,
-                    }}
-                    refreshKey={gitRefreshKey}
-                    onOpenReview={() => {
-                      openSidePanelTab(CodingSidePanelView.Review);
-                      if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
-                    }}
-                  />
-                  {!desktopSidePanelOpen && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={i18nService.t('codingAgentSidePanel')}
-                      aria-pressed={false}
-                      onClick={() => {
-                        restoreSidePanel();
-                        if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
-                      }}
-                    >
-                      <PanelRight />
-                    </Button>
-                  )}
-                </>
-              }
               emptyDescription={
                 draftSession ? i18nService.t('codingSessionDraftDescription') : undefined
               }

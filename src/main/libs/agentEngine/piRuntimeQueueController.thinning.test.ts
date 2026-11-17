@@ -46,7 +46,7 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       persistImageAttachments: vi.fn((_id: string, imgs: any) => imgs),
       recovery: {
         imageInputVerdictForActive: vi.fn(() => ImageInputVerdict.Supported),
-        recordImagePrompt: vi.fn(),
+        reportOmittedImages: vi.fn(),
       },
       getOcrCommandFor: vi.fn(),
       getStore: vi.fn(() => mockStore),
@@ -92,49 +92,6 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
     });
   });
 
-  describe('steer promotion with clean native clear and follow-up re-enqueue', () => {
-    it('clears Pi native queue, dispatches steer prompt, and re-enqueues remaining follow-ups preserving attachments', async () => {
-      // Enqueue two follow-ups
-      const first = queueController.enqueuePendingMessage(
-        sessionId,
-        'Follow-up 1',
-        undefined,
-        undefined,
-        ['s1'],
-      );
-      const second = queueController.enqueuePendingMessage(sessionId, 'Follow-up 2 with image', [
-        { name: 'chart.png', mimeType: 'image/png', base64Data: 'abc' },
-      ]);
-      expect(first.success && second.success).toBe(true);
-
-      mockPiSession.clearQueue.mockClear();
-      mockPiSession.sendUserMessage.mockClear();
-      mockPiSession.prompt.mockClear();
-
-      // Steer the first item
-      const steerResult = await queueController.steerPendingMessage(sessionId, first.item!.id);
-      expect(steerResult.success).toBe(true);
-
-      // 1. Cleared native queue
-      expect(mockPiSession.clearQueue).toHaveBeenCalled();
-
-      // 2. Prompt sent as steer
-      expect(mockPiSession.prompt).toHaveBeenCalledWith('Follow-up 1', {
-        streamingBehavior: 'steer',
-      });
-
-      // 3. Remaining follow-up 2 re-enqueued with image preserved
-      expect(mockPiSession.sendUserMessage).toHaveBeenCalledWith(expect.anything(), {
-        deliverAs: 'followUp',
-      });
-
-      // Sidecar only has follow-up 2 now
-      const list = queueController.list(sessionId);
-      expect(list).toHaveLength(1);
-      expect(list[0].id).toBe(second.item?.id);
-    });
-  });
-
   describe('onNativeUserMessageStart sidecar synchronization', () => {
     it('pops pending follow-up from sidecar and persists to SQLite upon native user message start', () => {
       const enqueued = queueController.enqueuePendingMessage(sessionId, 'Queued item');
@@ -166,32 +123,6 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       // No message added since direct prompt is already saved prior to dispatch
       expect(mockStore.addMessage).not.toHaveBeenCalled();
     });
-
-    it('does not pop pending follow-ups when an in-flight steer message starts', async () => {
-      const first = queueController.enqueuePendingMessage(sessionId, 'Steer candidate');
-      const second = queueController.enqueuePendingMessage(sessionId, 'Remaining follow-up');
-      expect(first.success && second.success).toBe(true);
-
-      mockStore.addMessage.mockClear();
-
-      // Steer candidate
-      await queueController.steerPendingMessage(sessionId, first.item!.id);
-      expect(mockStore.addMessage).toHaveBeenCalledTimes(1); // Steer message persisted
-
-      // Now message_start arrives for the steer turn
-      queueController.onNativeUserMessageStart(sessionId, activeSession);
-
-      // Remaining follow-up is NOT consumed prematurely
-      expect(queueController.list(sessionId)).toHaveLength(1);
-      expect(mockStore.addMessage).toHaveBeenCalledTimes(1); // No additional message persisted
-      expect(activeSession.summaryCheckpointGoal).toBe('Steer candidate');
-
-      // Subsequent message_start for remaining follow-up consumes it
-      queueController.onNativeUserMessageStart(sessionId, activeSession);
-      expect(queueController.list(sessionId)).toHaveLength(0);
-      expect(mockStore.addMessage).toHaveBeenCalledTimes(2);
-      expect(activeSession.summaryCheckpointGoal).toBe('Remaining follow-up');
-    });
   });
 
   describe('control actions lifecycle', () => {
@@ -210,7 +141,7 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
 
       // Settle run
       activeSession.isRunning = false;
-      await queueController.flushFollowUpQueue(sessionId, activeSession);
+      await queueController.flushControlActions(sessionId, activeSession);
 
       expect(executionOrder).toEqual([1, 2]);
       expect(queueController.hasQueuedControlActions(sessionId)).toBe(false);
@@ -226,21 +157,21 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       activeSession.isRunning = false;
       activeSession.turnFailed = true;
 
-      await queueController.flushFollowUpQueue(sessionId, activeSession);
+      await queueController.flushControlActions(sessionId, activeSession);
 
       expect(queueController.hasQueuedControlActions(sessionId)).toBe(false);
     });
   });
 
   describe('clear queue', () => {
-    it('clears both Pi native queue and sidecar metadata', () => {
+    it('clears sidecar metadata without mutating Pi queues', () => {
       queueController.enqueuePendingMessage(sessionId, 'Queued 1');
       queueController.enqueuePendingMessage(sessionId, 'Queued 2');
       expect(queueController.list(sessionId)).toHaveLength(2);
 
       queueController.clear(sessionId);
 
-      expect(mockPiSession.clearQueue).toHaveBeenCalled();
+      expect(mockPiSession.clearQueue).not.toHaveBeenCalled();
       expect(queueController.list(sessionId)).toHaveLength(0);
     });
   });

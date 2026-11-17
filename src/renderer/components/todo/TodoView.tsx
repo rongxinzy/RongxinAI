@@ -2,7 +2,6 @@ import { Button } from '@shared/components/ui/button';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -465,19 +464,6 @@ const TodoView: React.FC<TodoViewProps> = ({
                       <EmptyDescription>{i18nService.t('todoEmptyDescription')}</EmptyDescription>
                     )}
                   </EmptyHeader>
-                  {!query.trim() && activeView !== TodoViewFilter.Completed ? (
-                    <EmptyContent>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => document.getElementById('todo-new-input')?.focus()}
-                        className="gap-2"
-                      >
-                        <Plus />
-                        {i18nService.t('todoNewTask')}
-                      </Button>
-                    </EmptyContent>
-                  ) : null}
                 </Empty>
               ) : (
                 <div className="space-y-1">

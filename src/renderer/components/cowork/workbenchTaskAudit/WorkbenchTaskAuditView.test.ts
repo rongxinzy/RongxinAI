@@ -13,9 +13,8 @@ import {
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
   WorkbenchRunEventType,
-  WorkbenchRunStatus,
+  WorkbenchExecutionStatus,
   WorkbenchRunTrigger,
-  WorkbenchTaskStatus,
   type WorkbenchApproval,
   type WorkbenchArtifact,
   type WorkbenchRun,
@@ -39,12 +38,11 @@ const createTask = (
   status,
   contract: {
     kind: WorkbenchContractKind.GenericWork,
-    requiresUserAcceptance: false,
   },
   activeRunId: null,
   createdAt,
   updatedAt: createdAt,
-  completedAt: status === WorkbenchTaskStatus.Completed ? createdAt : null,
+  endedAt: status === WorkbenchExecutionStatus.Settled ? createdAt : null,
 });
 
 const createRun = (id: string, attempt: number, status: WorkbenchRun['status']): WorkbenchRun => ({
@@ -54,9 +52,8 @@ const createRun = (id: string, attempt: number, status: WorkbenchRun['status']):
   status,
   trigger: WorkbenchRunTrigger.Message,
   startedAt: Date.UTC(2026, 7, 20, 8, 0, 0),
-  endedAt: status === WorkbenchRunStatus.WaitingApproval ? null : Date.UTC(2026, 7, 20, 8, 2, 3),
+  endedAt: status === WorkbenchExecutionStatus.Running ? null : Date.UTC(2026, 7, 20, 8, 2, 3),
   context: null,
-  verificationResult: null,
   failure: null,
   createdAt: Date.UTC(2026, 7, 20, 8, 0, 0),
   updatedAt: Date.UTC(2026, 7, 20, 8, 2, 3),
@@ -117,13 +114,13 @@ test('renders the selected task summary instead of its id in the history trigger
   const currentTask = createTask(
     'task-current-id',
     'Generate a product analysis report',
-    WorkbenchTaskStatus.Completed,
+    WorkbenchExecutionStatus.Settled,
     Date.UTC(2026, 7, 19, 11, 18, 1),
   );
   const previousTask = createTask(
     'task-previous-id',
     'Organize historical data',
-    WorkbenchTaskStatus.Cancelled,
+    WorkbenchExecutionStatus.Cancelled,
     Date.UTC(2026, 7, 19, 10, 17, 35),
   );
   const detail: WorkbenchTaskDetail = {
@@ -155,13 +152,13 @@ test('renders runs, events, approvals, and artifacts as a single timeline', () =
     ...createTask(
       'task-timeline-id',
       'Inspect the timeline layout',
-      WorkbenchTaskStatus.Running,
+      WorkbenchExecutionStatus.Running,
       Date.UTC(2026, 7, 20, 8, 0, 0),
     ),
     activeRunId: 'run-2',
   };
-  const firstRun = createRun('run-1', 1, WorkbenchRunStatus.Failed);
-  const activeRun = createRun('run-2', 2, WorkbenchRunStatus.WaitingApproval);
+  const firstRun = createRun('run-1', 1, WorkbenchExecutionStatus.Failed);
+  const activeRun = createRun('run-2', 2, WorkbenchExecutionStatus.Running);
   const detail: WorkbenchTaskDetail = {
     task,
     runs: [activeRun, firstRun],

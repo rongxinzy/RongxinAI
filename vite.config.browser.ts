@@ -54,6 +54,9 @@ export default defineConfig(async () => ({
   optimizeDeps: {
     entries: ['src/renderer/main.tsx'],
     include: [
+      '@pierre/diffs/react',
+      '@pierre/diffs/worker',
+      '@pierre/diffs/worker/worker.js',
       'react',
       'react-dom',
       'react-dom/client',

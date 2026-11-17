@@ -13,8 +13,8 @@ const LOCKS_DIRECTORY_NAME = 'locks';
  * Where a Skill's Python dependencies come from.
  *
  * `core` means the packaged offline layer already satisfies the Skill's
- * requirements. `overlay` means the Skill needs a per-Skill overlay directory
- * that the app installs on demand into user data (see skillPythonDependencies).
+ * requirements. `overlay` identifies additional packaged dependencies. Actual
+ * execution and installation are owned by the workspace Python Runner.
  */
 const SkillPythonCoverage = {
   Core: 'core',

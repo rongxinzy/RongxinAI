@@ -1,5 +1,5 @@
 import { fork } from 'node:child_process';
-import { access, mkdtemp, mkdir, readFile, realpath, rm } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -18,7 +18,7 @@ const probe = async (path: string): Promise<string | undefined> =>
 const enabled = process.env.PYTHON_RUNTIME_INTEGRATION === '1';
 describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () => {
   let root: string, workspace: string, other: string, service: PythonRuntimeService;
-  let globalPythonPath: string, globalUvPath: string;
+  let globalPythonPath: string, globalUvPath: string, globalSharedPythonPath: string;
   beforeAll(async () => {
     root = await mkdtemp(join(tmpdir(), 'zhiyuan-python-integration-'));
     workspace = join(root, 'work a 雪');
@@ -40,7 +40,14 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
       (await probe(
         resolve(`resources/uv-${os}/${process.platform === 'win32' ? 'uv.exe' : 'uv'}`),
       ));
-    if (!pythonPath || !uvPath)
+    const sharedPythonPath =
+      (await probe(process.env.PYTHON_RUNTIME_BUNDLED_SHARED_PYTHON!)) ??
+      (await probe(
+        resolve(
+          `resources/skill-python/layers/shared/${process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'}`,
+        ),
+      ));
+    if (!pythonPath || !uvPath || !sharedPythonPath)
       throw new Error('Bundled managed runtime not found; run the setup:*-runtime scripts first.');
     service = new PythonRuntimeService({
       storageRoot: join(root, 'storage'),
@@ -48,9 +55,10 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
         process.env.PYTHON_RUNTIME_RUNNER ?? 'dist-electron/python-runtime-runner.cjs',
       ),
       jobRunnerPath: process.env.PYTHON_RUNTIME_JOB_HELPER,
-      preinstalledRuntime: { pythonPath, uvPath, runtimeId: bundledRuntimeId() },
+      preinstalledRuntime: { pythonPath, uvPath, sharedPythonPath, runtimeId: bundledRuntimeId() },
     });
     ({ pythonPath: globalPythonPath, uvPath: globalUvPath } = { pythonPath, uvPath });
+    globalSharedPythonPath = sharedPythonPath;
   });
   afterAll(async () => {
     await service?.shutdown();
@@ -72,24 +80,25 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
   test('install is workspace-isolated; failed install preserves active environment; explicit rebuild retains pinned dependencies', async () => {
     const installed = await service.install({
       workspace,
-      packages: ['packaging==25.0'],
+      packages: ['pyfiglet>=1.0.2,<2'],
       timeoutMs: 300000,
     });
     expect(installed.exitCode).toBe(0);
     const imported = await service.execute({
       workspace,
-      code: 'import packaging;print(packaging.__version__)',
+      code: 'import importlib.metadata;print(importlib.metadata.version("pyfiglet"))',
     });
-    expect(imported.stdout.trim()).toBe('25.0');
+    const installedVersion = imported.stdout.trim();
+    expect(installedVersion).toMatch(/^1\./);
     const isolated = await service.execute({
       workspace: other,
-      code: 'import importlib.util;print(importlib.util.find_spec("packaging"))',
+      code: 'import importlib.util;print(importlib.util.find_spec("pyfiglet"))',
     });
     expect(isolated.stdout.trim()).toBe('None');
     expect(isolated.environmentId).not.toBe(imported.environmentId);
     const failed = await service.install({
       workspace,
-      packages: ['packaging==0.0.0'],
+      packages: ['pyfiglet==0.0.0'],
       timeoutMs: 300000,
     });
     expect(failed.exitCode).not.toBe(0);
@@ -100,10 +109,67 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
     expect(rebuilt.environmentId).not.toBe(imported.environmentId);
     expect(
       (
-        await service.execute({ workspace, code: 'import packaging;print(packaging.__version__)' })
+        await service.execute({
+          workspace,
+          code: 'import importlib.metadata;print(importlib.metadata.version("pyfiglet"))',
+        })
       ).stdout.trim(),
-    ).toBe('25.0');
+    ).toBe(installedVersion);
   }, 310000);
+  test('preinstalled office libraries work offline and workspace package files are independent', async () => {
+    const work = join(root, 'offline workspace');
+    const another = join(root, 'offline other');
+    await mkdir(work);
+    await mkdir(another);
+    // Baseline creation must succeed even if both network indexes are unreachable.
+    const originalIndex = process.env.UV_INDEX;
+    const originalDefault = process.env.UV_DEFAULT_INDEX;
+    process.env.UV_INDEX = 'http://127.0.0.1:1/simple';
+    process.env.UV_DEFAULT_INDEX = 'http://127.0.0.1:1/simple';
+    try {
+      const baseline = await service.execute({
+        workspace: work,
+        code: 'import pandas,numpy,openpyxl,matplotlib,reportlab,pypdf,pypdfium2,PIL;print("office ready")',
+      });
+      expect(baseline.exitCode, baseline.stderr).toBe(0);
+      expect(baseline.stdout.trim()).toBe('office ready');
+      const changed = await service.execute({
+        workspace: work,
+        code: 'import pathlib,sysconfig;pathlib.Path(sysconfig.get_path("purelib"),"workspace_only_package.py").write_text("value = 7")',
+      });
+      expect(changed.exitCode).toBe(0);
+      const isolated = await service.execute({
+        workspace: another,
+        code: 'import importlib.util;print(importlib.util.find_spec("workspace_only_package"))',
+      });
+      expect(isolated.stdout.trim()).toBe('None');
+      expect(isolated.environmentId).not.toBe(baseline.environmentId);
+    } finally {
+      if (originalIndex === undefined) delete process.env.UV_INDEX;
+      else process.env.UV_INDEX = originalIndex;
+      if (originalDefault === undefined) delete process.env.UV_DEFAULT_INDEX;
+      else process.env.UV_DEFAULT_INDEX = originalDefault;
+    }
+  }, 120000);
+  test('Skill scripts use the same workspace interpreter and declared dependency gate', async () => {
+    const scriptPath = join(root, 'inspect workspace.py');
+    await writeFile(join(root, 'skill_sibling.py'), 'value = 42\n');
+    await writeFile(
+      scriptPath,
+      'import pyfiglet,sys,json,skill_sibling;assert skill_sibling.value == 42;print(json.dumps([sys.executable,sys.argv[1:]]))',
+    );
+    const script = await service.execute({ workspace, scriptPath, args: ['a b', '雪'] });
+    const prepared = await service.prepare({ workspace });
+    expect(script.exitCode, script.stderr).toBe(0);
+    expect(JSON.parse(script.stdout)).toEqual([prepared.pythonPath, ['a b', '雪']]);
+    expect(script.environmentId).toBe(prepared.environmentId);
+    const requirementsPath = join(root, 'requirements.txt');
+    await writeFile(requirementsPath, 'pandas>=99\n');
+    await expect(
+      service.execute({ workspace, scriptPath, skill: { skillId: 'xlsx', requirementsPath } }),
+    ).rejects.toThrow('Skill dependency manifest');
+    expect((await service.prepare({ workspace })).environmentId).toBe(prepared.environmentId);
+  }, 120000);
   test('the pinned Python runs a compiled NumPy wheel without using system Python', async () => {
     const installed = await service.install({
       workspace,
@@ -150,6 +216,7 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
           preinstalledRuntime: {
             pythonPath: globalPythonPath,
             uvPath: globalUvPath,
+            sharedPythonPath: globalSharedPythonPath,
             runtimeId: bundledRuntimeId(),
           },
           input: {

@@ -2,15 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CoworkErrorKind } from '../../../common/coworkError';
 
-const hoisted = vi.hoisted(() => ({
-  mockCancelPiRetry: vi.fn(async () => undefined),
-}));
-
-vi.mock('./piRetryCancellation', () => ({
-  cancelPiRetry: hoisted.mockCancelPiRetry,
-  waitForPiRetryCancellation: vi.fn(async () => undefined),
-}));
-
 import { PiRuntimeTurnEvents, type PiRuntimeTurnHost } from './piRuntimeTurnEvents';
 import type { ActivePiSession } from './piRuntimeSessionState';
 import { PiAgentEventType, PiCompactionReason } from './piStreamConstants';
@@ -22,8 +13,6 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
   let activeSession: Partial<ActivePiSession>;
 
   beforeEach(() => {
-    hoisted.mockCancelPiRetry.mockClear();
-
     mockHost = {
       getStore: vi.fn(() => null),
       getWorkbench: vi.fn(() => null),
@@ -37,10 +26,8 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
       getActiveSession: vi.fn(() => activeSession as ActivePiSession),
       emit: vi.fn(),
       stopActiveSession: vi.fn(),
-      flushFollowUpQueue: vi.fn(async () => undefined),
+      flushControlActions: vi.fn(async () => undefined),
       flushPendingError: vi.fn(() => false),
-      imageCapabilityConfiguration: vi.fn(() => ({}) as never),
-      syncImageInputCapability: vi.fn(async () => undefined),
       createSessionMemoryCompletion: vi.fn(() => ({}) as never),
       recordSummaryOmission: vi.fn(async () => undefined),
     };
@@ -48,7 +35,7 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
     turnEvents = new PiRuntimeTurnEvents(mockHost);
 
     activeSession = {
-      piSession: {} as never,
+      piSession: { abort: vi.fn() } as never,
       pendingError: null,
       errorSurfaced: false,
       turnFailed: false,
@@ -99,7 +86,6 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
 
     expect(activeSession.pendingError).toBeDefined();
     expect(activeSession.pendingError?.classified.kind).toBe(CoworkErrorKind.InputTooLong);
-    expect(activeSession.pendingError?.sticky).toBeFalsy();
   });
 
   it('does NOT cancel Pi retry when auto_retry_start arrives on context overflow', () => {
@@ -131,7 +117,7 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
     );
 
     // 3. cancelPiRetry must NOT have been called!
-    expect(hoisted.mockCancelPiRetry).not.toHaveBeenCalled();
+    expect(activeSession.piSession!.abort).not.toHaveBeenCalled();
     expect(activeSession.retryAttempts).toBe(1);
   });
 
@@ -150,8 +136,6 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
       } as never,
     );
 
-    expect(activeSession.pendingError?.sticky).toBeFalsy();
-
     turnEvents.handlePiEvent(
       'test-session',
       activeSession as ActivePiSession,
@@ -161,10 +145,10 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
       } as never,
     );
 
-    expect(hoisted.mockCancelPiRetry).not.toHaveBeenCalled();
+    expect(activeSession.piSession!.abort).not.toHaveBeenCalled();
   });
 
-  it('cancels Pi retry for image capability rejection', () => {
+  it('leaves image capability rejection retry to Pi', () => {
     turnEvents.handlePiEvent(
       'test-session',
       activeSession as ActivePiSession,
@@ -178,8 +162,6 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
       } as never,
     );
 
-    expect(activeSession.pendingError?.sticky).toBe(true);
-
     turnEvents.handlePiEvent(
       'test-session',
       activeSession as ActivePiSession,
@@ -189,7 +171,7 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
       } as never,
     );
 
-    expect(hoisted.mockCancelPiRetry).toHaveBeenCalledOnce();
+    expect(activeSession.piSession!.abort).not.toHaveBeenCalled();
   });
 
   it('surfaces the summary failure at settlement without completing or cancelling native recovery', () => {
@@ -199,9 +181,9 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
       errorMessage: 'Auto-compaction failed: summary unavailable',
     });
     expect(activeSession.pendingError?.message).toContain('summary unavailable');
-    expect(activeSession.pendingError?.sticky).toBeFalsy();
+
     expect(mockHost.flushPendingError).not.toHaveBeenCalled();
-    expect(hoisted.mockCancelPiRetry).not.toHaveBeenCalled();
+    expect(activeSession.piSession!.abort).not.toHaveBeenCalled();
     turnEvents.handlePiEvent('test-session', activeSession as ActivePiSession, {
       type: PiAgentEventType.AgentSettled,
     });
@@ -223,25 +205,6 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
     expect(activeSession.turnFailed).toBe(false);
   });
 
-  it('preserves an existing sticky image capability error when compaction also fails', () => {
-    turnEvents.handlePiEvent('test-session', activeSession as ActivePiSession, {
-      type: PiAgentEventType.MessageEnd,
-      message: {
-        role: 'assistant',
-        stopReason: PiAssistantStopReason.Error,
-        errorMessage: 'image input is not supported for this model',
-      },
-    });
-    const original = activeSession.pendingError;
-    expect(original?.sticky).toBe(true);
-    turnEvents.handlePiEvent('test-session', activeSession as ActivePiSession, {
-      type: PiAgentEventType.CompactionEnd,
-      reason: PiCompactionReason.Threshold,
-      errorMessage: 'Auto-compaction failed: summary unavailable',
-    });
-    expect(activeSession.pendingError).toBe(original);
-  });
-
   it.each([
     { reason: PiCompactionReason.Manual, aborted: false },
     { reason: PiCompactionReason.Overflow, aborted: true },
@@ -253,6 +216,6 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
     });
     expect(activeSession.pendingError).toBeNull();
     expect(activeSession.turnFailed).toBe(false);
-    expect(hoisted.mockCancelPiRetry).not.toHaveBeenCalled();
+    expect(activeSession.piSession!.abort).not.toHaveBeenCalled();
   });
 });

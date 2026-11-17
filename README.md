@@ -46,7 +46,7 @@
 
 ## Get started
 
-1. **Download** from the [official website](https://www.rongxzyai.com/#download) or [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases): **Windows** x64 lite, CPU, and CUDA installers (`.exe`); **macOS** Apple Silicon and Intel CPU builds (`.dmg` and `.zip`); **Linux** x64 CPU and CUDA packages (`.deb` and AppImage).
+1. **Download** from the [official website](https://www.rongxzyai.com/#download) or [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases): **Windows** x64 lite and CUDA installers (`.exe`); **macOS** Apple Silicon and Intel CPU builds (`.dmg` and `.zip`); **Linux** x64 lite and CUDA packages (`.deb` and AppImage).
 2. **Open the app** and chat with the built-in free model — no API key required.
 3. **Pick a project folder**, describe your task, then follow progress and approve actions as it works.
 
@@ -160,8 +160,8 @@ The edition is selected with `ZHIYUAN_UPDATE_VARIANT` and decides which bundled 
 | --- | --- |
 | `bun run dist:win` / `dist:win:offline` / `dist:win:lite` | Unsigned Windows x64 lite build: the WebView2 installer `ZhiYuanAgent-Setup-<version>.exe` plus the NSIS updater |
 | `bun run dist:win:cpu` / `dist:win:cuda` | Same, cpu or cuda edition |
-| `bun run dist:win:signed` / `dist:win:signed:cpu` / `dist:win:signed:cuda` | Certum-signed lite / cpu / cuda; requires `CERTUM_CERT_THUMBPRINT`, used by the release workflow |
-| `bun run dist:linux:cpu` / `dist:linux:cuda` | Linux deb + AppImage, cpu or cuda (`dist:linux:cuda` compiles the CUDA llama-server locally with `scripts/build-llamacpp-cuda-rtx40.sh`) |
+| `bun run dist:win:signed` / `dist:win:signed:cuda` | Certum-signed lite / cuda; requires `CERTUM_CERT_THUMBPRINT`, used by the release workflow |
+| `ZHIYUAN_UPDATE_VARIANT=lite bun run dist:linux` / `bun run dist:linux:cuda` | Linux deb + AppImage, lite or cuda (`dist:linux:cuda` compiles the CUDA llama-server locally with `scripts/build-llamacpp-cuda-rtx40.sh`) |
 | `bun run dist:mac:arm64` / `dist:mac:x64` | macOS packages; the release workflow builds them as the cpu edition |
 
 Packaging also involves platform runtimes, resources, and signing configuration; see [CONTRIBUTING.md](CONTRIBUTING.md), [RELEASING.md](RELEASING.md), and [`package.json`](package.json).

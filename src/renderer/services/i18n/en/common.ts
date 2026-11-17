@@ -12,6 +12,7 @@ export const enCommon: Record<string, string> = {
   saving: 'Saving...',
   delete: 'Delete',
   edit: 'Edit',
+  configure: 'Configure',
   create: 'Create',
   clear: 'Clear',
   pagination: 'Pagination',

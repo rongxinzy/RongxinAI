@@ -1,5 +1,6 @@
 import { fork, spawn, type ChildProcess } from 'node:child_process';
 import { access } from 'node:fs/promises';
+import { applyUvPackageIndexDefaults } from '../libs/pythonPackageIndexes';
 
 export type ProcessResult = {
   stdout: string;
@@ -8,6 +9,28 @@ export type ProcessResult = {
   truncated: boolean;
 };
 const MAX_OUTPUT = 1024 * 1024;
+
+/** Fails closed on Windows when `job-runner.exe` is missing or inaccessible. */
+export async function assertWindowsJobRunnerAvailable(
+  jobRunnerPath: string | undefined,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  if (platform !== 'win32') return;
+  if (!jobRunnerPath) {
+    throw new Error('The Windows Python Job Object helper is missing.');
+  }
+  try {
+    await access(jobRunnerPath);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      throw new Error(
+        `The Windows Python Job Object helper is missing (${jobRunnerPath}). Run "bun run python:build:job-runner" in development or reinstall the application.`,
+      );
+    }
+    throw error;
+  }
+}
 
 /** No shell. Windows cannot execute without the real Job Object owner. */
 export async function runProcess(
@@ -21,10 +44,7 @@ export async function runProcess(
   },
 ): Promise<ProcessResult> {
   options.signal.throwIfAborted();
-  if (process.platform === 'win32') {
-    if (!options.jobRunnerPath) throw new Error('The Windows Python Job Object helper is missing.');
-    await access(options.jobRunnerPath);
-  }
+  await assertWindowsJobRunnerAvailable(options.jobRunnerPath);
   return new Promise((resolve, reject) => {
     const supervisorPath =
       process.platform !== 'win32' ? process.env.ZHIYUAN_PYTHON_RUNNER_ENTRY : undefined;
@@ -121,6 +141,10 @@ export function isolatedEnvironment(root: string): NodeJS.ProcessEnv {
     'LC_ALL',
     'COMSPEC',
     'PATHEXT',
+    'ZHIYUAN_ELECTRON_PATH',
+    'ZHIYUAN_NPM_BIN_DIR',
+    'ZHIYUAN_NODE_SHIM_ACTIVE',
+    'NODE_PATH',
   ]) {
     if (process.env[key]) env[key] = process.env[key];
   }
@@ -151,9 +175,12 @@ export function runtimeNetworkEnvironment(root: string): NodeJS.ProcessEnv {
     'SSL_CERT_FILE',
     'SSL_CERT_DIR',
     'NODE_EXTRA_CA_CERTS',
+    'UV_INDEX',
+    'UV_DEFAULT_INDEX',
   ])
     if (process.env[key]) env[key] = process.env[key];
   env.NODE_USE_ENV_PROXY = '1';
+  applyUvPackageIndexDefaults(env);
   return env;
 }
 

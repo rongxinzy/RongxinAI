@@ -24,6 +24,9 @@ function captureBuild(args: string[], env: NodeJS.ProcessEnv, failPackaging = fa
         return { status: failPackaging && args.includes('electron-builder') ? 1 : 0 };
       },
     },
+    './python-runtime/ensure-job-runner.cjs': {
+      ensureWindowsJobRunner: () => ({ status: 'fresh', outputPath: 'fixture' }),
+    },
   };
   const execute = () =>
     vm.runInNewContext(source, {

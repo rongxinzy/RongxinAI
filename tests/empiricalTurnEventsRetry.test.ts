@@ -20,17 +20,6 @@ vi.mock('../src/main/libs/llamacppRunningModelRegistry', () => ({
   getLlamaCppModelAgentEligibility: hoistedRegistry.getLlamaCppModelAgentEligibility,
 }));
 
-// ── Hoisted mocks for Pi Retry Cancellation ──────────────────────────────────
-const hoistedRetry = vi.hoisted(() => ({
-  cancelPiRetry: vi.fn(async () => undefined),
-  waitForPiRetryCancellation: vi.fn(async () => undefined),
-}));
-
-vi.mock('../src/main/libs/agentEngine/piRetryCancellation', () => ({
-  cancelPiRetry: hoistedRetry.cancelPiRetry,
-  waitForPiRetryCancellation: hoistedRetry.waitForPiRetryCancellation,
-}));
-
 import {
   assertLlamaCppWorkModeContext,
   assertWorkModeContextWindow,
@@ -48,8 +37,6 @@ describe('Empirical Verification Harness — Context Window Guard, Sizing & Auto
     setLanguage('en');
     hoistedRegistry.isLlamaCppModelRunning.mockReset();
     hoistedRegistry.getLlamaCppModelAgentEligibility.mockReset();
-    hoistedRetry.cancelPiRetry.mockClear();
-    hoistedRetry.waitForPiRetryCancellation.mockClear();
   });
 
   // Suite 3: Event flow & cancellation matrix in piRuntimeTurnEvents
@@ -75,10 +62,8 @@ describe('Empirical Verification Harness — Context Window Guard, Sizing & Auto
         getActiveSession: vi.fn(() => activeSession as ActivePiSession),
         emit: vi.fn(),
         stopActiveSession: vi.fn(),
-        flushFollowUpQueue: vi.fn(async () => undefined),
+        flushControlActions: vi.fn(async () => undefined),
         flushPendingError: vi.fn(() => false),
-        imageCapabilityConfiguration: vi.fn(() => ({}) as never),
-        syncImageInputCapability: vi.fn(async () => undefined),
         createSessionMemoryCompletion: vi.fn(() => ({}) as never),
         recordSummaryOmission: vi.fn(async () => undefined),
       };
@@ -86,7 +71,7 @@ describe('Empirical Verification Harness — Context Window Guard, Sizing & Auto
       turnEvents = new PiRuntimeTurnEvents(mockHost);
 
       activeSession = {
-        piSession: { id: 'test-pi-session' } as never,
+        piSession: { abort: vi.fn() } as never,
         pendingError: null,
         errorSurfaced: false,
         turnFailed: false,
@@ -121,29 +106,23 @@ describe('Empirical Verification Harness — Context Window Guard, Sizing & Auto
     });
 
     const errorScenarios = [
-      // 1. Context overflow errors (must NOT be sticky, must NOT be cancelled on auto_retry_start)
+      // 1. Context overflow errors leave retry ownership with Pi
       {
         name: 'Context overflow HTTP 400',
         rawError: 'HTTP 400: context_length_exceeded: maximum context length is 8192 tokens',
         expectedKind: CoworkErrorKind.InputTooLong,
-        expectSticky: false,
-        expectCancelledOnRetry: false,
       },
       {
         name: 'Prompt too long HTTP 413',
         rawError:
           'Invalid request: prompt is too long. context length exceeded: maximum context length is 8192 tokens',
         expectedKind: CoworkErrorKind.InputTooLong,
-        expectSticky: false,
-        expectCancelledOnRetry: false,
       },
       {
         name: 'OpenAI Range of input length overflow',
         rawError:
           'The request was rejected because the range of input length exceeds maximum 32768',
         expectedKind: CoworkErrorKind.InputTooLong,
-        expectSticky: false,
-        expectCancelledOnRetry: false,
       },
 
       // 2. Client-side error classification leaves non-image retry eligibility to Pi
@@ -151,97 +130,70 @@ describe('Empirical Verification Harness — Context Window Guard, Sizing & Auto
         name: 'Invalid API Key (AuthExpired)',
         rawError: 'Unauthorized: invalid api key provided',
         expectedKind: CoworkErrorKind.AuthExpired,
-        expectSticky: false,
-        expectCancelledOnRetry: false,
       },
       {
         name: 'Model Not Found (ModelNotFound)',
         rawError: 'The model `deepseek-chat-nonexistent` does not exist',
         expectedKind: CoworkErrorKind.ModelNotFound,
-        expectSticky: false,
-        expectCancelledOnRetry: false,
       },
       {
         name: 'Quota / Budget Exceeded (BudgetExceeded)',
         rawError:
           'You have exceeded your current quota, please check your plan and billing details',
         expectedKind: CoworkErrorKind.BudgetExceeded,
-        expectSticky: false,
-        expectCancelledOnRetry: false,
       },
-      // 3. Image capability rejections stay sticky and cancel SDK retries
+      // 3. Image capability errors also leave retry ownership with Pi
       {
         name: 'Model Capability Unsupported',
         rawError: 'image input is not supported for this model',
         expectedKind: CoworkErrorKind.ModelCapabilityUnsupported,
-        expectSticky: true,
-        expectCancelledOnRetry: true,
       },
 
-      // 3. Transient auto-retryable errors (sticky = false, retry allowed)
+      // 3. Transient auto-retryable errors
       {
         name: 'Rate Limit 429 (RateLimited)',
         rawError: 'HTTP 429: Too Many Requests. rate limit exceeded',
         expectedKind: CoworkErrorKind.RateLimited,
-        expectSticky: false,
-        expectCancelledOnRetry: false,
       },
       {
         name: 'Upstream Server Error 502 (ServerError)',
         rawError: 'HTTP 502: Bad Gateway',
         expectedKind: CoworkErrorKind.ServerError,
-        expectSticky: false,
-        expectCancelledOnRetry: false,
       },
     ];
 
-    it.each(errorScenarios)(
-      'evaluates error scenario "$name" -> kind=$expectedKind sticky=$expectSticky cancelled=$expectCancelledOnRetry',
-      scenario => {
-        // Step 1: Simulate error event on message_end
-        turnEvents.handlePiEvent(
-          'session-1',
-          activeSession as ActivePiSession,
-          {
-            type: 'message_end',
-            message: {
-              role: 'assistant',
-              stopReason: 'error',
-              errorMessage: scenario.rawError,
-            },
-          } as never,
-        );
+    it.each(errorScenarios)('evaluates error scenario "$name" -> kind=$expectedKind', scenario => {
+      // Step 1: Simulate error event on message_end
+      turnEvents.handlePiEvent(
+        'session-1',
+        activeSession as ActivePiSession,
+        {
+          type: 'message_end',
+          message: {
+            role: 'assistant',
+            stopReason: 'error',
+            errorMessage: scenario.rawError,
+          },
+        } as never,
+      );
 
-        // Verify classification
-        expect(activeSession.pendingError).toBeDefined();
-        expect(activeSession.pendingError?.classified.kind).toBe(scenario.expectedKind);
+      // Verify classification
+      expect(activeSession.pendingError).toBeDefined();
+      expect(activeSession.pendingError?.classified.kind).toBe(scenario.expectedKind);
 
-        // Verify sticky flag
-        if (scenario.expectSticky) {
-          expect(activeSession.pendingError?.sticky).toBe(true);
-        } else {
-          expect(activeSession.pendingError?.sticky).toBeFalsy();
-        }
+      // Step 2: Simulate auto_retry_start from Pi SDK
+      turnEvents.handlePiEvent(
+        'session-1',
+        activeSession as ActivePiSession,
+        {
+          type: 'auto_retry_start',
+          attempt: 1,
+        } as never,
+      );
 
-        // Step 2: Simulate auto_retry_start from Pi SDK
-        turnEvents.handlePiEvent(
-          'session-1',
-          activeSession as ActivePiSession,
-          {
-            type: 'auto_retry_start',
-            attempt: 1,
-          } as never,
-        );
-
-        // Verify whether cancelPiRetry was invoked
-        if (scenario.expectCancelledOnRetry) {
-          expect(hoistedRetry.cancelPiRetry).toHaveBeenCalledOnce();
-        } else {
-          expect(hoistedRetry.cancelPiRetry).not.toHaveBeenCalled();
-          expect(activeSession.retryAttempts).toBe(1);
-        }
-      },
-    );
+      expect(activeSession.piSession!.abort).not.toHaveBeenCalled();
+      expect(activeSession.retryAttempts).toBe(1);
+    });
 
     it('clears pendingError on successful retry message_end', () => {
       // 1. Initial overflow error

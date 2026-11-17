@@ -1,0 +1,300 @@
+import { MessageActions } from '@shared/components/conversation';
+import { Alert, AlertDescription } from '@shared/components/ui/alert';
+import { Button } from '@shared/components/ui/button';
+import { Check, Copy, Info, TriangleAlert } from 'lucide-react';
+import React, { useCallback, useState } from 'react';
+
+import { type CoworkErrorKind, getUserErrorI18nKey } from '../../../../common/coworkError';
+import { getScheduledReminderDisplayText } from '../../../../scheduledTask/reminderText';
+import {
+  CoworkInterruptionCause,
+  type CoworkSessionInterruption,
+} from '../../../../shared/cowork/interruption';
+import { i18nService } from '../../../services/i18n';
+import type { CoworkMessage, CoworkPermissionResult } from '../../../types/cowork';
+import type { Skill } from '../../../types/skill';
+import ArtifactPreviewCard from '../../artifacts/ArtifactPreviewCard';
+import { ExpertAvatar } from '../../expert/expertAvatars';
+import AskUserQuestionCard from '../../cowork/AskUserQuestionCard';
+import { WorkingIndicator } from '../../cowork/components/WorkingIndicator';
+import type { ConversationTurn, NoticeTurnPart, ToolTurnPart } from '../model/types';
+import {
+  getToolCategoryActionLabel,
+  getToolDisplayName,
+  getToolInputSummary,
+} from '../tools/toolFormatters';
+import { ToolGroupView } from '../tools/ToolGroupView';
+import { ToolPartView } from '../tools/ToolPartView';
+import { AssistantTextPartView } from './AssistantTextPartView';
+import { ThinkingPartView } from './ThinkingPartView';
+import { UserPromptBubble } from './UserPromptBubble';
+
+interface TurnViewProps {
+  turn: ConversationTurn;
+  skills: Skill[];
+  cwd?: string;
+  forceExpand?: boolean;
+  onReEdit?: (message: CoworkMessage) => void;
+  onRespondToPermission?: (result: CoworkPermissionResult) => void | Promise<void>;
+  onRespondToQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
+}
+
+const getInterruptionLabel = (interruption: CoworkSessionInterruption): string => {
+  switch (interruption.cause) {
+    case CoworkInterruptionCause.ApprovalDenied:
+      return i18nService.t('coworkInterruptionApprovalDenied');
+    case CoworkInterruptionCause.RuntimePaused:
+      return i18nService.t('coworkInterruptionRuntimePaused');
+    case CoworkInterruptionCause.UserStop:
+    default:
+      return i18nService.t('coworkInterruptionUserStop');
+  }
+};
+
+const NoticePartView: React.FC<{ part: NoticeTurnPart }> = ({ part }) => {
+  const errorKind = part.message.metadata?.errorKind as CoworkErrorKind | undefined;
+  const key = part.isError && errorKind ? getUserErrorI18nKey(errorKind) : null;
+  const raw = part.interruption
+    ? getInterruptionLabel(part.interruption)
+    : key
+      ? i18nService.t(key)
+      : part.message.content.trim()
+        ? part.message.content
+        : typeof part.message.metadata?.error === 'string'
+          ? part.message.metadata.error
+          : '';
+  const text = getScheduledReminderDisplayText(raw) ?? raw;
+  if (!text.trim()) return null;
+
+  return (
+    <Alert>
+      {part.isError ? <TriangleAlert /> : <Info />}
+      <AlertDescription className="flex flex-wrap items-center gap-2">
+        <span className="whitespace-pre-wrap">{text}</span>
+      </AlertDescription>
+    </Alert>
+  );
+};
+
+const CopyResponseButton: React.FC<{ content: string }> = ({ content }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Ignore clipboard denial in non-focused environments.
+    }
+  }, [content]);
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      aria-label={i18nService.t('copy')}
+      title={i18nService.t('copy')}
+      onClick={() => void handleCopy()}
+    >
+      {copied ? (
+        <Check className="theme-conversation-icon" />
+      ) : (
+        <Copy className="theme-conversation-icon" />
+      )}
+    </Button>
+  );
+};
+
+type BottomActivityState =
+  | { kind: 'initial' }
+  | { kind: 'waiting'; resetKey: string }
+  | { kind: 'tool'; tool: ToolTurnPart };
+
+const resolveBottomActivity = (turn: ConversationTurn): BottomActivityState | null => {
+  if (!turn.isStreaming || turn.hasApproval) return null;
+  if (turn.parts.length === 0) return { kind: 'initial' };
+
+  let activeTool: ToolTurnPart | null = null;
+  for (const part of turn.parts) {
+    if (part.kind === 'tool') {
+      if (part.phase === 'input-streaming' || part.phase === 'running') {
+        activeTool = part;
+      }
+    } else if (part.kind === 'tool_group') {
+      for (const nested of part.parts) {
+        if (
+          nested.kind === 'tool' &&
+          (nested.phase === 'input-streaming' || nested.phase === 'running')
+        ) {
+          activeTool = nested;
+        }
+      }
+    }
+  }
+  if (activeTool) return { kind: 'tool', tool: activeTool };
+
+  const lastPart = turn.parts[turn.parts.length - 1];
+  if (lastPart?.kind === 'reasoning' && lastPart.isStreaming) return null;
+  if (
+    lastPart?.kind === 'tool_group' &&
+    lastPart.parts.some(nested => nested.kind === 'reasoning' && nested.isStreaming)
+  ) {
+    return null;
+  }
+  if (lastPart?.kind === 'text' && lastPart.isStreaming && lastPart.message.content.trim()) {
+    return null;
+  }
+
+  return { kind: 'waiting', resetKey: `${turn.id}:${lastPart?.id ?? 'tail'}` };
+};
+
+const renderBottomActivity = (activity: BottomActivityState | null): React.ReactNode => {
+  if (!activity) return null;
+  if (activity.kind === 'initial') return <WorkingIndicator />;
+  if (activity.kind === 'waiting') {
+    return (
+      <WorkingIndicator
+        statusLabel={i18nService.t('coworkRunWaiting')}
+        showElapsedImmediately
+        resetKey={activity.resetKey}
+      />
+    );
+  }
+  const { tool } = activity;
+  const actionLabel = getToolCategoryActionLabel(tool.category);
+  const displayName = getToolDisplayName(tool.toolName);
+  const statusLabel =
+    tool.category === 'other' ||
+    tool.category === 'mcp' ||
+    tool.category === 'python' ||
+    tool.category === 'skill'
+      ? `${actionLabel} ${displayName}`
+      : `${actionLabel} (${displayName})`;
+  const summary = getToolInputSummary(tool.toolName, tool.input);
+  const charsText =
+    tool.phase === 'input-streaming' && tool.progress?.argsChars
+      ? i18nService
+          .t('coworkExecutionGeneratedChars')
+          .replace('{chars}', tool.progress.argsChars.toLocaleString())
+      : null;
+  const detailLabel = [summary, charsText].filter(Boolean).join(' · ') || undefined;
+
+  return (
+    <WorkingIndicator
+      statusLabel={statusLabel}
+      detailLabel={detailLabel}
+      showElapsedImmediately
+      resetKey={`${tool.toolCallId}:${tool.phase}`}
+    />
+  );
+};
+
+/**
+ * Renders one user+assistant turn in normal DOM order; offscreen virtualization
+ * is owned by `ConversationThread` via `@tanstack/react-virtual`.
+ */
+export const TurnView: React.FC<TurnViewProps> = React.memo(
+  ({
+    turn,
+    skills,
+    cwd,
+    forceExpand = false,
+    onReEdit,
+    onRespondToPermission,
+    onRespondToQuestion,
+  }) => {
+    const primaryExpert = turn.experts[0];
+    const bottomActivity = resolveBottomActivity(turn);
+    const hasAssistantBody =
+      turn.parts.length > 0 ||
+      turn.deliverables.length > 0 ||
+      turn.isStreaming ||
+      Boolean(primaryExpert);
+
+    return (
+      <section data-turn-id={turn.id} data-turn-index={turn.index}>
+        {turn.userMessage ? (
+          <UserPromptBubble message={turn.userMessage} skills={skills} onReEdit={onReEdit} />
+        ) : null}
+
+        {hasAssistantBody ? (
+          <div data-export-role="assistant-block" className="group/turn pt-2 pb-4">
+            <div className="mx-auto w-full max-w-4xl min-w-[320px]">
+              <div className="flex min-w-0 flex-col gap-2.5">
+                {primaryExpert ? (
+                  <div className="flex items-center gap-2 theme-conversation-heading">
+                    <ExpertAvatar
+                      name={primaryExpert.presetId}
+                      label={primaryExpert.expertName}
+                      className="theme-conversation-avatar"
+                    />
+                    <span className="truncate">{primaryExpert.expertName}</span>
+                  </div>
+                ) : null}
+
+                {turn.parts.map(part => {
+                  switch (part.kind) {
+                    case 'reasoning':
+                      return <ThinkingPartView key={part.id} part={part} />;
+                    case 'text':
+                      return <AssistantTextPartView key={part.id} part={part} cwd={cwd} />;
+                    case 'tool':
+                      return (
+                        <ToolPartView
+                          key={part.id}
+                          part={part}
+                          forceExpand={forceExpand}
+                          onRespondToPermission={onRespondToPermission}
+                        />
+                      );
+                    case 'tool_group':
+                      return (
+                        <ToolGroupView
+                          key={part.id}
+                          group={part}
+                          forceExpand={forceExpand}
+                          onRespondToPermission={onRespondToPermission}
+                        />
+                      );
+                    case 'question':
+                      return onRespondToQuestion ? (
+                        <AskUserQuestionCard
+                          key={part.id}
+                          permission={part.permission}
+                          onRespond={onRespondToQuestion}
+                        />
+                      ) : null;
+                    case 'notice':
+                      return <NoticePartView key={part.id} part={part} />;
+                    default:
+                      return null;
+                  }
+                })}
+
+                {renderBottomActivity(bottomActivity)}
+
+                {turn.deliverables.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {turn.deliverables.map(artifact => (
+                      <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
+                    ))}
+                  </div>
+                ) : null}
+
+                {!turn.isStreaming && turn.copyText ? (
+                  <MessageActions align="start" visible={forceExpand}>
+                    <CopyResponseButton content={turn.copyText} />
+                  </MessageActions>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </section>
+    );
+  },
+);
+
+TurnView.displayName = 'TurnView';

@@ -388,64 +388,6 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
         },
       };
     },
-    updatePendingMessage: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.updatePendingMessage');
-      return {
-        success: true,
-        item: {
-          id: 'preview',
-          text: '',
-          delivery: 'followUp',
-          createdAt: 1792108800000,
-          status: 'failed',
-          imageAttachments: [],
-          fileAttachments: [],
-          skillIds: [],
-        },
-      };
-    },
-    deletePendingMessage: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.deletePendingMessage');
-      return {
-        success: true,
-      };
-    },
-    steerPendingMessage: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.steerPendingMessage');
-      return {
-        success: true,
-        item: {
-          id: 'preview',
-          text: '',
-          delivery: 'followUp',
-          createdAt: 1792108800000,
-          status: 'failed',
-          imageAttachments: [],
-          fileAttachments: [],
-          skillIds: [],
-        },
-      };
-    },
-    followUpPendingMessage: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.followUpPendingMessage');
-      return {
-        success: true,
-        item: {
-          id: 'preview',
-          text: '',
-          delivery: 'followUp',
-          createdAt: 1792108800000,
-          status: 'failed',
-          imageAttachments: [],
-          fileAttachments: [],
-          skillIds: [],
-        },
-      };
-    },
     getConfig: async () => {
       runtime.warnOnce('cowork.getConfig');
       return {

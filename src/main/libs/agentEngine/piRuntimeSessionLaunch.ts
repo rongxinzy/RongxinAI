@@ -7,6 +7,8 @@
  * of the initial (history- and memory-augmented) prompt.
  */
 
+import { observeWorkbench } from '../../workbenchTask/observe';
+
 import { randomUUID } from 'crypto';
 
 import { classifyCoworkError } from '../../../common/coworkError';
@@ -40,7 +42,7 @@ import { resolvePiSkillRoots } from './piSkillRoots';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
 import { createPiTranslatorState } from './piTranslate/piTranslateUiMessageChunk';
-import { PiEventProjectionQueue } from './piEventProjectionQueue';
+import { PiEventProjection } from './piEventProjection';
 import { ToolActivityTracker } from './toolActivity';
 import { collectImagePathReferences } from './piImageInputFallback';
 import { DEFAULT_PI_LOCAL_MAX_TOKENS, resolvePiModel } from './piMagpiePiModel';
@@ -79,7 +81,7 @@ export async function startPiRuntimeSession(
   const expertIds = normalizeSingleExpertIds(options.expertIds);
 
   if (host.activeSessions.has(sessionId) || host.initializingSessions.has(sessionId)) {
-    host.stopActiveSession(sessionId, 'The session was replaced by a new run.', false);
+    host.stopActiveSession(sessionId, 'The session was replaced by a new run.');
   }
 
   const abortController = new AbortController();
@@ -212,16 +214,20 @@ export async function startPiRuntimeSession(
     );
 
     const workflowKind = chatMode ? WorkbenchContractKind.Chat : WorkbenchContractKind.GenericWork;
-    const workbenchTaskService = host.getWorkbenchTaskService();
-    if (workbenchTaskService && !chatMode) {
-      const workbench = workbenchTaskService.beginRun({
-        sessionId,
-        goal: prompt,
-        contract: { kind: workflowKind, requiresUserAcceptance: false },
-        trigger: WorkbenchRunTrigger.Message,
-        preparedRunId: options._workbenchRunId,
-      });
-      workbenchRunId = workbench.run.id;
+    if (!chatMode) {
+      workbenchRunId =
+        observeWorkbench(
+          sessionId,
+          () =>
+            host.getWorkbenchTaskService()?.beginRun({
+              sessionId,
+              goal: prompt,
+              contract: { kind: workflowKind },
+              trigger: WorkbenchRunTrigger.Message,
+              preparedRunId: options._workbenchRunId,
+              preparedTaskId: options._workbenchTaskId,
+            }).run.id,
+        ) ?? null;
     }
 
     // Pi's createAgentSession does not accept a systemPrompt option. Its
@@ -263,21 +269,25 @@ export async function startPiRuntimeSession(
       workflowKind,
       harnessVersion: HarnessVersion,
     };
-    const workbenchForContext = host.getWorkbenchTaskService();
-    if (workbenchRunId && workbenchForContext) {
-      workbenchForContext.updateRunContext(workbenchRunId, {
-        model: harnessModelProfile.model,
-        provider: harnessModelProfile.provider,
-        reasoningProfile: harnessModelProfile.reasoningProfile,
-        workspaceRoot,
-        skillIds: resourceState.skillIds ?? [],
-      });
-      workbenchForContext.measurement?.recordModelProfile(workbenchRunId, harnessModelProfile);
-    }
+    observeWorkbench(sessionId, () => {
+      const workbenchForContext = host.getWorkbenchTaskService();
+      if (workbenchRunId && workbenchForContext) {
+        workbenchForContext.updateRunContext(workbenchRunId, {
+          model: harnessModelProfile.model,
+          provider: harnessModelProfile.provider,
+          reasoningProfile: harnessModelProfile.reasoningProfile,
+          workspaceRoot,
+          skillIds: resourceState.skillIds ?? [],
+        });
+        workbenchForContext.measurement?.recordModelProfile(workbenchRunId, harnessModelProfile);
+      }
+    });
     const recordActivation = (event: HarnessActivationEvent): void => {
       const currentRunId = host.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId;
       if (!currentRunId) return;
-      host.getWorkbenchTaskService()?.measurement?.recordActivation(currentRunId, event);
+      observeWorkbench(sessionId, () => {
+        host.getWorkbenchTaskService()?.measurement?.recordActivation(currentRunId, event);
+      });
     };
     if (
       options.sessionMode === CoworkSessionMode.Work &&
@@ -362,16 +372,18 @@ export async function startPiRuntimeSession(
       if (readOnlyWorkspace) {
         sessionOptions.tools = ['read', 'grep', 'find', 'ls', ...customToolNames];
       } else {
+        // Use +modifiers so platform defaultTools (powershell on Windows, bash on POSIX,
+        // plus optional +codemode) stay intact rather than being replaced by a plain list.
         sessionOptions.tools = [
-          'read',
-          'bash',
-          'edit',
-          'write',
-          'grep',
-          'find',
-          'ls',
-          ...customToolNames,
+          '+grep',
+          '+find',
+          '+ls',
+          ...customToolNames.map(name => `+${name}`),
         ];
+        if (process.platform === 'win32') {
+          // Ensure resumed transcripts never reactivate bash on Windows.
+          sessionOptions.excludeTools = ['bash'];
+        }
       }
     }
 
@@ -410,7 +422,6 @@ export async function startPiRuntimeSession(
       modelRuntime: resolvedModel.modelRuntime,
       modelRequestOptions: resolvedModel.requestOptions,
       codemodeEnabled,
-      imageEndpointKey: resolvedModel.endpointKey,
       capabilities: {
         toolCalling: ModelCapabilityStatus.Unknown,
         imageInput: ModelCapabilityStatus.Unknown,
@@ -482,19 +493,25 @@ export async function startPiRuntimeSession(
       isRunning: true,
       lastUsedAt: Date.now(),
       turnFailed: false,
-      lastImagePrompt: null,
-      imageRetryPending: false,
-      imageRejectionHandled: false,
-      queueFlushInFlight: false,
+      controlActionInFlight: false,
       mcpToolManifestGeneration: host.getMcpToolManifestGeneration(),
     };
     activeSession = active;
 
     // Session ownership stays on main; display transforms preserve SDK event order.
-    active.eventProjection = new PiEventProjectionQueue<PiEvent>(
-      event => host.turnEvents.handlePiEvent(sessionId, active, event),
+    active.eventProjection = new PiEventProjection<PiEvent>(
+      [
+        event => {
+          if (event.type === PiAgentEventType.CompactionEnd && event.result) {
+            host.memoryInjectionDedup.reset(sessionId);
+            active.injectedProjectMemorySections = [];
+          }
+        },
+        event => host.emit('executionEvent', sessionId, event),
+        event => host.turnEvents.handlePiEvent(sessionId, active, event),
+      ],
       abortController.signal,
-      error => console.error(`[PiRuntime] event projection failed in session ${sessionId}:`, error),
+      error => console.warn(`[PiRuntime] event projection failed in session ${sessionId}:`, error),
     );
     console.debug(
       `[PiRuntime] Pi session created for ${sessionId} in ${piSessionCreatedAt - piSessionCreateStartedAt}ms`,
@@ -505,11 +522,6 @@ export async function startPiRuntimeSession(
       if (abortController.signal.aborted || host.activeSessions.get(sessionId) !== active) {
         return;
       }
-      if (event.type === PiAgentEventType.CompactionEnd && event.result) {
-        host.memoryInjectionDedup.reset(sessionId);
-        active.injectedProjectMemorySections = [];
-      }
-      host.emit('executionEvent', sessionId, event);
       active.eventProjection?.push(event);
     });
 
@@ -568,17 +580,8 @@ export async function startPiRuntimeSession(
       host.getOcrCommandFor(),
       collectImagePathReferences(options.fileAttachments),
     );
-    // Recorded before the request leaves: the SDK can report the rejection
-    // through events that arrive before the send promise settles.
-    host.recovery.recordImagePrompt(sessionId, active, prompt, initialImagePrompt);
-    host.queue.expectDirectUserPrompt(sessionId);
-    try {
-      await sendPiPrompt(session, initialImagePrompt, undefined);
-    } catch (sendError) {
-      host.queue.cancelDirectUserPrompt(sessionId);
-      throw sendError;
-    }
-    await active.eventProjection?.drain();
+    host.recovery.reportOmittedImages(sessionId, initialImagePrompt);
+    await sendPiPrompt(session, initialImagePrompt, undefined);
   } catch (error) {
     // A stopped turn can immediately restart from the first queued follow-up.
     // Its eventual abort rejection must not delete that replacement session.
@@ -591,7 +594,9 @@ export async function startPiRuntimeSession(
       return;
     }
     const message = error instanceof Error ? error.message : String(error);
-    host.getWorkbenchTaskService()?.failRun?.(sessionId, { message });
+    observeWorkbench(sessionId, () =>
+      host.getWorkbenchTaskService()?.failRun(sessionId, { message }),
+    );
     host.emit('error', sessionId, classifyCoworkError(message));
     throw error;
   } finally {

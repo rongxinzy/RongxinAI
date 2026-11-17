@@ -80,12 +80,7 @@ export interface PiRuntimeAdapterHost {
 
   // Lifecycle operations the extracted modules call back into.
   evictIdleSessions(): void;
-  stopActiveSession(
-    sessionId: string,
-    reason: string,
-    drainQueuedFollowUp: boolean,
-    cause?: CoworkInterruptionCause,
-  ): void;
+  stopActiveSession(sessionId: string, reason: string, cause?: CoworkInterruptionCause): void;
   disposeSessionForRecreation(sessionId: string, active: ActivePiSession): void;
   /** Deletes the session's Pi JSONL directory (divergence or session delete). */
   invalidatePiSessionDir(sessionId: string): void;

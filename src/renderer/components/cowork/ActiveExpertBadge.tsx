@@ -53,7 +53,7 @@ const ActiveExpertBadge: React.FC<ActiveExpertBadgeProps> = ({
           label={displayName}
           className="size-4 rounded-full border-0 transition-opacity group-hover/expert:opacity-0"
         />
-        <X className="absolute size-4 text-primary opacity-0 transition-opacity group-hover/expert:opacity-100" />
+        <X className="absolute size-4 text-foreground opacity-0 transition-opacity group-hover/expert:opacity-100" />
       </Button>
       {!compact && <span className="truncate">{displayName}</span>}
     </span>

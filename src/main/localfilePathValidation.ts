@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ALLOWED_LOCALFILE_EXTENSIONS = new Set([
   '.png',
@@ -64,4 +65,36 @@ export function isAllowedLocalfilePath(resolvedPath: string, allowedImageRoot: s
   }
 
   return true;
+}
+
+/**
+ * Resolves a custom `localfile://` request URL into a native OS path using
+ * `node:url#fileURLToPath` semantics while ignoring cache-busting query/hash parts.
+ */
+export function resolveLocalfileRequestPath(
+  requestUrl: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const parsed = new URL(requestUrl);
+  if (parsed.protocol !== 'localfile:') {
+    throw new TypeError(`Expected localfile: URL, got ${parsed.protocol}`);
+  }
+  const asFileUrl = new URL('file:///');
+  asFileUrl.hostname = parsed.hostname;
+  asFileUrl.pathname = parsed.pathname;
+
+  if (platform === process.platform) {
+    return fileURLToPath(asFileUrl);
+  }
+
+  let decoded = decodeURIComponent(asFileUrl.pathname);
+  if (platform === 'win32') {
+    if (asFileUrl.hostname && asFileUrl.hostname.toLowerCase() !== 'localhost') {
+      decoded = `\\\\${asFileUrl.hostname}${decoded}`;
+    } else if (/^\/[A-Za-z]:/.test(decoded)) {
+      decoded = decoded.slice(1);
+    }
+    return path.win32.resolve(decoded);
+  }
+  return path.posix.resolve(decoded);
 }

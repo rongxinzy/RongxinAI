@@ -6,6 +6,7 @@ import type {
   MagpieProviderSummary,
 } from '../../shared/magpie/types';
 import { getMagpieProviderName } from './magpieProviderNames';
+import { neutralRuntimeName } from './runtimeNameNeutralizer';
 import { getRunningModelAgentEligibility } from '../utils/llamacppAgentEligibility';
 import { ModelCapabilityStatus } from '../../shared/providers';
 import { store } from '../store';
@@ -47,11 +48,13 @@ export function toCatalogModel(
   providers: readonly MagpieProviderSummary[] = [],
 ): Model {
   const llamaCppAgentEligibility = localModelEligibility(model);
+  const ownerProvider = providers.find(provider => provider.id === model.owned_by);
   return {
     id: model.id,
-    name: model.display_name || model.id,
+    name: neutralRuntimeName(model.display_name || model.id),
     provider: getMagpieProviderName(model.owned_by, providers),
     providerKey: model.owned_by,
+    ...(ownerProvider?.baseUrl ? { providerBaseUrl: ownerProvider.baseUrl } : {}),
     supportsImage: model.modalities?.input.includes('image') ?? false,
     supportsThinkingToggle: model.reasoning,
     contextWindow: model.context_window,
@@ -63,7 +66,7 @@ export function toCatalogModel(
     ...(llamaCppAgentEligibility ? { llamaCppAgentEligibility } : {}),
   };
 }
-export function applyMagpieCatalog(
+function applyMagpieCatalog(
   catalog: MagpieModelCatalog,
   providers: readonly MagpieProviderSummary[] = [],
 ): void {

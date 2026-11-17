@@ -102,6 +102,10 @@ type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
   code: string;
   language: string;
   showLineNumbers?: boolean;
+  /** Defer Shiki tokenization while a streamed fence is still open. */
+  skipHighlight?: boolean;
+  /** Compact density (12px font / 12px padding) for tool detail blocks. */
+  compact?: boolean;
 };
 
 interface TokenizedCode {
@@ -269,10 +273,12 @@ const CodeBlockBody = memo(
   ({
     tokenized,
     showLineNumbers,
+    compact = false,
     className,
   }: {
     tokenized: TokenizedCode;
     showLineNumbers: boolean;
+    compact?: boolean;
     className?: string;
   }) => {
     const preStyle = useMemo(
@@ -288,14 +294,16 @@ const CodeBlockBody = memo(
     return (
       <pre
         className={cn(
-          'dark:bg-(--shiki-dark-bg)! dark:text-(--shiki-dark)! m-0 p-4 text-sm',
+          'dark:bg-(--shiki-dark-bg)! dark:text-(--shiki-dark)! m-0',
+          compact ? 'p-3 text-xs leading-[1.6]' : 'p-4 text-sm',
           className,
         )}
         style={preStyle}
       >
         <code
           className={cn(
-            'font-mono text-sm',
+            'font-mono',
+            compact ? 'text-xs leading-[1.6]' : 'text-sm',
             showLineNumbers && '[counter-increment:line_0] [counter-reset:line]',
           )}
         >
@@ -309,6 +317,7 @@ const CodeBlockBody = memo(
   (prevProps, nextProps) =>
     prevProps.tokenized === nextProps.tokenized &&
     prevProps.showLineNumbers === nextProps.showLineNumbers &&
+    prevProps.compact === nextProps.compact &&
     prevProps.className === nextProps.className,
 );
 
@@ -322,7 +331,7 @@ const CodeBlockContainer = ({
 }: HTMLAttributes<HTMLDivElement> & { language: string }) => (
   <div
     className={cn(
-      'group relative w-full overflow-hidden rounded-md border bg-background text-foreground',
+      'group relative w-full overflow-hidden rounded-lg border bg-background text-foreground',
       className,
     )}
     data-language={language}
@@ -384,18 +393,22 @@ const CodeBlockContent = ({
   code,
   language,
   showLineNumbers = false,
+  skipHighlight = false,
+  compact = false,
 }: {
   code: string;
   language: string;
   showLineNumbers?: boolean;
+  skipHighlight?: boolean;
+  compact?: boolean;
 }) => {
   // Memoized raw tokens for immediate display
   const rawTokens = useMemo(() => createRawTokens(code), [code]);
 
   // Synchronous cache lookup — avoids setState in effect for cached results
   const syncTokens = useMemo(
-    () => highlightCode(code, language) ?? rawTokens,
-    [code, language, rawTokens],
+    () => (skipHighlight ? rawTokens : (highlightCode(code, language) ?? rawTokens)),
+    [code, language, rawTokens, skipHighlight],
   );
 
   // Async highlighting result (populated after shiki loads)
@@ -409,6 +422,7 @@ const CodeBlockContent = ({
   }
 
   useEffect(() => {
+    if (skipHighlight) return;
     let cancelled = false;
 
     highlightCode(code, language, result => {
@@ -420,13 +434,13 @@ const CodeBlockContent = ({
     return () => {
       cancelled = true;
     };
-  }, [code, language]);
+  }, [code, language, skipHighlight]);
 
-  const tokenized = asyncTokens ?? syncTokens;
+  const tokenized = skipHighlight ? rawTokens : (asyncTokens ?? syncTokens);
 
   return (
     <div className="relative overflow-auto">
-      <CodeBlockBody showLineNumbers={showLineNumbers} tokenized={tokenized} />
+      <CodeBlockBody showLineNumbers={showLineNumbers} compact={compact} tokenized={tokenized} />
     </div>
   );
 };
@@ -435,6 +449,8 @@ export const CodeBlock = ({
   code,
   language,
   showLineNumbers = false,
+  skipHighlight = false,
+  compact = false,
   className,
   children,
   ...props
@@ -445,7 +461,13 @@ export const CodeBlock = ({
     <CodeBlockContext.Provider value={contextValue}>
       <CodeBlockContainer className={className} language={language} {...props}>
         {children}
-        <CodeBlockContent code={code} language={language} showLineNumbers={showLineNumbers} />
+        <CodeBlockContent
+          code={code}
+          language={language}
+          showLineNumbers={showLineNumbers}
+          skipHighlight={skipHighlight}
+          compact={compact}
+        />
       </CodeBlockContainer>
     </CodeBlockContext.Provider>
   );

@@ -46,7 +46,7 @@
 
 ## 开始使用
 
-1. **下载**：从[官网](https://www.rongxzyai.com/#download)或 [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases) 获取安装包：**Windows** x64 轻量版、CPU 版、CUDA 版（`.exe`）；**macOS** Apple Silicon 与 Intel 的 CPU 版（`.dmg` 与 `.zip`）；**Linux** x64 CPU 与 CUDA 版（`.deb` 与 AppImage）；**麒麟 V11** x86_64 CPU 版（`.rpm`，默认中文界面）。
+1. **下载**：从[官网](https://www.rongxzyai.com/#download)或 [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases) 获取安装包：**Windows** x64 轻量版、CUDA 版（`.exe`）；**macOS** Apple Silicon 与 Intel 的 CPU 版（`.dmg` 与 `.zip`）；**Linux** x64 轻量版与 CUDA 版（`.deb` 与 AppImage）；**麒麟 V11** x86_64 CPU 版（`.rpm`，默认中文界面）。
 2. **打开应用**：直接用内置免费模型对话，无需 API Key。
 3. **派任务**：选择项目目录、描述任务，查看执行过程并处理授权请求。
 
@@ -152,8 +152,8 @@ bun run llamacpp:runtime:download
 | --- | --- |
 | `bun run dist:win` / `dist:win:offline` / `dist:win:lite` | 未签名 Windows x64 lite 构建：WebView2 安装器 `ZhiYuanAgent-Setup-<version>.exe` 与 NSIS 更新器 |
 | `bun run dist:win:cpu` / `dist:win:cuda` | 同上，cpu 或 cuda 版 |
-| `bun run dist:win:signed` / `dist:win:signed:cpu` / `dist:win:signed:cuda` | Certum 签名的 lite / cpu / cuda；需要 `CERTUM_CERT_THUMBPRINT`，由发布流水线使用 |
-| `bun run dist:linux:cpu` / `dist:linux:cuda` | Linux deb + AppImage，cpu 或 cuda（`dist:linux:cuda` 会用 `scripts/build-llamacpp-cuda-rtx40.sh` 在本机编译 CUDA llama-server） |
+| `bun run dist:win:signed` / `dist:win:signed:cuda` | Certum 签名的 lite / cuda；需要 `CERTUM_CERT_THUMBPRINT`，由发布流水线使用 |
+| `ZHIYUAN_UPDATE_VARIANT=lite bun run dist:linux` / `bun run dist:linux:cuda` | Linux deb + AppImage，lite 或 cuda（`dist:linux:cuda` 会用 `scripts/build-llamacpp-cuda-rtx40.sh` 在本机编译 CUDA llama-server） |
 | `bun run dist:kylin:x64` | 麒麟 V11 x86_64 RPM 安装包，使用 CPU 本地推理并默认中文界面 |
 | `bun run dist:mac:arm64` / `dist:mac:x64` | macOS 安装包；发布流水线按 cpu 版构建 |
 

@@ -179,16 +179,18 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
                 {i18nService.t('scheduledTasksCreateByChat')}
               </span>
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => openCreateModal()}
-              className="gap-1.5"
-              aria-label={i18nService.t('scheduledTasksNewTask')}
-            >
-              <Plus className="size-4" />
-              <span className="hidden xl:inline">{i18nService.t('scheduledTasksNewTask')}</span>
-            </Button>
+            {activeTab !== AUTO_TAB.Create ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => openCreateModal()}
+                className="gap-1.5"
+                aria-label={i18nService.t('scheduledTasksNewTask')}
+              >
+                <Plus className="size-4" />
+                <span className="hidden xl:inline">{i18nService.t('scheduledTasksNewTask')}</span>
+              </Button>
+            ) : null}
           </div>
         }
         tabs={

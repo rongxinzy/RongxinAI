@@ -10,7 +10,6 @@ import { randomUUID } from 'crypto';
 
 import {
   CoworkQueueDelivery,
-  CoworkQueueItemStatus,
   type CoworkPendingMessage,
 } from '../../../shared/cowork/pendingMessageQueue';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
@@ -39,19 +38,8 @@ export class PiRuntimeQueueController {
 
   constructor(private readonly host: PiRuntimeAdapterHost) {}
 
-  /** Maintained for backward compatibility with continuation/launch helpers. */
-  expectDirectUserPrompt(_sessionId: string): void {}
-
-  /** Maintained for backward compatibility with continuation/launch helpers. */
-  cancelDirectUserPrompt(_sessionId: string): void {}
-
   resetNativeDispatch(sessionId: string): void {
     this.pendingSteerCounts.delete(sessionId);
-    try {
-      this.host.activeSessions.get(sessionId)?.piSession.clearQueue?.();
-    } catch {
-      // Ignore cleanup errors when clearing Pi queue state.
-    }
   }
 
   onNativeUserMessageStart(sessionId: string, active: ActivePiSession): void {
@@ -82,7 +70,7 @@ export class PiRuntimeQueueController {
     this.emitQueueUpdated(sessionId);
     active.summaryCheckpointGoal = item.text;
     const payload = this.buildQueuedPromptPayload(active, item);
-    this.host.recovery.recordImagePrompt(sessionId, active, item.text, payload);
+    this.host.recovery.reportOmittedImages(sessionId, payload);
     this.persistQueuedUserMessage(sessionId, item, CoworkQueueDelivery.FollowUp);
     this.pendingMessageQueue.finishDelivery(item.id);
   }
@@ -112,12 +100,6 @@ export class PiRuntimeQueueController {
     return cleared;
   }
 
-  /** Deliver the next queued follow-up after a stop settled the queue check. */
-  resumeNextFollowUp(sessionId: string): void {
-    const next = this.pendingMessageQueue.findNextPending(sessionId, CoworkQueueDelivery.FollowUp);
-    if (next) void this.followUpPendingMessage(sessionId, next.id);
-  }
-
   /**
    * Adds an application-owned action after already queued Work prompts. The
    * callback is never persisted and never reaches the model.
@@ -136,7 +118,7 @@ export class PiRuntimeQueueController {
     const actions = this.queuedControlActions.get(sessionId) ?? [];
     actions.push(action);
     this.queuedControlActions.set(sessionId, actions);
-    if (!active.isRunning) void this.flushFollowUpQueue(sessionId, active);
+    if (!active.isRunning) void this.flushControlActions(sessionId, active);
     return { success: true };
   }
 
@@ -189,138 +171,31 @@ export class PiRuntimeQueueController {
     return { success: true, item };
   }
 
-  updatePendingMessage(
-    sessionId: string,
-    itemId: string,
-    text: string,
-  ): { success: boolean; item?: CoworkPendingMessage; error?: string } {
+  /** A new explicit input goes straight to Pi; accepted inputs are never rebuilt. */
+  async steerInput(sessionId: string, text: string): Promise<{ success: boolean; error?: string }> {
     const active = this.host.activeSessions.get(sessionId);
-    if (!this.isWorkSession(sessionId, active)) {
-      return { success: false, error: 'Pending message queue is only available in Work sessions.' };
-    }
-    const normalizedText = text.trim();
-    if (!hasVisiblePromptContent(normalizedText))
-      return { success: false, error: 'Message text is required.' };
-    const item = this.pendingMessageQueue.update(sessionId, itemId, normalizedText);
-    if (!item) return { success: false, error: 'Pending message was not found.' };
-    this.emitQueueUpdated(sessionId);
-    this.syncNativeFollowUpQueue(sessionId, active);
-    return { success: true, item };
-  }
-
-  deletePendingMessage(sessionId: string, itemId: string): { success: boolean; error?: string } {
-    const active = this.host.activeSessions.get(sessionId);
-    if (!this.isWorkSession(sessionId, active)) {
-      return { success: false, error: 'Pending message queue is only available in Work sessions.' };
-    }
-    if (!this.pendingMessageQueue.remove(sessionId, itemId)) {
-      return { success: false, error: 'Pending message was not found.' };
-    }
-    this.emitQueueUpdated(sessionId);
-    this.syncNativeFollowUpQueue(sessionId, active);
-    return { success: true };
-  }
-
-  async steerPendingMessage(
-    sessionId: string,
-    itemId: string,
-  ): Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }> {
-    const active = this.host.activeSessions.get(sessionId);
-    if (!this.isWorkSession(sessionId, active)) {
-      return { success: false, error: 'Pending message queue is only available in Work sessions.' };
-    }
-    if (!active || !this.host.isSessionRunning(sessionId)) {
+    if (!active || active.aborted || !this.host.isSessionRunning(sessionId)) {
       return { success: false, error: 'The Work session is not running.' };
     }
-    // A queued message is initially classified as FollowUp, but the user can
-    // explicitly promote any pending item to an immediate Steer.
-    const item = this.pendingMessageQueue.take(sessionId, itemId);
-    if (!item) return { success: false, error: 'Pending message was not found.' };
-
-    this.emitQueueUpdated(sessionId);
-    this.applyQueuedSkillIds(active, item.skillIds);
-
+    if (active.resourceState.chatMode || !hasVisiblePromptContent(text)) {
+      return { success: false, error: 'Steering requires a Work session and message text.' };
+    }
+    this.persistQueuedUserMessage(sessionId, { text }, CoworkQueueDelivery.Steer);
     this.pendingSteerCounts.set(sessionId, (this.pendingSteerCounts.get(sessionId) ?? 0) + 1);
-
     try {
-      // Clear native queue first
-      try {
-        active.piSession.clearQueue?.();
-      } catch {
-        // Ignore clear queue errors
-      }
-
-      const queuedImagePrompt = this.buildQueuedPromptPayload(active, item);
-      this.host.recovery.recordImagePrompt(sessionId, active, item.text, queuedImagePrompt);
-
-      await sendPiPrompt(active.piSession, queuedImagePrompt, 'steer');
-
-      this.persistQueuedUserMessage(sessionId, item, CoworkQueueDelivery.Steer);
-      active.isRunning = true;
-      active.summaryCheckpointGoal = item.text;
-      this.pendingMessageQueue.finishDelivery(item.id);
-
-      // Re-enqueue remaining follow-ups preserving attachments
-      this.reEnqueueRemainingFollowUps(sessionId, active);
-
-      return { success: true, item };
+      await active.piSession.steer(text);
+      active.summaryCheckpointGoal = text;
+      return { success: true };
     } catch (error) {
-      const current = this.pendingSteerCounts.get(sessionId) ?? 0;
-      if (current <= 1) {
-        this.pendingSteerCounts.delete(sessionId);
-      } else {
-        this.pendingSteerCounts.set(sessionId, current - 1);
-      }
-      const message = error instanceof Error ? error.message : String(error);
-      const restored = this.pendingMessageQueue.restore(sessionId, { ...item, error: message });
-      this.emitQueueUpdated(sessionId);
-      this.reEnqueueRemainingFollowUps(sessionId, active);
-      return { success: false, item: restored, error: message };
+      const count = this.pendingSteerCounts.get(sessionId) ?? 0;
+      if (count <= 1) this.pendingSteerCounts.delete(sessionId);
+      else this.pendingSteerCounts.set(sessionId, count - 1);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
 
-  async followUpPendingMessage(
-    sessionId: string,
-    itemId: string,
-  ): Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }> {
-    const active = this.host.activeSessions.get(sessionId);
-    if (!this.isWorkSession(sessionId, active)) {
-      return { success: false, error: 'Pending message queue is only available in Work sessions.' };
-    }
-    if (!this.host.isSessionActive(sessionId)) {
-      return { success: false, error: 'The Work session is not active.' };
-    }
-    if (this.host.isSessionRunning(sessionId)) {
-      return { success: false, error: 'The Work session is still running.' };
-    }
-    const item = this.pendingMessageQueue.take(sessionId, itemId, CoworkQueueDelivery.FollowUp);
-    if (!item) return { success: false, error: 'Pending message was not found.' };
-    this.emitQueueUpdated(sessionId);
-    try {
-      // The queued turn keeps the session's skills and adds its own picks; only
-      // the picks belong on the user message.
-      const activeSession = this.host.activeSessions.get(sessionId);
-      await this.host.continueSession(sessionId, item.text, {
-        sessionMode: CoworkSessionMode.Work,
-        _queueDelivery: CoworkQueueDelivery.FollowUp,
-        _streamingBehavior: 'followUp',
-        imageAttachments: item.imageAttachments,
-        fileAttachments: item.fileAttachments,
-        skillIds: mergeSkillIds(activeSession?.resourceState.skillIds, item.skillIds),
-        attachedSkillIds: item.skillIds,
-      });
-      this.pendingMessageQueue.finishDelivery(item.id);
-      return { success: true, item };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const restored = this.pendingMessageQueue.restore(sessionId, { ...item, error: message });
-      this.emitQueueUpdated(sessionId);
-      return { success: false, item: restored, error: message };
-    }
-  }
-
-  async flushFollowUpQueue(sessionId: string, active: ActivePiSession): Promise<void> {
-    if (active.queueFlushInFlight || active.aborted) return;
+  async flushControlActions(sessionId: string, active: ActivePiSession): Promise<void> {
+    if (active.controlActionInFlight || active.aborted) return;
     if (active.pendingError || active.turnFailed) {
       // A failed turn never drains work, so a control action queued behind it
       // would otherwise run after an unrelated later turn. Drop it instead.
@@ -330,57 +205,28 @@ export class PiRuntimeQueueController {
       return;
     }
     if (active.resourceState.chatMode) return;
-    active.queueFlushInFlight = true;
-    let retryAfterFailure = false;
+    active.controlActionInFlight = true;
     try {
       if (active.aborted || active.isRunning) return;
-      const next = this.pendingMessageQueue.takeNext(sessionId, CoworkQueueDelivery.FollowUp);
-      if (!next) {
-        // Control actions wait behind queued user prompts, and a single flush
-        // runs one of them at a time for the same reason.
-        const action = this.queuedControlActions.get(sessionId)?.shift();
-        if (!action) return;
-        if (this.queuedControlActions.get(sessionId)?.length === 0) {
-          this.queuedControlActions.delete(sessionId);
-        }
-        try {
-          await action();
-        } catch (error) {
-          console.error('[PiRuntime] queued control action failed:', error);
-        }
-        return;
+      const action = this.queuedControlActions.get(sessionId)?.shift();
+      if (!action) return;
+      if (this.queuedControlActions.get(sessionId)?.length === 0) {
+        this.queuedControlActions.delete(sessionId);
       }
-      this.emitQueueUpdated(sessionId);
       try {
-        await this.host.continueSession(sessionId, next.text, {
-          sessionMode: CoworkSessionMode.Work,
-          _queueDelivery: CoworkQueueDelivery.FollowUp,
-          _streamingBehavior: 'followUp',
-          imageAttachments: next.imageAttachments,
-          fileAttachments: next.fileAttachments,
-          skillIds: mergeSkillIds(active.resourceState.skillIds, next.skillIds),
-          attachedSkillIds: next.skillIds,
-        });
-        this.pendingMessageQueue.finishDelivery(next.id);
+        await action();
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.pendingMessageQueue.restore(sessionId, { ...next, error: message });
-        this.emitQueueUpdated(sessionId);
-        console.error('[PiRuntime] queued follow-up failed:', error);
-        retryAfterFailure = true;
+        console.error(`[PiRuntime] queued control action failed for session ${sessionId}:`, error);
       }
     } finally {
-      active.queueFlushInFlight = false;
-      const hasNextFollowUp =
-        this.pendingMessageQueue.hasPendingFollowUp(sessionId) ||
-        (this.queuedControlActions.get(sessionId)?.length ?? 0) > 0;
+      active.controlActionInFlight = false;
       if (
-        (retryAfterFailure || hasNextFollowUp) &&
+        this.hasQueuedControlActions(sessionId) &&
         this.host.activeSessions.get(sessionId) === active &&
         !active.aborted &&
         !active.isRunning
       ) {
-        void this.flushFollowUpQueue(sessionId, active);
+        void this.flushControlActions(sessionId, active);
       }
     }
   }
@@ -414,35 +260,9 @@ export class PiRuntimeQueueController {
     active.pendingSkillReload = true;
   }
 
-  private reEnqueueRemainingFollowUps(sessionId: string, active: ActivePiSession): void {
-    const remaining = this.pendingMessageQueue
-      .list(sessionId)
-      .filter(
-        entry =>
-          entry.delivery === CoworkQueueDelivery.FollowUp &&
-          entry.status === CoworkQueueItemStatus.Pending,
-      );
-    for (const pending of remaining) {
-      const payload = this.buildQueuedPromptPayload(active, pending);
-      void sendPiPrompt(active.piSession, payload, 'followUp').catch(err => {
-        console.warn(`[PiRuntime] failed to re-enqueue follow-up for ${sessionId}:`, err);
-      });
-    }
-  }
-
-  private syncNativeFollowUpQueue(sessionId: string, active: ActivePiSession | undefined): void {
-    if (!active || !this.host.isSessionRunning(sessionId)) return;
-    try {
-      active.piSession.clearQueue?.();
-    } catch (e) {
-      console.warn(`[PiRuntime] failed to clear native queue for ${sessionId}:`, e);
-    }
-    this.reEnqueueRemainingFollowUps(sessionId, active);
-  }
-
   private persistQueuedUserMessage(
     sessionId: string,
-    item: CoworkPendingMessage,
+    item: Pick<CoworkPendingMessage, 'text' | 'skillIds' | 'imageAttachments' | 'fileAttachments'>,
     delivery: CoworkQueueDelivery,
   ): CoworkMessage {
     const message: CoworkMessage = {

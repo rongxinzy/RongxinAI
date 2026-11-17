@@ -20,17 +20,6 @@ vi.mock('../src/main/libs/llamacppRunningModelRegistry', () => ({
   getLlamaCppModelAgentEligibility: hoistedRegistry.getLlamaCppModelAgentEligibility,
 }));
 
-// ── Hoisted mocks for Pi Retry Cancellation ──────────────────────────────────
-const hoistedRetry = vi.hoisted(() => ({
-  cancelPiRetry: vi.fn(async () => undefined),
-  waitForPiRetryCancellation: vi.fn(async () => undefined),
-}));
-
-vi.mock('../src/main/libs/agentEngine/piRetryCancellation', () => ({
-  cancelPiRetry: hoistedRetry.cancelPiRetry,
-  waitForPiRetryCancellation: hoistedRetry.waitForPiRetryCancellation,
-}));
-
 import {
   assertLlamaCppWorkModeContext,
   assertWorkModeContextWindow,
@@ -48,8 +37,6 @@ describe('Empirical Verification Harness — Context Window Guard, Sizing & Auto
     setLanguage('en');
     hoistedRegistry.isLlamaCppModelRunning.mockReset();
     hoistedRegistry.getLlamaCppModelAgentEligibility.mockReset();
-    hoistedRetry.cancelPiRetry.mockClear();
-    hoistedRetry.waitForPiRetryCancellation.mockClear();
   });
 
   // ═══════════════════════════════════════════════════════════════════════════

@@ -12,7 +12,6 @@ test('retiring workflow state preserves task history and releases foreign keys',
     const repository = new WorkbenchTaskRepository(db);
     const task = repository.createTask('session', 'Keep the task', {
       kind: WorkbenchContractKind.GenericWork,
-      requiresUserAcceptance: false,
     });
     const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
     db.exec(`CREATE TABLE workbench_production_loops (

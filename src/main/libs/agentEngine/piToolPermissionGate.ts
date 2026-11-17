@@ -8,20 +8,18 @@
  * trace tab still reflects tool activity without gating Pi execution.
  */
 
+import { observeWorkbench } from '../../workbenchTask/observe';
+
 import { randomUUID } from 'crypto';
 
 import type { ToolAnnotations } from '@earendil-works/pi-coding-agent';
 
-import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalMode,
   WorkbenchApprovalRiskLevel,
 } from '../../../shared/workbenchTask';
-import {
-  classifyWorkbenchToolRisk,
-  createToolIdempotencyKey,
-} from '../../workbenchTask/riskClassifier';
+import { classifyWorkbenchToolRisk } from '../../workbenchTask/riskClassifier';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import type { PiPermissionRequest, PiPermissionResult } from './piRuntimeTypes';
 
@@ -45,12 +43,6 @@ export interface PiToolPermissionGateHost {
   getWorkbenchTaskService(): WorkbenchTaskService | null;
   emit(event: 'permissionRequest', sessionId: string, request: PiPermissionRequest): unknown;
   emit(event: 'permissionDismiss', requestId: string): unknown;
-  stopActiveSession(
-    sessionId: string,
-    reason: string,
-    drainQueuedFollowUp: boolean,
-    cause?: CoworkInterruptionCause,
-  ): void;
 }
 
 type PendingToolApproval = {
@@ -79,40 +71,22 @@ export class PiToolPermissionGate {
 
   async authorizeToolCall(input: PiToolAuthorizationInput): Promise<PiToolAuthorizationResult> {
     const riskLevel = classifyWorkbenchToolRisk(input.toolName, input.toolInput, input.annotations);
-    const idempotencyKey = createToolIdempotencyKey(
-      input.runId ?? input.sessionId,
-      input.toolCallId,
-      input.toolInput,
-    );
     const promptRequired = requiresToolPermissionPrompt(input.approvalMode, riskLevel);
     const requestId = randomUUID();
-    const workbench = this.host.getWorkbenchTaskService();
 
-    if (!promptRequired) {
-      workbench?.recordToolCallObserved?.({
+    observeWorkbench(input.sessionId, () => {
+      this.host.getWorkbenchTaskService()?.recordToolCallObserved?.({
         runId: input.runId,
         approvalId: requestId,
         toolCallId: input.toolCallId,
         toolName: input.toolName,
         toolInput: input.toolInput,
         riskLevel,
-        idempotencyKey,
-        autoApproved: true,
+        idempotencyKey: requestId,
+        autoApproved: !promptRequired,
       });
-      return { allow: true };
-    }
-
-    workbench?.recordToolCallObserved?.({
-      runId: input.runId,
-      approvalId: requestId,
-      toolCallId: input.toolCallId,
-      toolName: input.toolName,
-      toolInput: input.toolInput,
-      riskLevel,
-      idempotencyKey,
-      autoApproved: false,
     });
-
+    if (!promptRequired) return { allow: true };
     const decisionPromise = new Promise<PiToolAuthorizationResult>(resolve => {
       this.pendingApprovals.set(requestId, {
         sessionId: input.sessionId,
@@ -146,13 +120,14 @@ export class PiToolPermissionGate {
 
     const denied = result.behavior === 'deny';
     const reason = denied ? result.message || 'The user denied this action.' : undefined;
-    this.host.getWorkbenchTaskService()?.recordToolApprovalDecision?.({
-      approvalId: requestId,
-      runId: pending.runId,
-      decision: denied ? WorkbenchApprovalDecision.Denied : WorkbenchApprovalDecision.Approved,
-      reason,
+    observeWorkbench(pending.sessionId, () => {
+      this.host.getWorkbenchTaskService()?.recordToolApprovalDecision?.({
+        approvalId: requestId,
+        runId: pending.runId,
+        decision: denied ? WorkbenchApprovalDecision.Denied : WorkbenchApprovalDecision.Approved,
+        reason,
+      });
     });
-
     pending.resolve(denied ? { allow: false, reason } : { allow: true });
     return true;
   }
@@ -165,11 +140,13 @@ export class PiToolPermissionGate {
       if (pending.sessionId !== sessionId) continue;
       this.pendingApprovals.delete(requestId);
       this.host.approvalSessionMap.delete(requestId);
-      this.host.getWorkbenchTaskService()?.recordToolApprovalDecision?.({
-        approvalId: requestId,
-        runId: pending.runId,
-        decision: WorkbenchApprovalDecision.Expired,
-        reason,
+      observeWorkbench(sessionId, () => {
+        this.host.getWorkbenchTaskService()?.recordToolApprovalDecision?.({
+          approvalId: requestId,
+          runId: pending.runId,
+          decision: WorkbenchApprovalDecision.Expired,
+          reason,
+        });
       });
       pending.resolve({ allow: false, reason });
       this.host.emit('permissionDismiss', requestId);

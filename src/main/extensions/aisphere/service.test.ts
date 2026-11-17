@@ -180,4 +180,11 @@ test('refresh cannot race a replacement connection and same-address reconnect re
   expect((values.get(AISphere.AppConfigKey) as typeof current).model.defaultModel).toBe(
     'removed-selection',
   );
+  const disconnected = await service.disconnect();
+  expect(disconnected).toEqual({
+    address: '',
+    status: AISphereStatus.Unconfigured,
+    models: [],
+  });
+  expect(values.get(AISphere.StoreKey)).toBe('');
 });

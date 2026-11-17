@@ -5,12 +5,9 @@ import { createCoworkStoreHarness } from '../coworkStore/coworkStore.testHarness
 import { initializeWorkbenchTaskSchema } from '../workbenchTask/schema';
 import { WorkbenchTaskService } from '../workbenchTask/taskService';
 import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
-import {
-  WorkbenchRunStatus,
-  WorkbenchRunTrigger,
-  WorkbenchTaskStatus,
-} from '../../shared/workbenchTask';
+import { WorkbenchExecutionStatus, WorkbenchRunTrigger } from '../../shared/workbenchTask';
 import type { CoworkSessionIpcDeps } from '../coworkIpc/sessionStart';
+import type { PiStartOptions } from '../libs/agentEngine/piRuntimeTypes';
 
 vi.mock('../i18n', () => ({ t: (key: string) => key }));
 vi.mock('../appBootstrap/sessionExperts', () => ({
@@ -33,7 +30,7 @@ function fixture() {
   initializeWorkbenchTaskSchema(db);
   const tasks = new WorkbenchTaskService(db);
   const workspace = store.ensureWorkspace('/tmp/companion-task-workspace');
-  const start = vi.fn(async () => {});
+  const start = vi.fn(async (_sessionId: string, _prompt: string, _options?: PiStartOptions) => {});
   const stop = vi.fn();
   const sessions = {
     getCoworkStore: () => store,
@@ -69,11 +66,7 @@ function fixture() {
 test('commits session, message, task, run and receipt before the single native launch', async () => {
   const f = fixture();
   f.start.mockImplementation(
-    async (
-      sessionId?: string,
-      _prompt?: string,
-      options?: { _workbenchRunId: string; modelOverride: string; systemPrompt: string },
-    ) => {
+    async (sessionId?: string, _prompt?: string, options?: PiStartOptions) => {
       expect(f.db.inTransaction).toBe(false);
       expect(f.db.prepare('SELECT count(*) AS n FROM companion_task_admissions').get()).toEqual({
         n: 1,
@@ -93,7 +86,7 @@ test('commits session, message, task, run and receipt before the single native l
   expect(f.models.resolveAutomatic).toHaveBeenCalledOnce();
   expect(f.service.recent(f.profile.petId)[0]).toMatchObject({
     receipt: first.receipt,
-    status: WorkbenchRunStatus.Queued,
+    status: WorkbenchExecutionStatus.Queued,
   });
   expect(f.service.recent('another-pet')).toEqual([]);
 });
@@ -112,6 +105,34 @@ test('concurrent lost-reply retries commit only one task and reject a changed pa
   await expect(
     f.service.submit({ ...f.profile, petId: '00000000-0000-4000-8000-000000000002' }, f.request),
   ).rejects.toThrow('another companion');
+});
+
+test('audit failure cannot prevent the owned native launch and reserved IDs can be recorded later', async () => {
+  const f = fixture();
+  const brokenAudit = vi.spyOn(f.tasks.repository, 'createRun').mockImplementationOnce(() => {
+    throw new Error('audit table unavailable');
+  });
+  const result = await f.service.submit(f.profile, f.request);
+  expect(result.receipt).not.toBeNull();
+  expect(f.start).toHaveBeenCalledOnce();
+  expect(f.tasks.getCurrent(result.receipt!.sessionId)).toBeNull();
+  expect(f.store.getSession(result.receipt!.sessionId)?.messages[0].content).toBe(f.request.text);
+  const options = f.start.mock.calls[0][2];
+  expect(options).toMatchObject({
+    _workbenchTaskId: result.receipt!.taskId,
+    _workbenchRunId: result.receipt!.runId,
+  });
+  brokenAudit.mockRestore();
+  const recorded = f.tasks.beginRun({
+    sessionId: result.receipt!.sessionId,
+    goal: f.request.text,
+    preparedTaskId: result.receipt!.taskId,
+    preparedRunId: result.receipt!.runId,
+  });
+  expect(recorded.task.id).toBe(result.receipt!.taskId);
+  expect(recorded.run.id).toBe(result.receipt!.runId);
+  expect((await f.service.submit(f.profile, f.request)).receipt).toEqual(result.receipt);
+  expect(f.start).toHaveBeenCalledOnce();
 });
 
 test('a preparation failure rolls back all canonical state without starting execution', async () => {
@@ -135,7 +156,7 @@ test('restart and session deletion preserve the original receipt and never repla
   const first = await f.service.submit(f.profile, f.request);
   const restored = new CompanionTasks(f.options);
   expect(await restored.submit(f.profile, f.request)).toEqual(first);
-  expect(restored.recent(f.profile.petId)[0].status).toBe(WorkbenchRunStatus.Failed);
+  expect(restored.recent(f.profile.petId)[0].status).toBe(WorkbenchExecutionStatus.Failed);
   f.db.prepare('DELETE FROM cowork_sessions WHERE id = ?').run(first.receipt!.sessionId);
   expect(await restored.submit(f.profile, f.request)).toEqual(first);
   expect(restored.recent(f.profile.petId)[0].missing).toBe(true);
@@ -158,7 +179,7 @@ test('an initialization rejection fails the owned run without creating a second 
   f.start.mockRejectedValue(new Error('provider unavailable'));
   const result = await f.service.submit(f.profile, f.request);
   await vi.waitFor(() =>
-    expect(f.service.recent(f.profile.petId)[0].status).toBe(WorkbenchRunStatus.Failed),
+    expect(f.service.recent(f.profile.petId)[0].status).toBe(WorkbenchExecutionStatus.Failed),
   );
   expect((await f.service.submit(f.profile, f.request)).receipt).toEqual(result.receipt);
   expect(f.start).toHaveBeenCalledOnce();
@@ -173,7 +194,7 @@ test('stop uses the owned native session while foreign ownership cannot stop it'
   expect(f.stop).not.toHaveBeenCalled();
   f.service.stop(f.profile.petId, result.receipt!.sessionId);
   expect(f.stop).toHaveBeenCalledWith(result.receipt!.sessionId);
-  expect(f.service.recent(f.profile.petId)[0].status).toBe(WorkbenchRunStatus.Cancelled);
+  expect(f.service.recent(f.profile.petId)[0].status).toBe(WorkbenchExecutionStatus.Cancelled);
   expect(f.start).toHaveBeenCalledOnce();
 });
 
@@ -184,8 +205,8 @@ test('metadata reads preserve order across native status changes', async () => {
   f.service.stop(f.profile.petId, receipt!.sessionId);
   const after = f.service.snapshot(f.profile.petId);
   expect(after.revision).toBeGreaterThan(before.revision);
-  expect(before.tasks[0].status).toBe(WorkbenchRunStatus.Queued);
-  expect(after.tasks[0].status).toBe(WorkbenchRunStatus.Cancelled);
+  expect(before.tasks[0].status).toBe(WorkbenchExecutionStatus.Queued);
+  expect(after.tasks[0].status).toBe(WorkbenchExecutionStatus.Cancelled);
   expect(f.service.snapshot('another-pet').tasks).toEqual([]);
 });
 
@@ -201,17 +222,17 @@ test('a workbench retry remains the same task and projects the latest run after 
   });
   f.tasks.failRun(first.sessionId, { message: 'first attempt failed' });
   const next = f.tasks.repository.createRun(first.id, WorkbenchRunTrigger.Retry);
-  f.tasks.repository.updateTaskStatus(first.id, WorkbenchTaskStatus.Running, next.id);
+  f.tasks.repository.updateTaskStatus(first.id, WorkbenchExecutionStatus.Running, next.id);
   f.tasks.beginRun({
     sessionId: first.sessionId,
     goal: first.goal,
     contract: first.contract,
     preparedRunId: next.id,
   });
-  f.tasks.completeObservedRun({ sessionId: first.sessionId, runId: next.id, finalAnswer: 'done' });
+  f.tasks.settleObservedRun({ sessionId: first.sessionId, runId: next.id, finalAnswer: 'done' });
   const [projection] = f.service.recent(f.profile.petId);
   expect(projection.receipt.taskId).toBe(first.id);
-  expect(projection.status).toBe(WorkbenchRunStatus.Succeeded);
+  expect(projection.status).toBe(WorkbenchExecutionStatus.Settled);
   expect(f.db.prepare('SELECT count(*) AS n FROM workbench_tasks').get()).toEqual({ n: 1 });
 });
 

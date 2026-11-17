@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { WorkbenchRunStatus } from '../../../src/shared/workbenchTask/constants.ts';
+import { WorkbenchExecutionStatus } from '../../../src/shared/workbenchTask/constants.ts';
 
 for (const theme of ['light', 'dark']) {
   test(`task admission, workbench link and explicit stop in ${theme}`, async ({ page }) => {
@@ -115,13 +115,18 @@ test('task state events are scoped to their companion and late admission never c
       petId: '00000000-0000-4000-8000-000000000002',
       tasks: snapshot.tasks.map(task => ({ ...task, status })),
     });
-  }, WorkbenchRunStatus.WaitingApproval);
+  }, WorkbenchExecutionStatus.Running);
   await expect(task).toContainText('已受理');
   await page.evaluate(async status => {
     const snapshot = await window.companion.tasks();
     window.tasksChanged({ ...snapshot, tasks: snapshot.tasks.map(task => ({ ...task, status })) });
-  }, WorkbenchRunStatus.WaitingApproval);
-  await expect(task).toContainText('需要确认');
+  }, WorkbenchExecutionStatus.Running);
+  await expect(task).toContainText('进行中');
+  await page.evaluate(async status => {
+    const snapshot = await window.companion.tasks();
+    window.tasksChanged({ ...snapshot, tasks: snapshot.tasks.map(task => ({ ...task, status })) });
+  }, WorkbenchExecutionStatus.Settled);
+  await expect(task).toContainText('执行已结束');
   await expect(input).toHaveValue('Keep this next task');
 });
 

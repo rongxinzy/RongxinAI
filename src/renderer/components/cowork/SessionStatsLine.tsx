@@ -40,7 +40,9 @@ export function SessionStatsLine({ messages }: SessionStatsLineProps) {
   return (
     <div className="flex justify-center pt-1">
       <Popover>
-        <PopoverTrigger render={<Button variant="ghost" size="sm" />}>
+        <PopoverTrigger
+          render={<Button variant="ghost" size="sm" className="theme-conversation-stats-trigger" />}
+        >
           {i18nService.t('coworkStatsTitle')}
         </PopoverTrigger>
         <PopoverContent side="top" className="max-w-full gap-3" data-testid="session-run-info">

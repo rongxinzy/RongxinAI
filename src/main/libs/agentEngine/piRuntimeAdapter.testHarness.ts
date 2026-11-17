@@ -273,7 +273,6 @@ vi.mock('../coworkUtil', async importOriginal => {
 });
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
-import { clearImageInputObservations } from './piImageInputFallback';
 import { piSessionDirFor } from './piSessionStore';
 
 /**
@@ -355,9 +354,6 @@ export const setupPiRuntimeAdapterSuite = (): void => {
   beforeEach(() => {
     mockApplyApplicationRuntimeEnv.mockClear();
     vi.clearAllMocks();
-    // Runtime image observations are process-wide state; reset per test so cases
-    // cannot leak a suppression into the next one.
-    clearImageInputObservations();
     mockModelRuntimeCreate.mockResolvedValue(mockModelRuntime);
     disposeMagpie?.();
     testMagpie = installTestMagpie();

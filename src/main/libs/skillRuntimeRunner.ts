@@ -4,14 +4,13 @@ import path from 'path';
 import { StringDecoder } from 'string_decoder';
 
 import { getElectronNodeRuntimePath, getEnhancedEnv, getSkillsRoot } from './coworkUtil';
-import { appendPythonRuntimeToEnv, getManagedPythonExecutable } from './pythonRuntime';
-import { installSkillPythonDependencies } from './skillPythonDependencies';
-import { findSkillPythonExecutable, resolveSkillPython } from './skillPythonRuntime';
+import { appendPythonRuntimeToEnv } from './pythonRuntime';
 import {
-  appendUvRuntimeToEnv,
-  configureUvForManagedPython,
-  findBundledUvExecutable,
-} from './uvRuntime';
+  applyWorkspaceSkillPythonEnvironment,
+  prepareWorkspaceSkillPython,
+  runWorkspaceSkillPython,
+} from './skillWorkspacePython';
+import { appendUvRuntimeToEnv, configureUvForManagedPython } from './uvRuntime';
 
 export type SkillScriptErrorCode =
   | 'SKILL_SCRIPT_NOT_FOUND'
@@ -21,24 +20,6 @@ export type SkillScriptErrorCode =
   | 'SKILL_SCRIPT_FAILED'
   | 'SKILL_SCRIPT_TIMEOUT'
   | 'SKILL_SCRIPT_ABORTED';
-
-/**
- * Packages large enough that installing them must be an explicit user decision.
- * Anything else installs on first use without interrupting the turn.
- */
-const CONFIRM_REQUIRED_PACKAGES = new Set([
-  'vtk',
-  'vtkmodules',
-  'cadquery_ocp',
-  'cadquery_ocp_novtk',
-  'ocp',
-  'build123d',
-  'scipy',
-  'statsmodels',
-  'playwright',
-  'sympy',
-  'scikit_learn',
-]);
 
 type SkillScriptRuntime = 'python' | 'node' | 'bash' | 'powershell';
 
@@ -205,119 +186,26 @@ export function resolveSkillScriptPath(
 async function resolveRuntime(
   scriptPath: string,
   skillDir: string,
-  options: Pick<RunSkillScriptOptions, 'confirmDependencyInstall'> = {},
+  options: RunSkillScriptOptions,
 ): Promise<
   | {
       runtime: SkillScriptRuntime;
       command: string;
       prefixArgs: string[];
       env: Record<string, string>;
-      sitePackages?: string;
+      pythonPath?: string;
     }
   | { errorCode: SkillScriptErrorCode; error: string }
 > {
   const extension = path.extname(scriptPath).toLowerCase();
 
   if (extension === '.py') {
-    const skillId = path.basename(skillDir);
-    const requirementsPath = path.join(skillDir, 'requirements.txt');
-    const hasRequirements = fs.existsSync(requirementsPath);
-
-    if (hasRequirements) {
-      let resolution = resolveSkillPython(skillId, requirementsPath);
-      if (resolution.kind === 'dependencies-missing') {
-        const deltaPackages = resolution.delta.packages ?? [];
-        const requiresConfirmation = deltaPackages.some(pkg => CONFIRM_REQUIRED_PACKAGES.has(pkg));
-        if (requiresConfirmation && !options.confirmDependencyInstall) {
-          return {
-            errorCode: 'SKILL_DEPENDENCIES_UNAVAILABLE',
-            error:
-              `Skill '${skillId}' needs ${deltaPackages.length} Python packages that are not bundled with the app ` +
-              `(including ${deltaPackages.filter(pkg => CONFIRM_REQUIRED_PACKAGES.has(pkg)).join(', ')}). ` +
-              'Ask the user to confirm this download, then call run_skill_script again with ' +
-              'confirmDependencyInstall=true to install them and run the script.',
-          };
-        }
-        const outcome = await installSkillPythonDependencies(skillId, requirementsPath);
-        if (!outcome.ok) {
-          const reason = outcome.reason ?? 'failed';
-          return {
-            errorCode: 'SKILL_DEPENDENCIES_UNAVAILABLE',
-            error:
-              `Skill '${skillId}' dependencies could not be installed (${reason}): ${outcome.detail ?? 'unknown error'}. ` +
-              (reason === 'offline'
-                ? 'The package index is unreachable and no cached wheels are available.'
-                : 'Check the configured package index in Settings.'),
-          };
-        }
-        resolution = resolveSkillPython(skillId, requirementsPath);
-      }
-      if (resolution.kind === 'ready') {
-        return {
-          runtime: 'python',
-          command: resolution.python,
-          prefixArgs: [],
-          env: { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
-          sitePackages: resolution.sitePackages ?? undefined,
-        };
-      }
-      if (resolution.kind === 'dependencies-missing') {
-        return {
-          errorCode: 'SKILL_DEPENDENCIES_UNAVAILABLE',
-          error: `Skill '${skillId}' dependencies are still missing after installation.`,
-        };
-      }
-    }
-
-    let executable: string | null = null;
-    try {
-      executable = getManagedPythonExecutable();
-    } catch {
-      executable = null;
-    }
-    const skillPythonExecutable = hasRequirements
-      ? findSkillPythonExecutable(skillId, requirementsPath)
-      : null;
-    executable = skillPythonExecutable || executable;
-    if (!executable) {
-      return {
-        errorCode: 'SKILL_RUNTIME_UNAVAILABLE',
-        error: 'The application-managed Python runtime is unavailable for this Skill.',
-      };
-    }
-    if (hasRequirements && !skillPythonExecutable) {
-      // The Skill's requirements changed without a matching packaged manifest
-      // (local edit or a marketplace update). Keep the previous best-effort
-      // resolver so the Skill still runs instead of failing hard.
-      let uvExecutable: string | null = null;
-      try {
-        uvExecutable = findBundledUvExecutable(process.platform === 'win32' ? 'uv.exe' : 'uv');
-      } catch {
-        uvExecutable = null;
-      }
-      if (!uvExecutable) {
-        return {
-          errorCode: 'SKILL_RUNTIME_UNAVAILABLE',
-          error: 'The application-managed uv runtime is unavailable for this Skill dependency set.',
-        };
-      }
-      return {
-        runtime: 'python',
-        command: uvExecutable,
-        prefixArgs: [
-          'run',
-          '--no-project',
-          '--with-requirements',
-          requirementsPath,
-          '--python',
-          executable,
-        ],
-        env: { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
-      };
-    }
+    const prepared = await prepareWorkspaceSkillPython(options, skillDir);
+    if ('errorCode' in prepared) return prepared;
     return {
       runtime: 'python',
-      command: executable,
+      command: prepared.pythonPath,
+      pythonPath: prepared.pythonPath,
       prefixArgs: [],
       env: { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
     };
@@ -341,15 +229,17 @@ async function resolveRuntime(
     }
     const command = fs.existsSync('/bin/bash') ? '/bin/bash' : process.env.SHELL || 'bash';
     const requirementsPath = path.join(skillDir, 'requirements.txt');
-    const skillPythonExecutable = fs.existsSync(requirementsPath)
-      ? findSkillPythonExecutable(path.basename(skillDir), requirementsPath)
+    const preparedPython = fs.existsSync(requirementsPath)
+      ? await prepareWorkspaceSkillPython(options, skillDir)
       : null;
+    if (preparedPython && 'errorCode' in preparedPython) return preparedPython;
     return {
       runtime: 'bash',
       command,
+      pythonPath:
+        preparedPython && 'pythonPath' in preparedPython ? preparedPython.pythonPath : undefined,
       prefixArgs: [],
       env: {
-        ...(skillPythonExecutable ? { ZHIYUAN_SKILL_PYTHON_BIN: skillPythonExecutable } : {}),
         // DOCX preview uses the same managed Electron Node runtime as .mjs
         // Skills. This keeps preview self-contained on packaged POSIX builds,
         // where a user-installed `node` is not guaranteed to exist.
@@ -365,9 +255,16 @@ async function resolveRuntime(
         error: 'PowerShell Skill scripts are supported only on Windows.',
       };
     }
+    const requirementsPath = path.join(skillDir, 'requirements.txt');
+    const preparedPython = fs.existsSync(requirementsPath)
+      ? await prepareWorkspaceSkillPython(options, skillDir)
+      : null;
+    if (preparedPython && 'errorCode' in preparedPython) return preparedPython;
     return {
       runtime: 'powershell',
       command: 'powershell.exe',
+      pythonPath:
+        preparedPython && 'pythonPath' in preparedPython ? preparedPython.pythonPath : undefined,
       prefixArgs: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File'],
       env: {},
     };
@@ -391,9 +288,9 @@ type PreparedSkillScript = {
   env: Record<string, string | undefined>;
 };
 
-async function prepareSkillScript(
+function resolveSkillInvocation(
   options: RunSkillScriptOptions,
-): Promise<PreparedSkillScript | { result: SkillScriptRunResult }> {
+): { skillsRoot: string; scriptPath: string; skillDir: string } | { result: SkillScriptRunResult } {
   const skillsRoot = options.skillsRoot || getSkillsRoot();
   const resolved = resolveSkillScriptPath(skillsRoot, options.skillId, options.script);
   if ('errorCode' in resolved) {
@@ -420,9 +317,17 @@ async function prepareSkillScript(
     };
   }
 
-  const runtime = await resolveRuntime(resolved.scriptPath, resolved.skillDir, {
-    confirmDependencyInstall: options.confirmDependencyInstall,
-  });
+  return { skillsRoot, ...resolved };
+}
+
+async function prepareSkillScript(
+  options: RunSkillScriptOptions,
+): Promise<PreparedSkillScript | { result: SkillScriptRunResult }> {
+  const resolved = resolveSkillInvocation(options);
+  if ('result' in resolved) return resolved;
+  const { skillsRoot } = resolved;
+  const args = options.args ?? [];
+  const runtime = await resolveRuntime(resolved.scriptPath, resolved.skillDir, options);
   if ('errorCode' in runtime) {
     return { result: invalidInputResult(resolved.scriptPath, runtime.errorCode, runtime.error) };
   }
@@ -454,15 +359,10 @@ async function prepareSkillScript(
       error instanceof Error ? error.message : String(error),
     );
   }
-  if (runtime.sitePackages) {
-    // The overlay shadows the packaged layer (PYTHONPATH precedes site-packages),
-    // which is how one Skill can pin a different version of a shared package.
-    const existing = env.PYTHONPATH?.trim();
-    env.PYTHONPATH = existing
-      ? `${runtime.sitePackages}${path.delimiter}${existing}`
-      : runtime.sitePackages;
-  }
   Object.assign(env, runtime.env, options.envOverrides || {});
+  if (runtime.pythonPath) {
+    applyWorkspaceSkillPythonEnvironment(env, runtime.pythonPath);
+  }
   env.SKILLS_ROOT = skillsRoot;
   env.ZHIYUAN_SKILLS_ROOT = skillsRoot;
 
@@ -504,6 +404,16 @@ function invalidInputResult(
 export async function runManagedSkillScript(
   options: RunSkillScriptOptions,
 ): Promise<SkillScriptRunResult> {
+  const invocation = resolveSkillInvocation(options);
+  if ('result' in invocation) return invocation.result;
+  if (path.extname(invocation.scriptPath).toLowerCase() === '.py') {
+    return runWorkspaceSkillPython(
+      options,
+      invocation.scriptPath,
+      invocation.skillDir,
+      invocation.skillsRoot,
+    );
+  }
   const prepared = await prepareSkillScript(options);
   if ('result' in prepared) return prepared.result;
   const { runtime, scriptPath, commandArgs, env } = prepared;

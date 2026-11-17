@@ -24,11 +24,6 @@ import { Streamdown, type StreamdownProps } from 'streamdown';
 
 import { LinkSafetyModal } from './linkSafetyModal';
 import { Shimmer } from './shimmer';
-import {
-  isPlainTextStreamingTail,
-  useAdaptiveTextReveal,
-  useStreamingTextSegments,
-} from './streamingText';
 
 // Same on-demand pipeline as MessageResponse: plain reasoning text never
 // pays for the Shiki/KaTeX/Mermaid runtimes (issue #141).
@@ -79,8 +74,8 @@ export const Reasoning = memo(
     ...props
   }: ReasoningProps) => {
     const resolvedDefaultOpen = defaultOpen ?? isStreaming;
-    // Track if defaultOpen was explicitly set to false (to prevent auto-open)
     const isExplicitlyClosed = defaultOpen === false;
+    const userClosedRef = useRef(false);
 
     const [isOpen, setIsOpen] = useControllableState<boolean>({
       defaultProp: resolvedDefaultOpen,
@@ -94,12 +89,13 @@ export const Reasoning = memo(
 
     const hasEverStreamedRef = useRef(isStreaming);
     const [hasAutoClosed, setHasAutoClosed] = useState(false);
-    const startTimeRef = useRef<number | null>(null);
+    const startTimeRef = useRef<number | null>(isStreaming ? Date.now() : null);
 
     // Track when streaming starts and compute duration when it settles
     useEffect(() => {
       if (isStreaming) {
         hasEverStreamedRef.current = true;
+        setHasAutoClosed(false);
         if (startTimeRef.current === null) {
           startTimeRef.current = Date.now();
         }
@@ -109,9 +105,9 @@ export const Reasoning = memo(
       }
     }, [isStreaming, setDuration]);
 
-    // Auto-open when streaming starts (unless explicitly closed)
+    // Auto-open when streaming starts (unless explicitly configured closed or user closed it)
     useEffect(() => {
-      if (isStreaming && !isOpen && !isExplicitlyClosed) {
+      if (isStreaming && !isOpen && !isExplicitlyClosed && !userClosedRef.current) {
         setIsOpen(true);
       }
     }, [isStreaming, isOpen, setIsOpen, isExplicitlyClosed]);
@@ -130,6 +126,7 @@ export const Reasoning = memo(
 
     const handleOpenChange = useCallback(
       (newOpen: boolean) => {
+        userClosedRef.current = !newOpen;
         setIsOpen(newOpen);
       },
       [setIsOpen],
@@ -143,17 +140,11 @@ export const Reasoning = memo(
     return (
       <ReasoningContext.Provider value={contextValue}>
         <Collapsible
-          className={cn('not-prose', showConnector ? 'relative mb-0' : 'mb-4', className)}
+          className={cn('not-prose', className)}
           onOpenChange={handleOpenChange}
           open={isOpen}
           {...props}
         >
-          {showConnector && isOpen && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute top-9 bottom-0 left-2 w-px bg-border"
-            />
-          )}
           {children}
         </Collapsible>
       </ReasoningContext.Provider>
@@ -190,18 +181,18 @@ export const ReasoningTrigger = memo(
 
     return (
       <CollapsibleTrigger
-        className={cn('theme-fold-reasoning flex w-full items-center gap-2', className)}
+        className={cn(
+          'theme-fold-reasoning -mx-2 flex w-fit max-w-full items-center gap-2',
+          className,
+        )}
         {...props}
       >
         {children ?? (
           <>
-            <BrainIcon className="size-4" />
+            <BrainIcon className="theme-conversation-icon shrink-0" />
             {getThinkingMessage(isStreaming, duration)}
             <ChevronDownIcon
-              className={cn(
-                'size-4 transition-transform motion-reduce:transition-none',
-                isOpen ? 'rotate-180' : 'rotate-0',
-              )}
+              className={cn('theme-chat-tool-chevron shrink-0', isOpen ? 'rotate-180' : 'rotate-0')}
             />
           </>
         )}
@@ -231,9 +222,6 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
   const userScrolledUpRef = useRef(false);
 
   const text = typeof children === 'string' ? children : '';
-  const { committed, tail } = useStreamingTextSegments(text, isStreaming);
-  const shouldAnimateTail = isStreaming && Boolean(tail) && isPlainTextStreamingTail(tail);
-  const revealedTail = useAdaptiveTextReveal(tail, shouldAnimateTail);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -258,35 +246,34 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
     if (isStreaming && scrollRef.current && !userScrolledUpRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [children, isStreaming]);
+  }, [text, isStreaming]);
+
+  const proseClassName =
+    'size-full text-inherit [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>p+p]:mt-2';
 
   const base = (
-    <Streamdown plugins={basePlugins} linkSafety={linkSafety}>
+    <Streamdown
+      className={proseClassName}
+      mode="streaming"
+      parseIncompleteMarkdown={isStreaming}
+      isAnimating={isStreaming}
+      plugins={basePlugins}
+      linkSafety={linkSafety}
+    >
       {text}
     </Streamdown>
   );
 
-  const committedElement = useMemo(
-    () =>
-      committed ? (
-        <Streamdown plugins={basePlugins} linkSafety={linkSafety}>
-          {committed}
-        </Streamdown>
-      ) : null,
-    [committed],
-  );
-
-  const streamingContent = (
-    <>
-      {committedElement}
-      {revealedTail && <div className="whitespace-pre-wrap wrap-break-word">{revealedTail}</div>}
-    </>
-  );
-  const content = isStreaming ? (
-    streamingContent
-  ) : RICH_CONTENT_PATTERN.test(text) ? (
+  const content = RICH_CONTENT_PATTERN.test(text) ? (
     <React.Suspense fallback={base}>
-      <RichMessageResponse>{text}</RichMessageResponse>
+      <RichMessageResponse
+        className={proseClassName}
+        mode="streaming"
+        parseIncompleteMarkdown={isStreaming}
+        isAnimating={isStreaming}
+      >
+        {text}
+      </RichMessageResponse>
     </React.Suspense>
   ) : (
     base
@@ -295,8 +282,8 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
   return (
     <CollapsibleContent
       className={cn(
-        'theme-reasoning-panel mt-4',
-        showConnector && 'theme-reasoning-panel-indented',
+        'theme-reasoning-panel pt-1 pb-1.5',
+        showConnector && 'theme-reasoning-panel-indented ml-2',
         className,
       )}
       {...props}

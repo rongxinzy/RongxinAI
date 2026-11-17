@@ -19,6 +19,7 @@ import {
 } from '../../../../shared/magpie/routingUsage';
 import { i18nService } from '../../../services/i18n';
 import { showAppError } from '../../../services/appToast';
+import { neutralRuntimeName } from '../../../services/runtimeNameNeutralizer';
 import { routingGroupIdFromName } from './modelRoutingGroupId';
 import { memberSelectItems, membersEqual } from './modelRoutingMemberSelect';
 import { MODEL_ROUTING_OPTIONS, routingModeLabel } from './modelRoutingUsageConstants';
@@ -66,7 +67,7 @@ export function ModelRoutingGroupsSection({
     try {
       onRoutingChange(await api.arrangeRoutingGroups(next));
     } catch (cause) {
-      showAppError(cause instanceof Error ? cause.message : String(cause));
+      showAppError(neutralRuntimeName(cause instanceof Error ? cause.message : String(cause)));
     }
   };
 
@@ -89,7 +90,7 @@ export function ModelRoutingGroupsSection({
       setNewName('');
       setNewMembers(['']);
     } catch (cause) {
-      showAppError(cause instanceof Error ? cause.message : String(cause));
+      showAppError(neutralRuntimeName(cause instanceof Error ? cause.message : String(cause)));
     }
   };
 
@@ -111,7 +112,7 @@ export function ModelRoutingGroupsSection({
         }),
       );
     } catch (cause) {
-      showAppError(cause instanceof Error ? cause.message : String(cause));
+      showAppError(neutralRuntimeName(cause instanceof Error ? cause.message : String(cause)));
     }
   };
 
@@ -130,7 +131,7 @@ export function ModelRoutingGroupsSection({
         }),
       );
     } catch (cause) {
-      showAppError(cause instanceof Error ? cause.message : String(cause));
+      showAppError(neutralRuntimeName(cause instanceof Error ? cause.message : String(cause)));
     }
   };
 
@@ -140,7 +141,7 @@ export function ModelRoutingGroupsSection({
       onRoutingChange(await api.deleteRoutingGroup(deleteId));
       setDeleteId(null);
     } catch (cause) {
-      showAppError(cause instanceof Error ? cause.message : String(cause));
+      showAppError(neutralRuntimeName(cause instanceof Error ? cause.message : String(cause)));
     }
   };
 
@@ -195,8 +196,10 @@ export function ModelRoutingGroupsSection({
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium text-foreground">{group.name}</p>
-                    <p className="truncate text-sm text-muted-foreground">{group.id}</p>
+                    <p className="font-medium text-foreground">{neutralRuntimeName(group.name)}</p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {neutralRuntimeName(group.id)}
+                    </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <Button
@@ -372,6 +375,8 @@ export function ModelRoutingGroupsSection({
               <Label htmlFor="routing-group-name">{i18nService.t('modelRoutingName')}</Label>
               <Input
                 id="routing-group-name"
+                className="max-w-sm"
+                placeholder={i18nService.t('modelRoutingName')}
                 value={newName}
                 disabled={disabled}
                 onChange={event => setNewName(event.target.value)}

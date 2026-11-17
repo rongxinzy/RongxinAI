@@ -3,38 +3,93 @@
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
 import { ArrowDownIcon } from 'lucide-react';
+import type { ComponentProps } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { StickToBottom, useStickToBottom, useStickToBottomContext } from 'use-stick-to-bottom';
 
-import type { ComponentProps, ReactNode } from 'react';
-import { useCallback } from 'react';
-import {
-  type ConversationViewport,
-  ConversationViewportProvider,
-  useConversationViewport,
-  useConversationViewportContext,
-} from './useConversationViewport';
-
-export type ConversationProps = ComponentProps<'div'> & {
-  children?: ReactNode | ((viewport: ConversationViewport) => ReactNode);
+export type ConversationProps = Omit<ComponentProps<typeof StickToBottom>, 'children'> & {
+  children?: ComponentProps<typeof StickToBottom>['children'];
 };
 
+function isWallClockFrozen(startDateMs: number, startPerfMs: number): boolean {
+  if (typeof performance === 'undefined') return false;
+  const elapsedPerf = performance.now() - startPerfMs;
+  const elapsedDate = Date.now() - startDateMs;
+  return elapsedPerf > 30 && elapsedDate === 0;
+}
+
 /**
- * Chat scroll container. The scroll position has exactly one owner: either a
- * virtualizer registered through the viewport context, or the follow-bottom
- * hook itself. No second library writes scrollTop here.
+ * Chat scroll container powered by `use-stick-to-bottom`.
+ * Automatically follows streaming growth at the tail, pauses on user scroll-up,
+ * and re-arms when returning to the bottom.
  */
-export const Conversation = ({ children, ...props }: ConversationProps) => {
-  const viewport = useConversationViewport();
+export const Conversation = ({
+  className,
+  initial = 'instant',
+  resize = 'smooth',
+  instance: externalInstance,
+  targetScrollTop,
+  mass,
+  damping,
+  stiffness,
+  children,
+  ...props
+}: ConversationProps) => {
+  const startDateRef = useRef(Date.now());
+  const startPerfRef = useRef(typeof performance !== 'undefined' ? performance.now() : 0);
+  const fallbackInstance = useStickToBottom({
+    initial,
+    resize,
+    targetScrollTop,
+    mass,
+    damping,
+    stiffness,
+  });
+  const instance = externalInstance ?? fallbackInstance;
+  const instanceRef = useRef(instance);
+  instanceRef.current = instance;
+
+  useEffect(() => {
+    const content = instance.contentRef.current;
+    if (!content || typeof ResizeObserver === 'undefined') return;
+
+    // use-stick-to-bottom schedules ResizeObserver scrolls with `wait: true`
+    // (`Number(true) === 1`), which never clears if `Date.now()` is mocked.
+    // Re-sync instantly when clocks are frozen (tests) or `resize="instant"`,
+    // and otherwise follow smoothly.
+    const observer = new ResizeObserver(() => {
+      const current = instanceRef.current;
+      if (!current.state.isAtBottom || current.state.escapedFromLock) return;
+      const clockFrozen = isWallClockFrozen(startDateRef.current, startPerfRef.current);
+      const effectiveAnimation = resize === 'instant' || clockFrozen ? 'instant' : resize;
+      if (effectiveAnimation === 'instant') {
+        current.state.scrollTop = current.state.calculatedTargetScrollTop;
+      }
+      void current.scrollToBottom({
+        animation: effectiveAnimation,
+        preserveScrollPosition: true,
+      });
+    });
+
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [instance.contentRef, resize]);
 
   return (
-    <ConversationViewportProvider value={viewport}>
-      <div {...props}>{typeof children === 'function' ? children(viewport) : children}</div>
-    </ConversationViewportProvider>
+    <StickToBottom
+      className={cn('relative overflow-y-hidden', className)}
+      initial={initial}
+      resize={resize}
+      instance={instance}
+      role="log"
+      {...props}
+    >
+      {children}
+    </StickToBottom>
   );
 };
 
-export type ConversationContentProps = ComponentProps<'div'> & {
-  /** When false, content-height following is left to an embedded virtualizer. */
-  observeContentResize?: boolean;
+export type ConversationContentProps = ComponentProps<typeof StickToBottom.Content> & {
   reverse?: boolean;
   scrollClassName?: string;
   scrollTabIndex?: number;
@@ -43,45 +98,30 @@ export type ConversationContentProps = ComponentProps<'div'> & {
 export const ConversationContent = ({
   children,
   className,
-  observeContentResize = true,
-  reverse = true,
+  reverse = false,
   scrollClassName,
   scrollTabIndex,
   ...props
 }: ConversationContentProps) => {
-  const viewport = useConversationViewportContext();
-  // Browser scroll anchoring would be an unowned second writer of scrollTop:
-  // when a node near the top of the viewport is replaced (e.g. a code block
-  // swapping to its async shiki-highlighted version) it shifts the viewport,
-  // and the follow hook reads that shift as the user scrolling up. The
-  // viewport hook / registered virtualizer is the only owner, so turn it off.
   const resolvedScrollClassName = cn(
     'min-w-0 overflow-x-hidden overflow-y-auto [overflow-anchor:none]',
     scrollClassName,
   );
   const contentClassName = cn(
-    'flex min-w-0 gap-8 p-4',
+    'flex min-w-0 gap-6 p-4',
     reverse ? 'flex-col-reverse' : 'flex-col',
     className,
   );
-  const attachContent = useCallback(
-    (element: HTMLDivElement | null) => {
-      if (observeContentResize) viewport.attachContentElement(element);
-    },
-    [observeContentResize, viewport],
-  );
 
   return (
-    <div
-      ref={viewport.attachScrollElement}
-      tabIndex={scrollTabIndex}
-      className={resolvedScrollClassName}
-      style={{ height: '100%', width: '100%', scrollbarGutter: 'stable both-edges' }}
+    <StickToBottom.Content
+      {...(scrollTabIndex !== undefined ? { tabIndex: scrollTabIndex } : {})}
+      scrollClassName={resolvedScrollClassName}
+      className={contentClassName}
+      {...props}
     >
-      <div {...props} ref={attachContent} className={contentClassName}>
-        {children}
-      </div>
-    </div>
+      {children}
+    </StickToBottom.Content>
   );
 };
 
@@ -91,10 +131,10 @@ export const ConversationScrollButton = ({
   className,
   ...props
 }: ConversationScrollButtonProps) => {
-  const { isAtBottom, scrollToBottom } = useConversationViewportContext();
+  const { isAtBottom, scrollToBottom } = useStickToBottomContext();
 
   const handleScrollToBottom = useCallback(() => {
-    scrollToBottom();
+    void scrollToBottom('smooth');
   }, [scrollToBottom]);
 
   return (
@@ -107,7 +147,7 @@ export const ConversationScrollButton = ({
         onClick={handleScrollToBottom}
         size="icon"
         type="button"
-        variant="outline"
+        variant="secondary"
         {...props}
       >
         <ArrowDownIcon className="size-4" />

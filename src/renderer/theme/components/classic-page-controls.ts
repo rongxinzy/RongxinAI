@@ -599,7 +599,10 @@ export function classicPageControls() {
         'background-color': 'color-mix(in oklab, var(--muted) 50%, transparent)',
       },
       base: {
-        'transition-property': 'background-color',
+        'border-width': '1px',
+        'border-style': 'solid',
+        'border-color': 'var(--border)',
+        'transition-property': 'background-color, border-color',
         'transition-duration': '120ms',
         'box-shadow': 'none',
       },

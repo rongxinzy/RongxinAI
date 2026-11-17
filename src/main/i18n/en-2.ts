@@ -102,8 +102,6 @@ export const enMain2 = {
   // Image input fallback (see libs/agentEngine/piImageInputFallback.ts)
   coworkImageNotSentNotice:
     'This message included an image, but it was not sent to the model. The model received the image file path and will try local tools to read any text in it. If the model supports images, you can enable image input in the model settings.',
-  coworkImageRetryNotice:
-    'This model refused the image payload, so the request was retried as text only.',
 
   // Exec approval continuation
   execApprovalApproved:

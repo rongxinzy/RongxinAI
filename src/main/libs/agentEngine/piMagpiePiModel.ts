@@ -176,16 +176,7 @@ export async function resolvePiModel(
         enterpriseConfig.apiKey || 'managed-enterprise',
       );
 
-      const effectiveImageInput = imageInputVerdict(
-        imageInput,
-        ProviderName.Custom,
-        resolution.model.id,
-        {
-          supportsImage: imageInput === ModelCapabilityStatus.Supported,
-          imageInput,
-          endpointKey: enterpriseConfig.baseUrl,
-        },
-      );
+      const effectiveImageInput = imageInputVerdict(imageInput);
       const model =
         effectiveImageInput === ImageInputVerdict.Supported
           ? customModel
@@ -219,16 +210,7 @@ export async function resolvePiModel(
     await modelRuntime.setRuntimeApiKey('magpie', MAGPIE_RUNTIME_API_KEY);
 
     const imageInput = magpieImageInput(resolution.model);
-    const effectiveImageInput = imageInputVerdict(
-      imageInput,
-      ProviderName.Magpie,
-      resolution.model.id,
-      {
-        supportsImage: imageInput === ModelCapabilityStatus.Supported,
-        imageInput,
-        endpointKey: baseUrl,
-      },
-    );
+    const effectiveImageInput = imageInputVerdict(imageInput);
     const model =
       effectiveImageInput === ImageInputVerdict.Supported
         ? customModel

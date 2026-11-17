@@ -54,7 +54,7 @@ describe('Milestone 3 Adversarial Challenge: Queue, Tree, & Context Edit', () =>
         persistImageAttachments: vi.fn((_id: string, imgs: any) => imgs),
         recovery: {
           imageInputVerdictForActive: vi.fn(() => ImageInputVerdict.Supported),
-          recordImagePrompt: vi.fn(),
+          reportOmittedImages: vi.fn(),
         },
         getOcrCommandFor: vi.fn(),
         getStore: vi.fn(() => mockStore),
@@ -73,53 +73,6 @@ describe('Milestone 3 Adversarial Challenge: Queue, Tree, & Context Edit', () =>
 
       expect(mockStore.addMessage).not.toHaveBeenCalled();
       expect(persistedMessages).toHaveLength(0);
-    });
-
-    it('Scenario 1.2: Steer promotion with remaining follow-up does not prematurely pop follow-up on steer message_start', async () => {
-      // User enqueues FollowUp 1 and FollowUp 2
-      const first = queueController.enqueuePendingMessage(sessionId, 'Follow-up 1');
-      const second = queueController.enqueuePendingMessage(sessionId, 'Follow-up 2');
-      expect(first.success && second.success).toBe(true);
-      expect(queueController.list(sessionId)).toHaveLength(2);
-
-      // User triggers Steer on Follow-up 1
-      const steerResult = await queueController.steerPendingMessage(sessionId, first.item!.id);
-      expect(steerResult.success).toBe(true);
-
-      // 1. Cleared native queue
-      expect(mockPiSession.clearQueue).toHaveBeenCalledTimes(1);
-
-      // 2. Steer prompt was dispatched and persisted as Steer
-      expect(persistedMessages).toHaveLength(1);
-      expect(persistedMessages[0].content).toBe('Follow-up 1');
-      expect(persistedMessages[0].metadata?.queueDelivery).toBe(CoworkQueueDelivery.Steer);
-
-      // 3. Follow-up 2 was re-enqueued to Pi native queue
-      expect(mockPiSession.prompt).toHaveBeenCalledWith('Follow-up 2', {
-        streamingBehavior: 'followUp',
-      });
-
-      // Sidecar currently retains Follow-up 2 as Pending
-      expect(queueController.list(sessionId)).toHaveLength(1);
-      expect(queueController.list(sessionId)[0].id).toBe(second.item?.id);
-
-      // NOW: Pi begins executing the STEER turn (Follow-up 1).
-      // Pi emits `message_start` for user role.
-      queueController.onNativeUserMessageStart(sessionId, activeSession);
-
-      // REMEDIATED: onNativeUserMessageStart tracks in-flight steer dispatches
-      // and does NOT consume Follow-up 2 from the sidecar prematurely:
-      const sidecarRemaining = queueController.list(sessionId);
-      expect(sidecarRemaining).toHaveLength(1); // Retained in sidecar awaiting turn completion
-      expect(persistedMessages).toHaveLength(1); // Follow-up 2 not yet persisted
-      expect(activeSession.summaryCheckpointGoal).toBe('Follow-up 1'); // Preserved steer goal
-
-      // When Pi later begins executing Follow-up 2 turn:
-      queueController.onNativeUserMessageStart(sessionId, activeSession);
-      expect(queueController.list(sessionId)).toHaveLength(0); // Now consumed
-      expect(persistedMessages).toHaveLength(2); // Follow-up 2 persisted
-      expect(persistedMessages[1].content).toBe('Follow-up 2');
-      expect(activeSession.summaryCheckpointGoal).toBe('Follow-up 2');
     });
 
     it('Scenario 1.3: Control actions queue and execution lifecycle under heavy interleaving', async () => {
@@ -142,9 +95,10 @@ describe('Milestone 3 Adversarial Challenge: Queue, Tree, & Context Edit', () =>
 
       expect(queueController.hasQueuedControlActions(sessionId)).toBe(true);
 
-      // Turn finishes in Pi
+      queueController.onNativeUserMessageStart(sessionId, activeSession);
+      // Pi consumes the follow-up before settling.
       activeSession.isRunning = false;
-      await queueController.flushFollowUpQueue(sessionId, activeSession);
+      await queueController.flushControlActions(sessionId, activeSession);
 
       // Wait for chained background microtasks of control actions to complete
       while (queueController.hasQueuedControlActions(sessionId)) {
@@ -152,7 +106,7 @@ describe('Milestone 3 Adversarial Challenge: Queue, Tree, & Context Edit', () =>
       }
 
       // Follow-up must have executed first via continueSession, then control actions
-      expect(mockHost.continueSession).toHaveBeenCalledTimes(1);
+      expect(mockHost.continueSession).not.toHaveBeenCalled();
       expect(order).toEqual(['action-1', 'action-2', 'action-3']);
       expect(queueController.hasQueuedControlActions(sessionId)).toBe(false);
     });
@@ -169,7 +123,7 @@ describe('Milestone 3 Adversarial Challenge: Queue, Tree, & Context Edit', () =>
         order.push('action-2');
       });
 
-      await queueController.flushFollowUpQueue(sessionId, activeSession);
+      await queueController.flushControlActions(sessionId, activeSession);
 
       expect(order).toEqual(['action-1', 'action-2']);
       expect(queueController.hasQueuedControlActions(sessionId)).toBe(false);
@@ -186,7 +140,7 @@ describe('Milestone 3 Adversarial Challenge: Queue, Tree, & Context Edit', () =>
       activeSession.isRunning = false;
       activeSession.turnFailed = true;
 
-      await queueController.flushFollowUpQueue(sessionId, activeSession);
+      await queueController.flushControlActions(sessionId, activeSession);
 
       expect(executed).toBe(false);
       expect(queueController.hasQueuedControlActions(sessionId)).toBe(false);
@@ -199,14 +153,14 @@ describe('Milestone 3 Adversarial Challenge: Queue, Tree, & Context Edit', () =>
       expect(res.error).toContain('require a Work session');
     });
 
-    it('Scenario 1.7: Clear queue wipes both native queue and sidecar cleanly', () => {
+    it('Scenario 1.7: Clear removes sidecar metadata without mutating Pi queues', () => {
       queueController.enqueuePendingMessage(sessionId, 'Q1');
       queueController.enqueuePendingMessage(sessionId, 'Q2');
       expect(queueController.list(sessionId)).toHaveLength(2);
 
       const cleared = queueController.clear(sessionId);
       expect(cleared).toBe(true);
-      expect(mockPiSession.clearQueue).toHaveBeenCalled();
+      expect(mockPiSession.clearQueue).not.toHaveBeenCalled();
       expect(queueController.list(sessionId)).toHaveLength(0);
     });
   });

@@ -32,9 +32,11 @@ const rendererFallback = (
 interface ArtifactRendererProps {
   artifact: Artifact;
   sessionArtifacts?: Artifact[];
+  cwd?: string | null;
+  imageRevision?: number;
 }
 
-const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact }) => {
+const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, cwd, imageRevision }) => {
   let renderer: React.ReactNode;
   switch (artifact.type) {
     case 'html':
@@ -44,7 +46,7 @@ const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact }) => {
       renderer = <SvgRenderer artifact={artifact} />;
       break;
     case 'image':
-      renderer = <ImageRenderer artifact={artifact} />;
+      renderer = <ImageRenderer artifact={artifact} cwd={cwd} revision={imageRevision} />;
       break;
     case 'mermaid':
       renderer = <MermaidRenderer artifact={artifact} />;

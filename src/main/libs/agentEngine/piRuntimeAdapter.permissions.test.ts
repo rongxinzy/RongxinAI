@@ -20,7 +20,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalMode,
-  WorkbenchRunStatus,
+  WorkbenchExecutionStatus,
 } from '../../../shared/workbenchTask';
 import { PiExtensionEventType } from './piExtensionTypes';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
@@ -93,7 +93,7 @@ describe('PiRuntimeAdapter', () => {
         expect(mockSession.abort).not.toHaveBeenCalled();
         expect(adapter.isSessionRunning('denied-workbench')).toBe(true);
         const current = service.getCurrent('denied-workbench');
-        expect(current?.runs[0].status).toBe(WorkbenchRunStatus.Running);
+        expect(current?.runs[0].status).toBe(WorkbenchExecutionStatus.Running);
         expect(current?.approvals[0].decision).toBe(WorkbenchApprovalDecision.Denied);
         expect(interruptions).toEqual([]);
       } finally {

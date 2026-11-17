@@ -7,7 +7,7 @@ import { resetAppToastDedupeForTests } from '../../services/toastNotification';
 import type { RootState } from '../../store';
 import { clearDraftAttachments, type DraftAttachment } from '../../store/slices/coworkSlice';
 import { WorkMode } from '../../store/workMode/constants';
-import CoworkPromptInput from './CoworkPromptInput';
+import { ConversationComposer as CoworkPromptInput } from '../conversation/composer/ConversationComposer';
 
 type Dispatcher = { mock: { calls: [unknown][] } };
 
@@ -258,4 +258,24 @@ test('shows gateway start failure and restart hint when model service state is f
   const alert = view.getByRole('alert');
   expect(alert.textContent).toContain(i18nService.t('magpieGatewayStartFailedTitle'));
   expect(alert.textContent).toContain(i18nService.t('magpieGatewayStartFailedHint'));
+});
+
+test('does not write stale draft back to Redux when Home composer unmounts immediately on submit', async () => {
+  fixture.state.cowork.draftPrompts.__home__ = 'hello world';
+  let view!: ReturnType<typeof render>;
+  const onSubmit = vi.fn(async () => {
+    view.unmount();
+  });
+  view = render(<CoworkPromptInput onSubmit={onSubmit} />);
+
+  await submit(view.container.querySelector('form')!);
+
+  const dispatchedDrafts = fixture.dispatch.mock.calls
+    .map(
+      ([action]) => action as { type?: string; payload?: { sessionId?: string; draft?: string } },
+    )
+    .filter(action => action.type === 'cowork/setDraftPrompt')
+    .map(action => action.payload);
+
+  expect(dispatchedDrafts).toEqual([{ sessionId: '__home__', draft: '' }]);
 });

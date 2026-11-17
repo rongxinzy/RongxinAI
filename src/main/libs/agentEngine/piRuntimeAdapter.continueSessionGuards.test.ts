@@ -21,7 +21,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   WorkbenchApprovalMode,
   WorkbenchContractKind,
-  WorkbenchTaskStatus,
+  WorkbenchExecutionStatus,
 } from '../../../shared/workbenchTask';
 import { PiExtensionEventType } from './piExtensionTypes';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
@@ -382,7 +382,9 @@ describe('PiRuntimeAdapter', () => {
         const current = service.getCurrent('denied-shortcut')!;
         expect(current.task.id).not.toBe(first.task.id);
         expect(current.task.contract.kind).toBe(WorkbenchContractKind.GenericWork);
-        expect(service.getDetail(first.task.id)?.task.status).toBe(WorkbenchTaskStatus.Completed);
+        expect(service.getDetail(first.task.id)?.task.status).toBe(
+          WorkbenchExecutionStatus.Settled,
+        );
         expect(mockCreateAgentSession).toHaveBeenCalledOnce();
       } finally {
         db.close();

@@ -168,7 +168,10 @@ export default function AboutSettingsPanel({
                           : i18nService.t('updateNotChecked')}
                 </span>
               </div>
-              {update.lastInstallResult && update.status !== AppUpdateStatus.Installing ? (
+              {update.lastInstallResult &&
+              update.status !== AppUpdateStatus.Installing &&
+              (update.lastInstallResult.outcome !== AppUpdateInstallOutcome.Succeeded ||
+                Boolean(update.lastInstallResult.targetVersion?.trim())) ? (
                 <div className="text-xs text-muted-foreground" role="status">
                   {update.lastInstallResult.outcome === AppUpdateInstallOutcome.Succeeded
                     ? i18nService

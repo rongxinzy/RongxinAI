@@ -169,15 +169,13 @@ export interface TelegramChannelConfig {
 
 // ==================== Telegram Multi-Instance Types ====================
 
-export const MAX_TELEGRAM_INSTANCES = 5;
-
 export interface TelegramInstanceConfig extends TelegramChannelConfig {
   instanceId: string;
   instanceName: string;
   workspaceId: string;
 }
 
-export interface TelegramInstanceStatus extends TelegramGatewayStatus {
+interface TelegramInstanceStatus extends TelegramGatewayStatus {
   instanceId: string;
   instanceName: string;
 }
@@ -192,7 +190,7 @@ interface TelegramMultiInstanceStatus {
 
 // ==================== Discord Types ====================
 
-export interface DiscordChannelGuildConfig {
+interface DiscordChannelGuildConfig {
   requireMention?: boolean;
   allowFrom?: string[];
   systemPrompt?: string;
@@ -223,15 +221,13 @@ interface DiscordGatewayStatus {
   lastOutboundAt: number | null;
 }
 
-export const MAX_DISCORD_INSTANCES = 5;
-
 export interface DiscordInstanceConfig extends DiscordChannelConfig {
   instanceId: string;
   instanceName: string;
   workspaceId: string;
 }
 
-export interface DiscordInstanceStatus extends DiscordGatewayStatus {
+interface DiscordInstanceStatus extends DiscordGatewayStatus {
   instanceId: string;
   instanceName: string;
 }

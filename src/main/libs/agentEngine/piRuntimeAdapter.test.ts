@@ -30,7 +30,7 @@ import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import {
   WorkbenchContractKind,
   WorkbenchRunTrigger,
-  WorkbenchTaskStatus,
+  WorkbenchExecutionStatus,
 } from '../../../shared/workbenchTask';
 import { CONVERSATION_HISTORY_TOOL_NAME } from '../../conversationHistory/constants';
 import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor';
@@ -189,7 +189,7 @@ describe('PiRuntimeAdapter', () => {
           expect(mockSession.prompt).toHaveBeenCalledOnce();
           const task = service.getCurrent('ppt-session')!.task;
           expect(task.contract.kind).toBe(WorkbenchContractKind.GenericWork);
-          expect(task.status).toBe(WorkbenchTaskStatus.Completed);
+          expect(task.status).toBe(WorkbenchExecutionStatus.Settled);
         } finally {
           await adapter.stopAllSessions();
           db.close();

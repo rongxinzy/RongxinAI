@@ -306,6 +306,8 @@ async function runSubagent(
       profile.id === PiSubagentProfileId.Scout
     ) {
       subOptions.tools = ['read', 'grep', 'find', 'ls'];
+    } else if (process.platform === 'win32') {
+      subOptions.excludeTools = ['bash'];
     }
     const researcherUsesWebSearch =
       profile.id === PiSubagentProfileId.Researcher && Boolean(deps.webSearchSkillPath);

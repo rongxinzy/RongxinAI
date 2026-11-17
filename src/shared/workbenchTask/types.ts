@@ -8,44 +8,27 @@ import type {
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
   WorkbenchRunEventType,
-  WorkbenchRunStatus,
+  WorkbenchExecutionStatus,
   WorkbenchRunTrigger,
-  WorkbenchTaskStatus,
-  WorkbenchVerificationCheckStatus,
-  WorkbenchVerificationOutcome,
 } from './constants';
 
 export type WorkbenchJsonObject = Record<string, unknown>;
 
 export interface WorkbenchTaskContract {
   kind: WorkbenchContractKind;
-  requiresUserAcceptance: boolean;
   metadata?: WorkbenchJsonObject;
-}
-
-export interface WorkbenchVerificationCheck {
-  name: string;
-  status: WorkbenchVerificationCheckStatus;
-  detail?: string;
-}
-
-export interface WorkbenchVerificationResult {
-  outcome: WorkbenchVerificationOutcome;
-  checks: WorkbenchVerificationCheck[];
-  evidence: WorkbenchJsonObject[];
-  summary: string;
 }
 
 export interface WorkbenchTask {
   id: string;
   sessionId: string;
   goal: string;
-  status: WorkbenchTaskStatus;
+  status: WorkbenchExecutionStatus;
   contract: WorkbenchTaskContract;
   activeRunId: string | null;
   createdAt: number;
   updatedAt: number;
-  completedAt: number | null;
+  endedAt: number | null;
 }
 
 export interface WorkbenchRunContext {
@@ -60,12 +43,11 @@ export interface WorkbenchRun {
   id: string;
   taskId: string;
   attempt: number;
-  status: WorkbenchRunStatus;
+  status: WorkbenchExecutionStatus;
   trigger: WorkbenchRunTrigger;
   startedAt: number | null;
   endedAt: number | null;
   context: WorkbenchRunContext | null;
-  verificationResult: WorkbenchVerificationResult | null;
   failure: WorkbenchJsonObject | null;
   createdAt: number;
   updatedAt: number;

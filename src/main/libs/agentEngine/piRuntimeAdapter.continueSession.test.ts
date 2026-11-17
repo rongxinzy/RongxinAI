@@ -86,7 +86,7 @@ describe('PiRuntimeAdapter', () => {
         activeSessions: Map<string, { turnFailed: boolean }>;
         queue: {
           queuedControlActions: Map<string, Array<() => Promise<void>>>;
-          flushFollowUpQueue(sessionId: string, active: unknown): Promise<void>;
+          flushControlActions(sessionId: string, active: unknown): Promise<void>;
         };
       };
       const active = sessions.activeSessions.get('failed-session');
@@ -94,7 +94,7 @@ describe('PiRuntimeAdapter', () => {
       // Pi sets turnFailed when a settled run surfaces a deferred error.
       active.turnFailed = true;
 
-      await sessions.queue.flushFollowUpQueue('failed-session', active);
+      await sessions.queue.flushControlActions('failed-session', active);
 
       expect(sessions.queue.queuedControlActions.has('failed-session')).toBe(false);
       expect(action).not.toHaveBeenCalled();

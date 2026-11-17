@@ -260,7 +260,7 @@ export class MagpieManager implements MagpieRoutingGateway {
             this.state = {
               state: 'failed',
               version: MAGPIE_VERSION,
-              error: 'Local model service exited',
+              error: 'Model service exited',
             };
           }
         }
@@ -270,7 +270,7 @@ export class MagpieManager implements MagpieRoutingGateway {
       const deadline = Date.now() + (this.options.startupTimeoutMs ?? 30_000);
       while (Date.now() < deadline) {
         signal.throwIfAborted();
-        if (exited) throw new Error('Magpie process exited during startup');
+        if (exited) throw new Error('Model service process exited during startup');
         try {
           const hello = await this.request(`${gatewayUrl}/api/hello`, { signal });
           const data = (await hello.json()) as { name?: string; version?: string };
@@ -287,7 +287,7 @@ export class MagpieManager implements MagpieRoutingGateway {
         }
         await delay(100);
       }
-      throw new Error('Magpie startup timed out');
+      throw new Error('Model service startup timed out');
     } catch (error) {
       if (chosenGatewayPort !== undefined && (phase === 'spawn' || phase === 'probe')) {
         if (this.failedGatewayPorts.size >= 8) this.failedGatewayPorts.clear();
@@ -310,7 +310,7 @@ export class MagpieManager implements MagpieRoutingGateway {
       this.state = {
         state: signal.aborted ? 'stopped' : 'failed',
         version: MAGPIE_VERSION,
-        ...(signal.aborted ? {} : { error: 'Unable to start the verified local model service' }),
+        ...(signal.aborted ? {} : { error: 'Unable to start the verified model service' }),
       };
       return this.status();
     }
@@ -324,7 +324,7 @@ export class MagpieManager implements MagpieRoutingGateway {
     });
   }
   private webRequest(route: string, init: RequestInit = {}, timeoutMs?: number): Promise<Response> {
-    if (!this.webPort || !this.webKey) throw new Error('Local model service is unavailable');
+    if (!this.webPort || !this.webKey) throw new Error('Model service is unavailable');
     return this.request(
       `http://127.0.0.1:${this.webPort}${route}`,
       {
@@ -346,7 +346,7 @@ export class MagpieManager implements MagpieRoutingGateway {
   /** Main-only descriptor: never send this key through renderer IPC or logs. */
   managementConnection(): { url: string; cookieName: string; key: string } {
     if (this.state.state !== 'running' || !this.webPort || !this.webKey)
-      throw new Error('Local model service is unavailable');
+      throw new Error('Model service is unavailable');
     return {
       url: `http://127.0.0.1:${this.webPort}`,
       cookieName: `magpie_web_${this.webPort}`,
@@ -587,7 +587,7 @@ export class MagpieManager implements MagpieRoutingGateway {
         this.state = {
           state: 'failed',
           version: MAGPIE_VERSION,
-          error: 'Unable to stop the local model service. Restart the application before retrying.',
+          error: 'Unable to stop the model service. Restart the application before retrying.',
         };
         throw error;
       })

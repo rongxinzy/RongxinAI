@@ -46,8 +46,10 @@
           "type": "upsert",
           "activity": {
             "toolCallId": "call_f015bb21548e450994664fbd",
+            "parentToolCallId": null,
             "toolName": "list_files",
             "toolInput": null,
+            "partialResult": null,
             "progress": null,
             "phase": "preparing",
             "updatedAt": 1700000000004
@@ -68,10 +70,12 @@
           "type": "upsert",
           "activity": {
             "toolCallId": "call_f015bb21548e450994664fbd",
+            "parentToolCallId": null,
             "toolName": "list_files",
             "toolInput": {
               "path": ""
             },
+            "partialResult": null,
             "progress": {
               "argsChars": 6
             },
@@ -94,10 +98,12 @@
           "type": "upsert",
           "activity": {
             "toolCallId": "call_f015bb21548e450994664fbd",
+            "parentToolCallId": null,
             "toolName": "list_files",
             "toolInput": {
               "path": "."
             },
+            "partialResult": null,
             "progress": {
               "argsChars": 9
             },
@@ -120,10 +126,12 @@
           "type": "upsert",
           "activity": {
             "toolCallId": "call_f015bb21548e450994664fbd",
+            "parentToolCallId": null,
             "toolName": "list_files",
             "toolInput": {
               "path": "."
             },
+            "partialResult": null,
             "progress": {
               "argsChars": 12
             },
@@ -211,8 +219,10 @@
           "type": "upsert",
           "activity": {
             "toolCallId": "call_db4c7a807544444e92e108f4",
+            "parentToolCallId": null,
             "toolName": "list_files",
             "toolInput": null,
+            "partialResult": null,
             "progress": null,
             "phase": "preparing",
             "updatedAt": 1700000000017
@@ -233,10 +243,12 @@
           "type": "upsert",
           "activity": {
             "toolCallId": "call_db4c7a807544444e92e108f4",
+            "parentToolCallId": null,
             "toolName": "list_files",
             "toolInput": {
               "path": ""
             },
+            "partialResult": null,
             "progress": {
               "argsChars": 6
             },
@@ -259,10 +271,12 @@
           "type": "upsert",
           "activity": {
             "toolCallId": "call_db4c7a807544444e92e108f4",
+            "parentToolCallId": null,
             "toolName": "list_files",
             "toolInput": {
               "path": "src"
             },
+            "partialResult": null,
             "progress": {
               "argsChars": 9
             },
@@ -285,10 +299,12 @@
           "type": "upsert",
           "activity": {
             "toolCallId": "call_db4c7a807544444e92e108f4",
+            "parentToolCallId": null,
             "toolName": "list_files",
             "toolInput": {
               "path": "src"
             },
+            "partialResult": null,
             "progress": {
               "argsChars": 14
             },

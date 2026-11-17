@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { normalizeError } from '../../../services/errorNormalization';
 
 import {
-  WorkbenchTaskStatus,
+  WorkbenchExecutionStatus,
   type WorkbenchTask,
   type WorkbenchTaskDetail,
 } from '../../../../shared/workbenchTask';
@@ -70,7 +70,7 @@ export function WorkbenchTaskAuditView({
         <header className="flex flex-col gap-3 pt-8 pb-6">
           <div className="flex items-center justify-between gap-3">
             <span className="flex min-w-0 items-center gap-2">
-              {task.status === WorkbenchTaskStatus.Running && <RunningDot />}
+              {task.status === WorkbenchExecutionStatus.Running && <RunningDot />}
               <Badge variant={statusBadgeVariant(task.status)}>{statusLabel(task.status)}</Badge>
             </span>
             <div className="flex shrink-0 items-center gap-1">
@@ -168,20 +168,12 @@ function TaskDetailsDisclosure({ task }: { task: WorkbenchTask }) {
               value={contractLabel(task.contract.kind)}
             />
             <TaskMetadata
-              label={i18nService.t('workbenchTaskAcceptance')}
-              value={i18nService.t(
-                task.contract.requiresUserAcceptance
-                  ? 'workbenchTaskAcceptanceRequired'
-                  : 'workbenchTaskAcceptanceNotRequired',
-              )}
-            />
-            <TaskMetadata
               label={i18nService.t('workbenchTaskCreatedAt')}
               value={formatTimestamp(task.createdAt)}
             />
             <TaskMetadata
-              label={i18nService.t('workbenchTaskCompletedAt')}
-              value={formatTimestamp(task.completedAt)}
+              label={i18nService.t('workbenchTaskEndedAt')}
+              value={formatTimestamp(task.endedAt)}
             />
           </dl>
           <div className="flex flex-col gap-1">

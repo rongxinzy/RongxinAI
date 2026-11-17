@@ -241,7 +241,7 @@ describe('PiRuntimeAdapter', () => {
       });
     });
 
-    it('flushes deferred context usage before scheduling usage on a later answer', async () => {
+    it('flushes context usage at the native turn boundary after message persistence', async () => {
       const flushSpy = vi.spyOn(adapter.transcript, 'flushContextUsageSync');
       await adapter.startSession('multi-usage', 'Hi');
 
@@ -263,9 +263,13 @@ describe('PiRuntimeAdapter', () => {
       };
 
       driveAnswerEnd('First answer');
-      const flushCountAfterFirst = flushSpy.mock.calls.length;
+      expect(flushSpy).not.toHaveBeenCalled();
+      listener!({ type: 'turn_end' });
+      expect(flushSpy).toHaveBeenCalledTimes(1);
       driveAnswerEnd('Second answer');
-      expect(flushSpy.mock.calls.length).toBe(flushCountAfterFirst + 1);
+      expect(flushSpy).toHaveBeenCalledTimes(1);
+      listener!({ type: 'turn_end' });
+      expect(flushSpy).toHaveBeenCalledTimes(2);
       flushSpy.mockRestore();
     });
 

@@ -10,8 +10,8 @@ export function runIndicatorAppearances() {
   return {
     'run-indicator': recipe({
       base: {
-        height: '1.5rem',
-        'padding-inline': '1rem',
+        height: '2rem',
+        'padding-inline': '0.5rem',
         'font-size': 'var(--zy-component-text-xs)',
         'line-height': '1',
         color: 'var(--muted-foreground)',

@@ -2,7 +2,7 @@ import { Button } from '@shared/components/ui/button';
 import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Tabs, TabsContent } from '@shared/components/ui/tabs';
 import { cn } from '@shared/lib/utils';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import { ArtifactPanelAnimatedToggleIcon } from '../icons/ArtifactPanelAnimatedToggleIcon';
@@ -13,9 +13,17 @@ import {
   type CoworkSessionView as CoworkSessionViewType,
 } from './constants';
 import { CoworkSessionTitleLoadingSkeleton } from './CoworkSessionLoadingState';
-import { WorkbenchTaskTrajectory } from './WorkbenchTaskTrajectory';
+
+const WorkbenchTaskTrajectory = React.lazy(() =>
+  import('./WorkbenchTaskTrajectory').then(module => ({
+    default: module.WorkbenchTaskTrajectory,
+  })),
+);
 
 interface CoworkSessionLayoutProps {
+  mode?: 'home' | 'session';
+  divider?: boolean;
+  homeActions?: React.ReactNode;
   title: string;
   sessionId?: string;
   isSessionSwitching: boolean;
@@ -39,6 +47,9 @@ const panelTransitionClassName = cn(
 );
 
 export function CoworkSessionLayout({
+  mode = 'session',
+  divider,
+  homeActions,
   title,
   sessionId,
   isSessionSwitching,
@@ -54,59 +65,80 @@ export function CoworkSessionLayout({
   const [activeView, setActiveView] = useState<CoworkSessionViewType>(
     CoworkSessionView.Conversation,
   );
-  const isConversationView = activeView === CoworkSessionView.Conversation;
+  const isHome = mode === 'home';
+
+  useEffect(() => {
+    if (isHome && activeView !== CoworkSessionView.Conversation) {
+      setActiveView(CoworkSessionView.Conversation);
+    }
+  }, [activeView, isHome]);
+
+  const effectiveView = isHome ? CoworkSessionView.Conversation : activeView;
+  const isConversationView = effectiveView === CoworkSessionView.Conversation;
 
   return (
     <Tabs
-      value={activeView}
+      value={effectiveView}
       onValueChange={value => {
-        if (isCoworkSessionView(value)) setActiveView(value);
+        if (!isHome && isCoworkSessionView(value)) setActiveView(value);
       }}
       className="h-full min-h-0 flex-1 gap-0 overflow-hidden bg-background"
     >
       {/* 2026/09/18 lixiang  产物侧栏展开/收起还原到页头（窗口控件左侧） */}
       <PageHeader
-        title={isSessionSwitching ? undefined : title}
-        leftContent={isSessionSwitching ? <CoworkSessionTitleLoadingSkeleton /> : undefined}
+        divider={divider ?? !isHome}
+        title={!isHome && isSessionSwitching ? undefined : title}
+        leftContent={
+          !isHome && isSessionSwitching ? <CoworkSessionTitleLoadingSkeleton /> : undefined
+        }
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebar={onToggleSidebar}
         onNewChat={onNewChat}
         updateBadge={updateBadge}
         actions={
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggleArtifactPanel}
-            aria-label={i18nService.t('artifactPanelToggle')}
-            aria-hidden={!isConversationView}
-            tabIndex={isConversationView ? 0 : -1}
-            disabled={isSessionSwitching || !isConversationView}
-            className={cn(!isConversationView && 'invisible')}
-          >
-            <ArtifactPanelAnimatedToggleIcon open={!isSessionSwitching && isArtifactPanelOpen} />
-          </Button>
+          isHome ? (
+            homeActions
+          ) : (
+            <div className="flex items-center gap-1.5">
+              {runIndicator}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onToggleArtifactPanel}
+                aria-label={i18nService.t('artifactPanelToggle')}
+                aria-hidden={!isConversationView}
+                tabIndex={isConversationView ? 0 : -1}
+                disabled={isSessionSwitching || !isConversationView}
+                className={cn(!isConversationView && 'invisible')}
+              >
+                <ArtifactPanelAnimatedToggleIcon
+                  open={!isSessionSwitching && isArtifactPanelOpen}
+                />
+              </Button>
+            </div>
+          )
         }
         tabs={
-          <PageTabs
-            bare
-            value={activeView}
-            items={[
-              {
-                value: CoworkSessionView.Conversation,
-                label: i18nService.t('coworkConversationTab'),
-                disabled: isSessionSwitching,
-              },
-              {
-                value: CoworkSessionView.Trace,
-                label: i18nService.t('coworkTraceTab'),
-                disabled: isSessionSwitching,
-              },
-            ]}
-          />
+          isHome ? undefined : (
+            <PageTabs
+              bare
+              value={effectiveView}
+              items={[
+                {
+                  value: CoworkSessionView.Conversation,
+                  label: i18nService.t('coworkConversationTab'),
+                  disabled: isSessionSwitching,
+                },
+                {
+                  value: CoworkSessionView.Trace,
+                  label: i18nService.t('coworkTraceTab'),
+                  disabled: isSessionSwitching,
+                },
+              ]}
+            />
+          )
         }
       />
-
-      {runIndicator}
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <TabsContent
@@ -121,12 +153,16 @@ export function CoworkSessionLayout({
           keepMounted
           className={panelTransitionClassName}
         >
-          <WorkbenchTaskTrajectory
-            sessionId={sessionId}
-            active={activeView === CoworkSessionView.Trace}
-            loadingOverride={isSessionSwitching}
-            onBackToConversation={() => setActiveView(CoworkSessionView.Conversation)}
-          />
+          {isHome ? null : (
+            <React.Suspense fallback={null}>
+              <WorkbenchTaskTrajectory
+                sessionId={sessionId}
+                active={effectiveView === CoworkSessionView.Trace}
+                loadingOverride={isSessionSwitching}
+                onBackToConversation={() => setActiveView(CoworkSessionView.Conversation)}
+              />
+            </React.Suspense>
+          )}
         </TabsContent>
       </div>
     </Tabs>

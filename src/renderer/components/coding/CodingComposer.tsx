@@ -31,7 +31,9 @@ import {
   slashCommandSelectionPrompt,
 } from './codingSlashCommands';
 import { CodingComposerStatus } from './constants';
-import PendingMessageQueue from '../cowork/PendingMessageQueue';
+import PendingMessageQueue, {
+  type PendingMessageQueueActions,
+} from '../cowork/PendingMessageQueue';
 import type { coworkQueueService } from '../../services/coworkQueue';
 
 interface CodingComposerProps {
@@ -47,10 +49,7 @@ interface CodingComposerProps {
   leadingTools?: ReactNode;
   statusNotice?: ReactNode;
   sessionId?: string;
-  queueService?: Pick<
-    typeof coworkQueueService,
-    'subscribe' | 'load' | 'update' | 'remove' | 'steer' | 'followUp'
-  >;
+  queueService?: Pick<typeof coworkQueueService, 'subscribe' | 'load'> & PendingMessageQueueActions;
   onChange: (value: string) => void;
   onAddAttachments: () => void;
   onRemoveAttachment: (path: string) => void;
@@ -219,6 +218,7 @@ export const CodingComposer = ({
             sessionId={sessionId}
             isStreaming={isRunning}
             queueService={queueService}
+            queueActions={queueService}
           />
         ) : null}
         {menuOpen ? (

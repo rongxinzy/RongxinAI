@@ -1,5 +1,3 @@
-import { createHash } from 'crypto';
-
 import type { ToolAnnotations } from '@earendil-works/pi-coding-agent';
 
 import { WorkbenchApprovalRiskLevel } from '../../shared/workbenchTask';
@@ -58,18 +56,6 @@ const READ_ONLY_SHELL_FILTERS: Record<string, RegExp> = {
 const READ_ONLY_SHELL_SEGMENTS: Record<string, RegExp> = {
   ...READ_ONLY_SHELL_COMMANDS,
   ...READ_ONLY_SHELL_FILTERS,
-};
-
-const stableValue = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, child]) => [key, stableValue(child)]),
-    );
-  }
-  return value;
 };
 
 export function classifyWorkbenchToolRisk(
@@ -131,15 +117,4 @@ function isReadOnlyShellSegment(segment: string, allowed: Record<string, RegExp>
   const name = segment.split(/\s+/)[0];
   const pattern = allowed[name];
   return pattern !== undefined && pattern.test(segment);
-}
-
-export function createToolIdempotencyKey(
-  runId: string,
-  toolCallId: string,
-  input: Record<string, unknown>,
-): string {
-  const hash = createHash('sha256')
-    .update(JSON.stringify(stableValue(input)))
-    .digest('hex');
-  return `${runId}:${toolCallId}:${hash}`;
 }

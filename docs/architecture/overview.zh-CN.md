@@ -26,7 +26,7 @@
 | `src/main/libs/llamacppManager.ts` | llama.cpp 编排 barrel（实现于 `llamacppManager/`） |
 | `src/main/libs/llamacppBackendManager.ts` | 后端/runtime 安装 barrel（实现于 `llamacppBackendManager/`） |
 | `src/main/skillManager.ts` | 内置 Skill 管理 |
-| `src/main/pythonRuntime/` | 工作区隔离的托管 Python（`python_execute` / `python_install`） |
+| `src/main/pythonRuntime/` | 共享预装基线、工作区隔离的托管 Python 与统一 Skill 执行链路 |
 | `src/main/memory/` | Engram 投影与 `memory` 工具 |
 | `src/shared/llamacpp/` | 主/渲染共享的 llama.cpp 类型与常量 |
 
@@ -38,7 +38,8 @@
 | `src/renderer/services/cowork.ts` | Cowork IPC 与流订阅 |
 | `src/renderer/services/` | API、toast、持久化 KV 适配器等 |
 | `src/renderer/store/` | **Redux** 内存状态（与会话 UI 同步） |
-| `src/renderer/components/cowork/` | Work 主界面 |
+| `src/renderer/components/conversation/` | 会话舞台（`ConversationStage` / 懒加载 `SessionStage`、`projectSessionToTurns` 回合投影、`ConversationThread` + `TurnView`） |
+| `src/renderer/components/cowork/` | Work/Chat 视图容器、工作区/面板与权限弹窗 |
 | `src/renderer/browserMock/` | 浏览器预览 mock（仅 DEV、无 preload 时） |
 | `src/shared/components/` | shadcn/ui、ai-elements 等共享 UI |
 
@@ -72,9 +73,15 @@ App.tsx → coworkService.init() → IPC 加载配置/会话 → 流监听
 startSession() → IPC → PiRuntimeAdapter → 流事件 → Redux
 ```
 
-流式 IPC/渲染说明见 [streaming.md](streaming.md)（Pi 事件翻译为增量 UIMessageChunk，主进程仅 coalescer 一处合并，渲染端 rAF 批处理进 LiveTextStore；全文快照仅限异常路径与终态）。权限请求经 `CoworkPermissionModal` 回传引擎。
+流式 IPC/渲染说明见 [streaming.md](streaming.md)（Pi 事件翻译为增量 UIMessageChunk，主进程仅 coalescer 一处合并，渲染端 rAF 批处理进 `LiveTextStore`，经 `ConversationStage` / 常驻 `<StageComposer>`、懒加载 `SessionStage`、`projectSessionToTurns` 回合投影、`AssistantTextPartView`/`ThinkingPartView` 隔离订阅与 Streamdown 2.7 / `@tanstack/react-virtual` 增量渲染；全文快照仅限异常路径与终态）。权限请求经 `CoworkPermissionModal` 回传引擎。
 
 存储：`cowork_sessions` / `cowork_messages`；Cowork 配置 `cowork_config`；应用 KV 在 SQLite `kv` 表。
+
+## 托管 Python
+
+随包 CPython / uv 与 `resources/skill-python/layers/shared` 提供离线办公/PDF 依赖基线。独立 Runner 在 `userData/python-runtime/workspaces-v2/<sha256(realpath)>/` 管理每个工作区的版本化环境；首次复制基线，安装时从当前环境复制独立候选，解析、依赖检查和冻结成功后原子切换 `current.json`。失败保留当前环境；旧布局原地保留且不读取。新增包接受名称或版本范围，由安装器锁定版本，只使用兼容 wheel。工作区和 Skill 依赖安装共用索引策略与 uv 缓存。
+
+`python_execute` 与 Python `run_skill_script` 共用 `PythonRuntimeService` 和同一个工作区解释器；包装脚本与长驻 Skill 进程先调用 `prepare`。Runner 核对 Skill requirements 指纹、按需 delta lock 的 SHA-256 与大下载确认，manifest 过期直接失败，不走临时 `uv run` 旁路。复制、扫描、哈希、包管理与脚本执行均在 Runner 内，主进程负责排队与生命周期；执行具有用户的文件权限。模块、进程清理和集成验证见 [托管 Python 运行时](../../src/main/pythonRuntime/README.md)。
 
 ## 本地推理（llama.cpp）
 

@@ -2,9 +2,11 @@ import { CHAT_TOOL_SELECTORS } from '../chat-tool-contract';
 import { SHELL_SIDEBAR_SELECTORS } from '../shell-sidebar-contract';
 import { HOME_STUDIO_SELECTORS } from '../home-studio-contract';
 import { QUIET_STUDIO_SELECTORS } from '../quiet-studio-contract';
+import { CONVERSATION_SELECTORS } from '../conversation-contract';
 
 /** App-level part, piece, surface, composition and tab hooks. */
 export const APP_SELECTORS = {
+  ...CONVERSATION_SELECTORS,
   'part-coding-agent-manager-dialog-header-1': '.theme-part-coding-agent-manager-dialog-header-1',
   'part-coding-agent-manager-dialog-footer-1': '.theme-part-coding-agent-manager-dialog-footer-1',
   'part-session-expert-picker-command-1': '.theme-part-session-expert-picker-command-1',
@@ -49,8 +51,8 @@ export const APP_SELECTORS = {
   'queue-body-completed': '.theme-queue-body-completed',
   'reasoning-panel': '.theme-reasoning-panel',
   'reasoning-panel-indented': '.theme-reasoning-panel-indented',
-  'reasoning-panel-open': '.theme-reasoning-panel[data-state="open"]',
-  'reasoning-panel-closed': '.theme-reasoning-panel[data-state="closed"]',
+  'reasoning-panel-open': '.theme-reasoning-panel[data-open]',
+  'reasoning-panel-closed': '.theme-reasoning-panel[data-closed]',
   'input-submit': '.theme-input-submit',
   'control-content-height': '.theme-control-content-height',
   'composition-button-icon': '.theme-button svg:not([class*="size-"])',
@@ -127,6 +129,8 @@ export const APP_SELECTORS = {
   'surface-image-overlay': '.theme-surface-image-overlay',
   'surface-skill-editor': '.theme-surface-skill-editor',
   'surface-pending-row': '.theme-surface-pending-row',
+  'surface-pending-content': '.theme-surface-pending-content',
+  'surface-pending-icon': '.theme-surface-pending-icon',
   'surface-pending-selected': '.theme-surface-pending-selected',
   'surface-pending-failed': '.theme-surface-pending-failed',
   'surface-market-link': '.theme-surface-market-link',

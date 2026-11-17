@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { describe, expect, test } from 'vitest';
 
-import { isAllowedLocalfilePath } from './localfilePathValidation';
+import { isAllowedLocalfilePath, resolveLocalfileRequestPath } from './localfilePathValidation';
 
 describe('localfilePathValidation', () => {
   const allowedRoot = path.resolve('/tmp/test-user-data/cowork-images');
@@ -48,5 +48,23 @@ describe('localfilePathValidation', () => {
     expect(isAllowedLocalfilePath('', allowedRoot)).toBe(false);
     expect(isAllowedLocalfilePath(null as unknown as string, allowedRoot)).toBe(false);
     expect(isAllowedLocalfilePath(undefined as unknown as string, allowedRoot)).toBe(false);
+  });
+
+  test('resolves localfile URLs across Windows drives, UNC shares, Chinese names, and special characters', () => {
+    expect(
+      resolveLocalfileRequestPath(
+        'localfile:///work/%E5%9B%BE%20%231%3F100%25.png?revision=img-1-0',
+        'darwin',
+      ),
+    ).toBe('/work/图 #1?100%.png');
+    expect(
+      resolveLocalfileRequestPath(
+        'localfile:///C:/Users/%E5%BC%A0%E4%B8%89/chart%20%231%3F100%25.png?revision=1',
+        'win32',
+      ),
+    ).toBe('C:\\Users\\张三\\chart #1?100%.png');
+    expect(
+      resolveLocalfileRequestPath('localfile://fileserver/share/plot%20%231.png', 'win32'),
+    ).toBe('\\\\fileserver\\share\\plot #1.png');
   });
 });

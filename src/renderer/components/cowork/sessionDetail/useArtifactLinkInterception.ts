@@ -45,34 +45,42 @@ export const useArtifactLinkInterception = ({
     if (!container || !sessionId) return;
 
     const handleLinkClick = (e: MouseEvent) => {
-      const anchor = (e.target as HTMLElement).closest('a');
-      if (!anchor) return;
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
 
-      const href = anchor.getAttribute('href') || '';
-      if (!href.startsWith('file://')) return;
-
-      const filePath = resolveArtifactPath(href);
+      // Support both Streamdown LocalPathButton (<button data-local-path>) and file:// anchors.
+      let filePath: string | null = null;
+      const localPathButton = target.closest<HTMLElement>('[data-local-path]');
+      if (localPathButton?.dataset.localPath) {
+        filePath = localPathButton.dataset.localPath;
+      } else {
+        const anchor = target.closest('a');
+        const href = anchor?.getAttribute('href') || '';
+        if (href.startsWith('file://')) {
+          filePath = resolveArtifactPath(href);
+        }
+      }
+      if (!filePath) return;
 
       const lastDot = filePath.lastIndexOf('.');
       if (lastDot === -1) return;
       const ext = filePath.slice(lastDot).toLowerCase();
       if (!getArtifactTypeFromExtension(ext)) return;
 
-      e.preventDefault();
-      e.stopPropagation();
-
       const normalizedClick = normalizeFilePathForDedup(filePath);
       const existing = sessionArtifacts.find(
         a => a.filePath && normalizeFilePathForDedup(a.filePath) === normalizedClick,
       );
-      if (existing) {
-        // The probe may settle after the user switched sessions; only a verdict for
-        // the session that registered this listener may change the selection.
-        void openAvailableArtifact(existing, () => dispatch(selectArtifact(existing.id)), cwd, {
-          isCurrent: () => artifactListenerSessionIdRef.current === sessionId,
-        });
-      }
-      // No fallback creation — only artifacts already captured in the ledger can be opened.
+      if (!existing) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      // The probe may settle after the user switched sessions; only a verdict for
+      // the session that registered this listener may change the selection.
+      void openAvailableArtifact(existing, () => dispatch(selectArtifact(existing.id)), cwd, {
+        isCurrent: () => artifactListenerSessionIdRef.current === sessionId,
+      });
     };
 
     container.addEventListener('click', handleLinkClick, true);

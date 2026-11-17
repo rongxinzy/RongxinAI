@@ -118,11 +118,11 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, c
             <span className="truncate text-sm font-semibold text-foreground">
               {sourceLabel(run)}
             </span>
-            <span className="inline-flex items-center rounded-md border border-border/50 bg-muted/40 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground shrink-0">
+            <Badge variant="secondary" className="shrink-0 font-normal">
               {run.source === ActivitySource.ScheduledTask
                 ? i18nService.t('activityTriggerCron')
                 : i18nService.t('activityTriggerChannel')}
-            </span>
+            </Badge>
           </div>
 
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -137,10 +137,10 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, c
           <Badge
             variant="outline"
             className={cn(
-              'gap-1.5 px-2.5 py-0.5 text-xs font-medium',
-              isRunning && 'border-primary/40 bg-primary/10 text-primary',
-              isFailed && 'border-destructive/40 bg-destructive/10 text-destructive',
-              !isRunning && !isFailed && 'border-success/40 bg-success/10 text-success',
+              'gap-1.5 font-medium',
+              isRunning && 'border-primary/30 bg-primary/10 text-primary',
+              isFailed && 'border-destructive/30 bg-destructive/10 text-destructive',
+              !isRunning && !isFailed && 'border-success/30 bg-success/10 text-success',
             )}
           >
             {isRunning ? (

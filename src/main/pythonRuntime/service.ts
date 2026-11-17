@@ -6,13 +6,29 @@ import type {
   PythonExecutionResult,
   PythonRunnerRequest,
   PythonRunnerResponse,
+  PythonPrepareInput,
+  PythonPreparedEnvironment,
 } from '../../shared/pythonRuntime';
+import { PythonRuntimeOperation } from '../../shared/pythonRuntime/constants';
 import { runtimeNetworkEnvironment } from './process';
+
+const MAX_RUNNING_OPERATIONS = 2;
+const MAX_WAITING_OPERATIONS = 64;
+type QueuedOperation = {
+  workspace: string;
+  request: PythonRunnerRequest;
+  queuedAt: number;
+  signal?: AbortSignal;
+  abort: () => void;
+  resolve: (result: PythonExecutionResult) => void;
+  reject: (error: unknown) => void;
+};
 
 /** Main process only schedules; downloads, package work and Python execute in a child Runner. */
 export class PythonRuntimeService {
   private readonly active = new Set<ChildProcess>();
-  private readonly queues = new Map<string, Promise<unknown>>();
+  private readonly queue: QueuedOperation[] = [];
+  private readonly runningWorkspaces = new Set<string>();
   private closed = false;
   constructor(
     private readonly options: {
@@ -27,36 +43,83 @@ export class PythonRuntimeService {
   ) {}
 
   execute(input: PythonExecuteInput, signal?: AbortSignal): Promise<PythonExecutionResult> {
-    return this.schedule('execute', input, signal);
+    return this.schedule(PythonRuntimeOperation.Execute, input, signal);
   }
   install(input: PythonInstallInput, signal?: AbortSignal): Promise<PythonExecutionResult> {
-    return this.schedule('install', input, signal);
+    return this.schedule(PythonRuntimeOperation.Install, input, signal);
+  }
+
+  async prepare(
+    input: PythonPrepareInput,
+    signal?: AbortSignal,
+  ): Promise<PythonPreparedEnvironment> {
+    const result = await this.schedule(PythonRuntimeOperation.Prepare, input, signal);
+    if (result.exitCode !== 0)
+      throw new Error(result.stderr || result.stdout || 'Python environment preparation failed.');
+    if (!result.pythonPath)
+      throw new Error('Python environment preparation did not return an interpreter.');
+    return {
+      pythonPath: result.pythonPath,
+      environmentId: result.environmentId,
+      runtimeId: result.runtimeId,
+    };
   }
 
   private async schedule(
     operation: PythonRunnerRequest['operation'],
-    input: PythonExecuteInput | PythonInstallInput,
+    input: PythonExecuteInput | PythonInstallInput | PythonPrepareInput,
     signal?: AbortSignal,
   ) {
     if (this.closed) throw new Error('Python runtime is shutting down.');
     signal?.throwIfAborted();
     const workspace = await realpath(input.workspace);
-    const key = process.platform === 'win32' ? workspace.toLowerCase() : workspace;
-    const previous = this.queues.get(key) ?? Promise.resolve();
-    const pending = previous
-      .catch(() => {})
-      .then(() => {
-        if (this.closed) throw new Error('Python runtime is shutting down.');
-        signal?.throwIfAborted();
-        return this.launch({ operation, input: { ...input, workspace }, ...this.options }, signal);
-      });
-    this.queues.set(key, pending);
-    void pending
-      .finally(() => {
-        if (this.queues.get(key) === pending) this.queues.delete(key);
-      })
-      .catch(() => {});
-    return pending;
+    if (this.closed) throw new Error('Python runtime is shutting down.');
+    signal?.throwIfAborted();
+    if (this.queue.length >= MAX_WAITING_OPERATIONS)
+      throw new Error(
+        'The Python operation queue is full. Wait for an active operation to finish.',
+      );
+    return new Promise<PythonExecutionResult>((resolve, reject) => {
+      const item: QueuedOperation = {
+        workspace: process.platform === 'win32' ? workspace.toLowerCase() : workspace,
+        request: { operation, input: { ...input, workspace }, ...this.options },
+        queuedAt: Date.now(),
+        signal,
+        resolve,
+        reject,
+        abort: () => {
+          const index = this.queue.indexOf(item);
+          if (index === -1) return;
+          this.queue.splice(index, 1);
+          signal?.removeEventListener('abort', item.abort);
+          reject(signal?.reason ?? new Error('Python operation cancelled.'));
+        },
+      };
+      this.queue.push(item);
+      signal?.addEventListener('abort', item.abort, { once: true });
+      if (signal?.aborted) item.abort();
+      this.drain();
+    });
+  }
+
+  private drain(): void {
+    while (!this.closed && this.runningWorkspaces.size < MAX_RUNNING_OPERATIONS) {
+      const index = this.queue.findIndex(item => !this.runningWorkspaces.has(item.workspace));
+      if (index === -1) return;
+      const [item] = this.queue.splice(index, 1);
+      item.signal?.removeEventListener('abort', item.abort);
+      this.runningWorkspaces.add(item.workspace);
+      const startedAt = Date.now();
+      void this.launch(item.request, item.signal)
+        .then(item.resolve, item.reject)
+        .finally(() => {
+          this.runningWorkspaces.delete(item.workspace);
+          console.debug(
+            `[PythonRuntime] ${item.request.operation} waited ${startedAt - item.queuedAt}ms and ran for ${Date.now() - startedAt}ms`,
+          );
+          this.drain();
+        });
+    }
   }
 
   private launch(
@@ -114,6 +177,10 @@ export class PythonRuntimeService {
 
   async shutdown(): Promise<void> {
     this.closed = true;
+    for (const item of this.queue.splice(0)) {
+      item.signal?.removeEventListener('abort', item.abort);
+      item.reject(new Error('Python runtime is shutting down.'));
+    }
     await Promise.all(
       [...this.active].map(
         child =>

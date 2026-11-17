@@ -120,3 +120,28 @@ test('keeps filling the viewport buffer after a page is prepended', async () => 
   view.rerender(React.createElement(Harness, { messagesOffset: 50 }));
   await waitFor(() => expect(mocks.loadMoreMessages).toHaveBeenCalledTimes(2));
 });
+
+test('accepts scrollContainerRef directly without querying the DOM by class name', async () => {
+  const scrollElement = document.createElement('div');
+  Object.defineProperties(scrollElement, {
+    clientHeight: { configurable: true, value: 800 },
+    scrollHeight: { configurable: true, value: 2_000 },
+    scrollTop: { configurable: true, writable: true, value: 0 },
+  });
+  document.body.append(scrollElement);
+
+  const Harness = () => {
+    useSessionHistoryPagination({
+      sessionId: 'session-direct-ref',
+      messagesOffset: 30,
+      scrollContainerRef: { current: scrollElement },
+    });
+    return null;
+  };
+  render(React.createElement(Harness));
+
+  await waitFor(() => {
+    expect(mocks.loadMoreMessages).toHaveBeenCalledOnce();
+    expect(mocks.loadMoreMessages).toHaveBeenCalledWith('session-direct-ref');
+  });
+});

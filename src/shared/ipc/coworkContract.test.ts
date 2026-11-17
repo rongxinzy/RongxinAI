@@ -329,13 +329,16 @@ test('queue result items accept both stored and inline image forms', () => {
       items: [item],
     }).success,
   ).toBe(true);
-  expect(
-    coworkQueueContract.steerPendingMessage.args.safeParse([{ sessionId: 's', itemId: '' }])
-      .success,
-  ).toBe(false);
 });
 
 // --- Config ---------------------------------------------------------------------
+
+test('accepted queue inputs expose only submission and observation', () => {
+  expect(Object.keys(coworkQueueContract)).toEqual([
+    'listPendingMessages',
+    'enqueuePendingMessage',
+  ]);
+});
 
 test('setConfig accepts every field the renderer sends', () => {
   // coworkService.updateConfig / CoworkView chat-skill auto-allow

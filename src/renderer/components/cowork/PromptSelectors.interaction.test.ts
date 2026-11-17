@@ -10,7 +10,6 @@ import { CoworkModelPicker } from './CoworkModelPicker';
 import PermissionModeMenu from './PermissionModeMenu';
 
 vi.mock('../../services/i18n', () => ({ i18nService: { t: (key: string) => key } }));
-vi.mock('../../providers/uiRegistry', () => ({ ProviderIcon: () => null }));
 beforeAll(() => {
   Element.prototype.scrollIntoView ??= vi.fn();
 });

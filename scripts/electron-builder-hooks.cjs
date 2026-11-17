@@ -673,6 +673,21 @@ async function beforePack(context) {
   }
 }
 
+function signWindowsPythonJobHelper(context, env = process.env, spawn = spawnSync) {
+  if (!isWindowsTarget(context) || !env.CERTUM_CERT_THUMBPRINT) return;
+  const script = path.join(__dirname, 'runtime-signing', 'sign-runtime.ps1');
+  const executable = path.join(context.appOutDir, 'resources', 'python-runtime', 'job-runner.exe');
+  const result = spawn(
+    'powershell.exe',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', executable],
+    { stdio: 'inherit', windowsHide: true },
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`Windows Python job helper signing failed with exit code ${result.status}`);
+  }
+}
+
 async function afterPack(context) {
   const resourcesDir = isMacTarget(context)
     ? path.join(
@@ -699,11 +714,13 @@ async function afterPack(context) {
       console.warn(`[electron-builder-hooks] App not found at ${appPath}, skipping icon fix`);
     }
   }
+  signWindowsPythonJobHelper(context);
 }
 
 module.exports = {
   beforePack,
   afterPack,
+  signWindowsPythonJobHelper,
   configureMacAutoUpdateMetadata,
   ensureBundledChannelRuntime,
   packWindowsResourceComponent7z,

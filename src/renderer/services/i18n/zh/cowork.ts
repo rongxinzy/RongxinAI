@@ -1,5 +1,6 @@
 // Cowork 会话
 export const zhCowork: Record<string, string> = {
+  coworkConversationTurns: '对话轮次',
   coworkQueueTitle: '\u5f85\u5904\u7406\u6d88\u606f',
   coworkQueueCount: '{count} \u6761\u5f85\u5904\u7406\u6d88\u606f',
   coworkQueueEmpty: '\u961f\u5217\u4e3a\u7a7a',
@@ -8,6 +9,7 @@ export const zhCowork: Record<string, string> = {
   coworkQueueStatusSending: '\u53d1\u9001\u4e2d',
   coworkQueueStatusFollowUp: '\u4f1a\u8bdd\u7ed3\u675f\u540e\u81ea\u52a8\u53d1\u9001',
   coworkQueueStatusFailed: '\u53d1\u9001\u5931\u8d25',
+  coworkQueuePendingInputs: '已排队的输入',
   coworkQueueSteer: '\u5f15\u5bfc',
   coworkQueueRetry: '\u91cd\u8bd5',
   coworkQueueUpdateFailed: '\u66f4\u65b0\u5f85\u5904\u7406\u6d88\u606f\u5931\u8d25',
@@ -178,6 +180,10 @@ export const zhCowork: Record<string, string> = {
   coworkToolResultCollapse: '收起',
   coworkToolRunning: '执行中',
   coworkToolNoErrorDetail: '执行失败（无详细错误输出）',
+  coworkStepsExploring: '正在探索',
+  coworkStepsExploredCount: '已探索 {count} 个步骤',
+  coworkActivityGroupSteps: '{count} 步',
+  coworkTurnJumpLabel: '跳转到此轮',
   coworkTodosTitle: '待办事项',
   coworkTodoItems: '项',
   coworkTodoCompleted: '已完成',

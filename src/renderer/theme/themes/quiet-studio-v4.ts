@@ -178,6 +178,7 @@ export const quietStudioLightTokens: Record<string, string> = {
 
   'scroll-thumb': 'rgba(16, 24, 40, 0.18)',
   'scroll-thumb-hover': 'rgba(16, 24, 40, 0.28)',
+  'syntax-shiki-background': '#F4F5F7',
 };
 
 export const quietStudioDarkTokens: Record<string, string> = {
@@ -294,6 +295,7 @@ export const quietStudioDarkTokens: Record<string, string> = {
 
   'scroll-thumb': 'rgba(255, 255, 255, 0.16)',
   'scroll-thumb-hover': 'rgba(255, 255, 255, 0.24)',
+  'syntax-shiki-background': '#121316',
 };
 
 export function quietStudioAppearances(): Partial<ComponentAppearances> {

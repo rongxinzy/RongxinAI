@@ -195,13 +195,19 @@ jobs:
           path: |
             resources/python-linux
             resources/uv-linux
-          key: bundled-runtime-linux-${{ hashFiles('src/main/pythonRuntime/bundledRuntime.json') }}
-      - name: Provision the bundled managed runtime
+          key: bundled-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/main/pythonRuntime/bundledRuntime.json', 'scripts/setup-python-runtime.js', 'scripts/setup-uv-runtime.js', 'scripts/setup-mac-python-runtime.js', 'scripts/setup-mac-uv-runtime.js') }}
+      - name: Restore the preinstalled Python dependency baseline
+        uses: actions/cache@v5
+        with:
+          path: resources/skill-python
+          key: skill-python-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/main/pythonRuntime/bundledRuntime.json', 'scripts/setup-skill-python-runtime.js', 'scripts/setup-windows-skill-python.cjs', 'SKILLs/**/requirements.txt') }}
+      - name: Provision the bundled managed runtime and dependency baseline
         run: |
           bun run setup:posix-python-runtime
           bun run setup:posix-uv-runtime
+          bun run setup:skill-python-runtime
       - name: Verify pinned Python, isolated packages, rebuild and process cancellation
-        run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts --maxWorkers=1
+        run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts src/main/pythonRuntime/skill.integration.test.ts --maxWorkers=1
 
   browser-preview:
     needs: source

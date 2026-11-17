@@ -22,8 +22,32 @@ const createRepository = () => {
 
 const contract = {
   kind: WorkbenchContractKind.Chat,
-  requiresUserAcceptance: false,
 };
+
+test('leaves retired task statuses stored without exposing them as current execution facts', () => {
+  const { db, repository } = createRepository();
+  try {
+    const task = repository.createTask('retired-session', 'Historical task', contract);
+    const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
+    db.prepare('UPDATE workbench_tasks SET status = ? WHERE id = ?').run('completed', task.id);
+    db.prepare('UPDATE workbench_runs SET status = ? WHERE id = ?').run('succeeded', run.id);
+    expect(repository.getTask(task.id)).toBeNull();
+    expect(repository.getRun(run.id)).toBeNull();
+    expect(repository.getDetail(task.id)).toBeNull();
+    expect(repository.getLatestTaskForSession('retired-session')).toBeNull();
+    expect(repository.listTasksForSession('retired-session')).toEqual([]);
+    expect(db.prepare('SELECT status FROM workbench_tasks WHERE id = ?').get(task.id)).toEqual({
+      status: 'completed',
+    });
+    expect(db.prepare('SELECT status FROM workbench_runs WHERE id = ?').get(run.id)).toEqual({
+      status: 'succeeded',
+    });
+    const current = repository.createTask('retired-session', 'Current execution', contract);
+    expect(repository.getLatestTaskForSession('retired-session')?.id).toBe(current.id);
+  } finally {
+    db.close();
+  }
+});
 
 test('rolls back all repository writes when a transaction fails', () => {
   const { db, repository } = createRepository();
@@ -47,7 +71,7 @@ test('increments attempts and run event sequences while enforcing uniqueness', (
     const first = repository.createRun(task.id, WorkbenchRunTrigger.Message);
     const second = repository.createRun(task.id, WorkbenchRunTrigger.Retry);
     repository.appendRunEvent(first.id, WorkbenchRunEventType.RunStarted);
-    repository.appendRunEvent(first.id, WorkbenchRunEventType.VerificationStarted);
+    repository.appendRunEvent(first.id, WorkbenchRunEventType.ToolRead);
 
     expect([first.attempt, second.attempt]).toEqual([1, 2]);
     expect(

@@ -72,6 +72,7 @@ export interface ManagedProvidersApi extends Renamed<{
   catalog: 'managedProviderCatalog';
   aisphereSnapshot: 'aisphereSnapshot';
   aisphereConnect: 'aisphereConnect';
+  aisphereDisconnect: 'aisphereDisconnect';
   aisphereRefresh: 'aisphereRefresh';
 }> {
   onChanged: (callback: () => void) => () => void;

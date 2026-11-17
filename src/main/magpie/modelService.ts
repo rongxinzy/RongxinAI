@@ -8,6 +8,75 @@ import type {
 import { routingGroupAllowed } from './routingGroupPolicy';
 import type { MagpieRoutingUsageService } from './routingUsageService';
 
+/** Upper bound above which an unconfigured private/self-hosted model's catalog guess is suspect. */
+const UNCONFIGURED_PRIVATE_CATALOG_CONTEXT_SUSPECT_MIN = 500_000;
+
+function isPrivateOrLanBaseUrl(baseUrl: string | undefined): boolean {
+  if (!baseUrl) return false;
+  try {
+    const hostname = new URL(baseUrl).hostname.replace(/^\[|\]$/g, '').toLowerCase();
+    if (!hostname) return false;
+    if (
+      hostname === 'localhost' ||
+      hostname === '::1' ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.lan') ||
+      !hostname.includes('.')
+    ) {
+      return true;
+    }
+    const octets = hostname.split('.').map(part => Number(part));
+    if (octets.length !== 4 || octets.some(n => !Number.isInteger(n) || n < 0 || n > 255)) {
+      return false;
+    }
+    const [a, b] = octets;
+    return (
+      a === 10 ||
+      a === 127 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Prevent cloud-catalog guesses (e.g. 1M for a matching model name) from inflating an
+ * unconfigured self-hosted LAN provider that never declared or probed a context window.
+ */
+function sanitizeCatalogModelsForPrivateProviders(
+  models: MagpieModel[],
+  providers: readonly MagpieProviderSummary[],
+): MagpieModel[] {
+  const privateUnconfiguredPrefixes = providers
+    .filter(p => !p.off && !p.isHostManaged && isPrivateOrLanBaseUrl(p.baseUrl))
+    .map(p => ({
+      prefix: `${p.id}/`,
+      contexts: p.contexts ?? {},
+    }));
+  if (privateUnconfiguredPrefixes.length === 0) return models;
+
+  return models.map(model => {
+    if (
+      model.context_window === undefined ||
+      model.context_window < UNCONFIGURED_PRIVATE_CATALOG_CONTEXT_SUSPECT_MIN
+    ) {
+      return model;
+    }
+    const owner = privateUnconfiguredPrefixes.find(entry => model.id.startsWith(entry.prefix));
+    if (!owner) return model;
+    const rawModelId = model.id.slice(owner.prefix.length);
+    if (owner.contexts[rawModelId] !== undefined || owner.contexts['*'] !== undefined) {
+      return model;
+    }
+    const { context_window: _dropped, ...rest } = model;
+    return rest;
+  });
+}
+
 /** Loopback credential the runtime presents to the owned gateway. The gateway, not this process, holds upstream keys. */
 export const MAGPIE_RUNTIME_API_KEY = 'magpie-zhiyuan';
 
@@ -60,9 +129,18 @@ export class MagpieModelService {
         /* routing metadata is optional for catalog reads */
       }
     }
-    const models = (await this.backend.models()).filter(model =>
+    const rawModels = (await this.backend.models()).filter(model =>
       routingGroupAllowed(model, groupsById, this.options.allowedModel),
     );
+    let providers: MagpieProviderSummary[] = [];
+    if (this.backend.providers) {
+      try {
+        providers = await this.backend.providers();
+      } catch {
+        /* provider metadata is optional for catalog reads */
+      }
+    }
+    const models = sanitizeCatalogModelsForPrivateProviders(rawModels, providers);
     this.latestModels = models;
     const current = this.backend.status();
     if (current.state !== 'running' || current.gatewayUrl !== status.gatewayUrl)

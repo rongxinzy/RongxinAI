@@ -9,7 +9,7 @@ const readSource = (relativePath: string): string =>
 const appSource = readSource('../../App.tsx');
 const mainViewCanvasSource = readSource('../../app/MainViewCanvas.tsx');
 const settingsPageSource = readSource('../settings/SettingsPage.tsx');
-const modelSettingsPanelSource = readSource('../settings/model/ModelSettingsPanel.tsx');
+const modelsPageSource = readSource('../settings/model/ModelsPage.tsx');
 const localInferenceSource = readSource('./LocalInferenceView.tsx');
 const modelsPanelSource = readSource('./panels/ModelsPanel.tsx');
 
@@ -22,15 +22,16 @@ test('keeps model-load cancellation reachable through the loading overlay', () =
 
 test('opens the unified model settings after starting a local model', () => {
   expect(appSource).toContain('const handleOpenLocalModelSettings = useCallback(() =>');
-  expect(appSource).toContain("handleShowSettings({ initialTab: 'model' });");
+  expect(appSource).toContain("handleShowSettings({ initialTab: 'models' });");
   expect(appSource).toContain('onOpenModelSettings={handleOpenLocalModelSettings}');
   expect(mainViewCanvasSource).toContain('initialTab={settingsOptions.initialTab}');
 });
 
 test('routes model settings to the unified catalog and default selection', () => {
-  expect(settingsPageSource).toContain("activeTab === 'model' && <ModelSettingsPanel />");
-  expect(modelSettingsPanelSource).toContain('apply(await refreshMagpieModels())');
-  expect(modelSettingsPanelSource).toContain('selectMagpieDefaultModel(selection)');
+  expect(settingsPageSource).toContain("activeTab === 'models' && (");
+  expect(settingsPageSource).toContain('<ModelsPage');
+  expect(modelsPageSource).toContain('await refreshMagpieModels()');
+  expect(modelsPageSource).toContain('selectMagpieDefaultModel(item.id)');
 });
 
 test('refreshes the kept-alive local inference view on navigation requests', () => {

@@ -107,10 +107,12 @@ const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({
 
   const title = artifact.fileName || artifact.title;
   const localPath = artifact.filePath?.trim() || '';
+  const isSelected = isPanelOpen && selectedArtifact?.id === artifact.id;
 
   return (
     <Attachments variant="inline" className="max-w-full">
       <Attachment
+        className={isSelected ? 'bg-sidebar-accent border-input' : undefined}
         data={{
           type: 'source-document',
           id: artifact.id,
@@ -127,6 +129,7 @@ const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({
           disabled={disabled || busy}
           onClick={handleOpenPreview}
           aria-busy={busy}
+          aria-pressed={isSelected}
           aria-label={title + ' ' + t('artifactOpen')}
           className="min-w-0 flex-1 justify-start gap-2"
         >
@@ -138,7 +141,7 @@ const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({
           <Button
             type="button"
             variant="ghost"
-            size="icon-sm"
+            size="icon-xs"
             disabled={disabled || busy}
             onClick={handleOpenLocalFolder}
             title={t('artifactOpenFolder')}

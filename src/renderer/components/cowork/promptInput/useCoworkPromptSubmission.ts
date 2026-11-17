@@ -46,6 +46,9 @@ interface UseCoworkPromptSubmissionParams {
   findSlashSkill: (skillId: string) => Skill | undefined;
   runSlashCompact: () => Promise<void>;
   setImageVisionHint: (hint: boolean) => void;
+  onBeforeClearSubmittedDraft?: () => void;
+  onAfterClearSubmittedDraft?: () => void;
+  onRestoreRejectedDraft?: () => void;
 }
 
 /**
@@ -78,6 +81,9 @@ export function useCoworkPromptSubmission({
   findSlashSkill,
   runSlashCompact,
   setImageVisionHint,
+  onBeforeClearSubmittedDraft,
+  onAfterClearSubmittedDraft,
+  onRestoreRejectedDraft,
 }: UseCoworkPromptSubmissionParams) {
   const dispatch = useDispatch();
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -294,10 +300,12 @@ export function useCoworkPromptSubmission({
       );
     }
     // Clear input immediately; don't wait for the AI response.
+    onBeforeClearSubmittedDraft?.();
     setValue('');
     dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
     dispatch(clearDraftAttachments(draftKey));
     setImageVisionHint(false);
+    onAfterClearSubmittedDraft?.();
     const result = await onSubmit(
       finalPrompt,
       imageAtts.length > 0 ? imageAtts : undefined,
@@ -307,6 +315,7 @@ export function useCoworkPromptSubmission({
     );
     if (result === false) {
       // Submission rejected — restore the prompt so the user can retry.
+      onRestoreRejectedDraft?.();
       setValue(finalPrompt);
       dispatch(setDraftPrompt({ sessionId: draftKey, draft: finalPrompt }));
       dispatch(setDraftAttachments({ draftKey, attachments }));
@@ -344,6 +353,9 @@ export function useCoworkPromptSubmission({
     slashEnabledSkills,
     findSlashSkill,
     runSlashCompact,
+    onBeforeClearSubmittedDraft,
+    onAfterClearSubmittedDraft,
+    onRestoreRejectedDraft,
   ]);
 
   return { submitPrompt, cancelFolderWarningTimer };

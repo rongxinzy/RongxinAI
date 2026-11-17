@@ -19,25 +19,26 @@ import {
 } from '../libs/anysearchGatewayCredentials';
 import { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import { WorkbenchTaskService } from '../workbenchTask/taskService';
-import { promoteCompletedWorkbenchRun } from '../memory/taskMemoryPromotion';
+import { promoteSettledWorkbenchRun } from '../memory/taskMemoryPromotion';
 
 export const getWorkbenchTaskService = (): WorkbenchTaskService => {
   if (!agentRuntime.workbenchTaskService) {
     agentRuntime.workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase(), {
       listLedgerArtifacts: scopeId => getArtifactLedger().list(scopeId),
-      onCompletedRun: event => {
+      onSettledRun: event => {
         const complete = getPiRuntimeAdapter().getSessionMemoryCompletion(event.task.sessionId);
         if (!complete) {
           console.warn(
-            '[Memory] Skipped completed run extraction because the session model is unavailable.',
+            `[Memory] skipped settled run extraction for session ${event.task.sessionId} because the session model is unavailable.`,
           );
           return;
         }
-        void promoteCompletedWorkbenchRun(getProjectMemoryService(), event, complete).catch(
-          error => {
-            console.warn('[Memory] Failed to extract completed run memory:', error);
-          },
-        );
+        void promoteSettledWorkbenchRun(getProjectMemoryService(), event, complete).catch(error => {
+          console.warn(
+            `[Memory] failed to extract settled run memory for session ${event.task.sessionId}:`,
+            error,
+          );
+        });
       },
     });
   }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 /**
  * Expansion memory for collapsible turn content. Turn rows unmount under
@@ -14,13 +14,14 @@ const EXPANSION_MEMORY_LIMIT = 2000;
 
 /**
  * Maps a backend session id back to the optimistic `temp-*` id it replaced,
- * so React keys (`VirtualizedTurnList`, `CoworkRunStatus`) and persisted
- * collapsible states remain continuous when `startSession` resolves.
+ * so persisted collapsible states remain continuous when `startSession` resolves.
  */
 const promotedSessionKeyMap = new Map<string, string>();
 const PROMOTED_SESSION_KEY_LIMIT = 200;
 
 let currentNamespace = '';
+
+const PersistentToggleNamespaceContext = createContext<string | null>(null);
 
 const persistValue = (scoped: string, next: boolean): void => {
   expansionMemory.delete(scoped); // refresh recency
@@ -61,13 +62,13 @@ const promotePersistentToggleNamespace = (
   }
 };
 
-/** Returns a stable React key across `temp-*` -> real session id promotion. */
+/** Returns a stable key across `temp-*` -> real session id promotion. */
 export const resolveStableSessionKey = (sessionId: string | undefined): string | undefined => {
   if (!sessionId) return sessionId;
   return promotedSessionKeyMap.get(sessionId) ?? sessionId;
 };
 
-/** Scopes subsequently persisted toggles to one session. */
+/** Scopes subsequently persisted toggles to one session when no Provider is mounted. */
 export const setPersistentToggleNamespace = (namespace: string): void => {
   if (
     currentNamespace.startsWith('temp-') &&
@@ -80,22 +81,65 @@ export const setPersistentToggleNamespace = (namespace: string): void => {
   currentNamespace = namespace;
 };
 
-const scopedKey = (key: string): string => {
-  const canonicalNamespace = promotedSessionKeyMap.get(currentNamespace) ?? currentNamespace;
+/**
+ * React-pure session boundary for collapsible expansion memory so concurrent
+ * views (e.g. main transcript + RunSessionModal) never race on a global namespace.
+ */
+export const PersistentToggleNamespaceProvider: React.FC<{
+  namespace: string;
+  children?: React.ReactNode;
+}> = ({ namespace, children }) => {
+  const [tracked, setTracked] = useState(() => ({
+    raw: namespace,
+    canonical: resolveStableSessionKey(namespace) ?? namespace,
+  }));
+
+  if (tracked.raw !== namespace) {
+    const isPromotion =
+      tracked.raw.startsWith('temp-') && Boolean(namespace) && !namespace.startsWith('temp-');
+    setTracked({
+      raw: namespace,
+      canonical: isPromotion
+        ? tracked.canonical
+        : (resolveStableSessionKey(namespace) ?? namespace),
+    });
+  }
+
+  useEffect(() => {
+    if (tracked.raw && tracked.canonical !== tracked.raw && tracked.canonical.startsWith('temp-')) {
+      promotePersistentToggleNamespace(tracked.canonical, tracked.raw);
+    }
+  }, [tracked.canonical, tracked.raw]);
+
+  return React.createElement(
+    PersistentToggleNamespaceContext.Provider,
+    { value: tracked.canonical },
+    children,
+  );
+};
+
+const scopedKeyForNamespace = (namespace: string, key: string): string => {
+  const canonicalNamespace = promotedSessionKeyMap.get(namespace) ?? namespace;
   return `${canonicalNamespace}:${key}`;
 };
 
-/** Reads a persisted toggle state in the active session namespace if recorded. */
-export const getPersistentToggleValue = (key: string): boolean | undefined =>
-  expansionMemory.get(scopedKey(key)) ?? expansionMemory.get(`${currentNamespace}:${key}`);
+const getPersistentToggleValueForNamespace = (
+  namespace: string,
+  key: string,
+): boolean | undefined =>
+  expansionMemory.get(scopedKeyForNamespace(namespace, key)) ??
+  expansionMemory.get(`${namespace}:${key}`);
 
 export const usePersistentToggle = (
   key: string,
   defaultValue: boolean,
 ): [boolean, (next: boolean) => void] => {
+  const contextNamespace = useContext(PersistentToggleNamespaceContext);
+  const activeNamespace = contextNamespace ?? currentNamespace;
+
   const [value, setValue] = useState(() => {
-    const scoped = scopedKey(key);
-    const existing = getPersistentToggleValue(key);
+    const scoped = scopedKeyForNamespace(activeNamespace, key);
+    const existing = getPersistentToggleValueForNamespace(activeNamespace, key);
     if (existing !== undefined) return existing;
     if (defaultValue) {
       persistValue(scoped, defaultValue);
@@ -104,27 +148,29 @@ export const usePersistentToggle = (
   });
 
   useEffect(() => {
-    const existing = getPersistentToggleValue(key);
+    const existing = getPersistentToggleValueForNamespace(activeNamespace, key);
     if (existing !== undefined) {
       setValue(prev => (prev === existing ? prev : existing));
       return;
     }
     if (defaultValue) {
-      persistValue(scopedKey(key), true);
+      persistValue(scopedKeyForNamespace(activeNamespace, key), true);
       setValue(true);
+      return;
     }
-  }, [key, defaultValue]);
+    setValue(false);
+  }, [activeNamespace, key, defaultValue]);
 
   const setPersistedValue = useCallback(
     (next: boolean) => {
-      const scoped = scopedKey(key);
+      const scoped = scopedKeyForNamespace(activeNamespace, key);
       persistValue(scoped, next);
-      if (currentNamespace && scoped !== `${currentNamespace}:${key}`) {
-        persistValue(`${currentNamespace}:${key}`, next);
+      if (activeNamespace && scoped !== `${activeNamespace}:${key}`) {
+        persistValue(`${activeNamespace}:${key}`, next);
       }
       setValue(next);
     },
-    [key],
+    [activeNamespace, key],
   );
   return [value, setPersistedValue];
 };

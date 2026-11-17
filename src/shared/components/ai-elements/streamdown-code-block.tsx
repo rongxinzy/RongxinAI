@@ -3,6 +3,7 @@
 import { File } from 'lucide-react';
 import React from 'react';
 import type { BundledLanguage } from 'shiki';
+import { useIsCodeFenceIncomplete } from 'streamdown';
 
 import {
   CodeBlock,
@@ -82,12 +83,13 @@ export const AiPre: React.FC<React.ComponentProps<'pre'> & { node?: HastNode }> 
     }
   }
 
+  const isFenceIncomplete = useIsCodeFenceIncomplete();
   if (!lang) return <pre {...props}>{children}</pre>;
 
   rawText = rawText.replace(/\n$/, '');
 
   return (
-    <CodeBlock code={rawText} language={lang} showLineNumbers>
+    <CodeBlock code={rawText} language={lang} showLineNumbers skipHighlight={isFenceIncomplete}>
       <CodeBlockHeader>
         <CodeBlockTitle>
           <File size={14} />

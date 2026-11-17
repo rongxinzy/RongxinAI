@@ -1,7 +1,7 @@
 import { app } from 'electron';
-import { join } from 'node:path';
-import { getManagedPythonExecutable } from '../libs/pythonRuntime';
-import { findBundledUvExecutable } from '../libs/uvRuntime';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { getBundledPythonRoot } from '../libs/pythonRuntime';
 import { bundledRuntimeId } from './bundledRuntime';
 import { PythonRuntimeService } from './service';
 
@@ -18,10 +18,25 @@ function resolvePreinstalledRuntime() {
   // doubles) or a stripped build must not break session setup — only an
   // actual python operation reports the missing bundle.
   try {
-    const pythonPath = getManagedPythonExecutable();
-    const uvPath = findBundledUvExecutable(process.platform === 'win32' ? 'uv.exe' : 'uv');
-    if (!pythonPath || !uvPath) return undefined;
-    return { pythonPath, uvPath, runtimeId: bundledRuntimeId() };
+    // Resolve one installer-owned bundle as a unit. A stale userData runtime
+    // must not shadow a newer interpreter, uv or packaged dependency baseline.
+    const pythonRoot = getBundledPythonRoot();
+    if (!pythonRoot) return undefined;
+    const resources = dirname(pythonRoot);
+    const isWindows = process.platform === 'win32';
+    const platform =
+      process.platform === 'win32' ? 'win' : process.platform === 'darwin' ? 'mac' : 'linux';
+    const pythonPath = join(pythonRoot, isWindows ? 'python.exe' : 'bin/python3');
+    const uvPath = join(resources, `uv-${platform}`, isWindows ? 'uv.exe' : 'uv');
+    const sharedPythonPath = join(
+      resources,
+      'skill-python',
+      'layers',
+      'shared',
+      isWindows ? 'Scripts/python.exe' : 'bin/python',
+    );
+    if (![pythonPath, uvPath, sharedPythonPath].every(path => existsSync(path))) return undefined;
+    return { pythonPath, uvPath, sharedPythonPath, runtimeId: bundledRuntimeId() };
   } catch (error) {
     console.warn('[PythonRuntime] bundled runtime resolution failed:', error);
     return undefined;

@@ -2,7 +2,7 @@ import { extractRuntimeErrorMessage } from '../../shared/magpie/runtimeErrorMess
 
 /** Upstream management responses may embed the internal runtime name; user-facing errors stay neutral. */
 export function neutralizeUpstreamBrand(text: string): string {
-  return text.replace(/magpie/gi, 'local model service');
+  return text.replace(/magpie/gi, 'model service');
 }
 
 export function formatMagpieManagementError(

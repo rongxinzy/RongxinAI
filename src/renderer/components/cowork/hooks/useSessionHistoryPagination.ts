@@ -8,13 +8,15 @@ const HISTORY_PRELOAD_VIEWPORTS = 3;
 type UseSessionHistoryPaginationOptions = {
   sessionId: string | undefined;
   messagesOffset: number;
-  rootRef: RefObject<HTMLElement | null>;
+  scrollContainerRef?: RefObject<HTMLElement | null>;
+  rootRef?: RefObject<HTMLElement | null>;
 };
 
 /** Primes and extends older history while preserving an upward viewport buffer. */
 export function useSessionHistoryPagination({
   sessionId,
   messagesOffset,
+  scrollContainerRef,
   rootRef,
 }: UseSessionHistoryPaginationOptions): () => void {
   const isLoadingRef = useRef(false);
@@ -42,8 +44,10 @@ export function useSessionHistoryPagination({
   useEffect(() => {
     if (!sessionId || messagesOffset <= 0) return;
 
-    const root = rootRef.current;
-    const element = root?.querySelector<HTMLElement>('.cowork-conversation-scroll');
+    const element =
+      scrollContainerRef?.current ??
+      rootRef?.current?.querySelector<HTMLElement>('.cowork-conversation-scroll') ??
+      null;
     if (!element) return;
 
     const loadOlderMessages = () => {
@@ -108,7 +112,7 @@ export function useSessionHistoryPagination({
       window.cancelAnimationFrame(firstFrame);
       window.cancelAnimationFrame(secondFrame);
     };
-  }, [messagesOffset, positionedSessionId, rootRef, sessionId]);
+  }, [messagesOffset, positionedSessionId, rootRef, scrollContainerRef, sessionId]);
 
   return markInitialTailPositioned;
 }

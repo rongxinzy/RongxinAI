@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { bundledRuntimeId } from './bundledRuntime';
-import { resolvePreinstalledRuntime, validatePackages } from './runtime';
-import { isolatedEnvironment, runProcess } from './process';
+import { resolvePreinstalledRuntime } from './runtime';
+import { assertWindowsJobRunnerAvailable, isolatedEnvironment, runProcess } from './process';
 import type { PythonRunnerRequest } from '../../shared/pythonRuntime';
 
 const requestWith = (preinstalled?: PythonRunnerRequest['preinstalledRuntime']) =>
@@ -14,18 +14,6 @@ test('the bundled runtime id pins the packaged interpreter and uv versions', () 
   expect(bundledRuntimeId()).toBe('bundled-cpython-3.14.6-uv-0.11.32');
 });
 
-test('install arguments accept pinned registry names, never shell flags or external source URLs', () => {
-  expect(validatePackages(['numpy==2.2.6', 'requests[socks]==2.32.3'])).toHaveLength(2);
-  for (const p of [
-    '--target=/tmp',
-    'git+https://example.com/a',
-    '/tmp/local',
-    'numpy;rm -rf /',
-    'numpy',
-    'numpy>=2',
-  ])
-    expect(() => validatePackages([p])).toThrow('pinned');
-});
 test('subprocess environment does not forward application credentials or Python path injection', () => {
   process.env.ZHIYUAN_TEST_SECRET = 'no';
   process.env.PYTHONPATH = '/not-allowed';
@@ -97,4 +85,16 @@ test('present bundled executables resolve as absolute paths with their runtime i
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('missing Windows job-runner helper fails closed with a build hint', async () => {
+  await expect(assertWindowsJobRunnerAvailable(undefined, 'win32')).rejects.toThrow(
+    'Windows Python Job Object helper is missing',
+  );
+  await expect(
+    assertWindowsJobRunnerAvailable(
+      '/nonexistent/resources/python-runtime/job-runner.exe',
+      'win32',
+    ),
+  ).rejects.toThrow('bun run python:build:job-runner');
 });

@@ -1,3 +1,4 @@
+import { observeWorkbench } from '../workbenchTask/observe';
 import path from 'path';
 
 import { app, BrowserWindow } from 'electron';
@@ -224,35 +225,38 @@ export const getCodingRoomService = (): CodingRoomService => {
         isBuiltinSessionActive: sessionId => runtime.isSessionActive(sessionId),
         enqueueBuiltinMessage: (sessionId, prompt) =>
           runtime.enqueuePendingMessage(sessionId, prompt),
-        steerBuiltinMessage: async (sessionId, prompt) => {
-          const queued = runtime.enqueuePendingMessage(sessionId, prompt);
-          if (!queued.success || !queued.item) return queued;
-          return await runtime.steerPendingMessage(sessionId, queued.item.id);
-        },
+        steerBuiltinMessage: (sessionId, prompt) => runtime.steerInput(sessionId, prompt),
         getBuiltinWorkbenchLink: sessionId => {
-          const detail = getWorkbenchTaskService().getCurrent(sessionId);
-          const runId = detail?.task.activeRunId;
-          return detail && runId ? { taskId: detail.task.id, runId } : null;
+          return (
+            observeWorkbench(sessionId, () => {
+              const detail = getWorkbenchTaskService().getCurrent(sessionId);
+              const runId = detail?.task.activeRunId ?? detail?.runs[0]?.id;
+              return detail && runId ? { taskId: detail.task.id, runId } : null;
+            }) ?? null
+          );
         },
         beginExternalWorkbenchRun: ({ sessionId, goal, workspaceRoot }) => {
-          const workbench = getWorkbenchTaskService().beginRun({
-            sessionId,
-            goal,
-            contract: {
-              kind: WorkbenchContractKind.GenericWork,
-              requiresUserAcceptance: true,
-              metadata: { codingAgent: true, workspaceRoot },
-            },
-            trigger: WorkbenchRunTrigger.Message,
-          });
-          getWorkbenchTaskService().updateRunContext(workbench.run.id, {
-            model: 'external-agent',
-            provider: 'external-agent',
-            reasoningProfile: 'external',
-            workspaceRoot,
-            skillIds: [],
-          });
-          return { taskId: workbench.task.id, runId: workbench.run.id };
+          return (
+            observeWorkbench(sessionId, () => {
+              const workbench = getWorkbenchTaskService().beginRun({
+                sessionId,
+                goal,
+                contract: {
+                  kind: WorkbenchContractKind.GenericWork,
+                  metadata: { codingAgent: true, workspaceRoot },
+                },
+                trigger: WorkbenchRunTrigger.Message,
+              });
+              getWorkbenchTaskService().updateRunContext(workbench.run.id, {
+                model: 'external-agent',
+                provider: 'external-agent',
+                reasoningProfile: 'external',
+                workspaceRoot,
+                skillIds: [],
+              });
+              return { taskId: workbench.task.id, runId: workbench.run.id };
+            }) ?? null
+          );
         },
         completeExternalWorkbenchRun: async ({
           sessionId,
@@ -261,19 +265,23 @@ export const getCodingRoomService = (): CodingRoomService => {
           workspaceRoot,
           finalAnswer,
         }) => {
-          getWorkbenchTaskService().completeObservedRun({
-            sessionId,
-            artifactScopeId: laneId,
-            runId,
-            workspaceRoot,
-            finalAnswer,
+          observeWorkbench(sessionId, () => {
+            getWorkbenchTaskService().settleObservedRun({
+              sessionId,
+              artifactScopeId: laneId,
+              runId,
+              workspaceRoot,
+              finalAnswer,
+            });
           });
         },
         failExternalWorkbenchRun: ({ sessionId, error }) => {
-          getWorkbenchTaskService().failRun(sessionId, { message: error });
+          observeWorkbench(sessionId, () =>
+            getWorkbenchTaskService().failRun(sessionId, { message: error }),
+          );
         },
         cancelExternalWorkbenchRun: ({ sessionId, runId }) => {
-          getWorkbenchTaskService().cancelRun(sessionId, runId);
+          observeWorkbench(sessionId, () => getWorkbenchTaskService().cancelRun(sessionId, runId));
         },
         respondBuiltinPermission: (requestId, approved) =>
           runtime.respondToPermission(
