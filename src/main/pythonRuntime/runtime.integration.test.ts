@@ -1,5 +1,15 @@
-import { fork } from 'node:child_process';
-import { access, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { fork, spawnSync } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  access,
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -18,6 +28,7 @@ const probe = async (path: string): Promise<string | undefined> =>
 const enabled = process.env.PYTHON_RUNTIME_INTEGRATION === '1';
 describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () => {
   let root: string, workspace: string, other: string, service: PythonRuntimeService;
+  let storageRoot: string;
   let globalPythonPath: string, globalUvPath: string, globalSharedPythonPath: string;
   beforeAll(async () => {
     root = await mkdtemp(join(tmpdir(), 'zhiyuan-python-integration-'));
@@ -25,7 +36,8 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
     other = join(root, 'work b');
     await mkdir(workspace);
     await mkdir(other);
-    await mkdir(join(root, 'storage'));
+    storageRoot = join(root, 'storage');
+    await mkdir(storageRoot);
     const os =
       process.platform === 'win32' ? 'win' : process.platform === 'darwin' ? 'mac' : 'linux';
     const pythonPath =
@@ -49,8 +61,32 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
       ));
     if (!pythonPath || !uvPath || !sharedPythonPath)
       throw new Error('Bundled managed runtime not found; run the setup:*-runtime scripts first.');
+    if (process.platform === 'win32') {
+      // Exercise equivalent path spellings if this Windows volume exposes 8.3 aliases.
+      const shortPath = spawnSync(
+        pythonPath,
+        [
+          '-I',
+          '-X',
+          'utf8',
+          '-c',
+          [
+            'import ctypes,sys',
+            'buf = ctypes.create_unicode_buffer(32768)',
+            'size = ctypes.windll.kernel32.GetShortPathNameW(sys.argv[1], buf, len(buf))',
+            'print(buf.value if 0 < size < len(buf) else sys.argv[1])',
+          ].join('\n'),
+          storageRoot,
+        ],
+        { encoding: 'utf8', timeout: 5000, windowsHide: true },
+      );
+      expect(shortPath.status, shortPath.stderr).toBe(0);
+      const alias = shortPath.stdout.trim();
+      expect(await realpath(alias)).toBe(await realpath(storageRoot));
+      storageRoot = alias;
+    }
     service = new PythonRuntimeService({
-      storageRoot: join(root, 'storage'),
+      storageRoot,
       runnerPath: resolve(
         process.env.PYTHON_RUNTIME_RUNNER ?? 'dist-electron/python-runtime-runner.cjs',
       ),
@@ -63,7 +99,7 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
   afterAll(async () => {
     await service?.shutdown();
     if (root) await rm(root, { recursive: true, force: true });
-  });
+  }, 120_000);
   test('execute uses pinned Python, workspace cwd, streams and exit code', async () => {
     const result = await service.execute({
       workspace,
@@ -78,12 +114,14 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
     expect(result.exitCode).toBe(9);
   }, 310000);
   test('install is workspace-isolated; failed install preserves active environment; explicit rebuild retains pinned dependencies', async () => {
+    const packages = ['pyfiglet>=1.0.2,<2'];
+    if (process.platform === 'win32') packages.push('tablib==3.10.0', 'ruff==0.15.20');
     const installed = await service.install({
       workspace,
-      packages: ['pyfiglet>=1.0.2,<2'],
+      packages,
       timeoutMs: 300000,
     });
-    expect(installed.exitCode).toBe(0);
+    expect(installed.exitCode, installed.stderr).toBe(0);
     const imported = await service.execute({
       workspace,
       code: 'import importlib.metadata;print(importlib.metadata.version("pyfiglet"))',
@@ -116,6 +154,55 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
       ).stdout.trim(),
     ).toBe(installedVersion);
   }, 310000);
+  test.skipIf(process.platform !== 'win32')(
+    'Windows shortens an existing environment, preserves CLI executables and reads and writes XLSX',
+    async () => {
+      const storage = storageRoot;
+      const prepared = await service.prepare({ workspace });
+      const key = createHash('sha256')
+        .update((await realpath(workspace)).toLowerCase())
+        .digest('hex');
+      const stateRoot = join(storage, 'workspaces-v2', key);
+      const pointer = join(stateRoot, 'current.json');
+      const current = JSON.parse(await readFile(pointer, 'utf8'));
+      const legacyId = `${prepared.runtimeId}-${randomUUID()}`;
+      const legacyRoot = join(stateRoot, legacyId);
+      await rename(join(storage, 'venvs', prepared.environmentId), legacyRoot);
+      await access(join(legacyRoot, 'Scripts', 'pyfiglet.exe'));
+      await access(join(legacyRoot, 'Scripts', 'ruff.exe'));
+      await writeFile(pointer, JSON.stringify({ ...current, environmentId: legacyId }));
+
+      const result = await service.execute({
+        workspace,
+        code: [
+          'from io import BytesIO',
+          'from importlib.metadata import version',
+          'from openpyxl import load_workbook',
+          'from pathlib import Path',
+          'from tablib import Dataset',
+          'import os,subprocess,sysconfig',
+          'scripts = Path(sysconfig.get_path("scripts"))',
+          'assert scripts.parent.samefile(os.environ["VIRTUAL_ENV"]), str(scripts)',
+          'pyfiglet, ruff = scripts / "pyfiglet.exe", scripts / "ruff.exe"',
+          'assert pyfiglet.is_file(), str(pyfiglet)',
+          'assert ruff.is_file(), str(ruff)',
+          'subprocess.check_output([str(pyfiglet), "--help"])',
+          'assert b"ruff 0.15.20" in subprocess.check_output([str(ruff), "--version"])',
+          'workbook = load_workbook(BytesIO(Dataset([42]).export("xlsx")))',
+          'print(version("tablib"), workbook.active["A1"].value)',
+        ].join('\n'),
+        timeoutMs: 100_000,
+      });
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout.trim()).toBe('3.10.0 42');
+      expect(result.environmentId).not.toBe(legacyId);
+      expect(await probe(join(legacyRoot, 'Scripts', 'python.exe'))).toBeDefined();
+      expect(await realpath((await service.prepare({ workspace })).pythonPath)).toBe(
+        await realpath(join(storage, 'venvs', result.environmentId, 'Scripts', 'python.exe')),
+      );
+    },
+    120_000,
+  );
   test('preinstalled office libraries work offline and workspace package files are independent', async () => {
     const work = join(root, 'offline workspace');
     const another = join(root, 'offline other');

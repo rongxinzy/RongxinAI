@@ -15,6 +15,9 @@ import {
   missingRequirements,
   requirementsSatisfied,
 } from './workspaceExecution';
+
+const standaloneEnvironmentId = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+
 async function exists(file: string) {
   try {
     await access(file);
@@ -76,12 +79,14 @@ export async function runPythonOperation(
   if (input.runtimeId !== undefined && input.runtimeId !== runtime.runtimeId)
     throw new Error('Unsupported Python runtime version.');
   const workspace = await realpath(input.workspace);
+  const isWindows = process.platform === 'win32';
+  const storageRoot = resolve(request.storageRoot);
   const key = createHash('sha256')
-    .update(process.platform === 'win32' ? workspace.toLowerCase() : workspace)
+    .update(isWindows ? workspace.toLowerCase() : workspace)
     .digest('hex');
   // The former empty environments remain untouched; new workspaces start with
   // the packaged dependency baseline and never load the old environment layout.
-  const stateRoot = join(resolve(request.storageRoot), 'workspaces-v2', key);
+  const stateRoot = join(storageRoot, 'workspaces-v2', key);
   const currentFile = join(stateRoot, 'current.json');
   let current: EnvironmentRecord | undefined;
   try {
@@ -135,7 +140,7 @@ export async function runPythonOperation(
     (!('code' in input) || typeof input.code !== 'string' || input.code.length > 1024 * 1024)
   )
     throw new Error('Python code must be at most 1 MiB.');
-  const uvCacheDir = request.uvCacheDir ?? join(resolve(request.storageRoot), 'uv-cache');
+  const uvCacheDir = request.uvCacheDir ?? join(storageRoot, 'uv-cache');
   const env = buildWorkspaceExecutionEnv(uvCacheDir, 'env' in input ? input.env : undefined);
   const networkEnv = runtimeNetworkEnvironment(uvCacheDir);
   const run = (cmd: string, args: string[]) =>
@@ -145,12 +150,13 @@ export async function runPythonOperation(
       signal,
       jobRunnerPath: request.jobRunnerPath,
     });
+  // Keep Windows DLL paths short by storing venvs outside the workspace hash directory.
+  const environmentRoot = (record: EnvironmentRecord) =>
+    isWindows && standaloneEnvironmentId.test(record.environmentId)
+      ? join(storageRoot, 'venvs', record.environmentId)
+      : join(stateRoot, record.environmentId);
   const pythonIn = (record: EnvironmentRecord) =>
-    join(
-      stateRoot,
-      record.environmentId,
-      process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python',
-    );
+    join(environmentRoot(record), isWindows ? 'Scripts/python.exe' : 'bin/python');
   const skillRequirements = skill
     ? [
         ...skill.requirements,
@@ -171,18 +177,21 @@ export async function runPythonOperation(
       `Skill dependencies require confirmation for ${skill.skillId}: ${skill.confirmationPackages.join(', ')}. Ask the user to confirm this download, then retry with confirmDependencyInstall=true.`,
     );
   let installOutput = { stdout: '', stderr: '', exitCode: 0, truncated: false };
-  if (!current || request.operation === PythonRuntimeOperation.Install || needsSkillInstall) {
+  const install = request.operation === PythonRuntimeOperation.Install || needsSkillInstall;
+  const relocate = isWindows && current && !standaloneEnvironmentId.test(current.environmentId);
+  if (!current || install || relocate) {
     const candidate: EnvironmentRecord = {
       runtimeId: runtime.runtimeId,
       baselineId,
-      environmentId: `${runtime.runtimeId}-${randomUUID()}`,
+      environmentId: isWindows ? randomUUID() : `${runtime.runtimeId}-${randomUUID()}`,
       requirements: [],
       // An install can change dependencies of previously used Skills. Their
       // locks must be revalidated before reuse, even when packages were copied.
-      skillLocks: {},
+      skillLocks: relocate && !install ? (current.skillLocks ?? {}) : {},
     };
-    const candidateRoot = join(stateRoot, candidate.environmentId);
+    const candidateRoot = environmentRoot(candidate);
     await mkdir(stateRoot, { recursive: true });
+    if (isWindows) await mkdir(dirname(candidateRoot), { recursive: true });
     let committed = false;
     try {
       const created = await run(runtime.uv, [
@@ -239,7 +248,7 @@ export async function runPythonOperation(
       }
       if (rebuild && !(await requirementsSatisfied(pythonIn(candidate), requested, run)))
         throw new Error('The rebuilt Python environment does not match its locked requirements.');
-      if (skill) {
+      if (skill && install) {
         if (skill.lock) {
           // Install a verified immutable snapshot, never a mutable requirements
           // path supplied by a model or changed after manifest verification.
@@ -336,7 +345,7 @@ export async function runPythonOperation(
     pythonPath: pythonIn(current),
   };
   if (request.operation !== PythonRuntimeOperation.Execute) return result;
-  env.VIRTUAL_ENV = join(stateRoot, current.environmentId);
+  env.VIRTUAL_ENV = environmentRoot(current);
   env.PATH = [dirname(pythonIn(current)), env.PATH]
     .filter(Boolean)
     .join(process.platform === 'win32' ? ';' : ':');

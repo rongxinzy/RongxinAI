@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { buildWorkspaceExecutionEnv } from './workspaceExecution';
 import { runtimeNetworkEnvironment } from './process';
 import { PythonPackageIndexUrl } from '../libs/pythonPackageIndexes';
@@ -20,8 +20,22 @@ test('Skill execution receives runtime paths without credentials or Python path 
   expect(env.ANTHROPIC_API_KEY).toBeUndefined();
 });
 
-test('workspace dependency installation shares the managed package index defaults', () => {
-  const env = runtimeNetworkEnvironment('/cache');
-  expect(env.UV_INDEX).toBe(process.env.UV_INDEX || PythonPackageIndexUrl.Tsinghua);
-  expect(env.UV_DEFAULT_INDEX).toBe(process.env.UV_DEFAULT_INDEX || PythonPackageIndexUrl.Official);
+test('workspace installs use official PyPI by default and preserve configured indexes', () => {
+  vi.stubEnv('UV_INDEX', undefined);
+  vi.stubEnv('UV_DEFAULT_INDEX', undefined);
+  try {
+    expect(runtimeNetworkEnvironment('/cache')).toMatchObject({
+      UV_DEFAULT_INDEX: PythonPackageIndexUrl.Official,
+    });
+    expect(runtimeNetworkEnvironment('/cache').UV_INDEX).toBeUndefined();
+
+    vi.stubEnv('UV_INDEX', 'https://example.com/simple');
+    vi.stubEnv('UV_DEFAULT_INDEX', 'https://example.org/simple');
+    expect(runtimeNetworkEnvironment('/cache')).toMatchObject({
+      UV_INDEX: 'https://example.com/simple',
+      UV_DEFAULT_INDEX: 'https://example.org/simple',
+    });
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });

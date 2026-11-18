@@ -1,12 +1,15 @@
 import { constants } from 'node:fs';
 import { access, copyFile, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
+import { WINDOWS_WHEEL_EXECUTABLES } from './windowsWheelExecutables';
 
-const CONSOLE_METADATA_SCRIPT = [
-  'import importlib.metadata as metadata,json',
-  'entries = [{"name": ep.name, "distribution": dist.metadata["Name"]} for dist in metadata.distributions() for ep in dist.entry_points if ep.group == "console_scripts"]',
-  'print(json.dumps(sorted(entries, key=lambda entry: (entry["name"].lower(), entry["distribution"].lower()))))',
-].join('; ');
+const CONSOLE_METADATA_SCRIPT =
+  WINDOWS_WHEEL_EXECUTABLES +
+  [
+    'import json',
+    'entries = [{"name": ep.name, "distribution": dist.metadata["Name"]} for dist in distributions for ep in dist.entry_points if ep.group == "console_scripts"]',
+    'print(json.dumps(sorted(entries, key=lambda entry: (entry["name"].lower(), entry["distribution"].lower()))))',
+  ].join('; ');
 const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const WINDOWS_DEVICE_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
 
@@ -20,8 +23,9 @@ async function exists(file: string): Promise<boolean> {
   }
 }
 
-/** Recreate launchers from installed metadata, never copy an .exe bound to the shared interpreter. */
+/** Preserve wheel executables and make launchers point to the target interpreter. */
 export async function seedWindowsConsoleScripts(options: {
+  sourceScripts: string;
   targetPython: string;
   targetScripts: string;
   run: (
@@ -30,7 +34,7 @@ export async function seedWindowsConsoleScripts(options: {
   ) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
   signal: AbortSignal;
 }): Promise<void> {
-  const { targetPython, targetScripts, run, signal } = options;
+  const { sourceScripts, targetPython, targetScripts, run, signal } = options;
   signal.throwIfAborted();
   try {
     // Keep the alias beside the workspace launcher so Windows resolves the same
@@ -44,7 +48,13 @@ export async function seedWindowsConsoleScripts(options: {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
   }
   signal.throwIfAborted();
-  const result = await run(targetPython, ['-I', '-c', CONSOLE_METADATA_SCRIPT]);
+  const result = await run(targetPython, [
+    '-I',
+    '-c',
+    CONSOLE_METADATA_SCRIPT,
+    sourceScripts,
+    targetScripts,
+  ]);
   if (result.exitCode !== 0)
     throw new Error(`Unable to inspect Python console entry points: ${result.stderr}`);
   const entries: unknown = JSON.parse(result.stdout);
