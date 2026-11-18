@@ -58,6 +58,12 @@ runs:
         $app = Join-Path $env:RUNNER_TEMP "zhiyuan-shell-acceptance/安装路径/$($product.executableName)"
         node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $setup $app
         if ($LASTEXITCODE -ne 0) { throw 'Final installer evidence does not match this build' }
+    - name: Verify document reading in the installed application
+      shell: pwsh
+      run: |
+        $product = (node scripts/packaging/windows-product.cjs) | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve installer product' }
+        $app = Join-Path $env:RUNNER_TEMP "zhiyuan-shell-acceptance/安装路径/$($product.executableName)"
         node scripts/ci/verify-installed-document-reader.mjs $app
         if ($LASTEXITCODE -ne 0) { throw 'Installed document reader acceptance failed' }
     - name: Verify native uninstall preserves user data
