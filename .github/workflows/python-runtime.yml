@@ -1,113 +1,55 @@
-name: Python runtime process containment
-
-# Pull request checks run inside CI. This workflow remains for manual reruns.
+name: Windows uv path experiment
 
 on:
   workflow_dispatch:
+
 permissions:
   contents: read
-concurrency:
-  group: python-runtime-${{ github.ref }}
-  cancel-in-progress: true
+
 jobs:
-  windows-job-object:
+  compare:
     runs-on: windows-latest
-    timeout-minutes: 20
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      HUSKY: '0'
-      PYTHON_RUNTIME_INTEGRATION: '1'
-      PYTHON_RUNTIME_RUNNER: '${{ github.workspace }}/dist-electron/python-runtime-runner.js'
-      PYTHON_RUNTIME_JOB_HELPER: '${{ github.workspace }}/resources/python-runtime/job-runner.exe'
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          check-latest: true
-      - uses: ilammy/msvc-dev-cmd@v1
-      - name: Build actual Job Object helper
+      - name: Provision checksum-verified uv binaries
         shell: pwsh
-        run: ./scripts/python-runtime/build-job-runner.ps1
-      - name: Verify descendant containment and parent-death cleanup
-        run: node --test scripts/python-runtime/job-runner.test.cjs
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - name: Restore Bun package cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.bun/install/cache
-          key: copy-v2-bun-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            copy-v2-bun-${{ runner.os }}-1.4.0-
-      - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
-      - run: bun run apply:patches
-      - name: Bundle the independent Runner
-        run: bun build src/main/pythonRuntime/runner.ts --target=node --format=cjs --outfile=dist-electron/python-runtime-runner.js
-      - name: Restore the bundled managed runtime cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            resources/python-win
-            resources/uv-win
-          key: bundled-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/main/pythonRuntime/bundledRuntime.json', 'scripts/setup-python-runtime.js', 'scripts/setup-uv-runtime.js', 'scripts/setup-mac-python-runtime.js', 'scripts/setup-mac-uv-runtime.js') }}
-      - name: Restore the preinstalled Python dependency baseline
-        uses: actions/cache@v5
-        with:
-          path: resources/skill-python
-          key: skill-python-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/main/pythonRuntime/bundledRuntime.json', 'scripts/setup-skill-python-runtime.js', 'scripts/setup-windows-skill-python.cjs', 'SKILLs/**/requirements.txt') }}
-      - name: Provision the bundled managed runtime and dependency baseline
         run: |
-          bun run setup:python-runtime
-          bun run setup:uv-runtime
-          bun run setup:skill-python-runtime
-      - name: Verify Windows standalone Python and real uv wheel environments
-        run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts src/main/pythonRuntime/skill.integration.test.ts --maxWorkers=1
-  linux-standalone-runtime:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      HUSKY: '0'
-      PYTHON_RUNTIME_INTEGRATION: '1'
-      PYTHON_RUNTIME_RUNNER: '${{ github.workspace }}/dist-electron/python-runtime-runner.js'
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          check-latest: true
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - name: Restore Bun package cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.bun/install/cache
-          key: copy-v2-bun-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            copy-v2-bun-${{ runner.os }}-1.4.0-
-      - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
-      - run: bun run apply:patches
-      - name: Bundle the independent Runner
-        run: bun build src/main/pythonRuntime/runner.ts --target=node --format=cjs --outfile=dist-electron/python-runtime-runner.js
-      - name: Restore the bundled managed runtime cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            resources/python-linux
-            resources/uv-linux
-          key: bundled-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/main/pythonRuntime/bundledRuntime.json', 'scripts/setup-python-runtime.js', 'scripts/setup-uv-runtime.js', 'scripts/setup-mac-python-runtime.js', 'scripts/setup-mac-uv-runtime.js') }}
-      - name: Restore the preinstalled Python dependency baseline
-        uses: actions/cache@v5
-        with:
-          path: resources/skill-python
-          key: skill-python-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/main/pythonRuntime/bundledRuntime.json', 'scripts/setup-skill-python-runtime.js', 'scripts/setup-windows-skill-python.cjs', 'SKILLs/**/requirements.txt') }}
-      - name: Provision the bundled managed runtime and dependency baseline
+          $root = Join-Path $env:RUNNER_TEMP 'uv-windows-path-probe'
+          New-Item -ItemType Directory -Path $root | Out-Null
+          $checksums = [ordered]@{
+            '0.11.32' = 'acfde570451cfdb8689fa159a138ee805ba4e241c466432750302c86254b0984'
+            '0.13.9' = 'edd61f7f5728a56cc62455386661860bdfc7bab65872f39b0c25bdcc1d8e1beb'
+          }
+          foreach ($version in $checksums.Keys) {
+            $archive = Join-Path $root "$version.zip"
+            Invoke-WebRequest -Uri "https://github.com/astral-sh/uv/releases/download/$version/uv-x86_64-pc-windows-msvc.zip" -OutFile $archive -MaximumRetryCount 3
+            if ((Get-FileHash -Path $archive -Algorithm SHA256).Hash -ine $checksums[$version]) {
+              throw "uv $version checksum mismatch"
+            }
+            Expand-Archive -Path $archive -DestinationPath (Join-Path $root $version)
+          }
+      - name: Compare installation and native DLL imports with long paths disabled
+        shell: pwsh
         run: |
-          bun run setup:posix-python-runtime
-          bun run setup:posix-uv-runtime
-          bun run setup:skill-python-runtime
-      - name: Verify pinned Python, isolated packages, rebuild and process cancellation
-        run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts src/main/pythonRuntime/skill.integration.test.ts --maxWorkers=1
+          $key = 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem'
+          $before = (Get-ItemProperty -LiteralPath $key -Name LongPathsEnabled -ErrorAction SilentlyContinue).LongPathsEnabled
+          try {
+            New-ItemProperty -LiteralPath $key -Name LongPathsEnabled -Value 0 -PropertyType DWord -Force | Out-Null
+            $actual = (Get-ItemProperty -LiteralPath $key -Name LongPathsEnabled).LongPathsEnabled
+            if ($actual -ne 0) { throw "Wrong LongPathsEnabled value: $actual" }
+            Write-Host "LongPathsEnabled=$actual on $([System.Environment]::OSVersion.VersionString)"
+            node .github/experiments/uv-windows-paths.cjs
+            if ($LASTEXITCODE -ne 0) { throw "Windows uv experiment exited with $LASTEXITCODE" }
+          } finally {
+            if ($null -eq $before) {
+              Remove-ItemProperty -LiteralPath $key -Name LongPathsEnabled
+            } else {
+              Set-ItemProperty -LiteralPath $key -Name LongPathsEnabled -Value $before
+            }
+          }
