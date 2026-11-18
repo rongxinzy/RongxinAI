@@ -1,6 +1,5 @@
 export const ELECTRON_MAIN_EXTERNALS = [
   '@agentclientprotocol/sdk',
-  '@firecrawl/anydoc',
   'better-sqlite3',
   'bufferutil',
   'koffi',
@@ -12,7 +11,7 @@ export const ELECTRON_RUNTIME_DEPENDENCIES = [
   '@agentclientprotocol/claude-agent-acp',
   '@agentclientprotocol/codex-acp',
   '@agentclientprotocol/sdk',
-  '@firecrawl/anydoc',
+  '@firecrawl/anydoc-wasm',
   'ajv',
   'ajv-formats',
   'better-sqlite3',

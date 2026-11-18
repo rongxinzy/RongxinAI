@@ -348,6 +348,21 @@ export default defineConfig(async ({ command }) => {
                 onstart() {},
               },
               {
+                entry: 'src/main/documentReader/documentWorker.ts',
+                vite: {
+                  build: {
+                    watch: command === 'serve' ? {} : null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                    rolldownOptions: {
+                      external: ['@firecrawl/anydoc-wasm'],
+                    },
+                  },
+                },
+                onstart() {},
+              },
+              {
                 // Managed Python runtime runner is forked as a standalone Node child process.
                 entry: 'src/main/pythonRuntime/runner.ts',
                 vite: {

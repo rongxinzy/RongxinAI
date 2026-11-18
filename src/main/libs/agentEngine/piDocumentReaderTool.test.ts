@@ -5,6 +5,8 @@ import path from 'path';
 import JSZip from 'jszip';
 import { afterEach, expect, test, vi } from 'vitest';
 
+import { documentReaderWorkerMock } from '../../../../tests/fixtures/document-reader/worker.testHarness';
+
 const ocrState = vi.hoisted(() => ({
   supported: false,
   ready: true,
@@ -25,14 +27,13 @@ vi.mock('../../ocr/ocrEngine', () => ({
   }),
 }));
 
-vi.mock('../../ocr/pdfOcr', () => ({
-  ocrPdf: async () => ({
-    pages: [{ page: 1, text: '第一页正文', lines: [] }],
-    pageCount: 1,
-    renderedCount: 1,
-    truncated: false,
-  }),
-}));
+const pdf = vi.hoisted(() => ({ readPdfText: vi.fn(), ocrPdf: vi.fn() }));
+vi.mock('../../ocr/pdfOcr', () => pdf);
+
+const projectRoot = path.resolve(import.meta.dirname, '../../../..');
+vi.mock('../../documentReader/officeDocument', importOriginal =>
+  documentReaderWorkerMock(importOriginal),
+);
 
 import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
 
@@ -75,6 +76,7 @@ const writeDocxFixture = async (filePath: string, paragraph: string): Promise<vo
 afterEach(() => {
   ocrState.supported = false;
   ocrState.ready = true;
+  vi.resetAllMocks();
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -90,7 +92,22 @@ test('converts a workspace DOCX fixture to Markdown locally', async () => {
 
   const result = await tool.execute('tool-1', { path: 'example.docx' });
 
-  expect(result.content[0]?.text).toContain('Local conversion: AnyDoc\n\nWalking on imported air');
+  expect(result.content[0]?.text).toContain('Walking on imported air');
+});
+
+test.each([
+  ['legacy.doc', 'Fixture Document'],
+  ['legacy.xls', '15.5%'],
+])('reads real binary Office fixture %s in the WASM worker', async (filename, expected) => {
+  const root = createRoot();
+  fs.copyFileSync(
+    path.join(projectRoot, 'tests/fixtures/document-reader', filename),
+    path.join(root, filename),
+  );
+  const tool = buildPiDocumentReaderTool({ workspaceRoot: root });
+  const result = await tool.execute('legacy', { path: filename });
+  expect(result.isError).toBeUndefined();
+  expect(result.structuredContent.text).toContain(expected);
 });
 
 test('does not allow symlinks or junctions that leave the workspace', async () => {
@@ -158,21 +175,62 @@ test('reads an image through local OCR when supported and reports Windows-only o
   expect(recognized.details.engine).toBe('windows-media-ocr');
 });
 
-test('pages a scanned PDF through local OCR when pages is supplied', async () => {
+test('keeps Chinese PDF text and sends only the scan page to OCR', async () => {
   ocrState.supported = true;
+  pdf.readPdfText.mockResolvedValue({
+    pages: [
+      { page: 1, text: '季度预算分析报告' },
+      { page: 2, text: '' },
+    ],
+    pageCount: 2,
+    truncated: false,
+  });
+  pdf.ocrPdf.mockResolvedValue({
+    pages: [{ page: 2, text: '扫描件正文' }],
+    pageCount: 2,
+    truncated: false,
+  });
   const root = createRoot();
   fs.writeFileSync(path.join(root, 'scan.pdf'), '%PDF-1.4');
-  const tool = buildPiDocumentReaderTool({ workspaceRoot: root }) as {
-    execute: (
-      id: string,
-      params: { path: string; pages?: string },
-    ) => Promise<{ content: Array<{ text: string }>; details: Record<string, unknown> }>;
-  };
+  const tool = buildPiDocumentReaderTool({ workspaceRoot: root });
+  const result = await tool.execute('tool-1', {
+    path: 'scan.pdf',
+    pages: '1-2',
+    language: 'zh-CN',
+  });
+  expect(pdf.readPdfText).toHaveBeenCalledWith(
+    expect.stringContaining('scan.pdf'),
+    '1-2',
+    expect.any(AbortSignal),
+  );
+  expect(pdf.ocrPdf).toHaveBeenCalledWith(
+    expect.stringContaining('scan.pdf'),
+    [2],
+    'zh-CN',
+    expect.any(AbortSignal),
+  );
+  expect(result.structuredContent.text).toBe(
+    '## Page 1\n季度预算分析报告\n\n## Page 2\n扫描件正文',
+  );
+  expect(result.details).toMatchObject({ source: 'pdf-text+ocr', pages: 2, pageCount: 2 });
+});
 
-  const result = await tool.execute('tool-1', { path: 'scan.pdf', pages: '1' });
-  expect(result.content[0]?.text).toContain('第一页正文');
-  expect(result.details.source).toBe('ocr');
-  expect(result.details.pages).toBe(1);
+test('accepts a short Chinese text layer without OCR even with a PDF page range', async () => {
+  ocrState.supported = true;
+  pdf.readPdfText.mockResolvedValue({
+    pages: [{ page: 2, text: '发票' }],
+    pageCount: 2,
+    truncated: false,
+  });
+  const root = createRoot();
+  fs.writeFileSync(path.join(root, 'text.pdf'), '%PDF-1.4');
+  const result = await buildPiDocumentReaderTool({ workspaceRoot: root }).execute('tool-1', {
+    path: 'text.pdf',
+    pages: '2',
+  });
+  expect(result.structuredContent.text).toBe('## Page 2\n发票');
+  expect(result.details).toMatchObject({ source: 'pdf-text', pages: 1, pageCount: 2 });
+  expect(pdf.ocrPdf).not.toHaveBeenCalled();
 });
 
 test('truncates documents exceeding PI_DOCUMENT_READER_MAX_CHARS', async () => {
@@ -225,7 +283,7 @@ test('declares native tool annotations and output schema with text property', ()
     openWorldHint: false,
     idempotentHint: true,
   });
-  expect((tool.outputSchema as any)?.properties?.text).toBeDefined();
+  expect(tool.outputSchema).toMatchObject({ properties: { text: expect.anything() } });
 });
 
 test('populates structuredContent.text on successful document reading', async () => {

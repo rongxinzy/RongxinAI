@@ -77,6 +77,7 @@ await build(createBuildOptions('src/main/libs/sqliteBackup/sqliteVerifyWorker.ts
 await build(createBuildOptions('src/main/libs/skillSecurity/skillSecurityScanWorker.ts'));
 await build(createBuildOptions('src/main/extensions/aisphere/requestWorker.ts'));
 await build(createBuildOptions('src/main/libs/appUpdateHashWorker.ts'));
+await build(createBuildOptions('src/main/documentReader/documentWorker.ts'));
 await build(
   createBuildOptions('src/main/pythonRuntime/runner.ts', {
     output: {

@@ -389,7 +389,6 @@
     "node_modules/@anthropic-ai/claude-agent-sdk/**",
     "node_modules/zod/**",
     "node_modules/@img/**",
-    "node_modules/@firecrawl/**",
     "node_modules/better-sqlite3/**",
     "node_modules/koffi/**",
     "node_modules/@koromix/koffi-*/**",

@@ -2,8 +2,13 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import JSZip from 'jszip';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { documentReaderWorkerMock } from './fixtures/document-reader/worker.testHarness';
 import { buildPiDocumentReaderTool } from '../src/main/libs/agentEngine/piDocumentReaderTool';
+
+vi.mock('../src/main/documentReader/officeDocument', importOriginal =>
+  documentReaderWorkerMock(importOriginal),
+);
 
 describe('Milestone 3 Adversarial Challenge: Document Reader Tool', () => {
   const roots: string[] = [];

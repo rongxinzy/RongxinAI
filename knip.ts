@@ -36,6 +36,7 @@ const config: KnipConfig = {
         'src/main/libs/hashWorker.ts',
         'src/main/libs/sqliteBackup/sqliteVerifyWorker.ts',
         'src/main/libs/appUpdateHashWorker.ts',
+        'src/main/documentReader/documentWorker.ts',
         'src/main/libs/skillSecurity/skillSecurityScanWorker.ts',
         'src/main/pythonRuntime/runner.ts',
         // Spawned by path.join(__dirname, '...js'), not a static import.

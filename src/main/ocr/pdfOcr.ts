@@ -1,162 +1,139 @@
-/**
- * Scanned-PDF OCR: rasterize pages with the packaged Skill Python layer
- * (pypdfium2 + Pillow already ship for the PDF Skill) and run each rendered page
- * through the Windows OCR engine.
- *
- * Rasterization is a child process on purpose: decoding and rendering pages is
- * CPU heavy and must never run on the main thread.
- */
+import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { promisify } from 'node:util';
 
-import { spawn } from 'child_process';
-import { randomUUID } from 'crypto';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-
+import { DOCUMENT_MAX_CHARACTERS } from '../documentReader/constants';
 import { findSharedSkillPythonExecutable } from '../libs/skillPythonRuntime';
-import { recognizeImages, type OcrImageText } from './ocrEngine';
+import { recognizeImages } from './ocrEngine';
 
-interface OcrPdfPage {
+interface PdfPage {
   page: number;
   text: string;
-  lines: OcrImageText['lines'];
 }
 
-export interface OcrPdfResult {
-  pages: OcrPdfPage[];
+interface PdfPageResult<T> {
   pageCount: number;
-  renderedCount: number;
   truncated: boolean;
+  pages: T[];
 }
 
-export interface OcrPdfOptions {
-  pages?: string;
-  dpi?: number;
-  maxPages?: number;
-  language?: string;
-  timeoutMs?: number;
+const MAX_TEXT_PAGES = 200;
+const MAX_OCR_PAGES = 20;
+const PDF_PAGES_SCRIPT = path.join('ocr', 'pdf-pages.py');
+const execFileAsync = promisify(execFile);
+
+function resolvePdfPagesScript(): string | undefined {
+  const roots = [
+    process.resourcesPath,
+    path.join(__dirname, '../resources'),
+    path.resolve('resources'),
+  ];
+  return roots
+    .filter(Boolean)
+    .map(root => path.join(root, PDF_PAGES_SCRIPT))
+    .find(fs.existsSync);
 }
 
-const DEFAULT_TIMEOUT_MS = 120_000;
-
-const PDF_PAGES_SCRIPT_SEGMENTS = ['ocr', 'pdf-pages.py'];
-
-function resolvePdfPagesScript(): string | null {
-  const candidates: string[] = [];
-  if (typeof process.resourcesPath === 'string' && process.resourcesPath) {
-    candidates.push(path.join(process.resourcesPath, ...PDF_PAGES_SCRIPT_SEGMENTS));
-  }
-  candidates.push(
-    path.join(__dirname, '..', '..', '..', 'resources', ...PDF_PAGES_SCRIPT_SEGMENTS),
-  );
-  candidates.push(path.join(process.cwd(), 'resources', ...PDF_PAGES_SCRIPT_SEGMENTS));
-  return candidates.find(candidate => fs.existsSync(candidate)) ?? null;
-}
-
-interface RenderScriptOutput {
-  pageCount?: number;
-  renderedCount?: number;
-  truncated?: boolean;
-  pages?: Array<{ page?: number; path?: string }>;
-}
-
-function runPython(
-  python: string,
-  script: string,
+async function runPdfPages<T extends { page: number }>(
+  filePath: string,
+  pages: string,
+  maxPages: number,
   args: string[],
-  timeoutMs: number,
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  return new Promise(resolve => {
-    const child = spawn(python, [script, ...args], {
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
-    });
-    let stdout = '';
-    let stderr = '';
-    let settled = false;
-    const finish = (code: number) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({ code, stdout, stderr });
-    };
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8');
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString('utf8');
-    });
-    const timer = setTimeout(() => {
-      child.kill();
-      finish(-2);
-    }, timeoutMs);
-    child.on('error', error => {
-      stderr += error.message;
-      finish(-3);
-    });
-    child.on('close', code => finish(code ?? -4));
-  });
-}
-
-/** Rasterize and OCR a PDF. Throws when the Python layer or OCR engine is missing. */
-export async function ocrPdf(filePath: string, options: OcrPdfOptions = {}): Promise<OcrPdfResult> {
+  validatePage: (page: T) => boolean,
+  signal: AbortSignal,
+): Promise<PdfPageResult<T>> {
+  signal.throwIfAborted();
   const python = findSharedSkillPythonExecutable();
   const script = resolvePdfPagesScript();
-  if (!python || !script) {
-    throw new Error(
-      'Scanned-PDF OCR needs the packaged PDF runtime (pypdfium2/Pillow) and the OCR helper.',
-    );
-  }
-
-  const workDir = path.join(os.tmpdir(), `zhiyuan-ocr-pdf-${randomUUID()}`);
-  fs.mkdirSync(workDir, { recursive: true });
-  try {
-    const args = [
+  if (!python || !script) throw new Error('The bundled PDF runtime is unavailable.');
+  const { stdout } = await execFileAsync(
+    python,
+    [
+      script,
       '--input',
       filePath,
       '--pages',
-      options.pages ?? 'all',
-      '--dpi',
-      String(options.dpi ?? 200),
-      '--out',
-      workDir,
+      pages,
       '--max-pages',
-      String(options.maxPages ?? 20),
+      String(maxPages),
       '--json',
-    ];
-    const rendered = await runPython(python, script, args, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-    if (rendered.code !== 0) {
-      throw new Error(rendered.stderr.trim() || `pdf-pages.py exited with ${rendered.code}`);
-    }
-    const parsed = JSON.parse(
-      rendered.stdout.slice(rendered.stdout.indexOf('{')),
-    ) as RenderScriptOutput;
-    const pages = parsed.pages ?? [];
-    if (pages.length === 0) {
-      return { pages: [], pageCount: parsed.pageCount ?? 0, renderedCount: 0, truncated: false };
-    }
+      ...args,
+    ],
+    {
+      signal,
+      windowsHide: true,
+      maxBuffer: 512 * 1024,
+      env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+    },
+  );
+  const result = JSON.parse(stdout) as PdfPageResult<T>;
+  if (
+    !result ||
+    !Number.isSafeInteger(result.pageCount) ||
+    result.pageCount < 0 ||
+    typeof result.truncated !== 'boolean' ||
+    !Array.isArray(result.pages) ||
+    result.pages.length > maxPages ||
+    !result.pages.every(
+      page =>
+        page &&
+        Number.isSafeInteger(page.page) &&
+        page.page > 0 &&
+        page.page <= result.pageCount &&
+        validatePage(page),
+    )
+  ) {
+    throw new Error('Invalid bundled PDF runtime response.');
+  }
+  return result;
+}
 
+export function readPdfText(filePath: string, pages: string | undefined, signal: AbortSignal) {
+  return runPdfPages<PdfPage>(
+    filePath,
+    pages ?? 'all',
+    MAX_TEXT_PAGES,
+    ['--text', '--max-characters', String(DOCUMENT_MAX_CHARACTERS)],
+    page => typeof page.text === 'string' && page.text.length <= DOCUMENT_MAX_CHARACTERS * 2,
+    signal,
+  );
+}
+
+/** Render only the pages identified as lacking usable text, then run Windows OCR. */
+export async function ocrPdf(
+  filePath: string,
+  pages: number[],
+  language: string | undefined,
+  signal: AbortSignal,
+): Promise<PdfPageResult<PdfPage>> {
+  signal.throwIfAborted();
+  const workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-ocr-pdf-'));
+  try {
+    const rendered = await runPdfPages<{ page: number; path: string }>(
+      filePath,
+      pages.slice(0, MAX_OCR_PAGES).join(','),
+      MAX_OCR_PAGES,
+      ['--out', workDir],
+      page => page.path === path.join(workDir, `page-${String(page.page).padStart(4, '0')}.png`),
+      signal,
+    );
     const recognized = await recognizeImages(
-      pages.map(page => page.path as string),
-      options.language,
+      rendered.pages.map(page => page.path),
+      language,
+      signal,
     );
     const byPath = new Map(recognized.map(image => [image.path, image]));
-    const results: OcrPdfPage[] = pages.map((page, index) => {
-      const image = byPath.get(page.path as string) ?? recognized[index];
-      return {
-        page: page.page ?? index + 1,
-        text: (image?.lines ?? []).map(line => line.text).join('\n'),
-        lines: image?.lines ?? [],
-      };
-    });
     return {
-      pages: results,
-      pageCount: parsed.pageCount ?? results.length,
-      renderedCount: results.length,
-      truncated: parsed.truncated === true,
+      pageCount: rendered.pageCount,
+      truncated: rendered.truncated || pages.length > MAX_OCR_PAGES,
+      pages: rendered.pages.map(page => ({
+        page: page.page,
+        text: (byPath.get(page.path)?.lines ?? []).map(line => line.text).join('\n'),
+      })),
     };
   } finally {
-    fs.rmSync(workDir, { recursive: true, force: true });
+    await fs.promises.rm(workDir, { recursive: true, force: true });
   }
 }

@@ -3,6 +3,7 @@ import * as os from 'os';
 import path from 'path';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import JSZip from 'jszip';
+import { documentReaderWorkerMock } from './fixtures/document-reader/worker.testHarness';
 
 import {
   CoworkQueueDelivery,
@@ -19,6 +20,10 @@ import {
   PiDocumentReaderOutputSchema,
   PI_DOCUMENT_READER_MAX_CHARS,
 } from '../src/main/libs/agentEngine/piDocumentReaderTool';
+
+vi.mock('../src/main/documentReader/officeDocument', importOriginal =>
+  documentReaderWorkerMock(importOriginal),
+);
 
 describe('Adversarial M3 Verification: Queue Thinning, Session Stats, Context Edit, Document Reader', () => {
   describe('Integrity & Facade Checks', () => {
