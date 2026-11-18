@@ -81,7 +81,7 @@ type DocumentReaderToolResult = {
 
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
-function buildOcrFailure(
+function buildDocumentFailure(
   errorCode: string,
   message: string,
   requestedPath: string,
@@ -103,10 +103,14 @@ async function readImageWithOcr(
   signal?: AbortSignal,
 ): Promise<DocumentReaderToolResult> {
   if (signal?.aborted) {
-    return buildOcrFailure('DOCUMENT_ABORTED', 'Document reading was cancelled.', requestedPath);
+    return buildDocumentFailure(
+      'DOCUMENT_ABORTED',
+      'Document reading was cancelled.',
+      requestedPath,
+    );
   }
   if (!isOcrSupported()) {
-    return buildOcrFailure(
+    return buildDocumentFailure(
       'OCR_UNSUPPORTED_PLATFORM',
       'Local OCR is currently Windows only; on this platform inspect the image directly when vision input is available.',
       requestedPath,
@@ -114,10 +118,14 @@ async function readImageWithOcr(
   }
   const status = await getOcrStatus(language, signal);
   if (signal?.aborted) {
-    return buildOcrFailure('DOCUMENT_ABORTED', 'Document reading was cancelled.', requestedPath);
+    return buildDocumentFailure(
+      'DOCUMENT_ABORTED',
+      'Document reading was cancelled.',
+      requestedPath,
+    );
   }
   if (!status.ready) {
-    return buildOcrFailure(
+    return buildDocumentFailure(
       'OCR_ENGINE_UNAVAILABLE',
       'Local Windows OCR language pack is unavailable for this image.',
       requestedPath,
@@ -125,7 +133,11 @@ async function readImageWithOcr(
   }
   const result = await readOcrText([filePath], language, signal);
   if (signal?.aborted) {
-    return buildOcrFailure('DOCUMENT_ABORTED', 'Document reading was cancelled.', requestedPath);
+    return buildDocumentFailure(
+      'DOCUMENT_ABORTED',
+      'Document reading was cancelled.',
+      requestedPath,
+    );
   }
   const truncated = result.text.length > MAX_MARKDOWN_CHARS;
   const output = truncated ? safeSlice(result.text, MAX_MARKDOWN_CHARS) : result.text;
@@ -173,6 +185,48 @@ async function hasPdfHeader(filePath: string): Promise<boolean> {
   }
 }
 
+async function validateDocumentFile(workspaceRoot: string, requestedPath: string) {
+  const filePath = resolveWorkspaceFile(workspaceRoot, requestedPath);
+  if (!filePath) {
+    return {
+      failure: buildDocumentFailure(
+        'DOCUMENT_PATH_DENIED',
+        'Document read denied: path must be a file inside the workspace.',
+        requestedPath,
+      ),
+    };
+  }
+  const stat = await fs.promises.lstat(filePath).catch((): null => null);
+  if (!stat) {
+    return {
+      failure: buildDocumentFailure(
+        'DOCUMENT_NOT_FOUND',
+        `Document not found: ${requestedPath}`,
+        requestedPath,
+      ),
+    };
+  }
+  if (!stat.isFile()) {
+    return {
+      failure: buildDocumentFailure(
+        'DOCUMENT_NOT_A_FILE',
+        `Document read denied: ${requestedPath} is not a file.`,
+        requestedPath,
+      ),
+    };
+  }
+  if (stat.size > DOCUMENT_MAX_BYTES) {
+    const failure = buildDocumentFailure(
+      'DOCUMENT_TOO_LARGE',
+      `Document read denied: ${requestedPath} is larger than the 50 MiB local conversion limit.`,
+      requestedPath,
+    );
+    failure.details.bytes = stat.size;
+    return { failure };
+  }
+  return { filePath, bytes: stat.size };
+}
+
 export function buildPiDocumentReaderTool(options: {
   workspaceRoot: string;
 }): ToolDefinition<typeof PiDocumentReaderParameters, PiDocumentReaderOutput> {
@@ -200,105 +254,29 @@ export function buildPiDocumentReaderTool(options: {
       const language = text(params.language) || undefined;
 
       if (signal?.aborted) {
-        return buildOcrFailure(
+        return buildDocumentFailure(
           'DOCUMENT_ABORTED',
           'Document reading was cancelled.',
           requestedPath,
         );
       }
 
-      const filePath = resolveWorkspaceFile(options.workspaceRoot, requestedPath);
-      if (!filePath) {
-        const details: PiDocumentReaderOutput = {
-          errorCode: 'DOCUMENT_PATH_DENIED',
-          path: requestedPath,
-        };
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Document read denied: path must be a file inside the workspace.',
-            },
-          ],
-          details,
-          structuredContent: details,
-          isError: true,
-        };
-      }
-
-      let stat: fs.Stats;
-      try {
-        stat = await fs.promises.stat(filePath);
-      } catch {
-        const details: PiDocumentReaderOutput = {
-          errorCode: 'DOCUMENT_NOT_FOUND',
-          path: requestedPath,
-        };
-        return {
-          content: [{ type: 'text', text: `Document not found: ${requestedPath}` }],
-          details,
-          structuredContent: details,
-          isError: true,
-        };
-      }
-      if (!stat.isFile()) {
-        const details: PiDocumentReaderOutput = {
-          errorCode: 'DOCUMENT_NOT_A_FILE',
-          path: requestedPath,
-        };
-        return {
-          content: [
-            { type: 'text', text: `Document read denied: ${requestedPath} is not a file.` },
-          ],
-          details,
-          structuredContent: details,
-          isError: true,
-        };
-      }
-      if (stat.size > DOCUMENT_MAX_BYTES) {
-        const details: PiDocumentReaderOutput = {
-          errorCode: 'DOCUMENT_TOO_LARGE',
-          path: requestedPath,
-          bytes: stat.size,
-        };
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Document read denied: ${requestedPath} is larger than the 50 MiB local conversion limit.`,
-            },
-          ],
-          details,
-          structuredContent: details,
-          isError: true,
-        };
-      }
-
-      if (signal?.aborted) {
-        return buildOcrFailure(
-          'DOCUMENT_ABORTED',
-          'Document reading was cancelled.',
-          requestedPath,
-        );
-      }
-
-      const ext = path.extname(filePath).toLowerCase();
       let format: string | null = null;
       try {
         const result = await queueDocumentRead(async activeSignal => {
           activeSignal.throwIfAborted();
+          const validated = await validateDocumentFile(options.workspaceRoot, requestedPath);
+          activeSignal.throwIfAborted();
+          if (validated.failure) return validated.failure;
+
+          const { filePath, bytes } = validated;
+          const ext = path.extname(filePath).toLowerCase();
           if (IMAGE_EXTENSIONS.has(ext)) {
-            return await readImageWithOcr(
-              filePath,
-              requestedPath,
-              language,
-              stat.size,
-              activeSignal,
-            );
+            return await readImageWithOcr(filePath, requestedPath, language, bytes, activeSignal);
           }
 
           const isPdf = ext === '.pdf' || (await hasPdfHeader(filePath));
-          const details: PiDocumentReaderOutput = { path: requestedPath, bytes: stat.size };
+          const details: PiDocumentReaderOutput = { path: requestedPath, bytes };
           if (isPdf) {
             format = 'pdf';
             const pdf = await readPdfDocument(filePath, { pages, language }, activeSignal);
@@ -341,7 +319,7 @@ export function buildPiDocumentReaderTool(options: {
         return result;
       } catch (error) {
         if (signal?.aborted) {
-          return buildOcrFailure(
+          return buildDocumentFailure(
             'DOCUMENT_ABORTED',
             'Document reading was cancelled.',
             requestedPath,

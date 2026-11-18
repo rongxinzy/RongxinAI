@@ -233,6 +233,38 @@ test('accepts a short Chinese text layer without OCR even with a PDF page range'
   expect(pdf.ocrPdf).not.toHaveBeenCalled();
 });
 
+test('revalidates a pending document path when its read starts', async () => {
+  const root = createRoot();
+  const outside = createRoot();
+  const pendingDirectory = path.join(root, 'pending');
+  fs.mkdirSync(pendingDirectory);
+  fs.writeFileSync(path.join(root, 'first.pdf'), '%PDF-1.4');
+  fs.writeFileSync(path.join(pendingDirectory, 'second.pdf'), '%PDF-1.4');
+  fs.writeFileSync(path.join(outside, 'second.pdf'), '%PDF-1.4');
+
+  const active = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  pdf.readPdfText.mockImplementation(async () => {
+    active.resolve();
+    await release.promise;
+    return { pages: [{ page: 1, text: '第一份文档' }], pageCount: 1, truncated: false };
+  });
+  const tool = buildPiDocumentReaderTool({ workspaceRoot: root });
+  const first = tool.execute('lead', { path: 'first.pdf' });
+  await active.promise;
+  const pending = tool.execute('pending', { path: 'pending/second.pdf' });
+  try {
+    fs.rmSync(pendingDirectory, { recursive: true });
+    fs.symlinkSync(outside, pendingDirectory, process.platform === 'win32' ? 'junction' : 'dir');
+  } finally {
+    release.resolve();
+  }
+
+  expect((await first).structuredContent.text).toContain('第一份文档');
+  expect((await pending).structuredContent.errorCode).toBe('DOCUMENT_PATH_DENIED');
+  expect(pdf.readPdfText).toHaveBeenCalledTimes(1);
+});
+
 test('truncates documents exceeding PI_DOCUMENT_READER_MAX_CHARS', async () => {
   const root = createRoot();
   const oversizedText = 'A'.repeat(90_000);

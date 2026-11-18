@@ -24,6 +24,10 @@ const MAX_OCR_PAGES = 20;
 const PDF_PAGES_SCRIPT = path.join('ocr', 'pdf-pages.py');
 const execFileAsync = promisify(execFile);
 
+function imagePathKey(imagePath: string): string {
+  return process.platform === 'win32' ? path.win32.normalize(imagePath).toLowerCase() : imagePath;
+}
+
 function resolvePdfPagesScript(): string | undefined {
   const roots = [
     process.resourcesPath,
@@ -124,13 +128,13 @@ export async function ocrPdf(
       language,
       signal,
     );
-    const byPath = new Map(recognized.map(image => [image.path, image]));
+    const byPath = new Map(recognized.map(image => [imagePathKey(image.path), image]));
     return {
       pageCount: rendered.pageCount,
       truncated: rendered.truncated || pages.length > MAX_OCR_PAGES,
       pages: rendered.pages.map(page => ({
         page: page.page,
-        text: (byPath.get(page.path)?.lines ?? []).map(line => line.text).join('\n'),
+        text: (byPath.get(imagePathKey(page.path))?.lines ?? []).map(line => line.text).join('\n'),
       })),
     };
   } finally {
