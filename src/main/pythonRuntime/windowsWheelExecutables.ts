@@ -4,9 +4,10 @@
 export const WINDOWS_WHEEL_EXECUTABLES = String.raw`
 import ctypes as c
 from ctypes import wintypes as w
+import csv
 from importlib import metadata
+from io import StringIO
 from pathlib import Path
-import os
 import re
 import shutil
 import sys
@@ -84,12 +85,22 @@ def update_uv_interpreter(executable, python):
 
 def restore_wheel_executables(distributions, source_scripts, target_scripts):
     for dist in distributions:
-        for registered in dist.files or ():
-            if registered.suffix.lower() != '.exe':
+        # Distribution.files in Python 3.14 omits paths not present on disk.
+        # The wheel's RECORD is already copied, but its Scripts entries are not.
+        record = dist.read_text('RECORD')
+        if not record:
+            continue
+        for row in csv.reader(StringIO(record, newline='')):
+            if not row:
                 continue
-            destination = Path(os.path.abspath(dist.locate_file(registered)))
-            if destination.parent != target_scripts or INTERPRETER_FILENAME.fullmatch(destination.name):
+            registered = Path(row[0])
+            if registered.drive or registered.root or registered.suffix.lower() != '.exe':
                 continue
+            if INTERPRETER_FILENAME.fullmatch(registered.name):
+                continue
+            if dist.locate_file(registered).parent.resolve() != target_scripts:
+                continue
+            destination = target_scripts / registered.name
             if destination.exists():
                 continue
             source = legacy_path(source_scripts / destination.name)
@@ -108,5 +119,5 @@ def restore_wheel_executables(distributions, source_scripts, target_scripts):
                 update_uv_interpreter(destination, target_python)
 
 distributions = list(metadata.distributions())
-restore_wheel_executables(distributions, Path(sys.argv[1]), Path(sys.argv[2]))
+restore_wheel_executables(distributions, Path(sys.argv[1]), Path(sys.argv[2]).resolve(strict=True))
 `;

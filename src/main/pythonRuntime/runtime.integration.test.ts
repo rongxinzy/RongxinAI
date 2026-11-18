@@ -1,4 +1,4 @@
-import { fork } from 'node:child_process';
+import { fork, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   access,
@@ -28,6 +28,7 @@ const probe = async (path: string): Promise<string | undefined> =>
 const enabled = process.env.PYTHON_RUNTIME_INTEGRATION === '1';
 describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () => {
   let root: string, workspace: string, other: string, service: PythonRuntimeService;
+  let storageRoot: string;
   let globalPythonPath: string, globalUvPath: string, globalSharedPythonPath: string;
   beforeAll(async () => {
     root = await mkdtemp(join(tmpdir(), 'zhiyuan-python-integration-'));
@@ -35,7 +36,8 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
     other = join(root, 'work b');
     await mkdir(workspace);
     await mkdir(other);
-    await mkdir(join(root, 'storage'));
+    storageRoot = join(root, 'storage');
+    await mkdir(storageRoot);
     const os =
       process.platform === 'win32' ? 'win' : process.platform === 'darwin' ? 'mac' : 'linux';
     const pythonPath =
@@ -59,8 +61,32 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
       ));
     if (!pythonPath || !uvPath || !sharedPythonPath)
       throw new Error('Bundled managed runtime not found; run the setup:*-runtime scripts first.');
+    if (process.platform === 'win32') {
+      // Exercise equivalent path spellings if this Windows volume exposes 8.3 aliases.
+      const shortPath = spawnSync(
+        pythonPath,
+        [
+          '-I',
+          '-X',
+          'utf8',
+          '-c',
+          [
+            'import ctypes,sys',
+            'buf = ctypes.create_unicode_buffer(32768)',
+            'size = ctypes.windll.kernel32.GetShortPathNameW(sys.argv[1], buf, len(buf))',
+            'print(buf.value if 0 < size < len(buf) else sys.argv[1])',
+          ].join('\n'),
+          storageRoot,
+        ],
+        { encoding: 'utf8', timeout: 5000, windowsHide: true },
+      );
+      expect(shortPath.status, shortPath.stderr).toBe(0);
+      const alias = shortPath.stdout.trim();
+      expect(await realpath(alias)).toBe(await realpath(storageRoot));
+      storageRoot = alias;
+    }
     service = new PythonRuntimeService({
-      storageRoot: join(root, 'storage'),
+      storageRoot,
       runnerPath: resolve(
         process.env.PYTHON_RUNTIME_RUNNER ?? 'dist-electron/python-runtime-runner.cjs',
       ),
@@ -131,7 +157,7 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
   test.skipIf(process.platform !== 'win32')(
     'Windows shortens an existing environment, preserves CLI executables and reads and writes XLSX',
     async () => {
-      const storage = join(root, 'storage');
+      const storage = storageRoot;
       const prepared = await service.prepare({ workspace });
       const key = createHash('sha256')
         .update((await realpath(workspace)).toLowerCase())
@@ -154,10 +180,14 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
           'from openpyxl import load_workbook',
           'from pathlib import Path',
           'from tablib import Dataset',
-          'import subprocess,sys',
-          'scripts = Path(sys.executable).parent',
-          'subprocess.check_output([str(scripts / "pyfiglet.exe"), "--help"])',
-          'assert b"ruff 0.15.20" in subprocess.check_output([str(scripts / "ruff.exe"), "--version"])',
+          'import os,subprocess,sysconfig',
+          'scripts = Path(sysconfig.get_path("scripts"))',
+          'assert scripts.parent.samefile(os.environ["VIRTUAL_ENV"]), str(scripts)',
+          'pyfiglet, ruff = scripts / "pyfiglet.exe", scripts / "ruff.exe"',
+          'assert pyfiglet.is_file(), str(pyfiglet)',
+          'assert ruff.is_file(), str(ruff)',
+          'subprocess.check_output([str(pyfiglet), "--help"])',
+          'assert b"ruff 0.15.20" in subprocess.check_output([str(ruff), "--version"])',
           'workbook = load_workbook(BytesIO(Dataset([42]).export("xlsx")))',
           'print(version("tablib"), workbook.active["A1"].value)',
         ].join('\n'),
@@ -167,8 +197,8 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
       expect(result.stdout.trim()).toBe('3.10.0 42');
       expect(result.environmentId).not.toBe(legacyId);
       expect(await probe(join(legacyRoot, 'Scripts', 'python.exe'))).toBeDefined();
-      expect((await service.prepare({ workspace })).pythonPath).toBe(
-        join(storage, 'venvs', result.environmentId, 'Scripts', 'python.exe'),
+      expect(await realpath((await service.prepare({ workspace })).pythonPath)).toBe(
+        await realpath(join(storage, 'venvs', result.environmentId, 'Scripts', 'python.exe')),
       );
     },
     120_000,
