@@ -15,6 +15,10 @@ on:
         description: Optional formal beta tag to use instead of the rehearsal installer
         type: string
         default: ''
+      published-sha:
+        description: Expected full merge commit for the formal beta tag
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -54,6 +58,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PUBLISHED_TAG: ${{ inputs.published-tag }}
+          EXPECTED_PUBLISHED_SHA: ${{ inputs.published-sha }}
           REHEARSAL_MODE: ${{ inputs.mode }}
         run: |
           $oldAsset = 'win32-x64-lite-ZhiYuanAgent-Setup-2026.11.18-build.1.exe'
@@ -77,16 +82,19 @@ jobs:
           $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding UTF8 | ConvertFrom-Json -AsHashtable
           if ($env:PUBLISHED_TAG) {
             if ($env:PUBLISHED_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+-build\.[0-9]+$') { throw 'Expected a release tag' }
+            if ($env:EXPECTED_PUBLISHED_SHA -notmatch '^[0-9a-f]{40}$') { throw 'Expected a full release commit SHA' }
+            $releaseCommit = gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:PUBLISHED_TAG" --jq .sha
+            if ($LASTEXITCODE -ne 0 -or $releaseCommit -cne $env:EXPECTED_PUBLISHED_SHA) { throw 'Formal release tag does not match the merged source' }
             $version = $env:PUBLISHED_TAG.Substring(1)
             $asset = "win32-x64-lite-ZhiYuanAgent-Setup-$version.exe"
-            $release = gh release view $env:PUBLISHED_TAG --json assets,targetCommitish | ConvertFrom-Json
+            $release = gh release view $env:PUBLISHED_TAG --json assets | ConvertFrom-Json
             if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve the formal release' }
             $matching = @($release.assets | Where-Object { $_.name -ceq $asset })
             if ($matching.Count -ne 1 -or $matching[0].digest -notmatch '^sha256:[0-9a-f]{64}$') { throw 'Missing formal release asset digest' }
             gh release download $env:PUBLISHED_TAG --pattern $asset --dir candidate
             if ($LASTEXITCODE -ne 0) { throw 'Download of the formal Lite installer failed' }
             $receipt.candidateVersion = $version
-            $receipt.sourceCommit = $release.targetCommitish
+            $receipt.sourceCommit = $releaseCommit
             $receipt.installer = $asset
             $receipt.installerSha256 = $matching[0].digest.Substring(7)
             $receipt.Remove('appSha256')
