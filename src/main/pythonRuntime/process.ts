@@ -1,6 +1,6 @@
 import { fork, spawn, type ChildProcess } from 'node:child_process';
 import { access } from 'node:fs/promises';
-import { applyUvPackageIndexDefaults } from '../libs/pythonPackageIndexes';
+import { PythonPackageIndexUrl } from '../libs/pythonPackageIndexes';
 
 export type ProcessResult = {
   stdout: string;
@@ -132,6 +132,8 @@ export function isolatedEnvironment(root: string): NodeJS.ProcessEnv {
     'Path',
     'HOME',
     'USERPROFILE',
+    'APPDATA',
+    'LOCALAPPDATA',
     'SystemRoot',
     'WINDIR',
     'TEMP',
@@ -180,7 +182,8 @@ export function runtimeNetworkEnvironment(root: string): NodeJS.ProcessEnv {
   ])
     if (process.env[key]) env[key] = process.env[key];
   env.NODE_USE_ENV_PROXY = '1';
-  applyUvPackageIndexDefaults(env);
+  // A timeout on an additional index aborts uv's resolution, even with a default index.
+  env.UV_DEFAULT_INDEX ||= PythonPackageIndexUrl.Official;
   return env;
 }
 

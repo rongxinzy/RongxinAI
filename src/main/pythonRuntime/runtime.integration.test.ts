@@ -1,5 +1,15 @@
 import { fork } from 'node:child_process';
-import { access, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  access,
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -83,7 +93,7 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
       packages: ['pyfiglet>=1.0.2,<2'],
       timeoutMs: 300000,
     });
-    expect(installed.exitCode).toBe(0);
+    expect(installed.exitCode, installed.stderr).toBe(0);
     const imported = await service.execute({
       workspace,
       code: 'import importlib.metadata;print(importlib.metadata.version("pyfiglet"))',
@@ -116,6 +126,33 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
       ).stdout.trim(),
     ).toBe(installedVersion);
   }, 310000);
+  test.skipIf(process.platform !== 'win32')(
+    'Windows relocates a long-path environment and preserves its installed wheels',
+    async () => {
+      const storage = join(root, 'storage');
+      const prepared = await service.prepare({ workspace });
+      const key = createHash('sha256')
+        .update((await realpath(workspace)).toLowerCase())
+        .digest('hex');
+      const stateRoot = join(storage, 'workspaces-v2', key);
+      const pointer = join(stateRoot, 'current.json');
+      const current = JSON.parse(await readFile(pointer, 'utf8'));
+      const legacyId = `${prepared.runtimeId}-${randomUUID()}`;
+      const legacyRoot = join(stateRoot, legacyId);
+      await rename(join(storage, 'venvs', prepared.environmentId), legacyRoot);
+      await writeFile(pointer, JSON.stringify({ ...current, environmentId: legacyId }));
+
+      const result = await service.execute({ workspace, code: 'import pyfiglet; print("ready")' });
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout.trim()).toBe('ready');
+      expect(result.environmentId).not.toBe(legacyId);
+      expect(await probe(join(legacyRoot, 'Scripts', 'python.exe'))).toBeDefined();
+      expect((await service.prepare({ workspace })).pythonPath).toBe(
+        join(storage, 'venvs', result.environmentId, 'Scripts', 'python.exe'),
+      );
+    },
+    120_000,
+  );
   test('preinstalled office libraries work offline and workspace package files are independent', async () => {
     const work = join(root, 'offline workspace');
     const another = join(root, 'offline other');
