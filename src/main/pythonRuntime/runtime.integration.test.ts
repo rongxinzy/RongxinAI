@@ -73,7 +73,7 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
   afterAll(async () => {
     await service?.shutdown();
     if (root) await rm(root, { recursive: true, force: true });
-  });
+  }, 120_000);
   test('execute uses pinned Python, workspace cwd, streams and exit code', async () => {
     const result = await service.execute({
       workspace,
@@ -88,9 +88,11 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
     expect(result.exitCode).toBe(9);
   }, 310000);
   test('install is workspace-isolated; failed install preserves active environment; explicit rebuild retains pinned dependencies', async () => {
+    const packages = ['pyfiglet>=1.0.2,<2'];
+    if (process.platform === 'win32') packages.push('tablib==3.10.0');
     const installed = await service.install({
       workspace,
-      packages: ['pyfiglet>=1.0.2,<2'],
+      packages,
       timeoutMs: 300000,
     });
     expect(installed.exitCode, installed.stderr).toBe(0);
@@ -127,7 +129,7 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
     ).toBe(installedVersion);
   }, 310000);
   test.skipIf(process.platform !== 'win32')(
-    'Windows relocates a long-path environment and preserves its installed wheels',
+    'Windows shortens an existing environment and can use tablib and openpyxl to read and write XLSX',
     async () => {
       const storage = join(root, 'storage');
       const prepared = await service.prepare({ workspace });
@@ -142,9 +144,20 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
       await rename(join(storage, 'venvs', prepared.environmentId), legacyRoot);
       await writeFile(pointer, JSON.stringify({ ...current, environmentId: legacyId }));
 
-      const result = await service.execute({ workspace, code: 'import pyfiglet; print("ready")' });
+      const result = await service.execute({
+        workspace,
+        code: [
+          'from io import BytesIO',
+          'from importlib.metadata import version',
+          'from openpyxl import load_workbook',
+          'from tablib import Dataset',
+          'workbook = load_workbook(BytesIO(Dataset([42]).export("xlsx")))',
+          'print(version("tablib"), workbook.active["A1"].value)',
+        ].join('\n'),
+        timeoutMs: 100_000,
+      });
       expect(result.exitCode, result.stderr).toBe(0);
-      expect(result.stdout.trim()).toBe('ready');
+      expect(result.stdout.trim()).toBe('3.10.0 42');
       expect(result.environmentId).not.toBe(legacyId);
       expect(await probe(join(legacyRoot, 'Scripts', 'python.exe'))).toBeDefined();
       expect((await service.prepare({ workspace })).pythonPath).toBe(
