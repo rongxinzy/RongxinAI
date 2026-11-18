@@ -28,8 +28,11 @@ expected_count="$(
   "
 )"
 
-if [[ ${#keys[@]} -ne "$expected_count" ]]; then
-  echo "Expected ${expected_count} artifact metadata files, found ${#keys[@]} under ${prefix}" >&2
+# Tolerate generations built with a superset of the current bundles (for
+# example a target dropped between the tag build and stable promotion): extra
+# metadata is fetched harmlessly, but every current bundle must be present.
+if [[ ${#keys[@]} -lt "$expected_count" ]]; then
+  echo "Expected at least ${expected_count} artifact metadata files, found ${#keys[@]} under ${prefix}" >&2
   exit 1
 fi
 

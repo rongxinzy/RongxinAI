@@ -36,13 +36,13 @@ test('Linux acceptance requires complete immutable run identity', () => {
   assert.throws(() => installedExecutable(['/opt/one/app', '/opt/two/app'], 'app'));
 });
 
-test('Linux acceptance supports Lite and CUDA while rejecting CPU-only editions', () => {
-  for (const edition of ['lite', 'cuda']) {
-    expect(releaseIdentity({ ...env, ZHIYUAN_UPDATE_VARIANT: edition }).edition).toBe(edition);
+test('Linux acceptance supports CUDA while rejecting dropped lite and CPU-only editions', () => {
+  expect(releaseIdentity({ ...env, ZHIYUAN_UPDATE_VARIANT: 'cuda' }).edition).toBe('cuda');
+  for (const edition of ['lite', 'cpu']) {
+    expect(() => releaseIdentity({ ...env, ZHIYUAN_UPDATE_VARIANT: edition })).toThrow(
+      'requires complete release and run identity',
+    );
   }
-  expect(() => releaseIdentity({ ...env, ZHIYUAN_UPDATE_VARIANT: 'cpu' })).toThrow(
-    'requires complete release and run identity',
-  );
 });
 
 test('Linux acceptance binds final bytes and rejects evidence from another attempt', async () => {

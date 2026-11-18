@@ -18,12 +18,13 @@ test('promote loads all generation build metadata dynamically', () => {
   expect(promoteWorkflow).toContain('print-electron-updater-verify-specs.mjs');
 });
 
-test('fetch-generation-build-metadata expects one metadata file per release bundle', () => {
+test('fetch-generation-build-metadata requires at least one metadata file per release bundle', () => {
   const script = readFileSync(
     path.join(process.cwd(), 'scripts/release/fetch-generation-build-metadata.sh'),
     'utf8',
   );
   expect(script).toContain('list-objects-v2');
   expect(script).toContain('listReleaseCandidateBundles');
+  expect(script).toContain('-lt "$expected_count"');
   expect(listReleaseCandidateBundles().length).toBeGreaterThan(4);
 });
