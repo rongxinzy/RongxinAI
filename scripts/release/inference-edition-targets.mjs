@@ -7,16 +7,18 @@ export { RELEASE_PLATFORMS, resolveReleasePlatforms };
 /** @type {InferenceEditionVariant[]} */
 export const WINDOWS_INFERENCE_VARIANTS = ['lite', 'cuda'];
 
-// Windows and Linux ship lite + cuda; macOS retains cpu (Metal) per arch.
+// Windows ships lite + cuda; Linux ships cuda only (lite dropped: the update
+// gateway never registered the linux deb-lite/appimage-lite variants);
+// macOS retains cpu (Metal) per arch.
 /** @type {InferenceEditionVariant[]} */
-export const LINUX_INFERENCE_VARIANTS = ['lite', 'cuda'];
+export const LINUX_INFERENCE_VARIANTS = ['cuda'];
 
 /** @type {InferenceEditionVariant[]} */
 export const MACOS_INFERENCE_VARIANTS = ['cpu'];
 
 /**
  * Stable release targets for signed update manifests.
- * Linux ships deb + AppImage per inference edition (lite, cuda); macOS ships
+ * Linux ships deb + AppImage for cuda only; macOS ships
  * cpu (Metal) per arch; Windows ships lite and cuda.
  */
 export function listRequiredReleaseTargets(platforms = resolveReleasePlatforms()) {
@@ -44,7 +46,7 @@ export function isWindowsInferenceVariant(variant) {
 }
 
 export function parseLinuxReleaseVariant(variant) {
-  const match = /^(deb|appimage)-(lite|cuda)$/.exec(variant ?? '');
+  const match = /^(deb|appimage)-(cuda)$/.exec(variant ?? '');
   if (!match) return null;
   return { format: match[1], edition: match[2] };
 }

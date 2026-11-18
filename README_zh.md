@@ -46,7 +46,7 @@
 
 ## 开始使用
 
-1. **下载**：从[官网](https://www.rongxzyai.com/#download)或 [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases) 获取安装包：**Windows** x64 轻量版、CUDA 版（`.exe`）；**macOS** Apple Silicon 与 Intel 的 CPU 版（`.dmg` 与 `.zip`）；**Linux** x64 轻量版与 CUDA 版（`.deb` 与 AppImage）；**麒麟 V11** x86_64 CPU 版（`.rpm`，默认中文界面）。
+1. **下载**：从[官网](https://www.rongxzyai.com/#download)或 [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases) 获取安装包：**Windows** x64 轻量版、CUDA 版（`.exe`）；**macOS** Apple Silicon 与 Intel 的 CPU 版（`.dmg` 与 `.zip`）；**Linux** x64 CUDA 版（`.deb` 与 AppImage）；**麒麟 V11** x86_64 CPU 版（`.rpm`，默认中文界面）。
 2. **打开应用**：直接用内置免费模型对话，无需 API Key。
 3. **派任务**：选择项目目录、描述任务，查看执行过程并处理授权请求。
 

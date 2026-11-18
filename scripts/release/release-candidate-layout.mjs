@@ -11,7 +11,7 @@ import {
 export function listReleaseCandidateBundles(platforms = resolveReleasePlatforms()) {
   /** @type {ReleaseCandidateBundle[]} */
   const bundles = [];
-  // Windows/Linux ship lite + cuda; macOS ships cpu (Metal) per arch.
+  // Windows ships lite + cuda; Linux ships cuda only; macOS ships cpu (Metal) per arch.
   for (const edition of WINDOWS_INFERENCE_VARIANTS) {
     bundles.push({
       bundleId: `win32-x64-${edition}`,
