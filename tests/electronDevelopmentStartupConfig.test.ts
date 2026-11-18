@@ -13,10 +13,13 @@ test('standalone development build includes every worker from the Vite build', (
     'utf8',
   );
   const workers = [...viteConfig.matchAll(/entry: '(src\/main\/[^']*Worker\.ts)'/g)];
+  const developmentEntries = new Set(
+    [...developmentBuild.matchAll(/createBuildOptions\(\s*'([^']+)'/g)].map(([, entry]) => entry),
+  );
   assert.ok(workers.length > 0, 'the production worker inventory must not be empty');
   for (const [, entry] of workers) {
     assert.ok(
-      developmentBuild.includes(`createBuildOptions('${entry}')`),
+      developmentEntries.has(entry),
       `standalone development startup is missing worker ${entry}`,
     );
   }

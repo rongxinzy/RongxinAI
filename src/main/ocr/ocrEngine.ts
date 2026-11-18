@@ -8,11 +8,12 @@
  * CJK characters).
  */
 
-import { spawn } from 'child_process';
+import { execFile } from 'child_process';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { promisify } from 'node:util';
 
 import { resolveBundledOcrScriptPath } from '../libs/ocrHelper';
 
@@ -50,6 +51,7 @@ const DEFAULT_LANGUAGE = 'zh-Hans-CN';
 const MAX_IMAGES_PER_CALL = 12;
 const STATUS_TTL_MS = 10 * 60 * 1000;
 const CALL_TIMEOUT_MS = 5 * 60 * 1000;
+const execFileAsync = promisify(execFile);
 
 let cachedStatus: { value: OcrEngineStatus; at: number } | null = null;
 
@@ -57,49 +59,19 @@ export function isOcrSupported(): boolean {
   return resolveBundledOcrScriptPath() !== null;
 }
 
-function runPowerShell(
+async function runPowerShell(
   args: string[],
   timeoutMs: number,
-): Promise<{ code: number; stdout: string; stderr: string }> {
+  signal?: AbortSignal,
+): Promise<string> {
   const scriptPath = resolveBundledOcrScriptPath();
-  if (!scriptPath) {
-    return Promise.resolve({
-      code: -1,
-      stdout: '',
-      stderr: 'OCR helper is not bundled on this platform.',
-    });
-  }
-  return new Promise(resolve => {
-    const child = spawn(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args],
-      { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
-    );
-    let stdout = '';
-    let stderr = '';
-    let settled = false;
-    const finish = (code: number) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({ code, stdout, stderr });
-    };
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8');
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString('utf8');
-    });
-    const timer = setTimeout(() => {
-      child.kill();
-      finish(-2);
-    }, timeoutMs);
-    child.on('error', error => {
-      stderr += error.message;
-      finish(-3);
-    });
-    child.on('close', code => finish(code ?? -4));
-  });
+  if (!scriptPath) return '';
+  const { stdout } = await execFileAsync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args],
+    { windowsHide: true, timeout: timeoutMs, maxBuffer: 1024 * 1024, signal },
+  );
+  return stdout;
 }
 
 /**
@@ -137,8 +109,13 @@ function parseJson(stdout: string): RawOcrResponse | null {
   }
 }
 
-export async function getOcrStatus(language: string = DEFAULT_LANGUAGE): Promise<OcrEngineStatus> {
-  if (cachedStatus && Date.now() - cachedStatus.at < STATUS_TTL_MS) return cachedStatus.value;
+export async function getOcrStatus(
+  language: string = DEFAULT_LANGUAGE,
+  signal?: AbortSignal,
+): Promise<OcrEngineStatus> {
+  signal?.throwIfAborted();
+  if (cachedStatus?.value.requested === language && Date.now() - cachedStatus.at < STATUS_TTL_MS)
+    return cachedStatus.value;
 
   const unavailable: OcrEngineStatus = {
     ready: false,
@@ -151,8 +128,14 @@ export async function getOcrStatus(language: string = DEFAULT_LANGUAGE): Promise
     return unavailable;
   }
 
-  const { code, stdout } = await runPowerShell(['-Status', '-Json', '-Lang', language], 60_000);
-  const parsed = code === 0 ? (parseJson(stdout) as Partial<OcrEngineStatus> | null) : null;
+  const stdout = await runPowerShell(['-Status', '-Json', '-Lang', language], 60_000, signal).catch(
+    error => {
+      signal?.throwIfAborted();
+      console.debug('[OcrEngine] could not query language availability:', error);
+      return '';
+    },
+  );
+  const parsed = parseJson(stdout) as Partial<OcrEngineStatus> | null;
   const value: OcrEngineStatus = {
     ready: parsed?.ready === true,
     engine: typeof parsed?.engine === 'string' ? parsed.engine : null,
@@ -166,19 +149,26 @@ export async function getOcrStatus(language: string = DEFAULT_LANGUAGE): Promise
 export async function recognizeImages(
   imagePaths: string[],
   language: string = DEFAULT_LANGUAGE,
+  signal?: AbortSignal,
 ): Promise<OcrImageText[]> {
   if (imagePaths.length === 0 || !isOcrSupported()) return [];
 
   const results: OcrImageText[] = [];
   for (let offset = 0; offset < imagePaths.length; offset += MAX_IMAGES_PER_CALL) {
+    signal?.throwIfAborted();
     const batch = imagePaths.slice(offset, offset + MAX_IMAGES_PER_CALL);
     const pathsFile = path.join(os.tmpdir(), `zhiyuan-ocr-${randomUUID()}.json`);
     try {
-      fs.writeFileSync(pathsFile, JSON.stringify(batch), 'utf8');
-      const { stdout } = await runPowerShell(
+      await fs.promises.writeFile(pathsFile, JSON.stringify(batch), 'utf8');
+      const stdout = await runPowerShell(
         ['-PathsFile', pathsFile, '-Json', '-Lang', language],
         CALL_TIMEOUT_MS,
-      );
+        signal,
+      ).catch(error => {
+        signal?.throwIfAborted();
+        console.debug('[OcrEngine] recognition process failed:', error);
+        return '';
+      });
       const parsed = parseJson(stdout);
       for (const entry of parsed?.results ?? []) {
         results.push({
@@ -198,7 +188,7 @@ export async function recognizeImages(
         });
       }
     } finally {
-      fs.rmSync(pathsFile, { force: true });
+      await fs.promises.rm(pathsFile, { force: true });
     }
   }
   return results;
@@ -208,8 +198,9 @@ export async function recognizeImages(
 export async function readOcrText(
   imagePaths: string[],
   language: string = DEFAULT_LANGUAGE,
+  signal?: AbortSignal,
 ): Promise<OcrTextResult> {
-  const images = await recognizeImages(imagePaths, language);
+  const images = await recognizeImages(imagePaths, language, signal);
   const text = images
     .map(image => image.lines.map(line => line.text).join('\n'))
     .filter(Boolean)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render PDF pages to PNG for the bundled OCR pipeline.
+"""Extract PDF text by page or render selected pages for local OCR.
 
 Runs on the packaged Skill Python layer, which already ships pypdfium2 and
 Pillow for the PDF Skill, so scanned-PDF OCR adds no dependency.
@@ -16,14 +16,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
+from contextlib import closing
 
 
 def parse_pages(spec: str, page_count: int) -> list[int]:
     """Parse '1-5,9' into zero-based page indexes, clamped to the document."""
     if not spec or spec == "all":
         return list(range(page_count))
-    selected: list[int] = []
+    selected: dict[int, None] = {}
     for part in spec.split(","):
         part = part.strip()
         if not part:
@@ -34,11 +36,27 @@ def parse_pages(spec: str, page_count: int) -> list[int]:
             end = int(end_text or page_count)
         else:
             start = end = int(part)
-        for page in range(start, end + 1):
-            index = page - 1
-            if 0 <= index < page_count and index not in selected:
-                selected.append(index)
-    return selected
+        for page in range(max(1, start), min(page_count, end) + 1):
+            selected[page - 1] = None
+    return list(selected)
+
+
+def extract_text(document, indexes: list[int], max_characters: int) -> dict:
+    pages: list[dict] = []
+    remaining = max_characters
+    truncated = False
+    for index in indexes:
+        with closing(document[index]) as page:
+            with closing(page.get_textpage()) as textpage:
+                text = textpage.get_text_bounded().replace("\r\n", "\n").strip()
+        if not re.search(r"[^\s\ufffd\x00]", text):
+            text = ""
+        pages.append({"page": index + 1, "text": text[:remaining]})
+        truncated = len(text) > remaining
+        remaining -= len(text)
+        if remaining <= 0:
+            break
+    return {"pages": pages, "truncated": truncated or len(pages) < len(indexes)}
 
 
 def main() -> int:
@@ -46,20 +64,30 @@ def main() -> int:
     parser.add_argument("--input", required=True)
     parser.add_argument("--pages", default="all")
     parser.add_argument("--dpi", type=int, default=200)
-    parser.add_argument("--out", required=True)
+    parser.add_argument("--out")
     parser.add_argument("--max-pages", type=int, default=20)
     parser.add_argument("--max-megapixels", type=float, default=40.0)
+    parser.add_argument("--text", action="store_true")
+    parser.add_argument("--max-characters", type=int, default=30000)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
+    if not args.text and not args.out:
+        parser.error("--out is required when rendering PDF pages")
 
     import pypdfium2 as pdfium
 
     document = pdfium.PdfDocument(args.input)
     try:
         page_count = len(document)
-        pages = parse_pages(args.pages, page_count)
-        if len(pages) > args.max_pages:
-            pages = pages[: args.max_pages]
+        selected = parse_pages(args.pages, page_count)
+        pages = selected[: args.max_pages]
+        if args.text:
+            payload = extract_text(document, pages, args.max_characters)
+            payload["pageCount"] = page_count
+            payload["truncated"] = payload["truncated"] or len(pages) < len(selected)
+            print(json.dumps(payload, ensure_ascii=False))
+            return 0
+
         os.makedirs(args.out, exist_ok=True)
 
         scale = args.dpi / 72
@@ -82,7 +110,7 @@ def main() -> int:
         payload = {
             "pageCount": page_count,
             "renderedCount": len(rendered),
-            "truncated": len(rendered) < len(parse_pages(args.pages, page_count)),
+            "truncated": len(rendered) < len(selected),
             "pages": rendered,
         }
         if args.json:

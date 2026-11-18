@@ -8,7 +8,6 @@
         "@agentclientprotocol/claude-agent-acp": "0.70.0",
         "@agentclientprotocol/codex-acp": "1.6.2",
         "@agentclientprotocol/sdk": "1.4.0",
-        "@firecrawl/anydoc": "0.1.3",
         "ajv": "^8.20.0",
         "ajv-formats": "^3.0.1",
         "better-sqlite3": "13.0.3",
@@ -31,6 +30,7 @@
         "@earendil-works/pi-ai": "1.5.2",
         "@earendil-works/pi-coding-agent": "1.5.2",
         "@earendil-works/pi-durable": "1.5.2",
+        "@firecrawl/anydoc-wasm": "0.2.4",
         "@melloware/react-logviewer": "^6.5.5",
         "@modelcontextprotocol/sdk": "^1.32.1",
         "@napi-rs/canvas": "^0.1.100",
@@ -437,21 +437,7 @@
 
     "@file-type/xml": ["@file-type/xml@0.4.4", "https://registry.npmjs.org/@file-type/xml/-/xml-0.4.4.tgz", { "dependencies": { "sax": "^1.4.1", "strtok3": "^10.3.4" } }, "sha512-NhCyXoHlVZ8TqM476hyzwGJ24+D5IPSaZhmrPj7qXnEVb3q6jrFzA3mM9TBpknKSI9EuQeGTKRg2DXGUwvBBoQ=="],
 
-    "@firecrawl/anydoc": ["@firecrawl/anydoc@0.1.3", "https://registry.npmjs.org/@firecrawl/anydoc/-/anydoc-0.1.3.tgz", { "optionalDependencies": { "@firecrawl/anydoc-darwin-arm64": "0.1.3", "@firecrawl/anydoc-darwin-x64": "0.1.3", "@firecrawl/anydoc-linux-arm64-gnu": "0.1.3", "@firecrawl/anydoc-linux-arm64-musl": "0.1.3", "@firecrawl/anydoc-linux-x64-gnu": "0.1.3", "@firecrawl/anydoc-linux-x64-musl": "0.1.3", "@firecrawl/anydoc-win32-x64-msvc": "0.1.3" }, "bin": { "anydoc": "cli.js" } }, "sha512-OuYZWJHxiSNxU414g3l4w0gKb5BTqVZKGCwgmrkn8Mq84lf5z1Y2pHcTWQOWbyN4qD2NX7hQhrnozGhYYql6sw=="],
-
-    "@firecrawl/anydoc-darwin-arm64": ["@firecrawl/anydoc-darwin-arm64@0.1.3", "https://registry.npmjs.org/@firecrawl/anydoc-darwin-arm64/-/anydoc-darwin-arm64-0.1.3.tgz", { "os": "darwin", "cpu": "arm64" }, "sha512-tCi0pqATVbS4el+lF/XBGvXzMUzc1dLTQd6eZxctLoP5HBLyQsmBQiSDdU+dE5reVpriLdumAo3MRhSJVBfikw=="],
-
-    "@firecrawl/anydoc-darwin-x64": ["@firecrawl/anydoc-darwin-x64@0.1.3", "https://registry.npmjs.org/@firecrawl/anydoc-darwin-x64/-/anydoc-darwin-x64-0.1.3.tgz", { "os": "darwin", "cpu": "x64" }, "sha512-WpegrFgCZfXgbDBsrHrZcUcJNoB31fL7ztGL0x3OCThGNcND/JFOAb0ihS3Y/uwbHvXJDZTt+ZzAQOhSoC/8Rg=="],
-
-    "@firecrawl/anydoc-linux-arm64-gnu": ["@firecrawl/anydoc-linux-arm64-gnu@0.1.3", "https://registry.npmjs.org/@firecrawl/anydoc-linux-arm64-gnu/-/anydoc-linux-arm64-gnu-0.1.3.tgz", { "os": "linux", "cpu": "arm64" }, "sha512-5/QCKECO2ujVZ7b3JOcNyvZrH1uSB3I/uLmgN05FWEIERA3rrwdzZi/k6K7ULcmSOD4eMJDfd6g41Ka48gW6zw=="],
-
-    "@firecrawl/anydoc-linux-arm64-musl": ["@firecrawl/anydoc-linux-arm64-musl@0.1.3", "https://registry.npmjs.org/@firecrawl/anydoc-linux-arm64-musl/-/anydoc-linux-arm64-musl-0.1.3.tgz", { "os": "linux", "cpu": "arm64" }, "sha512-nf/IakkpFAA3wdIoicohgOW+3D3xDr8gGhU5C+QdWDvRTQjK3Bm2R0DLvZJcnuOonsb01ob+BqFb9Q7PqmCOpw=="],
-
-    "@firecrawl/anydoc-linux-x64-gnu": ["@firecrawl/anydoc-linux-x64-gnu@0.1.3", "https://registry.npmjs.org/@firecrawl/anydoc-linux-x64-gnu/-/anydoc-linux-x64-gnu-0.1.3.tgz", { "os": "linux", "cpu": "x64" }, "sha512-VYnBbTIyRwv3HcWZgEaguPMjRs2CdA5aV+Nx60kCBV4Ykp3GOIdiCxJFE0RfOUQN3nfPV6hcaKtXz+1O4jxX0A=="],
-
-    "@firecrawl/anydoc-linux-x64-musl": ["@firecrawl/anydoc-linux-x64-musl@0.1.3", "https://registry.npmjs.org/@firecrawl/anydoc-linux-x64-musl/-/anydoc-linux-x64-musl-0.1.3.tgz", { "os": "linux", "cpu": "x64" }, "sha512-gL3dYfVmpN6ixfdmy2Ifgkdd5s3xrIHuwUlTTsTWR15OkhfL9LuA/VkgDO+p82D3SWAVnCTEWI7scE8nkMLmBQ=="],
-
-    "@firecrawl/anydoc-win32-x64-msvc": ["@firecrawl/anydoc-win32-x64-msvc@0.1.3", "https://registry.npmjs.org/@firecrawl/anydoc-win32-x64-msvc/-/anydoc-win32-x64-msvc-0.1.3.tgz", { "os": "win32", "cpu": "x64" }, "sha512-NwjmXqhrL6xVTLAJeZ0Ie7h7Clm2CwSPuJ9wuZX9fPP5nx/p7GvPRDvtLq6PxtXk2LQFWklfHmDczUQmzMh1Kg=="],
+    "@firecrawl/anydoc-wasm": ["@firecrawl/anydoc-wasm@0.2.4", "https://registry.npmjs.org/@firecrawl/anydoc-wasm/-/anydoc-wasm-0.2.4.tgz", {}, "sha512-ZqrTXBrwi1Ct4kB5R72KQC9fOxwq4W08bZh6T+o84Mork3xCKLpH8TRe+KM3vJ+XqRVlV1dxHvQp0cnkO2r5TQ=="],
 
     "@floating-ui/core": ["@floating-ui/core@1.8.0", "https://registry.npmjs.org/@floating-ui/core/-/core-1.8.0.tgz", { "dependencies": { "@floating-ui/utils": "^0.2.12" } }, "sha512-0CIZ5itps/8x7BG8dEIhs53BvCUH2PCoogtakwRTut+Arm58sJooJ0AuZhLw2HJYIR5cMLNPBSS728sPho2khQ=="],
 

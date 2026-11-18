@@ -4,6 +4,11 @@ import path from 'path';
 
 import JSZip from 'jszip';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { documentReaderWorkerMock } from './fixtures/document-reader/worker.testHarness';
+
+vi.mock('../src/main/documentReader/officeDocument', importOriginal =>
+  documentReaderWorkerMock(importOriginal),
+);
 
 const hoisted = vi.hoisted(() => ({
   mockCreateAgentSession: vi.fn(),

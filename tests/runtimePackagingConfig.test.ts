@@ -56,22 +56,20 @@ test('each desktop target keeps the private document and Python toolchain resour
   }
 });
 
-test('unpacks AnyDoc native bindings from the application archive', () => {
+test('keeps the document WASM out of the Electron main entry', () => {
   const config = JSON.parse(readFileSync(path.join(root, 'electron-builder.json'), 'utf8')) as {
     asarUnpack?: string[];
   };
-  assert.ok(config.asarUnpack?.includes('node_modules/@firecrawl/**'));
+  assert.ok(!config.asarUnpack?.some(pattern => pattern.includes('@firecrawl/anydoc')));
 
   const viteConfig = readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
   const runtimeDependencies = readFileSync(
     path.join(root, 'scripts', 'electron-runtime-dependencies.mjs'),
     'utf8',
   );
-  assert.match(viteConfig, /ELECTRON_MAIN_EXTERNALS\.includes\(id\)/);
-  assert.match(
-    runtimeDependencies,
-    /ELECTRON_MAIN_EXTERNALS\s*=\s*\[[\s\S]*['"]@firecrawl\/anydoc['"]/,
-  );
+  assert.match(viteConfig, /entry: ['"]src\/main\/documentReader\/documentWorker\.ts['"]/);
+  assert.match(viteConfig, /plugins: \[documentWasmAssets\(projectRoot\)\]/);
+  assert.doesNotMatch(runtimeDependencies, /@firecrawl/);
 });
 
 test('unpacks npm for connector installation without a system Node.js runtime', () => {

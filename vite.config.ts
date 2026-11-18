@@ -10,6 +10,7 @@ import renderer from 'vite-plugin-electron-renderer';
 
 import { ELECTRON_MAIN_EXTERNALS } from './scripts/electron-runtime-dependencies.mjs';
 import { copyCompanionPhoton } from './scripts/copy-companion-photon.mjs';
+import { documentWasmAssets } from './scripts/document-wasm-assets.mjs';
 
 // https://vitejs.dev/config/
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -338,6 +339,19 @@ export default defineConfig(async ({ command }) => {
                 // Hash large update payloads without blocking Electron's main process.
                 entry: 'src/main/libs/appUpdateHashWorker.ts',
                 vite: {
+                  build: {
+                    watch: command === 'serve' ? {} : null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                  },
+                },
+                onstart() {},
+              },
+              {
+                entry: 'src/main/documentReader/documentWorker.ts',
+                vite: {
+                  plugins: [documentWasmAssets(projectRoot)],
                   build: {
                     watch: command === 'serve' ? {} : null,
                     sourcemap: electronSourceMap,
