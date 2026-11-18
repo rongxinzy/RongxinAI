@@ -1,15 +1,112 @@
 name: Signed Windows Python upgrade rehearsal
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Build a signed Lite candidate or validate two signed installers
+        type: choice
+        options: [package, verify]
+        default: package
+      candidate-run:
+        description: Run ID of the signed Lite candidate package
+        type: string
+        default: ''
+      published-tag:
+        description: Optional formal beta tag to use instead of the rehearsal installer
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   package:
+    if: inputs.mode == 'package'
     uses: ./.github/workflows/build-windows-release.yml
     with:
-      source-ref: '403778f1c7e09aef653271959eb0dab71c9ecef5'
+      source-ref: '9c2fbbbc407f5870593fc86710cfc0879adb43e6'
       app-build-version: '2026.11.18-build.2-rehearsal'
       include-modelscope-token: false
     secrets: inherit
+
+  verify:
+    if: inputs.mode == 'verify'
+    runs-on: windows-2022
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-python-signed-lite
+          run-id: ${{ inputs.candidate-run }}
+          github-token: ${{ github.token }}
+          path: candidate/
+      - name: Fetch the old stable setup and resolve the upgrade target
+        id: target
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISHED_TAG: ${{ inputs.published-tag }}
+        run: |
+          $oldAsset = 'win32-x64-lite-ZhiYuanAgent-Setup-2026.11.18-build.1.exe'
+          $old = Join-Path $PWD 'previous-setup.exe'
+          curl.exe --fail --location --retry 4 --retry-all-errors --max-time 600 --output $old "https://github.com/rongxinzy/RongxinAI/releases/download/v2026.11.18-build.1/$oldAsset"
+          if ($LASTEXITCODE -ne 0) { throw 'Download of the old stable installer failed' }
+          $receiptPath = Join-Path $PWD 'candidate/python-signed-rehearsal.json'
+          $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding UTF8 | ConvertFrom-Json -AsHashtable
+          if ($env:PUBLISHED_TAG) {
+            if ($env:PUBLISHED_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+-build\.[0-9]+$') { throw 'Expected a release tag' }
+            $version = $env:PUBLISHED_TAG.Substring(1)
+            $asset = "win32-x64-lite-ZhiYuanAgent-Setup-$version.exe"
+            $release = gh release view $env:PUBLISHED_TAG --json assets,targetCommitish | ConvertFrom-Json
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve the formal release' }
+            $matching = @($release.assets | Where-Object { $_.name -ceq $asset })
+            if ($matching.Count -ne 1 -or $matching[0].digest -notmatch '^sha256:[0-9a-f]{64}$') { throw 'Missing formal release asset digest' }
+            gh release download $env:PUBLISHED_TAG --pattern $asset --dir candidate
+            if ($LASTEXITCODE -ne 0) { throw 'Download of the formal Lite installer failed' }
+            $receipt.candidateVersion = $version
+            $receipt.sourceCommit = $release.targetCommitish
+            $receipt.installer = $asset
+            $receipt.installerSha256 = $matching[0].digest.Substring(7)
+            $receipt.Remove('appSha256')
+            $receipt.Remove('asarSha256')
+            $receipt | ConvertTo-Json | Set-Content -LiteralPath $receiptPath -Encoding utf8
+          }
+          $installer = Join-Path $PWD ('candidate/' + $receipt.installer)
+          "previous=$old" >> $env:GITHUB_OUTPUT
+          "candidate=$installer" >> $env:GITHUB_OUTPUT
+          "receipt=$receiptPath" >> $env:GITHUB_OUTPUT
+      - name: Install and upgrade with Windows long paths disabled
+        shell: pwsh
+        env:
+          PREVIOUS_SETUP: ${{ steps.target.outputs.previous }}
+          CANDIDATE_SETUP: ${{ steps.target.outputs.candidate }}
+          CANDIDATE_RECEIPT: ${{ steps.target.outputs.receipt }}
+        run: |
+          if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'A disposable hosted runner is required' }
+          $key = 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem'
+          $prior = (Get-Item -LiteralPath $key).GetValue('LongPathsEnabled', $null)
+          New-ItemProperty -LiteralPath $key -Name LongPathsEnabled -PropertyType DWord -Value 0 -Force | Out-Null
+          try {
+            if ((Get-ItemPropertyValue -LiteralPath $key -Name LongPathsEnabled) -ne 0) { throw 'Long-path policy remains enabled' }
+            $fixture = Join-Path $env:RUNNER_TEMP 'pyup'
+            node scripts/ci/run-signed-python-upgrade.mjs $env:PREVIOUS_SETUP $env:CANDIDATE_SETUP $env:CANDIDATE_RECEIPT $fixture
+            if ($LASTEXITCODE -ne 0) { throw 'Signed installer Python upgrade validation failed' }
+          } finally {
+            if ($null -eq $prior) { Remove-ItemProperty -LiteralPath $key -Name LongPathsEnabled }
+            else { Set-ItemProperty -LiteralPath $key -Name LongPathsEnabled -Value $prior }
+          }
+      - name: Save the installer and runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: signed-windows-python-upgrade-evidence
+          path: acceptance-diagnostics/python-upgrade/
+          if-no-files-found: warn
+          retention-days: 30
