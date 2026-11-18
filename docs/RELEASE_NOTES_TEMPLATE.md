@@ -37,7 +37,6 @@ Beta 用户：设置 → 关于 → Beta 更新通道。Stable 由 [RELEASING.md
 | **Windows x64**，NVIDIA 显卡（推荐 RTX 40 系列，CUDA 12.4） | **cuda** | GPU 加速 + CPU 回退；需匹配驱动 |
 | **macOS Apple Silicon (arm64)** | **cpu** | 内置本地推理，支持 Metal 加速 |
 | **macOS Intel (x64)** | **cpu** | 同上 |
-| **Linux x64**，不需要本地推理 | **lite** | `.deb` 或 AppImage；不含本地推理运行时 |
 | **Linux x64**，NVIDIA + CUDA | **cuda** | `.deb` 或 AppImage；需 NVIDIA 驱动与 CUDA 运行库 |
 
 **GitHub Assets 命名：** 当前流水线将文件发布为  
@@ -45,7 +44,7 @@ Beta 用户：设置 → 关于 → Beta 更新通道。Stable 由 [RELEASING.md
 例如 `win32-x64-lite-ZhiYuanAgent-Setup-<version>.exe`。
 历史 Release 中可能出现 `-.ZhiYuan.Agent.-` 等旧命名；**新发布以流水线产物为准**，无需改动历史附件。
 
-**English quick pick:** Windows/Linux **lite** = no bundled local inference; **cuda** = NVIDIA GPU (CUDA 12.4, RTX 40-class build) with CPU fallback. macOS **cpu** = local inference with Metal acceleration. Linux packages are available as deb/AppImage.
+**English quick pick:** Windows **lite** = no bundled local inference; Windows/Linux **cuda** = NVIDIA GPU (CUDA 12.4, RTX 40-class build) with CPU fallback. macOS **cpu** = local inference with Metal acceleration. Linux ships cuda only, as deb/AppImage.
 
 ---
 

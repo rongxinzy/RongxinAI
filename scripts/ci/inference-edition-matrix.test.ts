@@ -53,11 +53,12 @@ test.each(['verify', 'release'])(
         .map(bundle => bundle.bundleId)
         .sort(),
     );
-    for (const platform of ['windows', 'linux']) {
-      expect(
-        result.legs.filter(leg => leg.platform === platform).map(leg => leg.inference_edition),
-      ).toEqual(['lite', 'cuda']);
-    }
+    expect(result.legs.filter(leg => leg.platform === 'windows').map(leg => leg.inference_edition)).toEqual(
+      ['lite', 'cuda'],
+    );
+    expect(result.legs.filter(leg => leg.platform === 'linux').map(leg => leg.inference_edition)).toEqual(
+      ['cuda'],
+    );
     expect(result.legs.find(leg => leg.target === 'win32-x64-cuda')?.runner).toBe('windows-2022');
     expect(
       result.legs
@@ -68,28 +69,31 @@ test.each(['verify', 'release'])(
   },
 );
 
-test('staged Windows release leaves both Linux editions and both macOS architectures', () => {
+test('staged Windows release leaves the Linux cuda leg and both macOS architectures', () => {
   const result = plan({ MODE: 'release', WINDOWS_RELEASE_STAGED: 'true' });
   expect(result.status).toBe(0);
   expect(result.legs.map(leg => leg.target).sort()).toEqual([
     'darwin-arm64-cpu',
     'darwin-x64-cpu',
     'linux-x64-cuda',
-    'linux-x64-lite',
   ]);
 });
 
-test('Linux matrix permits Lite/CUDA subsets and rejects CPU-only builds', () => {
+test('Linux matrix builds cuda only and rejects dropped lite/CPU editions', () => {
   const selected = plan({
     BUILD_WINDOWS: 'false',
     BUILD_MACOS: 'false',
-    LINUX_INFERENCE_EDITIONS: 'lite',
   });
   expect(selected.status).toBe(0);
-  expect(selected.legs.map(leg => leg.target)).toEqual(['linux-x64-lite']);
-  const removed = plan({ LINUX_INFERENCE_EDITIONS: 'cpu,cuda' });
-  expect(removed.status).not.toBe(0);
-  expect(removed.stderr).toContain('Unsupported Linux inference edition: cpu');
+  expect(selected.legs.map(leg => leg.target)).toEqual(['linux-x64-cuda']);
+  for (const editions of ['lite', 'cpu,cuda']) {
+    const removed = plan({ LINUX_INFERENCE_EDITIONS: editions });
+    expect(removed.status).not.toBe(0);
+  }
+  const lite = plan({ LINUX_INFERENCE_EDITIONS: 'lite' });
+  expect(lite.stderr).toContain('Unsupported Linux inference edition: lite');
+  const cpu = plan({ LINUX_INFERENCE_EDITIONS: 'cpu,cuda' });
+  expect(cpu.stderr).toContain('Unsupported Linux inference edition: cpu');
 });
 
 test('Linux packaging uses staged runtimes and preserves the selected edition in both modes', () => {

@@ -35,10 +35,10 @@ Beta users opt in under **Settings → About → Beta update channel**.
 | Platform | Editions | Release build |
 | --- | --- | --- |
 | Windows x64 | `lite`, `cuda` | Build lite once with `dist:win:signed`, then assemble/sign CUDA with `scripts/release/windows/assemble-windows-edition.cjs cuda` (`windows-2022`, CUDA 12.4.1) |
-| Linux x64 | `lite`, `cuda` (deb + AppImage each) | `dist:linux` with `ZHIYUAN_UPDATE_VARIANT=lite` or `cuda`; CUDA runtime is compiled/staged first in Docker (CUDA 12.4 / Ubuntu 22.04) |
+| Linux x64 | `cuda` (deb + AppImage) | `dist:linux` with `ZHIYUAN_UPDATE_VARIANT=cuda`; CUDA runtime is compiled/staged first in Docker (CUDA 12.4 / Ubuntu 22.04) |
 | macOS arm64, x64 | `cpu` | `dist:mac:<arch>` with `ZHIYUAN_UPDATE_VARIANT=cpu` |
 
-Windows and Linux publish only `lite` and `cuda`; standalone CPU editions are no longer built or required by release CI. `lite` has no bundled local inference runtime. macOS keeps the `cpu` variant identifier with Metal acceleration. `cuda` bundles an RTX 40 (sm_89) / CUDA 12.4 llama-server, its CUDA libraries, and a CPU fallback. CPU runtime preparation remains required for the CUDA fallback. Every platform build verifies the pinned Magpie gateway (`magpie:build` + `magpie:verify`) before packaging.
+Windows publishes `lite` and `cuda`; Linux publishes `cuda` only (the update gateway never registered the `deb-lite`/`appimage-lite` variants, and Linux lite was dropped rather than expanding gateway config); standalone CPU editions are no longer built or required by release CI. `lite` has no bundled local inference runtime. macOS keeps the `cpu` variant identifier with Metal acceleration. `cuda` bundles an RTX 40 (sm_89) / CUDA 12.4 llama-server, its CUDA libraries, and a CPU fallback. CPU runtime preparation remains required for the CUDA fallback. Every platform build verifies the pinned Magpie gateway (`magpie:build` + `magpie:verify`) before packaging.
 
 **Full platform rehearsal:** `build-platforms.yml` is manual-only and runs the full six-leg unsigned matrix. It never starts on PRs or a schedule. Windows CUDA output uses the same exact source/toolchain cache as signed releases; run this rehearsal on `main` before tagging to warm the cache for subsequent tags. A cache hit still verifies every file hash, DLL closure and CPU fallback startup. Changes to the pinned runtime, compiler image or build inputs invalidate the cache. Tag **`release.yml`** remains the authoritative signed build.
 

@@ -28,7 +28,7 @@ on:
         type: boolean
         default: true
       build-linux:
-        description: 'Include Linux lite/cuda matrix legs'
+        description: 'Include Linux cuda matrix legs'
         type: boolean
         default: true
       windows-release-staged:
@@ -36,9 +36,9 @@ on:
         type: boolean
         default: false
       linux-inference-editions:
-        description: 'Comma-separated Linux editions to build (lite,cuda)'
+        description: 'Comma-separated Linux editions to build (cuda)'
         type: string
-        default: 'lite,cuda'
+        default: 'cuda'
     secrets:
       CERTUM_USER_ID:
         required: false
@@ -98,14 +98,14 @@ jobs:
               separator=','
             done
           fi
-          # Windows/Linux lite/cuda, macOS cpu/Metal (arm64 + x64) = 6 legs.
+          # Windows lite/cuda, Linux cuda only, macOS cpu/Metal (arm64 + x64) = 5 legs.
           # Keep in sync with scripts/release/inference-edition-targets.mjs.
           if [[ "$BUILD_LINUX" == "true" ]]; then
             IFS=',' read -r -a linux_editions <<< "$LINUX_INFERENCE_EDITIONS"
             for edition in "${linux_editions[@]}"; do
               edition="${edition// /}"
               if [[ -z "$edition" ]]; then continue; fi
-              if [[ "$edition" != 'lite' && "$edition" != 'cuda' ]]; then
+              if [[ "$edition" != 'cuda' ]]; then
                 echo "Unsupported Linux inference edition: $edition" >&2
                 exit 1
               fi

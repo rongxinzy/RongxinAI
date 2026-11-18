@@ -46,7 +46,7 @@
 
 ## Get started
 
-1. **Download** from the [official website](https://www.rongxzyai.com/#download) or [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases): **Windows** x64 lite and CUDA installers (`.exe`); **macOS** Apple Silicon and Intel CPU builds (`.dmg` and `.zip`); **Linux** x64 lite and CUDA packages (`.deb` and AppImage).
+1. **Download** from the [official website](https://www.rongxzyai.com/#download) or [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases): **Windows** x64 lite and CUDA installers (`.exe`); **macOS** Apple Silicon and Intel CPU builds (`.dmg` and `.zip`); **Linux** x64 CUDA packages (`.deb` and AppImage).
 2. **Open the app** and chat with the built-in free model — no API key required.
 3. **Pick a project folder**, describe your task, then follow progress and approve actions as it works.
 

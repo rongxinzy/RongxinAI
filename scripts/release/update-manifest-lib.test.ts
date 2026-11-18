@@ -106,11 +106,11 @@ describe('online update release tools', () => {
     ).toEqual(
       expect.arrayContaining([
         {
-          target: 'linux:x64:deb-lite',
+          target: 'linux:x64:deb-cuda',
           contentType: 'application/vnd.debian.binary-package',
         },
         {
-          target: 'linux:x64:appimage-lite',
+          target: 'linux:x64:appimage-cuda',
           contentType: 'application/vnd.appimage',
         },
       ]),
@@ -368,14 +368,14 @@ describe('online update release tools', () => {
     );
     const result = runScript(
       'normalize-electron-updater-metadata.mjs',
-      ['2026.7.6', 'linux', 'x64', 'appimage-lite', inputPath, outputPath],
+      ['2026.7.6', 'linux', 'x64', 'appimage-cuda', inputPath, outputPath],
       releaseEnvironment,
     );
     expect(result.status).toBe(0);
     const normalized = yaml.load(fs.readFileSync(outputPath, 'utf8')) as any;
     expect(normalized.files).toEqual([
       {
-        url: 'https://updates.rongxzyai.com/v2/electron/releases/2026.7.6/linux/x64/appimage-lite/ZhiYuan.AppImage',
+        url: 'https://updates.rongxzyai.com/v2/electron/releases/2026.7.6/linux/x64/appimage-cuda/ZhiYuan.AppImage',
         sha512: appImageSha512,
       },
     ]);
@@ -396,7 +396,7 @@ describe('online update release tools', () => {
     );
     const result = runScript(
       'normalize-electron-updater-metadata.mjs',
-      ['2026.7.6', 'linux', 'x64', 'appimage-lite', inputPath, path.join(temporaryDirectory, 'out.yml')],
+      ['2026.7.6', 'linux', 'x64', 'appimage-cuda', inputPath, path.join(temporaryDirectory, 'out.yml')],
       releaseEnvironment,
     );
     expect(result.status).not.toBe(0);
