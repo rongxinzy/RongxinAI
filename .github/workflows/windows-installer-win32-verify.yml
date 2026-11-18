@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Build a signed Lite candidate or validate two signed installers
+        description: Build the candidate, verify the baseline, or exercise the full upgrade
         type: choice
-        options: [package, verify]
+        options: [package, seed, verify]
         default: package
       candidate-run:
         description: Run ID of the signed Lite candidate package
@@ -31,7 +31,7 @@ jobs:
     secrets: inherit
 
   verify:
-    if: inputs.mode == 'verify'
+    if: inputs.mode == 'verify' || inputs.mode == 'seed'
     runs-on: windows-2022
     timeout-minutes: 55
     steps:
@@ -42,6 +42,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - uses: actions/download-artifact@v8
+        if: inputs.mode == 'verify'
         with:
           name: windows-python-signed-lite
           run-id: ${{ inputs.candidate-run }}
@@ -53,11 +54,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PUBLISHED_TAG: ${{ inputs.published-tag }}
+          REHEARSAL_MODE: ${{ inputs.mode }}
         run: |
           $oldAsset = 'win32-x64-lite-ZhiYuanAgent-Setup-2026.11.18-build.1.exe'
           $old = Join-Path $PWD 'previous-setup.exe'
           curl.exe --fail --location --retry 4 --retry-all-errors --max-time 600 --output $old "https://github.com/rongxinzy/RongxinAI/releases/download/v2026.11.18-build.1/$oldAsset"
           if ($LASTEXITCODE -ne 0) { throw 'Download of the old stable installer failed' }
+          if ($env:REHEARSAL_MODE -eq 'seed') {
+            $product = (node scripts/packaging/windows-product.cjs) | ConvertFrom-Json
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve installer product' }
+            $signature = Get-AuthenticodeSignature -LiteralPath $old
+            if ($signature.Status -ne 'Valid') { throw 'The old stable setup signature is invalid' }
+            $baseline = Join-Path $PWD 'baseline-receipt.json'
+            @{ app = $product.executableName; thumbprint = $signature.SignerCertificate.Thumbprint } |
+              ConvertTo-Json | Set-Content -LiteralPath $baseline -Encoding utf8
+            "previous=$old" >> $env:GITHUB_OUTPUT
+            'candidate=-' >> $env:GITHUB_OUTPUT
+            "receipt=$baseline" >> $env:GITHUB_OUTPUT
+            exit
+          }
           $receiptPath = Join-Path $PWD 'candidate/python-signed-rehearsal.json'
           $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding UTF8 | ConvertFrom-Json -AsHashtable
           if ($env:PUBLISHED_TAG) {

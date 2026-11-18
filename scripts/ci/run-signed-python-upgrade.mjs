@@ -180,27 +180,37 @@ async function readAuthenticode(filename, expectedSigner) {
   assert.equal(stdout.trim(), expectedSigner, `Unexpected signer for ${filename}`);
 }
 
-const report = { candidate: receipt, previousVersion: firstVersion, passed: false };
+const seedOnly = newSetup === '-';
+const report = {
+  mode: seedOnly ? 'seed' : 'verify',
+  candidate: receipt,
+  previousVersion: firstVersion,
+  passed: false,
+};
 try {
   report.oldSetupSha256 = await sha256(oldSetup);
   assert.equal(
     report.oldSetupSha256,
     '24624e652475c70eb7574c663e280b66543bed5b937685c952fa7260faab30ed',
   );
-  assert.equal(await sha256(newSetup), receipt.installerSha256);
   await readAuthenticode(oldSetup, receipt.thumbprint);
-  await readAuthenticode(newSetup, receipt.thumbprint);
+  if (!seedOnly) {
+    assert.equal(await sha256(newSetup), receipt.installerSha256);
+    await readAuthenticode(newSetup, receipt.thumbprint);
+  }
   report.oldInstall = await runInstaller(oldSetup, 'old', false);
   await readAuthenticode(app, receipt.thumbprint);
   report.oldAsarSha256 = await sha256(archive);
   await nodeProbe('seed');
-  report.upgrade = await runInstaller(newSetup, 'upgrade', true);
-  await readAuthenticode(app, receipt.thumbprint);
-  if (receipt.appSha256) assert.equal(await sha256(app), receipt.appSha256);
-  report.newAsarSha256 = await sha256(archive);
-  if (receipt.asarSha256) assert.equal(report.newAsarSha256, receipt.asarSha256);
-  assert.notEqual(report.newAsarSha256, report.oldAsarSha256);
-  await nodeProbe('verify');
+  if (!seedOnly) {
+    report.upgrade = await runInstaller(newSetup, 'upgrade', true);
+    await readAuthenticode(app, receipt.thumbprint);
+    if (receipt.appSha256) assert.equal(await sha256(app), receipt.appSha256);
+    report.newAsarSha256 = await sha256(archive);
+    if (receipt.asarSha256) assert.equal(report.newAsarSha256, receipt.asarSha256);
+    assert.notEqual(report.newAsarSha256, report.oldAsarSha256);
+    await nodeProbe('verify');
+  }
   report.passed = true;
 } catch (error) {
   report.error = error.stack || String(error);
