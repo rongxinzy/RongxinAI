@@ -182,6 +182,7 @@ test('generates safe Windows entry points relative to the workspace Python', asy
   await writeFile(join(f.target.scripts, 'python.exe'), 'workspace interpreter');
   await writeFile(join(f.target.scripts, 'installed.exe'), 'existing workspace launcher');
   await seedWindowsConsoleScripts({
+    sourceScripts: f.source.scripts,
     targetPython: join(f.target.scripts, 'python.exe'),
     targetScripts: f.target.scripts,
     run,
@@ -205,6 +206,8 @@ test('generates safe Windows entry points relative to the workspace Python', asy
     '-I',
     '-c',
     expect.stringContaining('console_scripts'),
+    f.source.scripts,
+    f.target.scripts,
   ]);
 });
 
@@ -222,6 +225,7 @@ test('cancels Windows entry point generation without emitting launchers', async 
   });
   await expect(
     seedWindowsConsoleScripts({
+      sourceScripts: f.source.scripts,
       targetPython: join(f.target.scripts, 'python.exe'),
       targetScripts: f.target.scripts,
       run,
@@ -244,6 +248,7 @@ test('Windows python3 aliases the workspace launcher beside its venv configurati
   await writeFile(python, 'workspace venv launcher');
   const run = vi.fn(async () => ({ stdout: '[]', stderr: '', exitCode: 0 }));
   const options = {
+    sourceScripts: f.source.scripts,
     targetPython: python,
     targetScripts,
     run,

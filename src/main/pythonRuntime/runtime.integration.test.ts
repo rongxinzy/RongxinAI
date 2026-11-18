@@ -89,7 +89,7 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
   }, 310000);
   test('install is workspace-isolated; failed install preserves active environment; explicit rebuild retains pinned dependencies', async () => {
     const packages = ['pyfiglet>=1.0.2,<2'];
-    if (process.platform === 'win32') packages.push('tablib==3.10.0');
+    if (process.platform === 'win32') packages.push('tablib==3.10.0', 'ruff==0.15.20');
     const installed = await service.install({
       workspace,
       packages,
@@ -129,7 +129,7 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
     ).toBe(installedVersion);
   }, 310000);
   test.skipIf(process.platform !== 'win32')(
-    'Windows shortens an existing environment and can use tablib and openpyxl to read and write XLSX',
+    'Windows shortens an existing environment, preserves CLI executables and reads and writes XLSX',
     async () => {
       const storage = join(root, 'storage');
       const prepared = await service.prepare({ workspace });
@@ -142,6 +142,8 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
       const legacyId = `${prepared.runtimeId}-${randomUUID()}`;
       const legacyRoot = join(stateRoot, legacyId);
       await rename(join(storage, 'venvs', prepared.environmentId), legacyRoot);
+      await access(join(legacyRoot, 'Scripts', 'pyfiglet.exe'));
+      await access(join(legacyRoot, 'Scripts', 'ruff.exe'));
       await writeFile(pointer, JSON.stringify({ ...current, environmentId: legacyId }));
 
       const result = await service.execute({
@@ -150,7 +152,12 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
           'from io import BytesIO',
           'from importlib.metadata import version',
           'from openpyxl import load_workbook',
+          'from pathlib import Path',
           'from tablib import Dataset',
+          'import subprocess,sys',
+          'scripts = Path(sys.executable).parent',
+          'subprocess.check_output([str(scripts / "pyfiglet.exe"), "--help"])',
+          'assert b"ruff 0.15.20" in subprocess.check_output([str(scripts / "ruff.exe"), "--version"])',
           'workbook = load_workbook(BytesIO(Dataset([42]).export("xlsx")))',
           'print(version("tablib"), workbook.active["A1"].value)',
         ].join('\n'),

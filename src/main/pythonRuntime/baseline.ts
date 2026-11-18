@@ -48,7 +48,13 @@ async function seedConsoleScripts(
   signal: AbortSignal,
 ): Promise<void> {
   if (process.platform === 'win32') {
-    await seedWindowsConsoleScripts({ targetPython, targetScripts: target, run, signal });
+    await seedWindowsConsoleScripts({
+      sourceScripts: source,
+      targetPython,
+      targetScripts: target,
+      run,
+      signal,
+    });
     return;
   }
   const quotedPython = `'${targetPython.replace(/'/g, "'\"'\"'")}'`;
