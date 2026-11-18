@@ -53,12 +53,12 @@ test.each(['verify', 'release'])(
         .map(bundle => bundle.bundleId)
         .sort(),
     );
-    expect(result.legs.filter(leg => leg.platform === 'windows').map(leg => leg.inference_edition)).toEqual(
-      ['lite', 'cuda'],
-    );
-    expect(result.legs.filter(leg => leg.platform === 'linux').map(leg => leg.inference_edition)).toEqual(
-      ['cuda'],
-    );
+    expect(
+      result.legs.filter(leg => leg.platform === 'windows').map(leg => leg.inference_edition),
+    ).toEqual(['lite', 'cuda']);
+    expect(
+      result.legs.filter(leg => leg.platform === 'linux').map(leg => leg.inference_edition),
+    ).toEqual(['cuda']);
     expect(result.legs.find(leg => leg.target === 'win32-x64-cuda')?.runner).toBe('windows-2022');
     expect(
       result.legs
