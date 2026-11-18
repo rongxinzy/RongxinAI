@@ -35,6 +35,14 @@ LOAD_AS_DATA = 2
 PYTHON_PATH_RESOURCE = 'UV_PYTHON_PATH'
 INTERPRETER_FILENAME = re.compile(r'python(?:w|[0-9]+(?:[.][0-9]+)*w?)?[.]exe', re.I)
 
+def legacy_path(path):
+    value = str(path)
+    if len(value) < 260 or value.startswith('\\\\?\\'):
+        return path
+    if value.startswith('\\\\'):
+        return Path('\\\\?\\UNC\\' + value[2:])
+    return Path('\\\\?\\' + value)
+
 def resource_bytes(module, name):
     resource = find_resource(module, RT_RCDATA, name, LANGUAGE_NEUTRAL)
     if not resource:
@@ -84,7 +92,7 @@ def restore_wheel_executables(distributions, source_scripts, target_scripts):
                 continue
             if destination.exists():
                 continue
-            source = source_scripts / destination.name
+            source = legacy_path(source_scripts / destination.name)
             if source.is_symlink() or not source.is_file():
                 continue
             launcher_python = read_uv_interpreter(source)
