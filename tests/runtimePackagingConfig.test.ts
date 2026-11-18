@@ -68,14 +68,8 @@ test('keeps the document WASM out of the Electron main entry', () => {
     'utf8',
   );
   assert.match(viteConfig, /entry: ['"]src\/main\/documentReader\/documentWorker\.ts['"]/);
-  assert.match(
-    runtimeDependencies,
-    /ELECTRON_RUNTIME_DEPENDENCIES\s*=\s*\[[\s\S]*['"]@firecrawl\/anydoc-wasm['"]/,
-  );
-  assert.doesNotMatch(
-    runtimeDependencies.split('export const ELECTRON_RUNTIME_DEPENDENCIES')[0],
-    /@firecrawl/,
-  );
+  assert.match(viteConfig, /plugins: \[documentWasmAssets\(projectRoot\)\]/);
+  assert.doesNotMatch(runtimeDependencies, /@firecrawl/);
 });
 
 test('unpacks npm for connector installation without a system Node.js runtime', () => {

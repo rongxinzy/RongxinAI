@@ -6,6 +6,7 @@ import { build } from 'vite-plugin-electron';
 import { extractExternalDeps } from 'vite-plugin-electron/plugin';
 import { ELECTRON_MAIN_EXTERNALS } from './electron-runtime-dependencies.mjs';
 import { copyCompanionPhoton } from './copy-companion-photon.mjs';
+import { documentWasmAssets } from './document-wasm-assets.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, '..');
@@ -77,7 +78,13 @@ await build(createBuildOptions('src/main/libs/sqliteBackup/sqliteVerifyWorker.ts
 await build(createBuildOptions('src/main/libs/skillSecurity/skillSecurityScanWorker.ts'));
 await build(createBuildOptions('src/main/extensions/aisphere/requestWorker.ts'));
 await build(createBuildOptions('src/main/libs/appUpdateHashWorker.ts'));
-await build(createBuildOptions('src/main/documentReader/documentWorker.ts'));
+const documentWorker = createBuildOptions('src/main/documentReader/documentWorker.ts', {
+  external: [],
+});
+await build({
+  ...documentWorker,
+  vite: { ...documentWorker.vite, plugins: [documentWasmAssets(projectRoot)] },
+});
 await build(
   createBuildOptions('src/main/pythonRuntime/runner.ts', {
     output: {

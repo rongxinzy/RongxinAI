@@ -15,9 +15,12 @@ async function buildDocumentReaderTestWorker() {
       entryPoints: [path.join(projectRoot, 'src/main/documentReader/documentWorker.ts')],
       bundle: true,
       platform: 'node',
-      external: ['@firecrawl/anydoc-wasm'],
       outfile: workerPath,
     });
+    fs.copyFileSync(
+      path.join(projectRoot, 'node_modules/@firecrawl/anydoc-wasm/anydoc_wasm_bg.wasm'),
+      path.join(root, 'anydoc_wasm_bg.wasm'),
+    );
     return { workerPath, dispose };
   } catch (error) {
     dispose();

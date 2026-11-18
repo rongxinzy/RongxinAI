@@ -10,6 +10,7 @@ import renderer from 'vite-plugin-electron-renderer';
 
 import { ELECTRON_MAIN_EXTERNALS } from './scripts/electron-runtime-dependencies.mjs';
 import { copyCompanionPhoton } from './scripts/copy-companion-photon.mjs';
+import { documentWasmAssets } from './scripts/document-wasm-assets.mjs';
 
 // https://vitejs.dev/config/
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -350,14 +351,12 @@ export default defineConfig(async ({ command }) => {
               {
                 entry: 'src/main/documentReader/documentWorker.ts',
                 vite: {
+                  plugins: [documentWasmAssets(projectRoot)],
                   build: {
                     watch: command === 'serve' ? {} : null,
                     sourcemap: electronSourceMap,
                     outDir: 'dist-electron',
                     minify: false,
-                    rolldownOptions: {
-                      external: ['@firecrawl/anydoc-wasm'],
-                    },
                   },
                 },
                 onstart() {},

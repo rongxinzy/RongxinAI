@@ -27,9 +27,7 @@ function readDocument(filePath: string) {
       offset += count;
     }
 
-    const module = fs.readFileSync(
-      path.join(path.dirname(require.resolve('@firecrawl/anydoc-wasm')), 'anydoc_wasm_bg.wasm'),
-    );
+    const module = fs.readFileSync(path.join(__dirname, 'anydoc_wasm_bg.wasm'));
     initSync({ module });
     const input = bytes.subarray(0, offset);
     const format =

@@ -118,7 +118,7 @@ if (process.argv[2] === '--worker') {
   );
   const main = extractFile(archive, 'dist-electron/main.js').toString('utf8');
   assert.doesNotMatch(main, /\brequire\s*\(\s*['"]@firecrawl\/anydoc/);
-  assert.ok(statFile(archive, 'node_modules/@firecrawl/anydoc-wasm/anydoc_wasm_bg.wasm').size > 0);
+  assert.ok(statFile(archive, 'dist-electron/anydoc_wasm_bg.wasm').size > 0);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-installed-reader-'));
   try {
     const marker = path.join(scratch, 'worker-result');
