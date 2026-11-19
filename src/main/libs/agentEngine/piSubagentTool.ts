@@ -147,7 +147,7 @@ interface SubagentToolResult {
 const BUILTIN_AGENT_PROFILES: ReadonlyArray<Omit<SubagentProfile, 'source'>> = [
   {
     id: PiSubagentProfileId.Researcher,
-    description: 'Web and documentation research; produces findings with cited sources.',
+    description: 'Web/docs research with cited sources.',
     systemPrompt:
       'You are a research subagent. Investigate the assigned topic using the available ' +
       'web and documentation tools. Produce concise findings and cite a concrete source ' +
@@ -155,7 +155,7 @@ const BUILTIN_AGENT_PROFILES: ReadonlyArray<Omit<SubagentProfile, 'source'>> = [
   },
   {
     id: PiSubagentProfileId.Scout,
-    description: 'Local codebase recon: relevant files, entry points, data flow, risks.',
+    description: 'Read-only local codebase recon.',
     systemPrompt:
       'You are a code reconnaissance subagent. Explore the local workspace to map the ' +
       'files, entry points, and data flow relevant to the assigned task. Report concrete ' +
@@ -164,7 +164,7 @@ const BUILTIN_AGENT_PROFILES: ReadonlyArray<Omit<SubagentProfile, 'source'>> = [
   },
   {
     id: PiSubagentProfileId.Planner,
-    description: 'Turns existing context into a concrete implementation plan (read-only).',
+    description: 'Read-only implementation plan.',
     systemPrompt:
       'You are a planning subagent. Based on the existing context, produce a concrete, ' +
       'step-by-step implementation plan for the assigned task. You are read-only: never ' +
@@ -172,7 +172,7 @@ const BUILTIN_AGENT_PROFILES: ReadonlyArray<Omit<SubagentProfile, 'source'>> = [
   },
   {
     id: PiSubagentProfileId.Reviewer,
-    description: 'Reviews an implementation against the task or plan; reports findings.',
+    description: 'Code review against task or plan.',
     systemPrompt:
       'You are a code review subagent. Review the implementation against the assigned ' +
       'task or plan. Check correctness, test coverage, edge cases, and unnecessary ' +
@@ -548,12 +548,8 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
     name: PiSubagentToolName,
     label: 'Subagent',
     description:
-      'Delegate tasks to focused subagents with isolated context.\n' +
-      'Available agents:\n' +
-      agentList +
-      '\n\nModes (mutually exclusive):\n' +
-      '- Single: {agent, task} — delegate one task to one agent.\n' +
-      `- Parallel: {parallel: [{agent, task}, ...]} — run agents concurrently (max ${SUBAGENT_PARALLEL_LIMIT} at once).`,
+      `Delegate tasks to isolated subagents ({agent, task} or {parallel: [{agent, task}, ...]}, max ${SUBAGENT_PARALLEL_LIMIT} concurrent).\n` +
+      `Agents:\n${agentList}`,
     annotations: PiSubagentToolAnnotations,
 
     parameters: {
@@ -561,26 +557,20 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
       properties: {
         agent: {
           type: 'string',
-          description: `Agent to delegate to (single mode). Available: ${availableAgentIds}`,
+          description: 'Target agent id (single mode).',
         },
         task: {
           type: 'string',
-          description:
-            'Complete, self-contained task description with all necessary context (single mode).',
+          description: 'Self-contained task prompt (single mode).',
         },
         parallel: {
           type: 'array',
-          description:
-            'Parallel mode: independent {agent, task} entries run concurrently. ' +
-            'One failing entry does not affect the others.',
+          description: 'Concurrent {agent, task} jobs.',
           items: {
             type: 'object',
             properties: {
-              agent: {
-                type: 'string',
-                description: `Agent to delegate to. Available: ${availableAgentIds}`,
-              },
-              task: { type: 'string', description: 'Complete, self-contained task description.' },
+              agent: { type: 'string' },
+              task: { type: 'string' },
             },
             required: ['agent', 'task'],
             additionalProperties: false,

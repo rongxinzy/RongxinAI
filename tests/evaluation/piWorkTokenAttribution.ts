@@ -54,6 +54,30 @@ function measureMemory(content: unknown, knownBlocks: readonly string[]) {
   return { bytes, unpartitioned };
 }
 
+function extractUserText(content: unknown): string | null {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return null;
+  const texts: string[] = [];
+  for (const part of content) {
+    const record = object(part);
+    if (record.type !== 'text' || typeof record.text !== 'string') return null;
+    texts.push(record.text);
+  }
+  return texts.join('\n\n');
+}
+
+function isInjectedUserMemoryMessage(
+  messages: readonly unknown[],
+  index: number,
+  knownBlocks: readonly string[],
+): boolean {
+  if (index <= 0 || knownBlocks.length === 0) return false;
+  const message = object(messages[index]);
+  if (message.role !== 'user' || object(messages[index - 1]).role !== 'user') return false;
+  const text = extractUserText(message.content);
+  return text !== null && knownBlocks.some(block => text === block);
+}
+
 /**
  * Count disjoint components of Pi's OpenAI-compatible JSON request in UTF-8 bytes.
  * This measures the serialized request, not provider chat-template or tokenizer costs.
@@ -66,9 +90,12 @@ export function attributePiWorkRequest(
 ): PiWorkRequestByteAttribution {
   const request = object(payload);
   const messages: unknown[] = Array.isArray(request.messages) ? request.messages : [];
-  const currentUser = messages.findLastIndex(message => object(message).role === 'user');
   const knownBlocks = [...new Set(knownProjectMemory.filter(Boolean))].sort(
     (left, right) => right.length - left.length,
+  );
+  const currentUser = messages.findLastIndex(
+    (message, index) =>
+      object(message).role === 'user' && !isInjectedUserMemoryMessage(messages, index, knownBlocks),
   );
   let systemBytes = 0;
   let developerBytes = 0;
@@ -90,6 +117,8 @@ export function attributePiWorkRequest(
       messageBytes -= memory.bytes;
       if (message.role === 'system') systemBytes += messageBytes;
       else developerBytes += messageBytes;
+    } else if (isInjectedUserMemoryMessage(messages, index, knownBlocks)) {
+      projectMemoryBytes += messageBytes;
     } else if (index === currentUser) {
       currentUserBytes += messageBytes;
     } else {

@@ -194,16 +194,18 @@ test('subagent custom tool bubbles child events to host toolActivityTracker and 
   });
   expect(mockTracker.remove).toHaveBeenCalledWith('child-c1');
 
-  // Verify resource loader for subagents unlocks MCP & codemode (nativeToolsOnly: false)
+  // Verify resource loader for subagents stays isolated (nativeToolsOnly: true, isSubagent: true)
   subagentDeps.createPiResourceLoader('/work', 'system prompt', 4096);
   expect(loaderSpy).toHaveBeenCalledWith(
     host,
     expect.anything(),
     '/work',
     expect.objectContaining({
-      nativeToolsOnly: false,
+      nativeToolsOnly: true,
     }),
-    expect.anything(),
+    expect.objectContaining({
+      isSubagent: true,
+    }),
     undefined,
   );
 });

@@ -303,12 +303,13 @@ export function buildPiSessionCustomTools(
               fileToolsEnabled: true,
               unattended: resourceState.unattended,
               chatMode: resourceState.chatMode,
-              nativeToolsOnly: false,
+              nativeToolsOnly: true,
               expertSkillDirs: [],
               skillRoots: resolvePiSkillRoots(skillIds ?? [], resolveZhiyuanSkillDirs(), []),
             },
             {
               sessionId,
+              isSubagent: true,
               getRunId: () => host.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
               getApprovalMode: () =>
                 host.activeSessions.get(sessionId)?.approvalMode ??

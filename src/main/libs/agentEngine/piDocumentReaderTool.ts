@@ -29,16 +29,16 @@ const IMAGE_EXTENSIONS = new Set([
 
 export const PiDocumentReaderParameters = Type.Object({
   path: Type.String({
-    description: 'Path to a document or image relative to the current workspace.',
+    description: 'Workspace-relative path.',
   }),
   pages: Type.Optional(
     Type.String({
-      description: 'Optional 1-based PDF page range (for example "1-5" or "1,3").',
+      description: '1-based PDF pages, e.g. 1-5.',
     }),
   ),
   language: Type.Optional(
     Type.String({
-      description: 'Optional BCP-47 OCR language tag when local OCR runs (default zh-Hans-CN).',
+      description: 'OCR BCP-47 tag (default zh-Hans-CN).',
     }),
   ),
 });
@@ -234,12 +234,10 @@ export function buildPiDocumentReaderTool(options: {
     name: PiDocumentReaderToolName,
     label: 'Read Document',
     description:
-      'Read a workspace Office document (.doc, .docx, .ppt, .pptx, .xls, .xlsx), PDF, EPUB, RTF, CSV, or (on Windows) image as structured text/Markdown. ' +
-      'Local and read-only. On Windows, PDF pages without usable text fall back to local OCR.',
-    promptSnippet: 'Read workspace PDF, Office documents, or local OCR text',
+      'Read workspace Office (.docx/.pptx/.xlsx/.doc/.ppt/.xls), PDF, EPUB, RTF, CSV, or (Windows) image text; scanned PDFs use local OCR.',
+    promptSnippet: 'Read Office/PDF documents or local OCR text.',
     promptGuidelines: [
-      'Use `read_document` for Office/PDF documents rather than `read` or shell scripts; use `read` for plain text, source code, and vision-model image inspection.',
-      'Local OCR returns text only (not layout, colors, or chart shapes); if OCR returns empty text, report that no readable text was found.',
+      'Use `read_document` for Office/PDF files (use `read` for text/code/vision images). Local OCR returns plain text only—if empty, state no readable text was found.',
     ],
     parameters: PiDocumentReaderParameters,
     outputSchema: PiDocumentReaderOutputSchema,

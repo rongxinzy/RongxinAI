@@ -319,6 +319,8 @@ export interface PiResourceState {
   chatMode: boolean;
   /** Child sessions expose native tools, without the host's custom tools. */
   nativeToolsOnly?: boolean;
+  /** Child subagent sessions skip parent memory and plan injection. */
+  isSubagent?: boolean;
   /** Bundled preset skill dirs for the session's experts (file-sourced, live). */
   expertSkillDirs: string[];
   skillRoots: Record<string, string>;

@@ -65,6 +65,19 @@ export function classifyWorkbenchToolRisk(
 ): WorkbenchApprovalRiskLevel {
   const normalizedName = toolName.trim().toLowerCase();
 
+  // 0. Arbitrary Python execution / package installation stays sensitive (Ask/Auto prompt).
+  if (normalizedName === 'python_execute' || normalizedName === 'python_install') {
+    return WorkbenchApprovalRiskLevel.Unknown;
+  }
+
+  // Action-scoped risk for memory: read-only recall/list vs state-mutating save/propose_personal.
+  if (normalizedName === 'memory') {
+    const action = typeof input.action === 'string' ? input.action.trim().toLowerCase() : '';
+    return action === 'recall' || action === 'list'
+      ? WorkbenchApprovalRiskLevel.ReadOnly
+      : WorkbenchApprovalRiskLevel.Reversible;
+  }
+
   // 1. Direct evaluation from ToolAnnotations
   if (annotations) {
     if (annotations.readOnlyHint === true) {

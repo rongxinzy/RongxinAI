@@ -86,11 +86,6 @@ import type {
 
 // ── PiRuntimeAdapter ──
 
-// Force ANSI color output from CLI tools (npm, git, jest, etc.) run by
-// Pi's bash tool.  Pi executes commands via spawn + pipe, so TTY-aware
-// tools won't emit escape sequences without this env var.
-if (!process.env.FORCE_COLOR) process.env.FORCE_COLOR = '1';
-
 export class PiRuntimeAdapter
   extends PiRuntimeServiceBindings
   implements PiRuntime, PiRuntimeAdapterHost

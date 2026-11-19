@@ -117,10 +117,29 @@ function replaceWithNativeInstructions(
   };
 }
 
+function extractText(content: unknown): string | null {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return null;
+  const parts: string[] = [];
+  for (const item of content) {
+    if (
+      item &&
+      typeof item === 'object' &&
+      (item as { type?: unknown }).type === 'text' &&
+      typeof (item as { text?: unknown }).text === 'string'
+    ) {
+      parts.push((item as { text: string }).text);
+    } else {
+      return null;
+    }
+  }
+  return parts.join('\n\n');
+}
+
 function removeMemory(request: LivePiRequest, blocks: readonly string[]): LivePiRequest {
   if (!blocks.length) throw new Error('Synthetic memory fixture had no emitted blocks.');
   let replacements = 0;
-  const changed = rewriteInstructions(request, content => {
+  const strippedInstructions = rewriteInstructions(request, content => {
     for (const block of blocks) {
       if (content.includes(`\n\n${block}`)) {
         content = content.replace(`\n\n${block}`, '');
@@ -131,6 +150,21 @@ function removeMemory(request: LivePiRequest, blocks: readonly string[]): LivePi
     }
     return content;
   });
+  const sourceMessages = strippedInstructions.messages ?? [];
+  const filteredMessages = sourceMessages.filter((message, index) => {
+    if (message.role === 'user' && index > 0 && sourceMessages[index - 1]?.role === 'user') {
+      const text = extractText(message.content);
+      if (text !== null && blocks.includes(text)) {
+        replacements += 1;
+        return false;
+      }
+    }
+    return true;
+  });
+  const changed =
+    filteredMessages.length === sourceMessages.length
+      ? strippedInstructions
+      : { ...strippedInstructions, messages: filteredMessages };
   if (replacements !== blocks.length)
     throw new Error('Could not isolate exact synthetic memory block.');
   return changed;

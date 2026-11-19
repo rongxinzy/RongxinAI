@@ -6,6 +6,7 @@ import { expect, test, vi } from 'vitest';
 import { PythonRuntimeService } from '../../pythonRuntime/service';
 import {
   buildPiPythonTools,
+  PI_PYTHON_TOOL_MAX_OUTPUT_CHARS,
   PiPythonToolName,
   type PiPythonToolAuthorizationCall,
 } from './piPythonTools';
@@ -126,6 +127,72 @@ test('python_execute surfaces non-zero exit codes as tool errors with serialized
     await expect(executeTool.execute('call-1', { code: '1/0' })).rejects.toThrow(
       'ZeroDivisionError',
     );
+  } finally {
+    await service.shutdown();
+  }
+});
+
+test('bounds oversized python_execute stdout and traceback stderr within PI_PYTHON_TOOL_MAX_OUTPUT_CHARS as valid JSON', async () => {
+  const service = new PythonRuntimeService({
+    storageRoot: '/unused',
+    runnerPath: '/must-not-run',
+  });
+  const bigStdout = 'PY-HEAD-' + 'x'.repeat(200_000) + '-PY-TAIL';
+  const traceback = 'Traceback (most recent call last):\nValueError: boom';
+  const spy = vi.spyOn(service, 'execute');
+
+  const tools = buildPiPythonTools({
+    service,
+    workspace: '/workspace',
+  }) as unknown as ExecutableTool[];
+  const executeTool = tools.find(tool => tool.name === PiPythonToolName.Execute)!;
+
+  try {
+    spy.mockResolvedValueOnce({
+      stdout: bigStdout,
+      stderr: '',
+      exitCode: 0,
+      truncated: false,
+      environmentId: 'env-1',
+      runtimeId: 'rt-1',
+    });
+    const okRes = await executeTool.execute('call-ok', { code: 'print(1)' });
+    const parsedOk = JSON.parse(okRes.content[0].text) as {
+      stdout: string;
+      stderr: string;
+      truncated: boolean;
+    };
+    expect(parsedOk.truncated).toBe(true);
+    expect(parsedOk.stdout.length + parsedOk.stderr.length).toBeLessThanOrEqual(
+      PI_PYTHON_TOOL_MAX_OUTPUT_CHARS,
+    );
+    expect(parsedOk.stdout).toContain('PY-HEAD-');
+    expect(parsedOk.stdout).toContain('-PY-TAIL');
+
+    spy.mockResolvedValueOnce({
+      stdout: bigStdout,
+      stderr: traceback,
+      exitCode: 1,
+      truncated: false,
+      environmentId: 'env-1',
+      runtimeId: 'rt-1',
+    });
+    let thrown = '';
+    try {
+      await executeTool.execute('call-err', { code: 'raise ValueError("boom")' });
+    } catch (err) {
+      thrown = err instanceof Error ? err.message : String(err);
+    }
+    const parsedErr = JSON.parse(thrown) as {
+      stdout: string;
+      stderr: string;
+      truncated: boolean;
+    };
+    expect(parsedErr.truncated).toBe(true);
+    expect(parsedErr.stdout.length + parsedErr.stderr.length).toBeLessThanOrEqual(
+      PI_PYTHON_TOOL_MAX_OUTPUT_CHARS,
+    );
+    expect(parsedErr.stderr).toBe(traceback);
   } finally {
     await service.shutdown();
   }

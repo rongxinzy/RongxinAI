@@ -8,7 +8,11 @@ import { beforeEach, expect, test, vi } from 'vitest';
 
 vi.mock('../skillRuntimeRunner', () => ({ runManagedSkillScript: vi.fn() }));
 import { runManagedSkillScript, type SkillScriptRunResult } from '../skillRuntimeRunner';
-import { buildPiSkillScriptTool, PiSkillScriptToolName } from './piSkillScriptTool';
+import {
+  buildPiSkillScriptTool,
+  PI_SKILL_SCRIPT_MAX_OUTPUT_CHARS,
+  PiSkillScriptToolName,
+} from './piSkillScriptTool';
 import { PiToolEventType } from './constants';
 import { PiMessageRole } from './piSubagentExecution';
 import { PiAssistantStopReason, PiContentBlockType } from './piToolConstants';
@@ -181,4 +185,49 @@ test('reads the current selection and root when a skill is added during executio
   await expect(tool.execute('removed', { skillId: 'pdf', script: 'check.py' })).rejects.toThrow(
     'SKILL_NOT_SELECTED',
   );
+});
+
+test('caps oversized stdout/stderr within PI_SKILL_SCRIPT_MAX_OUTPUT_CHARS on success and failure', async () => {
+  const bigStdout = 'STDOUT-HEAD-' + 'x'.repeat(200_000) + '-STDOUT-TAIL';
+  const bigStderr = 'STDERR-HEAD-' + 'y'.repeat(200_000) + '-TRACEBACK-END';
+
+  const tool = buildPiSkillScriptTool({
+    workspaceRoot: '/workspace',
+    allowedSkillIds: ['pdf'],
+  }) as unknown as AgentTool;
+
+  vi.mocked(runManagedSkillScript).mockResolvedValue({
+    ...result,
+    ok: true,
+    status: 'completed',
+    exitCode: 0,
+    error: undefined,
+    errorCode: undefined,
+    stdout: bigStdout,
+    stderr: '',
+  });
+  const okResult = await tool.execute('ok-large', { skillId: 'pdf', script: 'check.py' });
+  const okText = (okResult.content[0] as { text: string }).text;
+  expect(okText.length).toBeLessThanOrEqual(PI_SKILL_SCRIPT_MAX_OUTPUT_CHARS);
+  expect(okText).toContain('STDOUT-HEAD-');
+  expect(okText).toContain('-STDOUT-TAIL');
+
+  vi.mocked(runManagedSkillScript).mockResolvedValue({
+    ...result,
+    ok: false,
+    status: 'failed',
+    errorCode: 'SKILL_SCRIPT_FAILED',
+    error: 'exit code 1',
+    stdout: bigStdout,
+    stderr: bigStderr,
+  });
+  let errMessage = '';
+  try {
+    await tool.execute('err-large', { skillId: 'pdf', script: 'check.py' });
+  } catch (err) {
+    errMessage = err instanceof Error ? err.message : String(err);
+  }
+  expect(errMessage.length).toBeLessThanOrEqual(PI_SKILL_SCRIPT_MAX_OUTPUT_CHARS);
+  expect(errMessage).toContain('SKILL_SCRIPT_FAILED');
+  expect(errMessage).toContain('-TRACEBACK-END');
 });

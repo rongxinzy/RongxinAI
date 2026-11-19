@@ -44,6 +44,16 @@ interface PiBeforeAgentStartEvent {
   systemPromptOptions: PiBeforeAgentStartSystemPromptOptions;
 }
 
+interface PiBeforeAgentStartCustomMessage {
+  customType: string;
+  content: string;
+  display: boolean;
+}
+
+interface PiBeforeAgentStartResult {
+  message?: PiBeforeAgentStartCustomMessage;
+}
+
 export interface BeforeProviderHeadersEvent {
   type: 'before_provider_headers';
   headers: Record<string, string | null>;
@@ -78,7 +88,9 @@ export interface PiExtensionApi {
   ): void;
   on(
     event: typeof PiExtensionEventType.BeforeAgentStart,
-    handler: (event: PiBeforeAgentStartEvent) => void | Promise<void>,
+    handler: (
+      event: PiBeforeAgentStartEvent,
+    ) => PiBeforeAgentStartResult | void | Promise<PiBeforeAgentStartResult | void>,
   ): void;
   on(
     event: typeof PiExtensionEventType.BeforeProviderHeaders | 'before_provider_headers',

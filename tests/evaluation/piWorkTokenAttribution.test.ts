@@ -103,3 +103,25 @@ test('keeps the raw request byte total and rejects a number too small for its co
   );
   expect(() => attributePiWorkRequest(payload, 0)).toThrow('does not reconcile');
 });
+
+test('attributes turn-scoped custom user memory messages without disturbing currentUserBytes', () => {
+  const system = { role: 'system', content: '产品行为' };
+  const currentUser = { role: 'user', content: [{ type: 'text', text: '请执行' }] };
+  const injectedMemory = { role: 'user', content: [{ type: 'text', text: knownMemory }] };
+  const payload = {
+    model: 'test',
+    stream: true,
+    messages: [system, currentUser, injectedMemory],
+  };
+  const measured = attributePiWorkRequest(payload, jsonBytes(payload), [knownMemory]);
+  expect(measured).toMatchObject({
+    requestBytes: jsonBytes(payload),
+    systemBytes: jsonBytes(system),
+    developerBytes: 0,
+    projectMemoryBytes: jsonBytes(injectedMemory),
+    memoryAttribution: 'matched',
+    toolsBytes: 0,
+    currentUserBytes: jsonBytes(currentUser),
+    historyBytes: 0,
+  });
+});

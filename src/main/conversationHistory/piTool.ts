@@ -5,12 +5,12 @@ import { CONVERSATION_HISTORY_TOOL_NAME } from './constants';
 import type { ConversationHistoryService } from './service';
 
 export const ConversationHistoryParameters = Type.Object({
-  query: Type.String({ description: 'Text or keywords to search in conversation history.' }),
+  query: Type.String({ description: 'Search text or keywords.' }),
   limit: Type.Optional(
     Type.Integer({
       minimum: 1,
       maximum: 100,
-      description: 'Maximum number of matching message excerpts.',
+      description: 'Max matched excerpts.',
     }),
   ),
 });
@@ -46,11 +46,8 @@ export function buildPiConversationHistoryTool(input: {
   return {
     name: CONVERSATION_HISTORY_TOOL_NAME,
     label: 'Conversation History',
-    description:
-      'Search raw user and assistant messages from conversations in the current project. ' +
-      'This is separate from durable memory and excludes thinking and tool output.',
-    promptSnippet:
-      'Use conversation_history when the user asks for details from prior conversations that may not be durable memory.',
+    description: 'Search prior user/assistant messages in this project (excluding durable memory).',
+    promptSnippet: 'Search prior project conversation messages.',
     parameters: ConversationHistoryParameters,
     outputSchema: ConversationHistoryOutputSchema,
     annotations: ConversationHistoryAnnotations,

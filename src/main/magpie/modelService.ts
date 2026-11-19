@@ -98,6 +98,7 @@ export interface MagpieModelServiceOptions {
 }
 export class MagpieModelService {
   private latestModels: MagpieModel[] = [];
+  private latestProviders: MagpieProviderSummary[] = [];
 
   constructor(
     private readonly backend: MagpieModelBackend,
@@ -114,6 +115,16 @@ export class MagpieModelService {
   /** Last catalog projection, for synchronous capability reads between turns. */
   peekModel(modelId: string): MagpieModel | undefined {
     return this.latestModels.find(model => model.id === modelId);
+  }
+
+  /** Last provider projection matching a catalog model id, if known. */
+  peekProviderForModel(modelId: string): MagpieProviderSummary | undefined {
+    const enabled = this.latestProviders.filter(provider => !provider.off);
+    return (
+      enabled.find(provider => modelId.startsWith(`${provider.id}/`)) ??
+      enabled.find(provider => provider.models.includes(modelId)) ??
+      enabled.find(provider => provider.fallback?.includes(modelId))
+    );
   }
   async catalog(): Promise<MagpieModelCatalog> {
     const status = this.backend.status();
@@ -142,6 +153,7 @@ export class MagpieModelService {
     }
     const models = sanitizeCatalogModelsForPrivateProviders(rawModels, providers);
     this.latestModels = models;
+    this.latestProviders = providers;
     const current = this.backend.status();
     if (current.state !== 'running' || current.gatewayUrl !== status.gatewayUrl)
       throw new Error('Model service changed while reading its catalog. Try again.');
@@ -168,9 +180,12 @@ export class MagpieModelService {
       };
     }
   }
-  async resolve(
-    modelRef?: string,
-  ): Promise<{ model: MagpieModel; catalog: MagpieModelCatalog; gatewayUrl: string }> {
+  async resolve(modelRef?: string): Promise<{
+    model: MagpieModel;
+    catalog: MagpieModelCatalog;
+    gatewayUrl: string;
+    provider?: MagpieProviderSummary;
+  }> {
     await this.backend.ensureRunning?.();
     const catalog = await this.catalog();
     if (catalog.status.state !== 'running' || !catalog.status.gatewayUrl)
@@ -178,6 +193,7 @@ export class MagpieModelService {
     const id = modelRef?.trim() || catalog.defaultModelId;
     if (!id) throw new Error('Choose a default model in model settings before starting a task.');
     let model = catalog.models.find(candidate => candidate.id === id);
+    let fallbackProvider: MagpieProviderSummary | undefined;
     if (!model && this.backend.providers) {
       try {
         const providers = await this.backend.providers();
@@ -191,6 +207,7 @@ export class MagpieModelService {
                 if (!endpoints.includes('/v1/messages')) continue;
               }
               model = candidate;
+              fallbackProvider = provider;
               break;
             }
           }
@@ -203,7 +220,12 @@ export class MagpieModelService {
       throw new Error(
         'The selected model is no longer available or is restricted. Choose a model in model settings.',
       );
-    return { model, catalog, gatewayUrl: catalog.status.gatewayUrl };
+    return {
+      model,
+      catalog,
+      gatewayUrl: catalog.status.gatewayUrl,
+      provider: this.peekProviderForModel(model.id) ?? fallbackProvider,
+    };
   }
 
   /** Companion requests use existing consent and policy, without changing the global default. */

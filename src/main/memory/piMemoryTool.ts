@@ -18,11 +18,8 @@ export function buildPiProjectMemoryTool(input: {
   return {
     name: 'memory',
     label: 'Memory',
-    description:
-      'Recall workspace, current-session, and confirmed personal memory; explicitly save durable workspace memory; ' +
-      'list controlled active memory; or propose personal memory for user review.',
-    promptSnippet:
-      'Use memory to recall prior workspace decisions or save durable facts only when they are useful later.',
+    description: 'Recall, list, save workspace memory, or propose personal memory for review.',
+    promptSnippet: 'Recall or save durable project/personal memory.',
     parameters: {
       type: 'object',
       properties: {
@@ -31,24 +28,23 @@ export function buildPiProjectMemoryTool(input: {
           enum: Object.values(PiMemoryAction),
           description: 'recall, list, save, or propose_personal',
         },
-        query: { type: 'string', description: 'Search query for recall.' },
-        limit: { type: 'number', description: 'Maximum number of memories to list.' },
-        title: { type: 'string', description: 'Short title for a saved workspace memory.' },
-        content: { type: 'string', description: 'Proposed atomic memory content.' },
-        topicKey: { type: 'string', description: 'Stable topic key for workspace memory upsert.' },
+        query: { type: 'string', description: 'Recall search query.' },
+        limit: { type: 'number', description: 'Max listed items.' },
+        title: { type: 'string', description: 'Memory title.' },
+        content: { type: 'string', description: 'Atomic memory content.' },
+        topicKey: { type: 'string', description: 'Workspace upsert topic key.' },
         supersedesMemoryId: {
           type: 'number',
-          description: 'Active Personal observation ID replaced by the proposed Personal memory.',
+          description: 'Personal ID replaced by proposal.',
         },
         promotesMemoryId: {
           type: 'number',
-          description:
-            'Active Project observation from this workspace, or Session observation from this session, promoted into Personal memory without replacing the source.',
+          description: 'Project/Session ID promoted to Personal.',
         },
         kind: {
           type: 'string',
           enum: [EngramObservationType.Decision, EngramObservationType.Preference],
-          description: 'Memory kind for save.',
+          description: 'Save memory kind.',
         },
       },
       required: ['action'],

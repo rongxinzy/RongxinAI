@@ -19,22 +19,22 @@ export function buildPiScheduledTaskTool(input: {
     name: 'scheduled_task',
     label: 'Scheduled Task',
     description:
-      'Create a scheduled task after confirming the task content, schedule, and notification method with the user. Delivery defaults to this conversation when the session has one; pass delivery only to override it.',
+      'Create a scheduled task after confirming content, schedule, and delivery (defaults to active conversation).',
+    promptSnippet: 'Create a one-time, interval, or cron scheduled task.',
     parameters: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Short task name.' },
-        description: { type: 'string', description: 'What the task does.' },
+        name: { type: 'string', description: 'Task name.' },
+        description: { type: 'string', description: 'Task summary.' },
         schedule: {
           type: 'object',
           description:
-            'Schedule: {kind:"at",at} or {kind:"cron",expr,tz} or {kind:"every",everyMs}. For "at", use a future ISO timestamp with an explicit timezone offset.',
+            '{kind:"at",at}|{kind:"cron",expr,tz}|{kind:"every",everyMs}. For "at", use a future ISO timestamp with an explicit timezone offset.',
         },
-        message: { type: 'string', description: 'Prompt executed when the task runs.' },
+        message: { type: 'string', description: 'Prompt executed on trigger.' },
         delivery: {
           type: 'object',
-          description:
-            'Optional delivery: {mode:"none"|"announce"|"webhook",channel,to,accountId}.',
+          description: 'Optional {mode:"none"|"announce"|"webhook",channel,to,accountId}.',
         },
       },
       required: ['name', 'schedule', 'message'],

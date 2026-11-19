@@ -9,53 +9,22 @@ import type { ProjectMemoryService } from '../memory/projectMemoryService';
 
 const SessionSummaryToolName = 'session_summary';
 
-const SessionSummaryPromptSnippet =
-  'Write a session checkpoint (goal, accomplishments, discoveries, next steps, relevant files), or explicitly skip it with a reason.';
-
-const SessionSummaryPromptGuidelines = [
-  'When you finish a task with substantive output, write one session checkpoint with `session_summary`: goal, what was accomplished, discoveries, next steps, relevant files. The host injects session/run identity; you only write the content.',
-  'Write it from your current context, not by re-reading the transcript. Do not call any other model or tool to summarize.',
-  'If the turn produced nothing worth remembering, call `session_summary` with `skip: true` and a short reason instead of writing empty content. Skip is an explicit, valid outcome, not an omission.',
-];
+const SessionSummaryPromptSnippet = 'Record a session checkpoint after substantial work.';
 
 const RelevantFileItemSchema = Type.Object({
-  path: Type.String({ description: 'Workspace-relative file path.' }),
-  role: Type.Optional(Type.String({ description: 'Role of the file in the turn.' })),
+  path: Type.String(),
+  role: Type.Optional(Type.String()),
 });
 
 export const SessionSummaryParameters = Type.Object({
-  goal: Type.Optional(Type.String({ description: 'What this turn/task was working on.' })),
-  instructions: Type.Optional(
-    Type.String({
-      description: 'User preferences or constraints discovered.',
-    }),
-  ),
-  discoveries: Type.Optional(
-    Type.Array(Type.String(), {
-      description: 'Technical findings, gotchas, non-obvious learnings.',
-    }),
-  ),
-  accomplished: Type.Optional(Type.String({ description: 'Completed items with key details.' })),
-  nextSteps: Type.Optional(
-    Type.Array(Type.String(), {
-      description: 'What remains to be done for the next session.',
-    }),
-  ),
-  relevantFiles: Type.Optional(
-    Type.Array(RelevantFileItemSchema, {
-      description: 'Files central to the work, with optional role notes.',
-    }),
-  ),
-  skip: Type.Optional(
-    Type.Boolean({
-      description: 'Set true when this turn produced nothing worth remembering.',
-    }),
-  ),
-  reason: Type.Optional(
-    Type.String({
-      description: 'Reason for skipping or context for the checkpoint.',
-    }),
-  ),
+  goal: Type.Optional(Type.String()),
+  instructions: Type.Optional(Type.String()),
+  discoveries: Type.Optional(Type.Array(Type.String())),
+  accomplished: Type.Optional(Type.String()),
+  nextSteps: Type.Optional(Type.Array(Type.String())),
+  relevantFiles: Type.Optional(Type.Array(RelevantFileItemSchema)),
+  skip: Type.Optional(Type.Boolean()),
+  reason: Type.Optional(Type.String()),
 });
 
 const SessionSummaryAnnotations: ToolAnnotations = {
@@ -112,9 +81,8 @@ export function buildSessionSummaryTool(
     name: SessionSummaryToolName,
     label: 'Session Summary',
     description:
-      'Write a session checkpoint (goal, accomplishments, discoveries, next steps, relevant files), or explicitly skip it with a reason. The host persists it with session/run identity and sequence; no separate summarization call happens.',
+      'Optionally write one concise session checkpoint from current context after substantial multi-step work or durable deliverables (or set skip=true with reason). Do not call on simple Q&A or minor edits.',
     promptSnippet: SessionSummaryPromptSnippet,
-    promptGuidelines: [...SessionSummaryPromptGuidelines],
     parameters: SessionSummaryParameters,
     outputSchema: SessionSummaryOutputSchema,
     annotations: SessionSummaryAnnotations,

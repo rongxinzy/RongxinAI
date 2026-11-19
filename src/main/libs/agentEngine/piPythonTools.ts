@@ -3,6 +3,9 @@ import { Type, type Static } from 'typebox';
 
 import type { PythonExecutionResult } from '../../../shared/pythonRuntime';
 import type { PythonRuntimeService } from '../../pythonRuntime/service';
+import { PI_CUSTOM_TOOL_MAX_OUTPUT_CHARS, truncateToolTextHeadTail } from './piToolOutputLimit';
+
+export const PI_PYTHON_TOOL_MAX_OUTPUT_CHARS = PI_CUSTOM_TOOL_MAX_OUTPUT_CHARS;
 
 export const PiPythonToolName = {
   Execute: 'python_execute',
@@ -67,23 +70,44 @@ const PiPythonInstallParameters = Type.Object({
   packages: Type.Array(
     Type.String({
       maxLength: 200,
-      description:
-        'PyPI package name or version constraints, such as packaging or requests>=2.31,<3.',
+      description: 'PyPI wheel spec (e.g. packaging, requests>=2.31,<3).',
     }),
     { maxItems: 40 },
   ),
-  rebuild: Type.Optional(Type.Boolean()),
+  rebuild: Type.Optional(
+    Type.Boolean({ description: 'Set true only when explicitly asked to rebuild.' }),
+  ),
 });
 
 const formatResult = (result: PythonExecutionResult): PiPythonToolResult => {
-  const text = JSON.stringify(result);
-  if (result.exitCode !== 0) {
+  let boundedResult = result;
+  if (result.stdout.length + result.stderr.length > PI_PYTHON_TOOL_MAX_OUTPUT_CHARS) {
+    // Preserve tracebacks/errors by sizing stderr first, then assigning the remainder to stdout.
+    const stderrBudget = Math.min(
+      result.stderr.length,
+      Math.max(
+        Math.floor(PI_PYTHON_TOOL_MAX_OUTPUT_CHARS * 0.5),
+        PI_PYTHON_TOOL_MAX_OUTPUT_CHARS - result.stdout.length,
+      ),
+    );
+    const stdoutBudget = Math.max(0, PI_PYTHON_TOOL_MAX_OUTPUT_CHARS - stderrBudget);
+    const clippedStderr = truncateToolTextHeadTail(result.stderr, stderrBudget);
+    const clippedStdout = truncateToolTextHeadTail(result.stdout, stdoutBudget);
+    boundedResult = {
+      ...result,
+      stdout: clippedStdout.text,
+      stderr: clippedStderr.text,
+      truncated: result.truncated || clippedStdout.truncated || clippedStderr.truncated,
+    };
+  }
+  const text = JSON.stringify(boundedResult);
+  if (boundedResult.exitCode !== 0) {
     throw new Error(text);
   }
   return {
     content: [{ type: 'text', text }],
-    details: result,
-    structuredContent: result,
+    details: boundedResult,
+    structuredContent: boundedResult,
   };
 };
 
@@ -113,9 +137,8 @@ export function buildPiPythonTools(options: PiPythonToolsOptions): ToolDefinitio
     name: PiPythonToolName.Execute,
     label: 'Python Execute',
     description:
-      "Product interface python.execute: execute Python code using this workspace's managed environment, including the bundled office/PDF core and its workspace-specific packages. Returns stdout, stderr and exit code. This is local execution with user permissions, not a filesystem sandbox. Use python_install (python.install) for additional packages.",
-    promptSnippet:
-      "Execute Python code using the bundled core and this workspace's additional packages.",
+      'Execute Python in the managed workspace venv (bundled office/PDF libs + installed wheels). Returns {stdout, stderr, exitCode}.',
+    promptSnippet: 'Execute Python in the workspace managed environment.',
     parameters: PiPythonExecuteParameters,
     outputSchema: PiPythonOutputSchema,
     annotations: PiPythonExecuteAnnotations,
@@ -146,12 +169,8 @@ export function buildPiPythonTools(options: PiPythonToolsOptions): ToolDefinitio
     name: PiPythonToolName.Install,
     label: 'Python Install',
     description:
-      'Product interface python.install: install PyPI wheel packages into this workspace only. Accepts package names or version constraints and locks resolved versions. URLs, local paths and command-line flags are not supported. Installation creates a new environment and switches only after success. Set rebuild=true only when the user explicitly asks to rebuild; existing environment directories are retained.',
-    promptSnippet:
-      'Install PyPI wheel packages by name or version constraints into this workspace.',
-    promptGuidelines: [
-      'Set `rebuild=true` only when the user explicitly asks to rebuild; existing environment directories are retained.',
-    ],
+      'Install PyPI wheel packages by name or version spec into this workspace venv (no URLs or local paths).',
+    promptSnippet: 'Install PyPI wheel packages into the workspace venv.',
     parameters: PiPythonInstallParameters,
     outputSchema: PiPythonOutputSchema,
     annotations: PiPythonInstallAnnotations,
