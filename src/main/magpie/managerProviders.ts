@@ -1,6 +1,7 @@
 import type { MagpieManagerOptions } from './managerOptions';
 import {
   HOST_PROVIDER_PREFIX,
+  RETIRED_STRATA_HOST_PROVIDER_ID,
   hostProviderPayload,
   type MagpieHostProvider,
 } from './hostProviders';
@@ -69,6 +70,28 @@ export class MagpieManagerProviders {
     this.cachedActiveProviderCount = 0;
   }
 
+  /** Retire the managed provider persisted by older Windows installations. */
+  async disableRetiredStrataProvider(signal: AbortSignal): Promise<void> {
+    const state = await this.context.managementJson('/api/providers', { signal });
+    const providers: { id?: string; off?: boolean }[] = Array.isArray(state.providers)
+      ? state.providers
+      : [];
+    if (
+      providers.some(provider => provider?.id === RETIRED_STRATA_HOST_PROVIDER_ID && !provider.off)
+    ) {
+      await this.context.managementJson(
+        '/api/provider/off',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: RETIRED_STRATA_HOST_PROVIDER_ID }),
+          signal,
+        },
+        2_000,
+      );
+    }
+  }
+
   /** Main-only authoritative host binding snapshot; external Provider credentials never enter here. */
   syncHostProviders(definitions: readonly MagpieHostProvider[]): Promise<void> {
     const payloads = definitions.map(hostProviderPayload);
@@ -81,24 +104,26 @@ export class MagpieManagerProviders {
         await this.context.ensureRunning();
         // Discover only reserved ids. Do not forward or log the management response.
         const state = await this.context.managementJson('/api/providers');
-        const existing = new Set<string>(
+        const existing = new Map<string, boolean>(
           (Array.isArray(state.providers) ? state.providers : []).flatMap((p: unknown) =>
             p &&
             typeof p === 'object' &&
             'id' in p &&
             typeof p.id === 'string' &&
             p.id.startsWith(HOST_PROVIDER_PREFIX)
-              ? [p.id]
+              ? [[p.id, 'off' in p && p.off === true]]
               : [],
           ),
         );
-        for (const id of existing) {
+        for (const [id, off] of existing) {
           if (!ids.has(id)) {
-            await this.context.managementJson('/api/provider/off', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id }),
-            });
+            if (!off) {
+              await this.context.managementJson('/api/provider/off', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id }),
+              });
+            }
             this.hostSignatures.delete(id);
           }
         }

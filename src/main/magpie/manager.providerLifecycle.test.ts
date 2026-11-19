@@ -3,7 +3,57 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs/promises';
 
 import { setup } from './manager.testHarness';
+import { RETIRED_STRATA_HOST_PROVIDER_ID } from './hostProviders';
+
 describe('Magpie provider lifecycle', () => {
+  it('retires a previously enabled Strata binding without exposing it or delaying Windows startup', async () => {
+    const { manager, root, fetcher } = await setup(undefined, undefined, undefined, {
+      managerOptions: { platform: 'win32' },
+    });
+    const modelId = `${RETIRED_STRATA_HOST_PROVIDER_ID}/old-model`;
+    const offRequested = Promise.withResolvers<unknown>();
+    const allowDisable = Promise.withResolvers<void>();
+    const offFinished = Promise.withResolvers<void>();
+    const originalFetch = fetcher.getMockImplementation();
+    fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/api/providers')) {
+        return Response.json({
+          providers: [
+            { id: RETIRED_STRATA_HOST_PROVIDER_ID, off: false },
+            { id: 'custom-openai', off: false },
+          ],
+        });
+      }
+      if (url.endsWith('/v1/models')) {
+        return Response.json({
+          data: [{ id: modelId }, { id: 'custom-openai/current-model' }],
+        });
+      }
+      if (url.endsWith('/api/provider/off')) {
+        offRequested.resolve(JSON.parse(String(init?.body)));
+        await allowDisable.promise;
+        offFinished.resolve();
+        return Response.json({ ok: true });
+      }
+      return originalFetch ? await originalFetch(url, init) : Response.json({});
+    });
+    try {
+      expect((await manager.start()).state).toBe('running');
+      await expect(offRequested.promise).resolves.toEqual({ id: RETIRED_STRATA_HOST_PROVIDER_ID });
+      expect((await manager.providers()).map(provider => provider.id)).toEqual(['custom-openai']);
+      expect((await manager.models()).map(model => model.id)).toEqual([
+        'custom-openai/current-model',
+      ]);
+    } finally {
+      allowDisable.resolve();
+      if (fetcher.mock.calls.some(([url]) => url.endsWith('/api/provider/off'))) {
+        await offFinished.promise;
+      }
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('resets provider hydration after host sync so diagnostics refetches providers', async () => {
     const { manager, root, fetcher } = await setup();
     let providersListFetches = 0;

@@ -276,6 +276,13 @@ export class MagpieManager implements MagpieRoutingGateway {
           const data = (await hello.json()) as { name?: string; version?: string };
           const web = await this.webRequest('/', { signal });
           if (data.name === 'magpie' && data.version === MAGPIE_VERSION && web.ok && !exited) {
+            if ((this.options.platform ?? process.platform) === 'win32') {
+              void this.providerOperations.disableRetiredStrataProvider(signal).catch(error => {
+                if (!signal.aborted) {
+                  console.warn('[Magpie] Failed to disable the retired local provider:', error);
+                }
+              });
+            }
             this.failedGatewayPorts.clear();
             this.state = { state: 'running', version: MAGPIE_VERSION, gatewayUrl };
             void this.agentOperations.reapplyManagedAgentsAfterStart();

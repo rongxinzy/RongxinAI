@@ -52,11 +52,16 @@ afterEach(() => {
 test('validates all recovery rows against the current component contract before mutation', () => {
   const source = fs.readFileSync(scriptPath, 'utf8');
   expect(source).toContain(
-    "$state -cnotmatch '^(?:channel-runtime|mcps|python|skill-python|skills|uv|llamacpp-bundled|strata-bundled)\\|(?:True|False)\\z'",
+    '$statePattern = "^(?:channel-runtime|mcps|python|skill-python|skills|uv|llamacpp-bundled|$retiredComponentKey)\\|(?:True|False)\\z"',
   );
   expect(source).not.toContain('Where-Object');
   expect(source.indexOf('Unsupported component recovery state')).toBeLessThan(
     source.indexOf('[array]::Reverse($states)'),
+  );
+  const retiredSkip = 'if ($parts[0] -ceq $retiredComponentKey) { continue }';
+  expect(source).toContain(retiredSkip);
+  expect(source.indexOf(retiredSkip)).toBeLessThan(
+    source.indexOf('$root = Join-Path $RuntimeRoot $parts[0]'),
   );
 });
 
@@ -85,24 +90,47 @@ describe.skipIf(process.platform !== 'win32')('component-switch recovery on Wind
     expect(fs.existsSync(data.statePath)).toBe(false);
   });
 
-  test.each(['retired-runtime|True', '../user-data|False', 'python|invalid'])(
-    'rejects an unsupported row and preserves every pointer and journal: %s',
-    unsupported => {
-      const journal = `${unsupported}\r\npython|False\r\n`;
-      const data = fixture(journal);
-      const retiredRoot = path.join(data.runtimeRoot, 'retired-runtime');
-      fs.mkdirSync(retiredRoot);
-      fs.symlinkSync(data.oldVersion, path.join(retiredRoot, 'current.previous'), 'junction');
-      const result = runRecovery(data.runtimeRoot);
-      expect(result.status).not.toBe(0);
-      expect(result.stderr).toContain('Unsupported component recovery state');
-      expect(fs.readFileSync(data.statePath, 'utf8')).toBe(journal);
-      expect(fs.readFileSync(path.join(data.component, 'current', 'data.txt'), 'utf8')).toBe(
-        'new-version',
-      );
-      expect(fs.existsSync(path.join(data.component, 'current.next'))).toBe(true);
-      expect(fs.existsSync(path.join(retiredRoot, 'current.previous'))).toBe(true);
-      expect(fs.existsSync(path.join(retiredRoot, 'current'))).toBe(false);
-    },
-  );
+  test('recovers current pointers and leaves the retired CUDA component untouched', () => {
+    const data = fixture('python|False\r\nstrata-bundled|True\r\n');
+    const retiredRoot = path.join(data.runtimeRoot, 'strata-bundled');
+    fs.mkdirSync(retiredRoot);
+    fs.symlinkSync(data.newVersion, path.join(retiredRoot, 'current'), 'junction');
+    fs.symlinkSync(data.oldVersion, path.join(retiredRoot, 'current.previous'), 'junction');
+
+    const result = runRecovery(data.runtimeRoot);
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(fs.existsSync(path.join(data.component, 'current'))).toBe(false);
+    expect(fs.existsSync(path.join(data.component, 'current.next'))).toBe(false);
+    expect(fs.readFileSync(path.join(retiredRoot, 'current', 'data.txt'), 'utf8')).toBe(
+      'new-version',
+    );
+    expect(fs.readFileSync(path.join(retiredRoot, 'current.previous', 'data.txt'), 'utf8')).toBe(
+      'old-version',
+    );
+    expect(fs.existsSync(data.statePath)).toBe(false);
+  });
+
+  test.each([
+    'retired-runtime|True',
+    '../user-data|False',
+    'python|invalid',
+    'strata-bundled|invalid',
+  ])('rejects an unsupported row and preserves every pointer and journal: %s', unsupported => {
+    const journal = `${unsupported}\r\npython|False\r\n`;
+    const data = fixture(journal);
+    const retiredRoot = path.join(data.runtimeRoot, 'retired-runtime');
+    fs.mkdirSync(retiredRoot);
+    fs.symlinkSync(data.oldVersion, path.join(retiredRoot, 'current.previous'), 'junction');
+    const result = runRecovery(data.runtimeRoot);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Unsupported component recovery state');
+    expect(fs.readFileSync(data.statePath, 'utf8')).toBe(journal);
+    expect(fs.readFileSync(path.join(data.component, 'current', 'data.txt'), 'utf8')).toBe(
+      'new-version',
+    );
+    expect(fs.existsSync(path.join(data.component, 'current.next'))).toBe(true);
+    expect(fs.existsSync(path.join(retiredRoot, 'current.previous'))).toBe(true);
+    expect(fs.existsSync(path.join(retiredRoot, 'current'))).toBe(false);
+  });
 });

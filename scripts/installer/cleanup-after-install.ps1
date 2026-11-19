@@ -31,10 +31,9 @@ function Assert-PhysicalDirectoryPath([string]$Path) {
 $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
 $rows = @($manifest.components)
 # Component contract: the six fixed application components are always
-# required. CPU adds the bundled local runtime; CUDA also adds Strata.
-# No other key is accepted (lite 6, cpu 7, cuda 8).
+# required. CPU and CUDA add the bundled local runtime.
 $requiredKeys = @('channel-runtime', 'mcps', 'python', 'skill-python', 'skills', 'uv')
-$optionalKeys = @('llamacpp-bundled', 'strata-bundled')
+$optionalKeys = @('llamacpp-bundled')
 $rowKeys = @($rows | ForEach-Object { [string]$_.key })
 if (@($requiredKeys | Where-Object { $rowKeys -cnotcontains $_ }).Count -gt 0 -or
     @($rowKeys | Where-Object { $requiredKeys -cnotcontains $_ -and $optionalKeys -cnotcontains $_ }).Count -gt 0 -or

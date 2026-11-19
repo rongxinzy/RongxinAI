@@ -9,10 +9,13 @@ if (-not (Test-Path -LiteralPath $statePath)) {
 }
 
 $states = @(Get-Content -LiteralPath $statePath)
-# Validate the entire journal before touching any pointer. Retired/unknown
-# component records must remain available without restoring their runtimes.
+# An interrupted older CUDA installer can leave this retired component in the
+# same journal as current components. Recover the current pointers only.
+$retiredComponentKey = 'strata-bundled'
+$statePattern = "^(?:channel-runtime|mcps|python|skill-python|skills|uv|llamacpp-bundled|$retiredComponentKey)\|(?:True|False)\z"
+# Validate the entire journal before touching any pointer.
 foreach ($state in $states) {
-  if ($state -cnotmatch '^(?:channel-runtime|mcps|python|skill-python|skills|uv|llamacpp-bundled|strata-bundled)\|(?:True|False)\z') {
+  if ($state -cnotmatch $statePattern) {
     throw "Unsupported component recovery state; preserving journal: $state"
   }
 }
@@ -20,6 +23,7 @@ foreach ($state in $states) {
 
 foreach ($state in $states) {
   $parts = $state.Split('|')
+  if ($parts[0] -ceq $retiredComponentKey) { continue }
   $root = Join-Path $RuntimeRoot $parts[0]
   $current = Join-Path $root 'current'
   $next = Join-Path $root 'current.next'

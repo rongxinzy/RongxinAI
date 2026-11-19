@@ -151,15 +151,6 @@ const runAppCleanup = async (): Promise<void> => {
       },
     },
     {
-      name: 'strata',
-      run: async () => {
-        if (!inferenceRuntime.strataManager) return;
-        await inferenceRuntime.strataManager.shutdownForQuit().catch(error => {
-          console.error('[Strata] Failed to stop service on quit:', error);
-        });
-      },
-    },
-    {
       name: 'llamacpp',
       run: async () => {
         if (!inferenceRuntime.llamaCppManager) return;

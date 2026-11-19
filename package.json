@@ -50,24 +50,6 @@
       "linux-arm64": "f5be29b7b5f86a365d03fd7df085d70636b29503600c8a67eabf2bda89a9cf64"
     }
   },
-  "strata": {
-    "releaseTag": "v0.2.4",
-    "defaultPort": 8096,
-    "control": {
-      "assetName": "strata-control-0.1.49.2-windows-x86_64.zip",
-      "sha256": "992405e03630ec41e318d90dc91cda21b232d3a3f409d27b48d82d1274afeaab"
-    },
-    "engineQwen": {
-      "assetName": "strata-engine-0.1.48-windows-x86_64-cuda-cuda13.tar.gz",
-      "sha256": "1e1611b0977d984bd7d8e79591a1ba1a7e550a2f4a66bfa45744a77308a71b95",
-      "installFolder": "0.1.48-windows-x86_64-cuda-cuda13"
-    },
-    "engineDsv41": {
-      "assetName": "strata-dsv41-0.1.49.2-windows-x86_64-cuda-cuda13.tar.gz",
-      "sha256": "57bfba85e1f5998c2e198a18ab125af2b5da32167370cdf5802af87ba8dc3480",
-      "installFolder": "0.1.49.2-windows-x86_64-cuda-cuda13"
-    }
-  },
   "channelRuntime": {
     "version": "zhiyuan-sidecar-v4",
     "repo": "rongxinzy/pi-connect",
@@ -210,8 +192,6 @@
     "engram:runtime:linux-x64": "node scripts/download-engram-runtime.cjs linux-x64",
     "engram:runtime:linux-arm64": "node scripts/download-engram-runtime.cjs linux-arm64",
     "llamacpp:runtime:host": "node scripts/llamacpp-runtime-host.cjs",
-    "strata:runtime:download": "node scripts/download-strata-runtime.cjs",
-    "strata:runtime:prepare": "node scripts/prepare-strata-runtime.cjs",
     "llamacpp:runtime:download": "node scripts/download-llamacpp-runtime.cjs",
     "llamacpp:runtime:download:mac-arm64": "node scripts/download-llamacpp-runtime.cjs mac-arm64",
     "llamacpp:runtime:download:mac-x64": "node scripts/download-llamacpp-runtime.cjs mac-x64",

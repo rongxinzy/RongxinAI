@@ -13,6 +13,7 @@ import {
   getStore,
 } from './runtimeServices';
 import { getPiRuntimeAdapter, getWorkbenchTaskService } from './sessionServices';
+import { resolveDefaultAgentModelRef } from './defaultAgentModel';
 import { resolveSessionExpertSnapshots } from './sessionExperts';
 import { t } from '../i18n';
 import {
@@ -61,8 +62,7 @@ export const getCodingRoomService = (): CodingRoomService => {
         new CodingAgentProfileRepository(getStore().getDatabase()),
         () => {
           const enabled = getStore().get<boolean>('magpie_service_enabled') === true;
-          const modelId = getStore().get<string>('magpie_default_model_id')?.trim();
-          return enabled && Boolean(modelId);
+          return enabled && Boolean(resolveDefaultAgentModelRef());
         },
         app.isPackaged
           ? path.join(process.resourcesPath, 'acp', 'registry.json')

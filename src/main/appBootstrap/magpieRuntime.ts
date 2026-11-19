@@ -6,14 +6,13 @@ import { app } from 'electron';
 import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
 import { getOllamaManager, getStore } from './runtimeServices';
+import { resolveDefaultAgentModelRef } from './defaultAgentModel';
 import { MagpieManager } from '../magpie/manager';
 import { MagpieModelService, installMagpieModelService } from '../magpie/modelService';
 import { isLlamaCppLanAccessEnabled } from '../magpie/lanAccess';
 import { ManagedMagpieProviderBindings } from '../magpie/managedProviderBindings';
 import { LlamaCppGatewayCredentialVault } from '../libs/llamacppGatewayCredentialVault';
 import { readOllamaProviderSnapshot } from '../magpie/ollamaProviderBinding';
-import { readStrataProviderSnapshot } from '../magpie/strataProviderBinding';
-import { getStrataManager } from './runtimeServices';
 import { buildLlamaCppRunningModelBinding } from '../libs/llamacppAgentBinding';
 import { getLlamaCppServiceConfig } from '../ipcHandlers/llamacpp';
 import { registerMagpieIpc } from '../magpie/registerIpc';
@@ -73,14 +72,6 @@ export const setupMagpieRuntime = (): void => {
   inferenceRuntime.managedMagpieBindings.setOllamaReader(() =>
     readOllamaProviderSnapshot(getOllamaManager()),
   );
-  inferenceRuntime.managedMagpieBindings.setStrataReader(async () => {
-    const manager = getStrataManager();
-    inferenceRuntime.managedMagpieBindings?.setExpectedStrataPort(manager.resolvePort());
-    // A catalog read is an explicit user-facing refresh, so probe health before
-    // publishing models; the snapshot itself never triggers another probe.
-    const status = await manager.detect();
-    return readStrataProviderSnapshot(manager, status);
-  });
   inferenceRuntime.managedMagpieBindings.setGpuReader(async () => {
     const orchestrator = inferenceRuntime.llamaCppModelOrchestrator;
     if (!orchestrator) return { baseUrl: null, models: [] };
@@ -95,7 +86,7 @@ export const setupMagpieRuntime = (): void => {
   const modelService = new MagpieModelService(
     inferenceRuntime.magpieManager,
     {
-      readDefaultModelId: () => getStore().get<string>('magpie_default_model_id'),
+      readDefaultModelId: resolveDefaultAgentModelRef,
       writeDefaultModelId: id => getStore().set('magpie_default_model_id', id),
       beforeCatalog: () => inferenceRuntime.managedMagpieBindings!.beforeCatalog(),
       allowedModel: model => inferenceRuntime.managedMagpieBindings!.allowedModel(model.id),

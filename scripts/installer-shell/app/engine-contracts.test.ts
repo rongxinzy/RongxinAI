@@ -19,8 +19,8 @@ const argumentsSource = read('SetupArguments.cs');
 test('engine checks extraction and retains all main repository runtime features', () => {
   expect(installer).toContain('failureMessage: "应用程序解包失败"');
   expect(installer).toContain('File.ReadAllText(TargetsPath)');
-  // Required fixed set + optional CPU/CUDA engines; never a fixed count.
-  expect(installer).toContain('OptionalComponentKeys = { "llamacpp-bundled", "strata-bundled" }');
+  // The bundled local runtime is optional across editions.
+  expect(installer).toContain('OptionalComponentKeys = { "llamacpp-bundled" }');
   expect(installer).not.toContain('GetArrayLength() != 7');
   expect(installer).toContain('target.GetProperty("sentinel")');
   expect(installer).toContain('"resources", "app.asar"');

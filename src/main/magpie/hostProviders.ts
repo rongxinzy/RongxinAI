@@ -18,6 +18,12 @@ export interface MagpieHostProvider {
   }[];
 }
 export const HOST_PROVIDER_PREFIX = 'zhiyuan-host-';
+export const RETIRED_STRATA_HOST_PROVIDER_ID = `${HOST_PROVIDER_PREFIX}strata`;
+
+export function isRetiredHostModel(modelRef: string): boolean {
+  return modelRef.startsWith(`${RETIRED_STRATA_HOST_PROVIDER_ID}/`);
+}
+
 function assertHostProviderId(id: string): void {
   if (!/^zhiyuan-host-[a-z0-9][a-z0-9-]{0,80}$/.test(id))
     throw new Error('Invalid host model provider id');
