@@ -1,0 +1,46 @@
+name: Reproduce Windows desktop pet startup
+
+on:
+  push:
+    branches:
+      - codex/windows-desktop-pet-repro
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Install the published Lite package
+        shell: pwsh
+        run: |
+          $tag = 'v2026.11.18-build.2'
+          $name = 'win32-x64-lite-ZhiYuanAgent-Setup-2026.11.18-build.2.exe'
+          $setup = Join-Path $env:RUNNER_TEMP $name
+          curl.exe --fail --location --retry 2 --output $setup "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$name"
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to download the published installer' }
+          $actual = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne '9cc119879740479d89dc23c9f8853291ef9a7ed244f4cf16efa720f5f9ecf32d') { throw "Unexpected installer SHA-256 $actual" }
+          $root = Join-Path $env:RUNNER_TEMP 'pet-probe'
+          New-Item -ItemType Directory -Path $root | Out-Null
+          $proc = Start-Process -FilePath $setup -ArgumentList "--silent --skip-registration --install-dir `"$root\installed`" --runtime-root `"$root\runtimes`" --app-data-root `"$root\data`" --events-log `"$root\install.jsonl`"" -Wait -PassThru
+          if ($proc.ExitCode -ne 0) {
+            Get-Content "$root\install.jsonl" -Tail 30
+            throw "Installer exited with $($proc.ExitCode)"
+          }
+          "PET_PROBE_ROOT=$root" >> $env:GITHUB_ENV
+      - name: Enable the pet through the installed app
+        shell: pwsh
+        run: node scripts/ci/windows-desktop-pet-repro.mjs "$env:PET_PROBE_ROOT/installed/知远.exe" --installed
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: desktop-pet-repro-evidence
+          path: desktop-pet-repro-evidence/
+          retention-days: 1
