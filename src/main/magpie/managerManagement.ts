@@ -5,6 +5,7 @@ import { formatMagpieManagementError } from './managementErrors';
 import { mergeMagpiePreferences, projectMagpiePreferences } from './preferences';
 import type { MagpiePreferences, MagpiePreferencesPatch } from '../../shared/magpie/preferences';
 import { parseMagpieCatalog, readBoundedCatalog } from './catalogReader';
+import { isRetiredHostModel, RETIRED_STRATA_HOST_PROVIDER_ID } from './hostProviders';
 
 import type { MagpieStatus, MagpieModel } from '../../shared/magpie/types';
 
@@ -43,7 +44,9 @@ export class MagpieManagerManagement {
     signal.throwIfAborted();
     if (this.context.state().state !== 'running' || this.context.state().gatewayUrl !== gateway)
       throw new Error('Model service changed while reading its catalog');
-    return models;
+    return models.filter(
+      model => model.owned_by !== RETIRED_STRATA_HOST_PROVIDER_ID && !isRetiredHostModel(model.id),
+    );
   }
   preferences(): Promise<MagpiePreferences> {
     return this.context.managementJson('/api/settings').then(projectMagpiePreferences);

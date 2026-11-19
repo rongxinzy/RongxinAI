@@ -57,10 +57,9 @@ function New-LiteralDirectoryJunction {
 $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
 $targets = @((Get-Content -LiteralPath $TargetsPath -Raw -ErrorAction Stop | ConvertFrom-Json))
 # Component contract: the six fixed application components are always
-# required. CPU adds the bundled local runtime; CUDA also adds Strata.
-# No other key is accepted (lite 6, cpu 7, cuda 8).
+# required. CPU and CUDA add the bundled local runtime.
 $requiredKeys = @('channel-runtime', 'mcps', 'python', 'skill-python', 'skills', 'uv')
-$optionalKeys = @('llamacpp-bundled', 'strata-bundled')
+$optionalKeys = @('llamacpp-bundled')
 $targetKeys = @($targets | ForEach-Object { [string]$_.key } | Sort-Object)
 $manifestKeys = @($manifest.components | ForEach-Object { [string]$_.key } | Sort-Object)
 $missingKeys = @($requiredKeys | Where-Object { $targetKeys -cnotcontains $_ })

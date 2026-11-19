@@ -389,12 +389,4 @@ export const enLocalInferenceService: Record<string, string> = {
   localInferenceLaunchBooleanDisabled: 'Disabled',
   localInferenceLaunchLoadOnly: 'Preload',
   localInferenceLaunchLoadAndDebug: 'Start Debugging',
-  strataCatalogTitle: 'MoE High-Performance Models (Windows CUDA)',
-  strataCatalogSubtitle:
-    'Dedicated MoE model; GPU resources are exclusively allocated and cannot be shared with other local models.',
-  strataCatalogHardwareGate:
-    'Recommended hardware: ≥{ram} GB RAM, ≥{vram} GB VRAM, ≥{disk} GB disk',
-  strataCatalogStart: 'Start Engine',
-  strataCatalogStop: 'Stop Engine',
-  strataStartRequested: 'Engine start requested. Model initialization may take several minutes.',
 };

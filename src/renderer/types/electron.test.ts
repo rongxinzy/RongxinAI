@@ -24,7 +24,6 @@ const ELECTRON_MEMBERS = [
   'llamacpp',
   'marketplace',
   'hardware',
-  'strata',
   'agents',
   'checkApiConfig',
   'generateSessionTitle',

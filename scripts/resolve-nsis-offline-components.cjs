@@ -10,12 +10,6 @@ const LLAMACPP_BUNDLED_TARGET = {
   sentinel: 'llamacpp-bundled/manifest.json',
 };
 
-const STRATA_BUNDLED_TARGET = {
-  key: 'strata-bundled',
-  prefix: 'strata-bundled',
-  sentinel: 'strata-bundled/manifest.json',
-};
-
 function resolveInferenceEdition() {
   return (process.env.ZHIYUAN_UPDATE_VARIANT || 'lite').trim().toLowerCase();
 }
@@ -24,19 +18,10 @@ function shouldIncludeLlamaCppBundledComponent(edition = resolveInferenceEdition
   return edition === 'cpu' || edition === 'cuda';
 }
 
-function shouldIncludeStrataBundledComponent(edition = resolveInferenceEdition()) {
-  return edition === 'cuda';
-}
-
 function resolveNsisOfflineComponentTargets(edition = resolveInferenceEdition()) {
-  let targets = baseTargets;
-  if (shouldIncludeLlamaCppBundledComponent(edition)) {
-    targets = [...targets, LLAMACPP_BUNDLED_TARGET];
-  }
-  if (shouldIncludeStrataBundledComponent(edition)) {
-    targets = [...targets, STRATA_BUNDLED_TARGET];
-  }
-  return targets;
+  return shouldIncludeLlamaCppBundledComponent(edition)
+    ? [...baseTargets, LLAMACPP_BUNDLED_TARGET]
+    : baseTargets;
 }
 
 // Generate both the routing table and every NSIS phase from the same edition
@@ -68,7 +53,6 @@ function writeNsisOfflineComponentRouting(
     'skill-python': 'Skill Python dependency layer',
     uv: 'uv 离线运行环境',
     'llamacpp-bundled': '本地推理运行环境',
-    'strata-bundled': 'Strata 推理引擎（双引擎）',
   };
   const phases = [
     [
@@ -95,10 +79,8 @@ function writeNsisOfflineComponentRouting(
 
 module.exports = {
   LLAMACPP_BUNDLED_TARGET,
-  STRATA_BUNDLED_TARGET,
   resolveInferenceEdition,
   shouldIncludeLlamaCppBundledComponent,
-  shouldIncludeStrataBundledComponent,
   resolveNsisOfflineComponentTargets,
   writeNsisOfflineComponentRouting,
 };

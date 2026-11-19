@@ -172,32 +172,15 @@ test('forbids duplicate root VC redistributable and duplicate managed uninstall 
   expect(() => assertPayloadDeduplication(payload, host)).toThrow(/duplicate payload content/);
 });
 
-function bundledRuntimeEntries(dir: string, edition: 'cpu' | 'cuda') {
-  const entries: Array<{
-    key: string;
-    prefix: string;
-    archiveSizeBytes: number;
-    archiveSha256: string;
-  }> = [];
-  const llamacppBytes = Buffer.from('archive-llamacpp-bundled');
-  writeFileSync(path.join(dir, 'llamacpp-bundled.7z'), llamacppBytes);
-  entries.push({
+function bundledRuntimeEntry(dir: string) {
+  const archive = Buffer.from('archive-llamacpp-bundled');
+  writeFileSync(path.join(dir, 'llamacpp-bundled.7z'), archive);
+  return {
     key: 'llamacpp-bundled',
     prefix: 'llamacpp-bundled',
-    archiveSizeBytes: llamacppBytes.length,
-    archiveSha256: createHash('sha256').update(llamacppBytes).digest('hex'),
-  });
-  if (edition === 'cuda') {
-    const strataBytes = Buffer.from('archive-strata-bundled');
-    writeFileSync(path.join(dir, 'strata-bundled.7z'), strataBytes);
-    entries.push({
-      key: 'strata-bundled',
-      prefix: 'strata-bundled',
-      archiveSizeBytes: strataBytes.length,
-      archiveSha256: createHash('sha256').update(strataBytes).digest('hex'),
-    });
-  }
-  return entries;
+    archiveSizeBytes: archive.length,
+    archiveSha256: createHash('sha256').update(archive).digest('hex'),
+  };
 }
 
 test('NSIS deduction includes and verifies the bundled runtime for cpu/cuda', () => {
@@ -206,22 +189,17 @@ test('NSIS deduction includes and verifies the bundled runtime for cpu/cuda', ()
     (sum: number, entry: { archiveSizeBytes: number }) => sum + entry.archiveSizeBytes,
     0,
   );
-  for (const edition of ['cpu', 'cuda'] as const) {
-    const bundled = bundledRuntimeEntries(dir, edition);
-    writeFileSync(
-      path.join(dir, 'manifest.json'),
-      JSON.stringify({ components: [...components, ...bundled] }),
-    );
-    const bundledTotal = bundled.reduce((sum, entry) => sum + entry.archiveSizeBytes, 0);
-    expect(readNsisUpdaterComponentDeductionBytes(dir, edition)).toBe(liteTotal + bundledTotal);
-  }
-  const llamacppBytes = Buffer.from('archive-llamacpp-bundled');
-  const cpuBundledForIntegrity = bundledRuntimeEntries(dir, 'cpu');
+  const bundled = bundledRuntimeEntry(dir);
   writeFileSync(
     path.join(dir, 'manifest.json'),
-    JSON.stringify({ components: [...components, ...cpuBundledForIntegrity] }),
+    JSON.stringify({ components: [...components, bundled] }),
   );
-  writeFileSync(path.join(dir, 'llamacpp-bundled.7z'), Buffer.alloc(llamacppBytes.length));
+  for (const edition of ['cpu', 'cuda']) {
+    expect(readNsisUpdaterComponentDeductionBytes(dir, edition)).toBe(
+      liteTotal + bundled.archiveSizeBytes,
+    );
+  }
+  writeFileSync(path.join(dir, 'llamacpp-bundled.7z'), Buffer.alloc(bundled.archiveSizeBytes));
   expect(() => readNsisUpdaterComponentDeductionBytes(dir, 'cpu')).toThrow(/bytes\/hash mismatch/);
   // The strict lite read still rejects a manifest that does not match exactly.
   expect(() => readComponentArchiveBytes(dir, 'lite')).toThrow(/every bundled Windows component/);
@@ -233,29 +211,21 @@ test('llama.cpp editions require the fixed set, verify and count extra component
     (sum: number, entry: { archiveSizeBytes: number }) => sum + entry.archiveSizeBytes,
     0,
   );
-  for (const edition of ['cpu', 'cuda'] as const) {
-    const bundled = bundledRuntimeEntries(dir, edition);
-    writeFileSync(
-      path.join(dir, 'manifest.json'),
-      JSON.stringify({ components: [...components, ...bundled] }),
-    );
-    const bundledTotal = bundled.reduce((sum, entry) => sum + entry.archiveSizeBytes, 0);
-    expect(readComponentArchiveBytes(dir, edition)).toBe(liteTotal + bundledTotal);
-  }
-  const llamacppBytes = Buffer.from('archive-llamacpp-bundled');
-  const cpuBundledForIntegrity = bundledRuntimeEntries(dir, 'cpu');
+  const bundled = bundledRuntimeEntry(dir);
   writeFileSync(
     path.join(dir, 'manifest.json'),
-    JSON.stringify({ components: [...components, ...cpuBundledForIntegrity] }),
+    JSON.stringify({ components: [...components, bundled] }),
   );
-  writeFileSync(path.join(dir, 'llamacpp-bundled.7z'), Buffer.alloc(llamacppBytes.length));
+  for (const edition of ['cpu', 'cuda']) {
+    expect(readComponentArchiveBytes(dir, edition)).toBe(liteTotal + bundled.archiveSizeBytes);
+  }
+  writeFileSync(path.join(dir, 'llamacpp-bundled.7z'), Buffer.alloc(bundled.archiveSizeBytes));
   expect(() => readComponentArchiveBytes(dir, 'cpu')).toThrow(/bytes\/hash mismatch/);
   // A missing fixed component is a broken install, in every edition.
-  const cpuBundled = bundledRuntimeEntries(dir, 'cpu');
-  writeFileSync(path.join(dir, 'llamacpp-bundled.7z'), llamacppBytes);
+  bundledRuntimeEntry(dir);
   writeFileSync(
     path.join(dir, 'manifest.json'),
-    JSON.stringify({ components: [...components.slice(1), ...cpuBundled] }),
+    JSON.stringify({ components: [...components.slice(1), bundled] }),
   );
   expect(() => readComponentArchiveBytes(dir, 'cpu')).toThrow(/every bundled|identity/);
 });

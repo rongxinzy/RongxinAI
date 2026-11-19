@@ -4,7 +4,7 @@ import type {
   MagpieProviderSummary,
   MagpieSaveProviderInput,
 } from '../../shared/magpie/types';
-import { HOST_PROVIDER_PREFIX } from './hostProviders';
+import { HOST_PROVIDER_PREFIX, RETIRED_STRATA_HOST_PROVIDER_ID } from './hostProviders';
 import { maskApiKey } from './magpieManagerUtils';
 
 const MAX_MODEL_ID_LENGTH = 500;
@@ -117,6 +117,7 @@ export function projectMagpieProviderSummaries(state: unknown): MagpieProviderSu
   return rawList.flatMap((p: unknown) => {
     if (!isRecord(p) || typeof p.id !== 'string') return [];
     const id = p.id;
+    if (id === RETIRED_STRATA_HOST_PROVIDER_ID) return [];
     const isHostManaged = id.startsWith(HOST_PROVIDER_PREFIX);
     const chat = typeof p.chat === 'string' ? p.chat : '';
     const responses = typeof p.responses === 'string' ? p.responses : '';

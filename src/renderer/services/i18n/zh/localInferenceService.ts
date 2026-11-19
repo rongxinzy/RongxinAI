@@ -344,10 +344,4 @@ export const zhLocalInferenceService: Record<string, string> = {
   localInferenceLaunchBooleanDisabled: '禁用',
   localInferenceLaunchLoadOnly: '预加载',
   localInferenceLaunchLoadAndDebug: '开始调试',
-  strataCatalogTitle: 'MoE 高性能模型（Windows CUDA）',
-  strataCatalogSubtitle: '大型 MoE 专属模型；显卡资源由本地引擎独占，不可与其他模型同时加载。',
-  strataCatalogHardwareGate: '推荐硬件配置：内存 ≥{ram} GB、显存 ≥{vram} GB、磁盘 ≥{disk} GB',
-  strataCatalogStart: '启动引擎',
-  strataCatalogStop: '停止引擎',
-  strataStartRequested: '已请求启动引擎；模型初始化可能需要数分钟，请稍候。',
 };

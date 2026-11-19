@@ -6,9 +6,9 @@ import path from 'node:path';
 import {
   resolveNsisOfflineComponentTargets,
   shouldIncludeLlamaCppBundledComponent,
-  shouldIncludeStrataBundledComponent,
   writeNsisOfflineComponentRouting,
 } from './resolve-nsis-offline-components.cjs';
+import { getWindowsResourceComponents } from './windows-resource-pack.cjs';
 
 const previous = process.env.ZHIYUAN_UPDATE_VARIANT;
 
@@ -78,11 +78,24 @@ test('lite targets exclude llamacpp-bundled component', () => {
   expect(resolveNsisOfflineComponentTargets()).toHaveLength(6);
 });
 
-test('cpu and cuda targets include llamacpp-bundled component', () => {
-  process.env.ZHIYUAN_UPDATE_VARIANT = 'cpu';
-  expect(resolveNsisOfflineComponentTargets()).toHaveLength(7);
-  expect(shouldIncludeStrataBundledComponent()).toBe(false);
-  process.env.ZHIYUAN_UPDATE_VARIANT = 'cuda';
-  expect(resolveNsisOfflineComponentTargets()).toHaveLength(8);
-  expect(shouldIncludeStrataBundledComponent()).toBe(true);
-});
+test.each(['cpu', 'cuda'])(
+  '%s adds only the bundled llama.cpp runtime to the lite targets',
+  edition => {
+    process.env.ZHIYUAN_UPDATE_VARIANT = edition;
+    expect(shouldIncludeLlamaCppBundledComponent()).toBe(true);
+    const targets = resolveNsisOfflineComponentTargets();
+    expect(targets.map(({ key }) => key)).toEqual([
+      ...resolveNsisOfflineComponentTargets('lite').map(({ key }) => key),
+      'llamacpp-bundled',
+    ]);
+    expect(
+      getWindowsResourceComponents(process.cwd()).map(({ key, prefix, sentinel }) => ({
+        key,
+        prefix,
+        sentinel,
+      })),
+    ).toEqual(
+      targets.map(target => ({ ...target, sentinel: target.sentinel.replaceAll('\\', '/') })),
+    );
+  },
+);

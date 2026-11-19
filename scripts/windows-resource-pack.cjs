@@ -66,10 +66,7 @@ function getWindowsResourceArchiveCompression(component) {
     : WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.NonSolid;
 }
 
-const {
-  shouldIncludeLlamaCppBundledComponent,
-  shouldIncludeStrataBundledComponent,
-} = require('./resolve-nsis-offline-components.cjs');
+const { shouldIncludeLlamaCppBundledComponent } = require('./resolve-nsis-offline-components.cjs');
 
 function getWindowsResourceComponents(projectRoot) {
   const components = [
@@ -123,15 +120,6 @@ function getWindowsResourceComponents(projectRoot) {
       dir: path.join(projectRoot, 'resources', 'llamacpp-bundled'),
       prefix: 'llamacpp-bundled',
       sentinel: 'llamacpp-bundled/manifest.json',
-    });
-  }
-  if (shouldIncludeStrataBundledComponent()) {
-    components.push({
-      key: 'strata-bundled',
-      label: 'Bundled Strata dual-engine runtime',
-      dir: path.join(projectRoot, 'resources', 'strata-bundled'),
-      prefix: 'strata-bundled',
-      sentinel: 'strata-bundled/manifest.json',
     });
   }
   return components;
