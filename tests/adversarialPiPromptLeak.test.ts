@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { ScheduledTaskAvailabilityGuidance } from '../src/scheduledTask/enginePrompt';
 import { CHAT_IDENTITY_PROMPT } from '../src/main/libs/agentEngine/piPromptOverrides';
 import { PiUnattendedSystemPrompt } from '../src/main/libs/agentEngine/piUnattendedPolicy';
-import { SessionSummarySystemPrompt } from '../src/main/sessionSummary/tool';
 import {
   assertNoLeakage,
   assertTopLevelPreamble,
@@ -23,7 +23,7 @@ describe('Milestone 1 Empirical Stress Test: Prompt Leak & XML Formatting', () =
   });
 
   describe('Work Mode vs Chat Mode Permutations', () => {
-    test('Work mode: contains Chinese preamble, preserves tools/rules, includes session summary, excludes chat identity', async () => {
+    test('Work mode: preserves native tools and rules alongside Work-only scheduling guidance', async () => {
       const loader = createPromptTestLoader(dirs.cwd, dirs.agentDir, {
         chatMode: false,
         systemPrompt: 'Work expert task.',
@@ -36,7 +36,8 @@ describe('Milestone 1 Empirical Stress Test: Prompt Leak & XML Formatting', () =
       assertWellFormedXmlTags(prompt, ['tools', 'rules', 'cwd', 'addendum']);
 
       expect(prompt).toContain('Work expert task.');
-      expect(prompt).toContain(SessionSummarySystemPrompt);
+      expect(prompt).toContain(ScheduledTaskAvailabilityGuidance);
+      expect(prompt).not.toContain('## Session checkpoint');
       expect(prompt).not.toContain(CHAT_IDENTITY_PROMPT);
       expect(prompt).toContain('<tools>');
       expect(prompt).toContain('- read: Read a file.');
@@ -44,7 +45,7 @@ describe('Milestone 1 Empirical Stress Test: Prompt Leak & XML Formatting', () =
       expect(prompt).toContain('- Be concise in your responses');
     });
 
-    test('Chat mode: contains Chinese preamble, preserves tools/rules, includes chat identity, excludes session summary', async () => {
+    test('Chat mode: preserves native tools and rules alongside Chat identity', async () => {
       const loader = createPromptTestLoader(dirs.cwd, dirs.agentDir, {
         chatMode: true,
         systemPrompt: 'Chat greeting.',
@@ -58,7 +59,7 @@ describe('Milestone 1 Empirical Stress Test: Prompt Leak & XML Formatting', () =
 
       expect(prompt).toContain('Chat greeting.');
       expect(prompt).toContain(CHAT_IDENTITY_PROMPT);
-      expect(prompt).not.toContain(SessionSummarySystemPrompt);
+      expect(prompt).not.toContain(ScheduledTaskAvailabilityGuidance);
     });
   });
 

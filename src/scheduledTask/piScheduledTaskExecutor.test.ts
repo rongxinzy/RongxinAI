@@ -131,6 +131,8 @@ test('runs a canonical task in its workspace and returns its settled output', as
       unattended: true,
       skillIds: session.activeSkillIds,
       modelOverride: session.modelOverride,
+      systemPrompt: session.systemPrompt,
+      scheduledTaskRun: true,
     }),
   );
   expect(startSession.mock.calls[0]?.[2]).not.toHaveProperty('confirmationMode');

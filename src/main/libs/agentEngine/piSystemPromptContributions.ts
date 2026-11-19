@@ -9,7 +9,7 @@
  * registering it here means the model never sees it — piRuntimeAdapter and its
  * tests read exclusively from this registry.
  */
-import { SessionSummarySystemPrompt } from '../../sessionSummary/tool';
+import { ScheduledTaskAvailabilityGuidance } from '../../../scheduledTask/enginePrompt';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
 
@@ -51,10 +51,10 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     prompt: PiPythonEnvSystemPrompt,
   },
   {
-    id: 'session-summary',
+    id: 'scheduled-task-availability',
     requiresHostTools: true,
     enabled: context => context.chatMode !== true,
-    prompt: SessionSummarySystemPrompt,
+    prompt: ScheduledTaskAvailabilityGuidance,
   },
 ];
 

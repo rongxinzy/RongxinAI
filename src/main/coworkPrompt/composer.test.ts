@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
+import { RetiredScheduledTaskPrompt } from '../../scheduledTask/enginePrompt';
 import { applyCoworkLanguagePrompt } from '../coworkLanguagePrompt';
 import { composeCoworkSystemPrompt } from './composer';
 import { CoworkBundledPromptMarker, ZhiyuanIdentityPrompt } from './constants';
@@ -58,20 +58,20 @@ test('keeps managed prompt sections idempotent across repeated composition', () 
   }
 
   expect(countOccurrences(prompt, ZhiyuanIdentityPrompt)).toBe(1);
-  expect(countOccurrences(prompt, buildScheduledTaskEnginePrompt())).toBe(1);
+  expect(prompt).not.toContain(RetiredScheduledTaskPrompt);
   expect(countOccurrences(prompt, '<cowork-response-language>')).toBe(1);
   expect(countOccurrences(prompt, 'User-configured instructions.')).toBe(1);
 });
 
 test('normalizes repeated legacy scheduled-task and language blocks', () => {
-  const scheduledPrompt = buildScheduledTaskEnginePrompt();
   const legacyPrompt = applyCoworkLanguagePrompt(
-    ['Base prompt', ...Array.from({ length: 10 }, () => scheduledPrompt)].join('\n\n'),
+    ['Base prompt', ...Array.from({ length: 10 }, () => RetiredScheduledTaskPrompt)].join('\n\n'),
     'zh',
   );
   const composed = composeCoworkSystemPrompt({ basePrompt: legacyPrompt, language: 'en' });
 
-  expect(countOccurrences(composed, scheduledPrompt)).toBe(1);
+  expect(composed).not.toContain(RetiredScheduledTaskPrompt);
+  expect(composed).toContain('Base prompt');
   expect(countOccurrences(composed, '<cowork-response-language>')).toBe(1);
   expect(composed).toContain('The current application language is English.');
 });

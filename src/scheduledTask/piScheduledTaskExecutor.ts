@@ -75,6 +75,7 @@ export class PiScheduledTaskExecutor {
       // into unattended execution, so tools must follow that run policy.
       approvalMode: WorkbenchApprovalMode.AllowAll,
       unattended: true,
+      scheduledTaskRun: true,
       onSettled: completion.settle,
     };
     try {

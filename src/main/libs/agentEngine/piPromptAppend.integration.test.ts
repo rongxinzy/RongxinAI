@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test } from 'vitest';
 
 import { DefaultResourceLoader, SettingsManager } from '@earendil-works/pi-coding-agent';
 import { buildSystemPrompt } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/system-prompt.js';
+import { RetiredScheduledTaskPrompt } from '../../../scheduledTask/enginePrompt';
 import {
   CHAT_IDENTITY_PROMPT,
   createPiPromptOverrides,
@@ -164,4 +165,17 @@ test('production Work preserves native tools and appends expert instructions wit
   expect(renderPrompt(loader)).not.toContain('Work base.');
   expect(loader.getAppendSystemPrompt()).toEqual([existingAppend, toolGuideline, 'Work expert.']);
   expect(renderPrompt(loader)).not.toContain(CHAT_IDENTITY_PROMPT);
+});
+
+test('an existing Work session keeps its expert instructions after loader reload', async () => {
+  const state = { chatMode: false, systemPrompt: 'Work expert.' };
+  const loader = createLoader(createPiPromptOverrides(state, () => []));
+  await loader.reload();
+
+  state.systemPrompt = `Follow this expert.\n\n${RetiredScheduledTaskPrompt}`;
+  await loader.reload();
+  const prompt = renderPrompt(loader);
+  expectZhiyuanPrompt(prompt);
+  expect(prompt).toContain('Follow this expert.');
+  expect(prompt).not.toContain(RetiredScheduledTaskPrompt);
 });

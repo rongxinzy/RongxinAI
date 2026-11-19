@@ -118,6 +118,8 @@ export type PiStartOptions = {
   codingElicitation?: boolean;
   /** No foreground user is available to answer questions during this run. */
   unattended?: boolean;
+  /** This run returns its answer to the scheduler's configured delivery. */
+  scheduledTaskRun?: boolean;
   workspaceRoot?: string;
   confirmationMode?: 'modal' | 'text';
   /** UI session mode, used to apply Work-only execution controls. */
@@ -182,6 +184,7 @@ export type PiContinueOptions = {
   codingElicitation?: boolean;
   /** No foreground user is available to answer questions during this run. */
   unattended?: boolean;
+  scheduledTaskRun?: PiStartOptions['scheduledTaskRun'];
   onSettled?: PiStartOptions['onSettled'];
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;

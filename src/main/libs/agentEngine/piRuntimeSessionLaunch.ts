@@ -30,7 +30,6 @@ import { isLocalProviderName, ModelCapabilityStatus } from '../../../shared/prov
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkMessage } from '../../coworkStore';
 import { t } from '../../i18n';
-import { captureMemoryPromptForE2e } from '../../memory/memoryPromptE2eCapture';
 import { resolveProjectMemoryContextForPiPrompt } from '../../memory/piRuntimeProjectMemoryPrompt';
 import { applyApplicationRuntimeEnv } from '../coworkUtil';
 import {
@@ -482,8 +481,6 @@ export async function startPiRuntimeSession(
       goalMode: options.goalMode === true,
       planMode: options.planMode === true,
       pendingSkillReload: false,
-      pendingTurnMemoryContext: null,
-      injectedProjectMemorySections: [],
       pendingError: null,
       errorSurfaced: false,
       retryNoticeEmitted: false,
@@ -501,6 +498,7 @@ export async function startPiRuntimeSession(
       settingsManager,
       approvalMode: options.approvalMode ?? WorkbenchApprovalMode.Ask,
       unattended: resourceState.unattended,
+      scheduledTaskRun: options.scheduledTaskRun === true,
       isRunning: true,
       lastUsedAt: Date.now(),
       turnFailed: false,
@@ -515,7 +513,6 @@ export async function startPiRuntimeSession(
         event => {
           if (event.type === PiAgentEventType.CompactionEnd && event.result) {
             host.memoryInjectionDedup.reset(sessionId);
-            active.injectedProjectMemorySections = [];
           }
         },
         event => host.emit('executionEvent', sessionId, event),
@@ -563,7 +560,6 @@ export async function startPiRuntimeSession(
     host.memoryInjectionDedup.reset(sessionId);
     const projectMemoryContext = await resolveProjectMemoryContextForPiPrompt({
       chatMode: resourceState.chatMode,
-      memoryInjectionDedup: host.memoryInjectionDedup,
       projectMemoryService: host.getProjectMemoryService(),
       workspaceRoot,
       sessionId,
@@ -571,13 +567,7 @@ export async function startPiRuntimeSession(
       signal: abortController.signal,
     });
     if (host.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
-    active.pendingTurnMemoryContext = projectMemoryContext;
-    captureMemoryPromptForE2e({
-      sessionId,
-      userPrompt: prompt,
-      memoryContext: projectMemoryContext,
-      initialPrompt: prompt,
-    });
+    active.pendingTurnMemory = { userPrompt: prompt, context: projectMemoryContext };
 
     // The user may stop the session while the execution-mode question is
     // open. Do not revive an aborted Pi turn when that question resolves.

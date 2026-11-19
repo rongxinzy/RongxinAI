@@ -1,3 +1,4 @@
+import { stripRetiredScheduledTaskPrompt } from '../../../scheduledTask/enginePrompt';
 import { getBranding } from '../../../shared/branding';
 
 export function getZhiyuanProductPreamble(): string {
@@ -18,12 +19,15 @@ export function createPiPromptOverrides(
 ) {
   return {
     systemPromptOverride: (_base?: string): string => getZhiyuanProductPreamble(),
-    appendSystemPromptOverride: (base: string[] = []): string[] => [
-      ...base,
-      ...contributions(),
-      ...[state.systemPrompt.trim(), ...(state.chatMode ? [CHAT_IDENTITY_PROMPT] : [])].filter(
-        Boolean,
-      ),
-    ],
+    appendSystemPromptOverride: (base: string[] = []): string[] => {
+      const hostPrompt = state.chatMode
+        ? state.systemPrompt
+        : stripRetiredScheduledTaskPrompt(state.systemPrompt);
+      return [
+        ...base,
+        ...contributions(),
+        ...[hostPrompt.trim(), ...(state.chatMode ? [CHAT_IDENTITY_PROMPT] : [])].filter(Boolean),
+      ];
+    },
   };
 }

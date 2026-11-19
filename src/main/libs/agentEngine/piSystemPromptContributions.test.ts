@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { SessionSummarySystemPrompt } from '../../sessionSummary/tool';
+import { ScheduledTaskAvailabilityGuidance } from '../../../scheduledTask/enginePrompt';
 import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import {
@@ -60,12 +60,12 @@ describe('piSystemPromptContributions', () => {
     expect(PiSystemPromptContributions.map(c => c.id)).toEqual([
       'unattended-execution',
       'python-runtime',
-      'session-summary',
+      'scheduled-task-availability',
     ]);
     for (const policy of [
       PiUnattendedSystemPrompt,
       PiPythonEnvSystemPrompt,
-      SessionSummarySystemPrompt,
+      ScheduledTaskAvailabilityGuidance,
     ]) {
       expect(resolvedPrompts).toContain(policy);
     }
@@ -87,7 +87,7 @@ describe('piSystemPromptContributions', () => {
     expect(text).not.toContain(PiPythonEnvSystemPrompt);
     expect(text.some(prompt => prompt.includes('## Large File Writes'))).toBe(false);
     // Tool-agnostic policies stay present in both modes.
-    expect(text).toContain(SessionSummarySystemPrompt);
+    expect(text).toContain(ScheduledTaskAvailabilityGuidance);
   });
 
   it('adds autonomous guidance only when unattended', () => {

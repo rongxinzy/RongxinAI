@@ -1,5 +1,5 @@
 import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
-import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
+import { stripRetiredScheduledTaskPrompt } from '../../scheduledTask/enginePrompt';
 import {
   applyCoworkLanguagePrompt,
   type CoworkPromptLanguage,
@@ -64,18 +64,13 @@ const stripManagedCoworkPrompt = (
   );
   result = removeDelimitedBlocks(
     result,
-    CoworkManagedPromptMarker.ScheduledTasksStart,
-    CoworkManagedPromptMarker.ScheduledTasksEnd,
-  );
-  result = removeDelimitedBlocks(
-    result,
     CoworkManagedPromptMarker.ExpertsStart,
     CoworkManagedPromptMarker.ExpertsEnd,
   );
 
   // Normalize sessions created before managed markers were introduced.
   result = removeExactText(result, ZhiyuanIdentityPrompt);
-  result = removeExactText(result, buildScheduledTaskEnginePrompt());
+  result = stripRetiredScheduledTaskPrompt(result);
   for (const expert of previousExpertSnapshots) {
     result = removeExactText(result, expert.promptSnapshot.trim());
   }
@@ -111,11 +106,6 @@ export const composeCoworkSystemPrompt = ({
           ZhiyuanIdentityPrompt,
           CoworkManagedPromptMarker.IdentityEnd,
         ),
-    managedBlock(
-      CoworkManagedPromptMarker.ScheduledTasksStart,
-      buildScheduledTaskEnginePrompt(),
-      CoworkManagedPromptMarker.ScheduledTasksEnd,
-    ),
     // The expert block precedes the user base prompt so the expert identity
     // and workflow instructions are read before any conflicting default
     // identity instructions in the user-configured prompt.
