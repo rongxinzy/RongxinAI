@@ -51,7 +51,7 @@ export interface DesktopPetPose {
   walkId?: number;
 }
 
-export interface DesktopPetWalkFrame {
+interface DesktopPetWalkFrame {
   walkId: number;
   mediaTime: number;
 }
