@@ -4,7 +4,7 @@ import path from 'path';
 import { app, BrowserWindow } from 'electron';
 
 import { agentRuntime } from './agentRuntimeState';
-import { mcpRuntime } from './mcpRuntimeState';
+import { diagnoseCodingMcp } from './codingMcpDiagnostics';
 import {
   getAgentManager,
   getCoworkStore,
@@ -191,34 +191,7 @@ export const getCodingRoomService = (): CodingRoomService => {
         cancelBuiltinElicitation: (requestId, reason) =>
           runtime.cancelCodingElicitation(requestId, reason),
         compactBuiltinSession: sessionId => runtime.compactSession(sessionId),
-        describeBuiltinMcp: (target?: string) => {
-          const statuses = new Map(
-            (mcpRuntime.serverManager?.serverStatuses ?? []).map(
-              status => [status.name, status] as const,
-            ),
-          );
-          const manifest = mcpRuntime.serverManager?.toolManifest ?? [];
-          return {
-            gatewayAvailable: agentRuntime.piRuntimeAdapter?.hasMcpServerManager() ?? false,
-            target: target ?? null,
-            servers: getMcpStore()
-              .listServers()
-              .filter(server => !target || server.name === target)
-              .map(server => {
-                const status = statuses.get(server.name);
-                return {
-                  name: server.name,
-                  enabled: server.enabled,
-                  connected: status?.connected ?? false,
-                  toolCount: status?.toolCount ?? 0,
-                  ...(status?.error ? { error: status.error } : {}),
-                };
-              }),
-            tools: manifest
-              .filter(entry => !target || entry.server === target)
-              .map(entry => ({ server: entry.server, name: entry.name })),
-          };
-        },
+        describeBuiltinMcp: target => diagnoseCodingMcp(getMcpStore().listServers(), target),
         enqueueBuiltinControlAction: (sessionId, action) =>
           runtime.enqueueControlAction(sessionId, action),
         isBuiltinSessionRunning: sessionId => runtime.isSessionRunning(sessionId),

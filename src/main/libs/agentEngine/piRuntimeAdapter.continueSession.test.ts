@@ -10,7 +10,6 @@ import {
   adapter,
   mockCreateAgentSession,
   mockDefaultResourceLoader,
-  mockMcpExtensionFactory,
   mockSession,
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
@@ -146,26 +145,17 @@ describe('PiRuntimeAdapter', () => {
       ]);
     });
 
-    it('reloads the session in place after MCP discovery refreshes its tool topology (F13)', async () => {
-      adapter.setMcpServerManager({
-        toolManifest: [
-          {
-            server: 'Supabase',
-            name: 'list_projects',
-            description: 'List projects',
-            inputSchema: { type: 'object' },
-          },
-        ],
-        lastEnabledRecords: [],
-      } as never);
+    it('reloads the session in place before the next turn after MCP configuration changes', async () => {
+      adapter.setMcpServerSource({ listEnabled: () => [] });
       await adapter.startSession('test', 'First');
 
-      adapter.refreshMcpTools();
+      adapter.markMcpConfigurationChanged();
+      expect(mockSession.reload).not.toHaveBeenCalled();
       await adapter.continueSession('test', 'Use Supabase');
 
       expect(mockSession.abort).not.toHaveBeenCalled();
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(1);
-      expect(mockSession.reload).toHaveBeenCalled();
+      expect(mockSession.reload).toHaveBeenCalledOnce();
     });
 
     it('persists the selected expert on a continuation user message', async () => {

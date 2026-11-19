@@ -26,8 +26,6 @@ import {
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
 
-import path from 'path';
-
 import { describe, expect, it, vi } from 'vitest';
 import { PiWebSearchToolName } from './constants';
 import { getZhiyuanProductPreamble } from './piPromptOverrides';
@@ -38,6 +36,9 @@ import { PiDocumentReaderToolName } from './piDocumentReaderTool';
 import { PiSubagentToolName } from './piSubagentTool';
 import { CONVERSATION_HISTORY_TOOL_NAME } from '../../conversationHistory/constants';
 import { applyPiPlatformToolOverrides } from './piRuntimeSettingsOverrides';
+import type { CoworkStore } from '../../coworkStore';
+import type { McpServerRecord } from '../../mcpStore';
+import type { PiLoadedMcpConfig } from './piMcpExtensionBridge';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 
 describe('PiRuntimeAdapter', () => {
@@ -76,10 +77,8 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('keeps Chat on Pi while skipping Work prompt, default Skill, and MCP resources', async () => {
-      adapter.setMcpServerManager({
-        toolManifest: [{ name: 'list_projects', description: 'List projects' }],
-        serverStatuses: [{ name: 'Supabase', connected: true, toolCount: 1 }],
-      } as never);
+      const listEnabled = vi.fn(() => []);
+      adapter.setMcpServerSource({ listEnabled });
       adapter.setProjectMemoryService({} as never);
       adapter.setConversationHistoryService({ search: vi.fn(() => []) } as never);
       const beginRun = vi.fn();
@@ -103,6 +102,7 @@ describe('PiRuntimeAdapter', () => {
       expect(loaderOptions.additionalSkillPaths).toEqual([]);
       expect(loaderOptions.extensionFactories ?? []).not.toContain(mockMcpExtensionFactory);
       expect(loaderOptions.extensionFactories ?? []).not.toContain(mockCodemodeExtensionFactory);
+      expect(listEnabled).not.toHaveBeenCalled();
       expect(mockSession.bindExtensions).not.toHaveBeenCalled();
       expect(loaderOptions.systemPromptOverride('Discovered custom prompt')).toBe(
         getZhiyuanProductPreamble(),
@@ -233,12 +233,23 @@ describe('PiRuntimeAdapter', () => {
       expect(sessionOptions.excludeTools).toEqual(['bash']);
     });
 
-    it('always routes work sessions through Pi builtin MCP extension', async () => {
-      adapter.setMcpServerManager({
-        toolManifest: [],
-        lastEnabledRecords: [],
-      } as never);
-      await adapter.startSession('mcp-native', 'Hello Pi');
+    it('loads current MCP configuration through Pi and keeps the expert server scope', async () => {
+      const records: McpServerRecord[] = [];
+      adapter.setMcpServerSource({ listEnabled: () => records });
+      adapter.setCoworkStore({
+        getSession: vi.fn(() => ({
+          experts: [
+            {
+              expertId: 'expert',
+              capabilityPolicy: { mcpIds: ['by-id', 'by-name'] },
+            },
+          ],
+        })),
+        getAgent: vi.fn(),
+        addMessage: vi.fn(),
+        updateSession: vi.fn(),
+      } as unknown as CoworkStore);
+      await adapter.startSession('mcp-native', 'Hello Pi', { expertIds: ['expert'] });
 
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         extensionFactories?: unknown[];
@@ -251,6 +262,29 @@ describe('PiRuntimeAdapter', () => {
         }),
       );
       expect(mockSession.bindExtensions).toHaveBeenCalled();
+
+      const [{ loadConfig }] = mockCreateMcpExtension.mock.lastCall as unknown as [
+        { loadConfig: () => PiLoadedMcpConfig },
+      ];
+      expect(loadConfig().servers).toEqual([]);
+      const record = (id: string, name: string): McpServerRecord => ({
+        id,
+        name,
+        enabled: true,
+        description: '',
+        transportType: 'http',
+        url: 'http://127.0.0.1/mcp',
+        timeout: 60,
+        isBuiltIn: false,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      records.push(
+        record('by-id', 'first'),
+        record('second', 'by-name'),
+        record('third', 'hidden'),
+      );
+      expect(loadConfig().servers.map(server => server.name)).toEqual(['first', 'by-name']);
     });
 
     it('excludes codemode from chat sessions even when requested', async () => {

@@ -4,8 +4,14 @@ import { app } from 'electron';
 
 import { agentRuntime } from './agentRuntimeState';
 import { memoryRuntime } from './memoryRuntimeState';
-import { mcpRuntime } from './mcpRuntimeState';
-import { getCoworkStore, getArtifactLedger, getSkillManager, getStore } from './runtimeServices';
+import { refreshMcpOAuthRecord } from './mcpOAuthHeaders';
+import {
+  getCoworkStore,
+  getArtifactLedger,
+  getMcpStore,
+  getSkillManager,
+  getStore,
+} from './runtimeServices';
 import { EngramManager } from '../memory/engramManager';
 import { ProjectMemoryService } from '../memory/projectMemoryService';
 import { MemoryRepository } from '../memory/repository';
@@ -94,18 +100,10 @@ export const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     // Live team member definitions must read the same bundled truth as the
     // main-session preset snapshot, not the userData skills copy.
     agentRuntime.piRuntimeAdapter.setBundledSkillsRoot(getSkillManager().getBundledSkillsRoot());
-    // MCP initialization runs asynchronously, so late injection may still be needed.
-    console.log(
-      '[PiRuntime] mcpServerManager available at init:',
-      mcpRuntime.serverManager !== null,
-    );
-  }
-  // Late-injection: mcpServerManager is created async after Pi init.
-  // On subsequent calls (e.g. from IPC handlers), it is available and
-  // we inject it so Pi sessions can use MCP tools.
-  if (mcpRuntime.serverManager && !agentRuntime.piRuntimeAdapter.hasMcpServerManager()) {
-    console.log('[PiRuntime] Late-injecting mcpServerManager (was null at init)');
-    agentRuntime.piRuntimeAdapter.setMcpServerManager(mcpRuntime.serverManager);
+    agentRuntime.piRuntimeAdapter.setMcpServerSource({
+      listEnabled: () => getMcpStore().getEnabledServers(),
+      refreshOAuthRecord: refreshMcpOAuthRecord,
+    });
   }
   return agentRuntime.piRuntimeAdapter;
 };

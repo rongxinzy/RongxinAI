@@ -60,7 +60,7 @@ test('runs builtin control commands locally instead of forwarding them to the ag
 test('answers the mcp command from the runtime instead of the agent', async () => {
   const db = openCodingRoomDatabase();
   const startBuiltinSession = vi.fn(async () => undefined);
-  const describeBuiltinMcp = vi.fn((target?: string) => ({
+  const describeBuiltinMcp = vi.fn(async (target?: string) => ({
     gatewayAvailable: true,
     target: target ?? null,
     servers: [{ name: 'github', enabled: true, connected: true, toolCount: 1 }],

@@ -230,7 +230,7 @@ const removeFeishuSkills = async (): Promise<void> => {
   console.log('[Feishu] official CLI skills removed from the Agent');
 };
 
-export const verifyFeishuConnector = async (signal?: AbortSignal): Promise<void> => {
+const verifyFeishuConnector = async (signal?: AbortSignal): Promise<void> => {
   const cliCommand = await findFeishuCliCommand();
   if (!cliCommand) throw new Error('Feishu CLI is not installed.');
   const cliRoot = getCurrentFeishuCliRoot();

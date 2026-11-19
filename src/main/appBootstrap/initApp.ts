@@ -49,7 +49,7 @@ import {
 import { getCodingRoomService } from './codingRoomRuntime';
 import { getCoworkImageRoot } from './coworkSessionImages';
 import { bindPiWorkbenchRuntimeForwarder } from './piUiForwarder';
-import { initMcpServers } from './mcpBootstrap';
+import { ensureBuiltInMcpDefaultsDisabled } from './mcpBootstrap';
 import { resolveDefaultAgentModelRef } from './defaultAgentModel';
 import { ensureEmbeddedPiAgentDir } from '../libs/agentEngine/piAgentDir';
 import { handleDeepLink } from './communityAuth';
@@ -424,11 +424,11 @@ export const initApp = async (): Promise<void> => {
     }
     profiler.measure('enterpriseConfigSync');
 
-    // Start MCP servers early so Pi sessions have access to MCP tools.
-    // initMcpServers is concurrency-safe: it deduplicates via a promise lock
-    // and skips startServers() if the McpServerManager is already running.
-    const mcpTools = await initMcpServers();
-    console.log(`[Main] initApp: MCP init done, ${mcpTools.length} tools available`);
+    try {
+      ensureBuiltInMcpDefaultsDisabled();
+    } catch (error) {
+      console.error('[McpInit] Failed to apply MCP defaults:', error);
+    }
 
     bindPiWorkbenchRuntimeForwarder();
 

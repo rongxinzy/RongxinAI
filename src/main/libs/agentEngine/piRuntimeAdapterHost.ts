@@ -17,7 +17,7 @@ import type { SessionMemoryCompletion } from '../../memory/sessionMemoryExtracto
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import type { ScheduledTaskDelivery } from '../../../scheduledTask/types';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
-import type { McpServerManager } from '../mcpServerManager';
+import type { PiMcpServerSource } from './piMcpExtensionBridge';
 import type { PiAssistantTranscript } from './piAssistantTranscript';
 import type { PiCadViewerService } from './piCadViewerTool';
 import type { PiRuntimeQueueController } from './piRuntimeQueueController';
@@ -57,8 +57,8 @@ export interface PiRuntimeAdapterHost {
   getScheduledTaskService(): ScheduledTaskService | null;
   /** Delivery a scheduled task created in this session defaults to (IM chats). */
   getScheduledTaskDeliveryForSession?(sessionId: string): ScheduledTaskDelivery | null;
-  getMcpServerManager(): McpServerManager | null;
-  getMcpToolManifestGeneration(): number;
+  getMcpServerSource(): PiMcpServerSource | null;
+  getMcpConfigGeneration(): number;
   getOcrCommandFor(): ((imagePath: string) => string) | undefined;
   /**
    * Root directory (`<userData>/pi-sessions`) holding one Pi session JSONL

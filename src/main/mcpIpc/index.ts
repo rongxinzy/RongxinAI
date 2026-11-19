@@ -5,13 +5,8 @@ import path from 'path';
 import { app, dialog } from 'electron';
 import type { z } from 'zod';
 
+import { ensureBuiltInMcpDefaultsDisabled, refreshMcpBridge } from '../appBootstrap/mcpBootstrap';
 import {
-  ensureBuiltInMcpDefaultsDisabled,
-  refreshMcpBridge,
-  refreshMcpOAuthHeaders,
-} from '../appBootstrap/mcpBootstrap';
-import {
-  verifyFeishuConnector,
   FEISHU_MCP_REGISTRY_ID,
   getMcpIntegrationRuntime,
   getLocalFeishuCliCommand,
@@ -200,10 +195,6 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
             if (validationError) {
               return { success: false, error: validationError };
             }
-            // Enabling must remain responsive. refreshMcpBridge() immediately
-            // follows this write and performs the single authoritative OAuth
-            // refresh plus MCP initialization. Doing it here as a synchronous
-            // probe duplicated that network work and blocked the switch.
           }
         }
 

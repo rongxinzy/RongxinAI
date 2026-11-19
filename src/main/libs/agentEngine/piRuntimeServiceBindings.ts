@@ -12,11 +12,10 @@ import { resolveBundledPresetMembers } from '../../presetExpertSnapshot';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import type { ScheduledTaskDelivery } from '../../../scheduledTask/types';
 import { getSkillsRoot } from '../coworkUtil';
-import type { McpServerManager } from '../mcpServerManager';
+import type { PiMcpServerSource } from './piMcpExtensionBridge';
 import { resolveBundledOcrHelper } from '../ocrHelper';
 import { invalidatePiSessionDir } from './piSessionStore';
 import type { PiStartOptions } from './piRuntimeTypes';
-import type { ActivePiSession } from './piRuntimeSessionState';
 import { PiCompanionRuntime } from '../../companion/durableRuntime.mjs';
 import { CompanionModelAssignment } from '../../companion/modelAssignment.mjs';
 import { CompanionProfiles, type CompanionProfileStore } from '../../companion/profiles';
@@ -61,16 +60,14 @@ export class PiRuntimeServiceBindings extends EventEmitter {
 
   protected store: CoworkStore | null = null;
 
-  protected mcpServerManager: McpServerManager | null = null;
+  private mcpServerSource: PiMcpServerSource | null = null;
 
   protected bundledSkillsRoot: string | null = null;
 
   /**
-   * Pi custom tools are fixed when a session is created. Bump this whenever
-   * MCP discovery changes so the next user turn recreates an outdated session
-   * with the current MCP proxy topology.
+   * Pi reloads its MCP extension when the stored configuration changes.
    */
-  protected mcpToolManifestGeneration = 0;
+  private mcpConfigGeneration = 0;
 
   /** Root of per-session Pi JSONL directories (`<userData>/pi-sessions`). */
   protected piSessionStoreRoot: string | null = null;
@@ -162,56 +159,17 @@ export class PiRuntimeServiceBindings extends EventEmitter {
     return this.scheduledTaskDeliveryResolver?.(sessionId) ?? null;
   }
 
-  setMcpServerManager(mgr: McpServerManager): void {
-    this.mcpServerManager = mgr;
-    this.mcpInjected = true;
-    this.mcpToolManifestGeneration += 1;
+  setMcpServerSource(source: PiMcpServerSource): void {
+    this.mcpServerSource = source;
   }
 
   setArtifactLedger(ledger: ArtifactLedger): void {
     this.artifactLedgerService = ledger;
   }
 
-  refreshMcpTools(): void {
-    this.mcpToolManifestGeneration += 1;
-    const activeSessions = (this as unknown as { activeSessions?: Map<string, ActivePiSession> })
-      .activeSessions;
-    if (activeSessions) {
-      for (const [sessionId, active] of activeSessions.entries()) {
-        const session = active.piSession as unknown as {
-          isStreaming?: boolean;
-          isCompacting?: boolean;
-          reload: () => Promise<void>;
-        };
-        if (
-          !active.resourceState.chatMode &&
-          !active.isRunning &&
-          session &&
-          session.isStreaming !== true &&
-          session.isCompacting !== true &&
-          typeof session.reload === 'function'
-        ) {
-          void session
-            .reload()
-            .then(() => {
-              active.mcpToolManifestGeneration = this.mcpToolManifestGeneration;
-              console.debug(
-                `[PiRuntime] eagerly hot-reloaded MCP servers for idle session ${sessionId}`,
-              );
-            })
-            .catch(err => {
-              console.debug(`[PiRuntime] deferred MCP reload for session ${sessionId}:`, err);
-            });
-        }
-      }
-    }
+  markMcpConfigurationChanged(): void {
+    this.mcpConfigGeneration += 1;
   }
-
-  hasMcpServerManager(): boolean {
-    return this.mcpInjected;
-  }
-
-  protected mcpInjected = false;
 
   getStore(): CoworkStore | null {
     return this.store;
@@ -233,12 +191,12 @@ export class PiRuntimeServiceBindings extends EventEmitter {
     return this.scheduledTaskService;
   }
 
-  getMcpServerManager(): McpServerManager | null {
-    return this.mcpServerManager;
+  getMcpServerSource(): PiMcpServerSource | null {
+    return this.mcpServerSource;
   }
 
-  getMcpToolManifestGeneration(): number {
-    return this.mcpToolManifestGeneration;
+  getMcpConfigGeneration(): number {
+    return this.mcpConfigGeneration;
   }
 
   getPiSessionStoreRoot(): string | null {
