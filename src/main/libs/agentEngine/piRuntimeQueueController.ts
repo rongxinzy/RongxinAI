@@ -20,57 +20,52 @@ import {
   haveSameStringList,
   mergeSkillIds,
   preparePiPrompt,
-  sendPiPrompt,
   type ActivePiSession,
+  type PiEvent,
 } from './piRuntimeSessionState';
 import type { PiContinueOptions } from './piRuntimeTypes';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
-import { collectImagePathReferences } from './piImageInputFallback';
+import { collectImagePathReferences, type ImagePromptPreparation } from './piImageInputFallback';
 import { resolvePiSkillRoots } from './piSkillRoots';
 import { resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
+
+const ScheduledInputError =
+  'Interactive messages are unavailable while the scheduled task is running.';
+
+type QueuedFollowUp = { itemId: string; images: ImagePromptPreparation };
 
 export class PiRuntimeQueueController {
   private readonly pendingMessageQueue = new PiPendingMessageQueue();
   /** Opaque application actions that run after queued Work prompts settle. */
   private readonly queuedControlActions = new Map<string, Array<() => Promise<void>>>();
-  /** In-flight steer dispatches awaiting their initial native user message_start. */
-  private readonly pendingSteerCounts = new Map<string, number>();
+  private readonly nativeFollowUps = new Map<string, WeakMap<object, QueuedFollowUp>>();
 
   constructor(private readonly host: PiRuntimeAdapterHost) {}
 
   resetNativeDispatch(sessionId: string): void {
-    this.pendingSteerCounts.delete(sessionId);
+    this.nativeFollowUps.delete(sessionId);
   }
 
-  onNativeUserMessageStart(sessionId: string, active: ActivePiSession): void {
-    const steerCount = this.pendingSteerCounts.get(sessionId) ?? 0;
-    if (steerCount > 0) {
-      if (steerCount === 1) {
-        this.pendingSteerCounts.delete(sessionId);
-      } else {
-        this.pendingSteerCounts.set(sessionId, steerCount - 1);
-      }
-      return;
-    }
-
-    const nextPending = this.pendingMessageQueue.findNextPending(
-      sessionId,
-      CoworkQueueDelivery.FollowUp,
-    );
-    if (!nextPending) {
-      // Direct prompt: already persisted to SQLite before dispatching to Pi.
-      return;
-    }
+  onNativeUserMessageStart(
+    sessionId: string,
+    active: ActivePiSession,
+    message: NonNullable<PiEvent['message']>,
+  ): void {
+    const followUps = this.nativeFollowUps.get(sessionId);
+    const queued = followUps?.get(message);
+    if (!queued) return;
+    followUps?.delete(message);
     const item = this.pendingMessageQueue.take(
       sessionId,
-      nextPending.id,
+      queued.itemId,
       CoworkQueueDelivery.FollowUp,
     );
     if (!item) return;
+    this.applyQueuedSkillIds(active, item.skillIds);
+    this.persistQueuedSkillIds(sessionId, item.skillIds);
     this.emitQueueUpdated(sessionId);
     active.summaryCheckpointGoal = item.text;
-    const payload = this.buildQueuedPromptPayload(active, item);
-    this.host.recovery.reportOmittedImages(sessionId, payload);
+    this.host.recovery.reportOmittedImages(sessionId, queued.images);
     this.persistQueuedUserMessage(sessionId, item, CoworkQueueDelivery.FollowUp);
     this.pendingMessageQueue.finishDelivery(item.id);
   }
@@ -93,7 +88,6 @@ export class PiRuntimeQueueController {
 
   /** Clear a deleted session's queue, emitting queueUpdated when it had items. */
   clear(sessionId: string): boolean {
-    this.pendingSteerCounts.delete(sessionId);
     this.resetNativeDispatch(sessionId);
     const cleared = this.pendingMessageQueue.clear(sessionId);
     if (cleared) this.emitQueueUpdated(sessionId);
@@ -136,6 +130,8 @@ export class PiRuntimeQueueController {
     if (!active || !this.host.isSessionRunning(sessionId)) {
       return { success: false, error: 'The Work session is not running.' };
     }
+    if (active.unattended && active.onSettled)
+      return { success: false, error: ScheduledInputError };
     const normalizedText = text.trim();
     if (!hasVisiblePromptContent(normalizedText))
       return { success: false, error: 'Message text is required.' };
@@ -150,23 +146,50 @@ export class PiRuntimeQueueController {
       skillIds,
     );
     this.emitQueueUpdated(sessionId);
-    this.applyQueuedSkillIds(active, item.skillIds);
-
-    const payload = this.buildQueuedPromptPayload(active, item);
-    void sendPiPrompt(active.piSession, payload, 'followUp').catch(error => {
-      if (
-        this.host.activeSessions.get(sessionId) !== active ||
-        active.aborted ||
-        active.abortController.signal.aborted
-      ) {
-        return;
-      }
-      const message = error instanceof Error ? error.message : String(error);
-      const taken = this.pendingMessageQueue.take(sessionId, item.id, CoworkQueueDelivery.FollowUp);
-      if (!taken) return;
-      this.pendingMessageQueue.restore(sessionId, { ...taken, error: message });
-      this.emitQueueUpdated(sessionId);
-    });
+    const skillContext =
+      item.skillIds && active.resourceState.describeQueuedSkills?.(item.skillIds);
+    // Follow-ups run before Pi can reload the session's ResourceLoader. Keep the
+    // selected Skill references on this native input, leaving the current request alone.
+    const { content, ...imagePreparation } = this.buildQueuedPromptPayload(
+      active,
+      item,
+      skillContext,
+    );
+    const textParts =
+      typeof content === 'string' ? [] : content.filter(part => part.type === 'text');
+    const promptText =
+      typeof content === 'string' ? content : textParts.map(part => part.text).join('\n');
+    const images =
+      typeof content === 'string' ? undefined : content.filter(part => part.type === 'image');
+    const followUps = this.nativeFollowUps.get(sessionId) ?? new WeakMap<object, QueuedFollowUp>();
+    this.nativeFollowUps.set(sessionId, followUps);
+    // followUp queues even during initial prompt preparation, when Pi is still idle.
+    void active.piSession
+      .followUp(promptText, images, {
+        onQueued: message => followUps.set(message, { itemId: item.id, images: imagePreparation }),
+      })
+      .then(disposition => {
+        if (disposition === 'handled')
+          throw new Error('The agent handled this input without adding a follow-up.');
+      })
+      .catch(error => {
+        if (
+          this.host.activeSessions.get(sessionId) !== active ||
+          active.aborted ||
+          active.abortController.signal.aborted
+        ) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        const taken = this.pendingMessageQueue.take(
+          sessionId,
+          item.id,
+          CoworkQueueDelivery.FollowUp,
+        );
+        if (!taken) return;
+        this.pendingMessageQueue.restore(sessionId, { ...taken, error: message });
+        this.emitQueueUpdated(sessionId);
+      });
 
     return { success: true, item };
   }
@@ -177,19 +200,19 @@ export class PiRuntimeQueueController {
     if (!active || active.aborted || !this.host.isSessionRunning(sessionId)) {
       return { success: false, error: 'The Work session is not running.' };
     }
+    if (active.unattended && active.onSettled)
+      return { success: false, error: ScheduledInputError };
     if (active.resourceState.chatMode || !hasVisiblePromptContent(text)) {
       return { success: false, error: 'Steering requires a Work session and message text.' };
     }
-    this.persistQueuedUserMessage(sessionId, { text }, CoworkQueueDelivery.Steer);
-    this.pendingSteerCounts.set(sessionId, (this.pendingSteerCounts.get(sessionId) ?? 0) + 1);
     try {
-      await active.piSession.steer(text);
-      active.summaryCheckpointGoal = text;
+      const disposition = await active.piSession.steer(text);
+      if (disposition === 'queued' && this.host.activeSessions.get(sessionId) === active) {
+        this.persistQueuedUserMessage(sessionId, { text }, CoworkQueueDelivery.Steer);
+        active.summaryCheckpointGoal = text;
+      }
       return { success: true };
     } catch (error) {
-      const count = this.pendingSteerCounts.get(sessionId) ?? 0;
-      if (count <= 1) this.pendingSteerCounts.delete(sessionId);
-      else this.pendingSteerCounts.set(sessionId, count - 1);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -236,9 +259,15 @@ export class PiRuntimeQueueController {
     return this.host.isStoredSessionWorkMode(sessionId);
   }
 
-  private buildQueuedPromptPayload(active: ActivePiSession, item: CoworkPendingMessage) {
+  private buildQueuedPromptPayload(
+    active: ActivePiSession,
+    item: CoworkPendingMessage,
+    skillContext?: string,
+  ) {
+    // Keep the first space after a bare /skill command so Pi can still parse it.
+    const delimiter = item.text.startsWith('/skill:') && !item.text.includes(' ') ? ' ' : '\n\n';
     return preparePiPrompt(
-      item.text,
+      skillContext ? `${item.text}${delimiter}${skillContext}` : item.text,
       item.imageAttachments,
       this.host.recovery.imageInputVerdictForActive(active),
       this.host.getOcrCommandFor(),
@@ -249,15 +278,30 @@ export class PiRuntimeQueueController {
   private applyQueuedSkillIds(active: ActivePiSession, skillIds?: string[]): void {
     const mergedSkillIds = mergeSkillIds(active.resourceState.skillIds, skillIds);
     if (haveSameStringList(mergedSkillIds, active.resourceState.skillIds)) return;
-    active.resourceState.skillIds = mergedSkillIds;
-    active.resourceState.skillRoots = resolvePiSkillRoots(
+    const skillRoots = resolvePiSkillRoots(
       mergedSkillIds,
       resolveZhiyuanSkillDirs(),
       active.resourceState.expertSkillDirs,
     );
+    if (skillRoots['text-to-cad'] && !active.resourceState.skillRoots['text-to-cad']) {
+      active.pendingCadToolReload = true;
+    }
+    active.resourceState.skillIds = mergedSkillIds;
+    active.resourceState.skillRoots = skillRoots;
     active.requestedSkillIds = mergedSkillIds;
     // Defer `piSession.reload()` until idle; Pi refuses reload() while streaming.
     active.pendingSkillReload = true;
+  }
+
+  private persistQueuedSkillIds(sessionId: string, skillIds?: string[]): void {
+    if (!skillIds?.length) return;
+    const store = this.host.getStore();
+    const session = store?.getSession(sessionId, 0, { includeArtifacts: false });
+    if (!store || !session) return;
+    const activeSkillIds = mergeSkillIds(session.activeSkillIds, skillIds) ?? [];
+    if (!haveSameStringList(session.activeSkillIds, activeSkillIds)) {
+      store.updateSession(sessionId, { activeSkillIds }, { touchUpdatedAt: false });
+    }
   }
 
   private persistQueuedUserMessage(

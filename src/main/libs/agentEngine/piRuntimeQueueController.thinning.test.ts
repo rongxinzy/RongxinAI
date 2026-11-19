@@ -17,6 +17,7 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
     mockPiSession = {
       prompt: vi.fn().mockResolvedValue(undefined),
       sendUserMessage: vi.fn().mockResolvedValue(undefined),
+      followUp: vi.fn().mockResolvedValue('queued'),
       clearQueue: vi.fn(() => ({ steering: [], followUp: [] })),
     };
 
@@ -79,8 +80,8 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       expect(list[0].id).toBe(result.item?.id);
 
       // Verify native send called with followUp
-      expect(mockPiSession.sendUserMessage).toHaveBeenCalledWith(expect.anything(), {
-        deliverAs: 'followUp',
+      expect(mockPiSession.followUp).toHaveBeenCalledWith('Process file data', expect.any(Array), {
+        onQueued: expect.any(Function),
       });
     });
 
@@ -100,7 +101,9 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       expect(queueController.list(sessionId)).toHaveLength(1);
 
       // Simulate Pi emitting message_start for user
-      queueController.onNativeUserMessageStart(sessionId, activeSession);
+      const message = { role: 'user', content: 'Queued item' };
+      mockPiSession.followUp.mock.calls[0][2].onQueued(message);
+      queueController.onNativeUserMessageStart(sessionId, activeSession, message);
 
       // Sidecar item is taken and finished
       expect(queueController.list(sessionId)).toHaveLength(0);
@@ -118,7 +121,10 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       expect(queueController.list(sessionId)).toHaveLength(0);
 
       // Fire message_start for direct prompt
-      queueController.onNativeUserMessageStart(sessionId, activeSession);
+      queueController.onNativeUserMessageStart(sessionId, activeSession, {
+        role: 'user',
+        content: 'Direct prompt',
+      });
 
       // No message added since direct prompt is already saved prior to dispatch
       expect(mockStore.addMessage).not.toHaveBeenCalled();

@@ -8,7 +8,7 @@ import type { Platform } from '../../../shared/platform';
 import type { ActivityService } from '../../activity/activityService';
 import type { CoworkMessage, CoworkStore } from '../../coworkStore';
 import { generateCorrelationId } from '../../libs/logCorrelation';
-import { formatIMReply } from './replies';
+import { DEFAULT_IM_EMPTY_REPLY, formatIMReply } from './replies';
 import type { IMCoworkBackgroundDelivery, MessageAccumulator } from './types';
 
 const ACCUMULATOR_TIMEOUT_MS = 4 * 60 * 1000 + 30 * 1000;
@@ -59,10 +59,10 @@ export class IMCoworkAccumulatorRegistry {
       const timeoutId = setTimeout(() => {
         const accumulator = this.accumulators.get(sessionId);
         if (accumulator && accumulator.timeoutId === timeoutId) {
-          const partialReply = formatIMReply(sessionId, accumulator.messages);
+          const partialReply = formatIMReply(accumulator.messages);
           this.cleanup(sessionId);
           this.deps.stopSession(sessionId);
-          if (partialReply && partialReply !== '处理完成，但没有生成回复。') {
+          if (partialReply && partialReply !== DEFAULT_IM_EMPTY_REPLY) {
             this.emitRunEvent(
               sessionId,
               accumulator,

@@ -18,6 +18,7 @@ import type {
   CreateAgentSessionOptions,
   CreateAgentSessionResult,
   DefaultResourceLoader,
+  formatSkillsForPrompt,
 } from '@earendil-works/pi-coding-agent';
 import {
   buildPiBackgroundCompletionContext,
@@ -45,8 +46,8 @@ export interface PiSession {
       | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>,
     options?: { deliverAs?: 'steer' | 'followUp' },
   ): Promise<void>;
-  steer(text: string): Promise<unknown>;
-  followUp?(text: string): Promise<unknown>;
+  steer: AgentSession['steer'];
+  followUp: AgentSession['followUp'];
   abort(): Promise<void>;
   abortBash(): void;
   dispose?(): void;
@@ -170,6 +171,7 @@ export interface ActivePiSession {
   /** Latest completed answer message, promoted to final only when the agent run ends. */
   lastCompletedAnswerMessageId: string | null;
   lastCompletedAnswerText: string;
+  onSettled?: PiStartOptions['onSettled'];
   /** Latest assistant message payload from Pi, including stopReason. */
   lastAssistantMessage?: PiEvent['message'];
   /**
@@ -240,6 +242,8 @@ export interface ActivePiSession {
    * reload its ResourceLoader once idle before starting another turn.
    */
   pendingSkillReload?: boolean;
+  /** The newly attached CAD Skill needs a new idle session to register its viewer tool. */
+  pendingCadToolReload?: boolean;
   /** Newly recalled memory block staged for injection in `before_agent_start`. */
   pendingTurnMemoryContext?: string | null;
   /** Deduped memory blocks currently active in this compaction window's system prompt. */
@@ -257,6 +261,7 @@ export interface PiModules {
     options?: CreateAgentSessionOptions | Record<string, unknown>,
   ) => Promise<{ session: PiSession }>;
   DefaultResourceLoader: new (options?: Record<string, unknown>) => PiResourceLoader;
+  formatSkillsForPrompt: typeof formatSkillsForPrompt;
   SessionManager?: {
     inMemory(cwd?: string): unknown;
     create(cwd: string, sessionDir?: string, options?: { id?: string }): unknown;
@@ -319,6 +324,8 @@ export interface PiResourceState {
   /** Bundled preset skill dirs for the session's experts (file-sourced, live). */
   expertSkillDirs: string[];
   skillRoots: Record<string, string>;
+  /** Formats explicitly attached Skills missing from the native run's loadout. */
+  describeQueuedSkills?: (skillIds: readonly string[]) => string;
 }
 
 export interface PiStartupLatency {
@@ -333,6 +340,7 @@ export interface PiStartupLatency {
 export interface InitializingPiSession {
   abortController: AbortController;
   generation: symbol;
+  onSettled?: PiStartOptions['onSettled'];
 }
 
 export interface PiModelRuntime {
@@ -475,6 +483,7 @@ export async function getPiModules(): Promise<PiModules> {
           codingAgent.createAgentSession as unknown as PiModules['createAgentSession'],
         DefaultResourceLoader:
           codingAgent.DefaultResourceLoader as unknown as PiModules['DefaultResourceLoader'],
+        formatSkillsForPrompt: codingAgent.formatSkillsForPrompt,
         SessionManager: Object.prototype.hasOwnProperty.call(codingAgent, 'SessionManager')
           ? ((codingAgent as typeof codingAgent & { SessionManager?: unknown })
               .SessionManager as PiModules['SessionManager'])

@@ -3,7 +3,7 @@
  *
  * Extracted from PiRuntimeAdapter.continueSession/patchSession: drives a
  * follow-up turn on a live Pi session — deciding whether the session can be
- * reused or must be recreated (model/skills/MCP topology/unattended changes
+ * reused or must be recreated (workspace/model/skills/MCP topology/unattended changes
  * restore history from the store), reloading resources, running the workbench
  * run bookkeeping, and dispatching the next prompt. patchSession swaps the
  * model or thinking level of a live session in place.
@@ -50,6 +50,12 @@ export async function continuePiRuntimeSession(
   const explicitExpertIds = normalizeSingleExpertIds(options.expertIds);
   const nextUnattended = options.unattended === true;
   const active = host.activeSessions.get(sessionId);
+  if (
+    host.isSessionRunning(sessionId) &&
+    (options.onSettled || active?.onSettled || host.initializingSessions.get(sessionId)?.onSettled)
+  ) {
+    throw new Error('A Pi run is already active in this session.');
+  }
   if (!active || active.aborted) {
     if (active?.aborted) {
       host.activeSessions.delete(sessionId);
@@ -94,7 +100,10 @@ export async function continuePiRuntimeSession(
     !active.resourceState.chatMode &&
     active.mcpToolManifestGeneration !== host.getMcpToolManifestGeneration();
   const unattendedTopologyChanged = nextUnattended !== active.unattended;
+  // Native tools and resources capture cwd at creation. Reopen the same Pi
+  // transcript with the new workspace rather than changing adapter metadata.
   if (
+    (options.workspaceRoot !== undefined && options.workspaceRoot !== active.workspaceRoot) ||
     (options.modelOverride !== undefined &&
       options.modelOverride !== active.requestedModelOverride) ||
     !haveSameStringList(requestedExpertIds, active.requestedExpertIds) ||
@@ -105,6 +114,7 @@ export async function continuePiRuntimeSession(
     return await host.startSession(sessionId, prompt, {
       ...options,
       sessionMode: requestedSessionMode,
+      skipInitialUserMessage: options._skipUserMessage,
       systemPrompt: requestedSystemPrompt ?? active.requestedSystemPrompt,
       skillIds: requestedSkillIds,
       expertIds: requestedExpertIds,
@@ -113,15 +123,6 @@ export async function continuePiRuntimeSession(
       unattended: nextUnattended,
     });
   }
-
-  if (options.approvalMode !== undefined) {
-    active.approvalMode = options.approvalMode;
-  }
-  active.isRunning = true;
-  active.turnFailed = false;
-  active.errorSurfaced = false;
-  active.retryNoticeEmitted = false;
-  active.retryAttempts = 0;
 
   const nextSystemPrompt = requestedSystemPrompt ?? active.requestedSystemPrompt;
   const promptChanged = nextSystemPrompt !== active.requestedSystemPrompt;
@@ -140,11 +141,15 @@ export async function continuePiRuntimeSession(
   // Chat sessions filter `additionalSkillPaths` at ResourceLoader creation and
   // CAD custom tool registration is decided once at createAgentSession. Work-mode
   // skill changes reload in place without tearing down the Pi session or MCPs.
-  if (skillsChanged && (active.resourceState.chatMode || cadToolChanged)) {
+  if (
+    (skillsChanged && (active.resourceState.chatMode || cadToolChanged)) ||
+    (active.pendingCadToolReload && nextSkillRoots['text-to-cad'])
+  ) {
     host.disposeSessionForRecreation(sessionId, active);
     return await host.startSession(sessionId, prompt, {
       ...options,
       sessionMode: requestedSessionMode,
+      skipInitialUserMessage: options._skipUserMessage,
       systemPrompt: nextSystemPrompt,
       skillIds: requestedSkillIds,
       expertIds: requestedExpertIds,
@@ -153,6 +158,18 @@ export async function continuePiRuntimeSession(
       unattended: nextUnattended,
     });
   }
+
+  if (options.approvalMode !== undefined) {
+    active.approvalMode = options.approvalMode;
+  }
+  active.isRunning = true;
+  active.onSettled = options.onSettled;
+  active.turnFailed = false;
+  active.errorSurfaced = false;
+  active.retryNoticeEmitted = false;
+  active.retryAttempts = 0;
+  const isCurrentSession = () =>
+    host.activeSessions.get(sessionId) === active && !active.abortController.signal.aborted;
 
   active.goalMode = nextGoalMode;
   active.planMode = nextPlanMode;
@@ -173,6 +190,7 @@ export async function continuePiRuntimeSession(
       // Pi reloads the existing ResourceLoader without replacing transcript
       // state, model, MCP tools, or custom expert tools.
       await active.piSession.reload();
+      if (!isCurrentSession()) return;
       active.requestedSystemPrompt = nextSystemPrompt;
       active.requestedSkillIds = requestedSkillIds;
       active.pendingSkillReload = false;
@@ -182,10 +200,12 @@ export async function continuePiRuntimeSession(
       }
       console.debug('[PiRuntime] reloaded session resources after prompt or skill change');
     } catch (error) {
+      if (!isCurrentSession()) return;
       active.resourceState.systemPrompt = previousSystemPrompt;
       active.resourceState.skillIds = previousSkillIds;
       active.resourceState.skillRoots = previousSkillRoots;
       active.isRunning = false;
+      active.onSettled = undefined;
       const message = error instanceof Error ? error.message : String(error);
       host.emit('error', sessionId, classifyCoworkError(message));
       throw error;
@@ -297,7 +317,7 @@ export async function continuePiRuntimeSession(
       userPrompt: prompt,
       signal: active.abortController.signal,
     });
-    active.abortController.signal.throwIfAborted();
+    if (!isCurrentSession()) return;
     active.pendingTurnMemoryContext = projectMemoryContext;
     captureMemoryPromptForE2e({
       sessionId,
@@ -315,12 +335,10 @@ export async function continuePiRuntimeSession(
     host.recovery.reportOmittedImages(sessionId, continuedImagePrompt);
     await sendPiPrompt(active.piSession, continuedImagePrompt);
   } catch (error) {
+    if (!isCurrentSession()) return;
     host.memoryInjectionDedup.reset(sessionId);
     active.isRunning = false;
-    if (active.abortController.signal.aborted) {
-      host.emit('sessionStopped', sessionId);
-      return;
-    }
+    active.onSettled = undefined;
     const message = error instanceof Error ? error.message : String(error);
     host.emit('error', sessionId, classifyCoworkError(message));
     throw error;

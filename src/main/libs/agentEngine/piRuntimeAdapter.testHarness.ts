@@ -31,7 +31,8 @@ const hoisted = vi.hoisted(() => {
   const mockSession = {
     prompt: vi.fn().mockResolvedValue(undefined),
     sendUserMessage: vi.fn().mockResolvedValue(undefined),
-    steer: vi.fn().mockResolvedValue(undefined),
+    followUp: vi.fn().mockResolvedValue('queued'),
+    steer: vi.fn().mockResolvedValue('queued'),
     abort: vi.fn().mockResolvedValue(undefined),
     abortBash: vi.fn(),
     dispose: vi.fn(),
@@ -240,6 +241,7 @@ export const mockCompleteSimple = hoisted.mockCompleteSimple;
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   createAgentSession: hoisted.mockCreateAgentSession,
+  formatSkillsForPrompt: vi.fn(() => ''),
   DefaultResourceLoader: hoisted.mockDefaultResourceLoader,
   SessionManager: {
     inMemory: hoisted.mockSessionManagerInMemory,

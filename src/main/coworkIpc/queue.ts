@@ -41,11 +41,7 @@ export const registerCoworkQueueIpc = (deps: CoworkQueueIpcDeps): void => {
               input.imageAttachments,
             )
           : undefined;
-        // Attaching a skill is a session-level action: a queued input's picks join
-        // the session's capability set like a directly submitted one. Commit them
-        // only once the queue accepts the item, so a rejected enqueue (e.g. the
-        // turn settled first) cannot leave a skill active that nothing revealed.
-        const enqueueResult = deps
+        return deps
           .getPiRuntimeAdapter()
           .enqueuePendingMessage(
             input.sessionId,
@@ -54,19 +50,6 @@ export const registerCoworkQueueIpc = (deps: CoworkQueueIpcDeps): void => {
             input.fileAttachments,
             input.skillIds,
           );
-        if (enqueueResult.success && input.skillIds?.length) {
-          const queuedSession = deps.getCoworkStore().getSession(input.sessionId, 0);
-          if (queuedSession) {
-            deps.getCoworkStore().updateSession(
-              input.sessionId,
-              {
-                activeSkillIds: [...new Set([...queuedSession.activeSkillIds, ...input.skillIds])],
-              },
-              { touchUpdatedAt: false },
-            );
-          }
-        }
-        return enqueueResult;
       } catch (error) {
         return {
           success: false as const,

@@ -75,6 +75,7 @@ export function stopActivePiRuntimeSession(
   if (initializing) {
     initializing.abortController.abort();
     host.initializingSessions.delete(sessionId);
+    initializing.onSettled?.({ ok: false, error: reason });
   }
   const active = host.activeSessions.get(sessionId);
   if (!active) {
@@ -87,6 +88,7 @@ export function stopActivePiRuntimeSession(
     if (cause && !host.retainedSessionIds.has(sessionId)) {
       recordSessionInterruption(host, sessionId, cause);
     }
+    if (initializing) host.emit('sessionStopped', sessionId);
     return;
   }
   if (!active.isRunning && active.aborted) return;
@@ -101,6 +103,8 @@ export function stopActivePiRuntimeSession(
   active.aborted = true;
   active.isRunning = false;
   active.turnFailed = false;
+  const onSettled = active.onSettled;
+  active.onSettled = undefined;
   active.artifactRecorder?.dispose();
   // Drop any deferred error without surfacing it — the user stopped the turn.
   active.pendingError = null;
@@ -122,6 +126,7 @@ export function stopActivePiRuntimeSession(
     host.getWorkbenchTaskService()?.cancelRun?.(sessionId, active.workbenchRunId, reason),
   );
   host.recovery.clearApprovalsBySession(sessionId);
+  onSettled?.({ ok: false, error: reason });
   host.emit('sessionStopped', sessionId);
   if (cause) recordSessionInterruption(host, sessionId, cause);
 

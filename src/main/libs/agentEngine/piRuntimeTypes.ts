@@ -99,6 +99,8 @@ type PiImageAttachment = {
   path?: string;
 };
 
+export type PiSubmissionResult = { ok: true; output: string | null } | { ok: false; error: string };
+
 export type PiStartOptions = {
   skipInitialUserMessage?: boolean;
   /** Execution skill set for this session (user selection plus expert preset). */
@@ -136,6 +138,8 @@ export type PiStartOptions = {
   modelOverride?: string;
   /** Pi thinking level applied when the session is (re)created. */
   thinkingLevel?: PiThinkingLevel;
+  /** Internal observer for this submission's native settlement or explicit stop. */
+  onSettled?: (result: PiSubmissionResult) => void;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
   _workbenchTaskId?: string;
@@ -178,6 +182,7 @@ export type PiContinueOptions = {
   codingElicitation?: boolean;
   /** No foreground user is available to answer questions during this run. */
   unattended?: boolean;
+  onSettled?: PiStartOptions['onSettled'];
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
   _workbenchTaskId?: string;

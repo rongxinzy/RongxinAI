@@ -59,9 +59,19 @@ describe('PiRuntimeAdapter', () => {
       );
       const interruptions: Array<{ cause: string }> = [];
       adapter.on('sessionInterrupted', event => interruptions.push(event));
+      const onStopped = vi.fn();
+      adapter.on('sessionStopped', onStopped);
+      const onSettled = vi.fn();
 
-      const startPromise = adapter.startSession('initializing', 'Hello');
+      const startPromise = adapter.startSession('initializing', 'Hello', { onSettled });
       await vi.waitFor(() => expect(mockCreateAgentSession).toHaveBeenCalledOnce());
+      expect(adapter.isSessionRunning('initializing')).toBe(true);
+      await expect(adapter.startSession('initializing', 'Replacement')).rejects.toThrow(
+        'A Pi run is already active in this session.',
+      );
+      await expect(adapter.continueSession('initializing', 'Replacement')).rejects.toThrow(
+        'A Pi run is already active in this session.',
+      );
       adapter.stopSession('initializing');
       resolveCreateSession?.({ session: mockSession });
       await startPromise;
@@ -69,9 +79,81 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).not.toHaveBeenCalled();
       expect(mockSession.abort).toHaveBeenCalledOnce();
       expect(adapter.isSessionActive('initializing')).toBe(false);
+      expect(onStopped).toHaveBeenCalledExactlyOnceWith('initializing');
+      expect(onSettled).toHaveBeenCalledExactlyOnceWith({ ok: false, error: expect.any(String) });
       expect(interruptions).toEqual([
         expect.objectContaining({ cause: CoworkInterruptionCause.UserStop }),
       ]);
+    });
+
+    it('keeps interactive input out of an unattended run that will deliver a result', async () => {
+      await adapter.startSession('scheduled', 'Scheduled report', {
+        sessionMode: 'work',
+        unattended: true,
+        onSettled: vi.fn(),
+      });
+
+      expect(adapter.enqueuePendingMessage('scheduled', 'Follow up')).toMatchObject({
+        success: false,
+      });
+      await expect(adapter.steerInput('scheduled', 'Interrupt')).resolves.toMatchObject({
+        success: false,
+      });
+      expect(adapter.listPendingMessages('scheduled')).toEqual([]);
+      expect(mockSession.steer).not.toHaveBeenCalled();
+    });
+
+    it('holds scheduled submission ownership during reload and drops its error after stop', async () => {
+      await adapter.startSession('scheduled', 'Previous report', { unattended: true });
+      const listener = mockSession.subscribe.mock.calls.at(-1)![0];
+      listener({ type: 'agent_settled' });
+      const reload = Promise.withResolvers<void>();
+      mockSession.reload.mockReturnValueOnce(reload.promise);
+      const onSettled = vi.fn();
+      const onError = vi.fn();
+      adapter.on('error', onError);
+
+      const scheduled = adapter.continueSession('scheduled', 'New report', {
+        unattended: true,
+        onSettled,
+        systemPrompt: 'Updated instructions',
+      });
+      await vi.waitFor(() => expect(mockSession.reload).toHaveBeenCalledOnce());
+      await expect(adapter.continueSession('scheduled', 'Interactive input')).rejects.toThrow(
+        'A Pi run is already active in this session.',
+      );
+
+      adapter.stopSession('scheduled');
+      await adapter.startSession('scheduled', 'Replacement');
+      reload.reject(new Error('The stopped session reload failed'));
+
+      await expect(scheduled).resolves.toBeUndefined();
+      expect(onError).not.toHaveBeenCalled();
+      expect(onSettled).toHaveBeenCalledExactlyOnceWith({ ok: false, error: expect.any(String) });
+      expect(adapter.isSessionRunning('scheduled')).toBe(true);
+    });
+
+    it('holds a failed scheduled run until native settlement after retry exhaustion', async () => {
+      const onSettled = vi.fn();
+      const onError = vi.fn();
+      adapter.on('error', onError);
+      await adapter.startSession('scheduled', 'New report', { unattended: true, onSettled });
+      const listener = mockSession.subscribe.mock.calls.at(-1)![0];
+
+      listener({ type: 'auto_retry_end', success: false, finalError: 'Service unavailable' });
+      expect(onError).not.toHaveBeenCalled();
+      expect(adapter.isSessionRunning('scheduled')).toBe(true);
+      await expect(
+        adapter.continueSession('scheduled', 'Another report', { unattended: true, onSettled }),
+      ).rejects.toThrow('A Pi run is already active in this session.');
+
+      listener({ type: 'agent_settled' });
+      expect(adapter.isSessionRunning('scheduled')).toBe(false);
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onSettled).toHaveBeenCalledExactlyOnceWith({
+        ok: false,
+        error: 'Service unavailable',
+      });
     });
 
     it('should keep session entry active (preserves IM routing) but mark it aborted', async () => {

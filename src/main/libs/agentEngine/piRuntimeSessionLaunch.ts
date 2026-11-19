@@ -80,6 +80,14 @@ export async function startPiRuntimeSession(
   host.evictIdleSessions();
   const expertIds = normalizeSingleExpertIds(options.expertIds);
 
+  if (
+    host.isSessionRunning(sessionId) &&
+    (options.onSettled ||
+      host.activeSessions.get(sessionId)?.onSettled ||
+      host.initializingSessions.get(sessionId)?.onSettled)
+  ) {
+    throw new Error('A Pi run is already active in this session.');
+  }
   if (host.activeSessions.has(sessionId) || host.initializingSessions.has(sessionId)) {
     host.stopActiveSession(sessionId, 'The session was replaced by a new run.');
   }
@@ -88,67 +96,68 @@ export async function startPiRuntimeSession(
   const initialization: InitializingPiSession = {
     abortController,
     generation: Symbol(sessionId),
+    onSettled: options.onSettled,
   };
   host.initializingSessions.set(sessionId, initialization);
   const isCurrentInitialization = (): boolean =>
     host.initializingSessions.get(sessionId)?.generation === initialization.generation &&
     !abortController.signal.aborted;
 
-  const pi = await getPiModules();
-  if (!isCurrentInitialization()) return;
-
-  // Emit user message to UI (unless the caller already did).
-  // Must persist via store.addMessage() — the CoworkStore is the source of
-  // truth for messages; emit alone delivers to the in-memory Redux state
-  // but never writes to SQLite, causing the prompt to vanish on session switch.
-  if (!options.skipInitialUserMessage) {
-    const storedImages = host.persistImageAttachments(sessionId, options.imageAttachments);
-    // The transcript shows what the user attached to this input, never the
-    // session's execution set (which also carries the expert preset bundle).
-    // A caller that passes nothing attaches nothing.
-    const attachedSkillIds = options.attachedSkillIds;
-    const userMsg: CoworkMessage = {
-      id: randomUUID(),
-      type: 'user',
-      content: prompt,
-      timestamp: Date.now(),
-      metadata:
-        attachedSkillIds?.length ||
-        expertIds.length ||
-        storedImages?.length ||
-        options.fileAttachments?.length
-          ? {
-              ...(attachedSkillIds?.length ? { skillIds: attachedSkillIds } : {}),
-              ...(expertIds.length
-                ? {
-                    experts: (
-                      host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false })
-                        ?.experts ?? []
-                    )
-                      .filter(expert => expertIds.includes(expert.expertId))
-                      .map(expert => ({
-                        expertId: expert.expertId,
-                        expertName: expert.expertName,
-                        presetId: expert.packageId,
-                      })),
-                  }
-                : {}),
-              ...(storedImages?.length ? { imageAttachments: storedImages } : {}),
-              ...(options.fileAttachments?.length
-                ? { fileAttachments: options.fileAttachments }
-                : {}),
-            }
-          : undefined,
-    };
-    const store = host.getStore();
-    const persisted = store ? store.addMessage(sessionId, userMsg) : userMsg;
-    host.emit('message', sessionId, persisted);
-  }
-
   let workbenchRunId: string | null = null;
   let activeSession: ActivePiSession | null = null;
 
   try {
+    const pi = await getPiModules();
+    if (!isCurrentInitialization()) return;
+
+    // Emit user message to UI (unless the caller already did).
+    // Must persist via store.addMessage() — the CoworkStore is the source of
+    // truth for messages; emit alone delivers to the in-memory Redux state
+    // but never writes to SQLite, causing the prompt to vanish on session switch.
+    if (!options.skipInitialUserMessage) {
+      const storedImages = host.persistImageAttachments(sessionId, options.imageAttachments);
+      // The transcript shows what the user attached to this input, never the
+      // session's execution set (which also carries the expert preset bundle).
+      // A caller that passes nothing attaches nothing.
+      const attachedSkillIds = options.attachedSkillIds;
+      const userMsg: CoworkMessage = {
+        id: randomUUID(),
+        type: 'user',
+        content: prompt,
+        timestamp: Date.now(),
+        metadata:
+          attachedSkillIds?.length ||
+          expertIds.length ||
+          storedImages?.length ||
+          options.fileAttachments?.length
+            ? {
+                ...(attachedSkillIds?.length ? { skillIds: attachedSkillIds } : {}),
+                ...(expertIds.length
+                  ? {
+                      experts: (
+                        host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false })
+                          ?.experts ?? []
+                      )
+                        .filter(expert => expertIds.includes(expert.expertId))
+                        .map(expert => ({
+                          expertId: expert.expertId,
+                          expertName: expert.expertName,
+                          presetId: expert.packageId,
+                        })),
+                    }
+                  : {}),
+                ...(storedImages?.length ? { imageAttachments: storedImages } : {}),
+                ...(options.fileAttachments?.length
+                  ? { fileAttachments: options.fileAttachments }
+                  : {}),
+              }
+            : undefined,
+      };
+      const store = host.getStore();
+      const persisted = store ? store.addMessage(sessionId, userMsg) : userMsg;
+      host.emit('message', sessionId, persisted);
+    }
+
     const workspaceRoot = options.workspaceRoot || process.cwd();
     // Pi's built-in shell tools snapshot process.env when they execute. Give
     // that snapshot the same app-managed Node/npm, Python, and uv
@@ -455,6 +464,7 @@ export async function startPiRuntimeSession(
       thinkingLifecycle: new PiThinkingLifecycle(),
       lastCompletedAnswerMessageId: null,
       lastCompletedAnswerText: '',
+      onSettled: options.onSettled,
       summaryCheckpointGoal: prompt,
       requestStartedAt: null,
       firstVisibleTextAt: null,
@@ -589,10 +599,9 @@ export async function startPiRuntimeSession(
       host.memoryInjectionDedup.reset(sessionId);
       host.activeSessions.delete(sessionId);
     }
-    if (abortController.signal.aborted) {
-      host.emit('sessionStopped', sessionId);
-      return;
-    }
+    // The stop path already reported cancellation. This promise can finish
+    // after a replacement starts under the same session ID.
+    if (abortController.signal.aborted) return;
     const message = error instanceof Error ? error.message : String(error);
     observeWorkbench(sessionId, () =>
       host.getWorkbenchTaskService()?.failRun(sessionId, { message }),
