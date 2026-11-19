@@ -78,6 +78,43 @@ test('dragging then holding before release places the companion without residual
   expect(settled).toHaveBeenCalledOnce();
 });
 
+test('spring dragging eases toward the grabbed offset and releases from the visible position', () => {
+  motion.setSpringDragEnabled(true);
+  motion.begin();
+  desktop.cursor.x += 100;
+  vi.advanceTimersByTime(32);
+  expect(position.x).toBeGreaterThan(400);
+  expect(position.x).toBeLessThan(450);
+  expect(position.y).toBe(300);
+  vi.advanceTimersByTime(160);
+  const held = position.x;
+  expect(held).toBeGreaterThan(450);
+  expect(held).toBeLessThan(500);
+  expect(motion.end()).toBe(false);
+  expect(position.x).toBeLessThan(500);
+  expect(position.x - held).toBeLessThanOrEqual(2);
+  const placed = { ...position };
+  vi.advanceTimersByTime(500);
+  expect(position).toEqual(placed);
+  expect(settled).toHaveBeenCalledOnce();
+});
+
+test('spring dragging reaches a new work area and reduced motion remains pointer-exact', () => {
+  motion.setSpringDragEnabled(true);
+  motion.begin();
+  desktop.area = { x: 1440, y: 24, width: 800, height: 600 };
+  desktop.cursor.x = 1700;
+  vi.advanceTimersByTime(32);
+  expect(position.x).toBeGreaterThanOrEqual(1440);
+  expect(position.x).toBeLessThan(1604);
+  motion.setReducedMotion(true);
+  vi.advanceTimersByTime(32);
+  expect(position).toEqual({ x: 1604, y: 300 });
+  expect(motion.end(true)).toBe(false);
+  vi.advanceTimersByTime(500);
+  expect(position).toEqual({ x: 1604, y: 300 });
+});
+
 test('a flick moves after release, and reduced motion stops it immediately', () => {
   motion.begin();
   for (let i = 0; i < 5; i++) {

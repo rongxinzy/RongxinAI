@@ -4,6 +4,8 @@
 
 七位伙伴均恢复日常入口。小远继续使用 `motion/xiaoyuan-original/`，字节不变；其余六位使用对应的 `motion/<id>-original/`，每位 24 段、512×512 / 30fps 透明视频。原图集与七位欢迎群像字节不变。
 
+`xiaoyuan-sleep.png` 使用原版 `motion/xiaoyuan-original/doze.webm` 的最后一帧（从 0 开始计数为 299），按 VP9 Alpha 解码为 512×512 的 RGBA 静帧。小远打盹结束后用它保持闭眼姿势并释放视频解码器，减少动效时直接显示该静帧。PNG 的 SHA-256 为 `b35d88f0e909bb7d28ff2c37c29bc4802a01f87c728a21b7a674447766e268cc`。
+
 六位的新素材直接以本目录原始多姿态 PNG 为纹理进行离线局部网格蒙皮，头、爪、脚和尾部各有连续位移。完整五官、耳朵、领巾、毛色与身体比例来自同一原图，不再用重新生成的独立眼睛、嘴、头、耳朵与身体组装角色。没有新增生成图或产品依赖。作者实现位于 `scripts/desktop-pet/`，复现命令为 `bun scripts/desktop-pet/render-originals.mjs youli`（替换角色 ID）；依赖现有 Playwright Chromium 与宿主 FFmpeg。纹理以预乘 alpha 插值，导出时去除 ≤8/255 的透明底噪，避免不可见 RGB 污染绒毛边缘；不覆盖原图。
 
 `original-poses.mjs` 映射每段动作所用原始姿态，`motion.mjs` 编排局部运动，`original-mesh.mjs` 限制关节形变。该方式保留原画的镜头与姿态，**不提供新视角、转身或重新绘制的关节透视**。运行时继续使用既有双视频槽、真实结束交接、任务抢占、静态回退、隐藏释放与减少动效。

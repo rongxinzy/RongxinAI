@@ -10,6 +10,7 @@ import {
   DesktopPetEffectKind,
   DesktopPetIpc,
   DesktopPetPlayableAction,
+  DesktopPetState,
   DesktopPetTaskResult,
   DESKTOP_PET_CLICK_DELAY_MS,
   DESKTOP_PET_STORE_KEY,
@@ -224,6 +225,7 @@ test('right-click menu provides mode-specific companion entry, interact submenu,
     '侧看一眼',
     '点点头',
     '展翅一下',
+    '打个盹',
   ]);
 
   const roaming = openMenu()('屏幕漫游');
@@ -243,6 +245,51 @@ test('right-click menu provides mode-specific companion entry, interact submenu,
     DesktopPetIpc.SettingsChanged,
     expect.objectContaining({ chatter: false }),
   );
+});
+
+test('Xiaoyuan can nap, wakes on click or work, and keeps task reminders actionable', () => {
+  setDesktopPetEnabled(true);
+  mocks.windows[0].emit('ready-to-show');
+  const contents = mocks.windows[0].webContents;
+  const sender = { sender: contents, senderFrame: contents.mainFrame };
+  const expectState = (state: DesktopPetState) =>
+    expect(contents.send).toHaveBeenLastCalledWith(
+      DesktopPetIpc.State,
+      expect.objectContaining({ state }),
+    );
+  const nap = () => {
+    petMenuItem(mocks.ipc.get(DesktopPetIpc.Menu)!, contents)('打个盹').click!();
+    (mocks.menuPopup.mock.calls.at(-1)![0] as { callback: () => void }).callback();
+  };
+
+  nap();
+  expectState(DesktopPetState.Sleeping);
+  expect(mocks.allowRoam).toHaveBeenLastCalledWith(false);
+  vi.advanceTimersByTime(60_000);
+  expectState(DesktopPetState.Sleeping);
+
+  mocks.end.mockReturnValueOnce(true);
+  mocks.ipc.get(DesktopPetIpc.DragEnd)!(sender, false);
+  vi.advanceTimersByTime(DESKTOP_PET_CLICK_DELAY_MS);
+  expectState(DesktopPetState.Idle);
+  expect(mocks.allowRoam).toHaveBeenLastCalledWith(true);
+
+  nap();
+  const events = new PiUiEventSequencer(() => 'event');
+  observeDesktopPetEvent(events.next({ type: PiUiEventType.Started, sessionId: 'task' }));
+  expectState(DesktopPetState.Thinking);
+  observeDesktopPetEvent(
+    events.next({
+      type: PiUiEventType.Error,
+      sessionId: 'task',
+      error: { kind: CoworkErrorKind.Unknown, message: 'failed' },
+    }),
+  );
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: DesktopPetState.Error, bubble: '有任务失败' }),
+  );
+  expect(petMenuItem(mocks.ipc.get(DesktopPetIpc.Menu)!, contents)('打个盹').enabled).toBe(false);
 });
 
 test('the native context menu pauses movement and restores only a visible pet', async () => {

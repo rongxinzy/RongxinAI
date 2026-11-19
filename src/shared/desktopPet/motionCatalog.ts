@@ -26,6 +26,8 @@ export const DesktopPetMotion = {
 } as const;
 export type DesktopPetMotion = (typeof DesktopPetMotion)[keyof typeof DesktopPetMotion];
 
+export const XIAOYUAN_WALK_SECONDS = 4;
+
 /** Authored clip durations are build inputs; playback completion comes from media events. */
 export const DESKTOP_PET_MOTIONS = [
   { id: DesktopPetMotion.Idle, seconds: 4, loop: true },
@@ -44,7 +46,7 @@ export const DESKTOP_PET_MOTIONS = [
   { id: DesktopPetMotion.Wait, seconds: 6, loop: true },
   { id: DesktopPetMotion.Concern, seconds: 6, loop: true },
   { id: DesktopPetMotion.Wave, seconds: 7, loop: false },
-  { id: DesktopPetMotion.Walk, seconds: 4, loop: true },
+  { id: DesktopPetMotion.Walk, seconds: XIAOYUAN_WALK_SECONDS, loop: true },
   { id: DesktopPetMotion.Lift, seconds: 4, loop: true },
   { id: DesktopPetMotion.Land, seconds: 3, loop: false },
   { id: DesktopPetMotion.Listen, seconds: 8, loop: false },

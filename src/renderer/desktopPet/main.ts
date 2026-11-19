@@ -8,13 +8,14 @@ import {
 import type { DesktopPetBridge, DesktopPetSnapshot } from '../../shared/desktopPet/types';
 import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
 import { isDesktopPetReleased } from '../../shared/desktopPet/availability';
+import { XIAOYUAN_WALK_SECONDS } from '../../shared/desktopPet/motionCatalog';
 import stylesheetUrl from './desktop-pet.css?url';
 import { DesktopPetAnimation } from './animation';
 import { DesktopPetAtlas } from './atlas';
 import { drawPetPose, petHitMask, drawPetMedia } from './draw';
 import { DesktopPetMediaController } from './mediaController';
 import { DesktopPetMediaMasks } from './mediaMasks';
-import { DesktopPetRenderLoop } from './renderLoop';
+import { DesktopPetRenderLoop, type DesktopPetDecodedFrame } from './renderLoop';
 import { PetOrientation } from '../../shared/desktopPet/surfaces/constants';
 import { applyPetOrientation, orientPetMask } from './orientation';
 
@@ -40,6 +41,8 @@ const atlas = new DesktopPetAtlas();
 const animation = new DesktopPetAnimation();
 let state: DesktopPetState = DesktopPetState.Idle;
 let nativeOrientation: PetOrientation = PetOrientation.Upright;
+let walkId: number | undefined;
+let lastWalkMediaTime = -1;
 let reducedMotion = reduced.matches;
 let systemReducedMotion = false;
 let maskDirty = true;
@@ -69,7 +72,7 @@ function setData(key: string, value: string): void {
   if (view.dataset[key] !== value) view.dataset[key] = value;
 }
 
-function draw(now: number) {
+function draw(now: number, frame?: DesktopPetDecodedFrame) {
   if (!atlas.image) return { video: null, animate: false };
   const ratio = Math.min(2, window.devicePixelRatio || 1);
   const size = Math.round(DESKTOP_PET_SIZE * ratio);
@@ -81,7 +84,7 @@ function draw(now: number) {
   animation.setContinuousMedia(media.supported, now);
   const clip = media.sample(now);
   const drawable = !reducedMotion ? clip.playing : null;
-  const poster = !reducedMotion ? clip.poster : undefined;
+  const poster = clip.poster;
   const orientation = reducedMotion ? PetOrientation.Upright : nativeOrientation;
   ctx.save();
   // A quarter-turn keeps the character's feet on the wall contact the window geometry reports.
@@ -118,6 +121,19 @@ function draw(now: number) {
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
   ctx.restore();
+  if (walkId !== undefined && drawable?.clip.walkId === walkId) {
+    const video = drawable.current.video;
+    const mediaTime =
+      video.ended && lastWalkMediaTime >= 0
+        ? XIAOYUAN_WALK_SECONDS
+        : frame?.video === video
+          ? frame.mediaTime
+          : undefined;
+    if (mediaTime !== undefined && mediaTime > lastWalkMediaTime) {
+      lastWalkMediaTime = mediaTime;
+      bridge?.walkFrame({ walkId, mediaTime });
+    }
+  }
   setData('orientation', orientation);
   setData('state', state);
   setData('reducedMotion', String(reducedMotion));
@@ -222,8 +238,12 @@ async function selectCharacter(id: string): Promise<void> {
 const unsubscribe = bridge?.onState(update);
 const unsubscribePose = bridge?.onPose(pose => {
   nativeOrientation = pose.orientation;
+  if (walkId !== pose.walkId) {
+    walkId = pose.walkId;
+    lastWalkMediaTime = -1;
+  }
   animation.setPose(pose.facing, pose.walking);
-  media.update({ walking: pose.walking });
+  media.update({ walking: pose.walking, walkId });
   maskDirty = true;
   refresh();
 });
@@ -238,7 +258,7 @@ const unsubscribeEffect = bridge?.onEffect(effect => {
     animation.setDragging(effect.active);
     media.update({ dragging: effect.active });
     refresh();
-  } else if (reducedMotion) return;
+  } else if (reducedMotion || state === DesktopPetState.Sleeping) return;
   else if (effect.kind === DesktopPetEffectKind.Action) {
     if (!media.playAction(effect.action)) {
       animation.setContinuousMedia(false, performance.now());

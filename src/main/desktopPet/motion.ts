@@ -15,6 +15,7 @@ import { DesktopPetRoam } from './roam';
 import {
   estimateReleaseVelocity,
   impactStrength,
+  stepDragSpring,
   throwStep,
   trimTrail,
   type DragSample,
@@ -42,7 +43,13 @@ export function clampPetPosition(point: Electron.Point, bounds: ThrowBounds): El
 export class DesktopPetMotion {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private dragging:
-    | { start: Electron.Point; offset: Electron.Point; at: number; moved: boolean }
+    | {
+        start: Electron.Point;
+        offset: Electron.Point;
+        at: number;
+        moved: boolean;
+        follow: ThrowState;
+      }
     | undefined;
   private trail: DragSample[] = [];
   private flying: ThrowState | undefined;
@@ -50,6 +57,7 @@ export class DesktopPetMotion {
   private mask = new Uint8Array(DESKTOP_PET_SIZE * DESKTOP_PET_SIZE);
   private ignoring = true;
   private reducedMotion = false;
+  private springDragEnabled = false;
   private roamingEnabled = true;
   private allowRoam = false;
   private readonly roam = new DesktopPetRoam();
@@ -80,6 +88,14 @@ export class DesktopPetMotion {
     this.mask = new Uint8Array(mask);
   }
 
+  setMediaDrivenWalk(enabled: boolean): void {
+    this.roam.setMediaDriven(enabled, performance.now());
+  }
+
+  observeWalkFrame(frame: unknown): void {
+    this.roam.observeMediaFrame(frame, performance.now());
+  }
+
   setWindowSnapshot(snapshot: WindowSurfaceSnapshot | null): void {
     this.surfaces.setSnapshot(snapshot, performance.now());
     if (snapshot && !this.paused && !this.reducedMotion && this.surfaces.active) this.restart();
@@ -102,6 +118,10 @@ export class DesktopPetMotion {
     if (!value) this.releaseSupport();
   }
 
+  setSpringDragEnabled(value: boolean): void {
+    this.springDragEnabled = value;
+  }
+
   setAllowRoam(value: boolean): void {
     this.allowRoam = value;
     if (!value) this.rest();
@@ -122,13 +142,15 @@ export class DesktopPetMotion {
     if (
       next.facing === this.lastPose.facing &&
       next.walking === this.lastPose.walking &&
-      next.orientation === this.lastPose.orientation
+      next.orientation === this.lastPose.orientation &&
+      next.walkId === this.lastPose.walkId
     )
       return;
     this.lastPose = {
       facing: next.facing,
       walking: next.walking,
       orientation: next.orientation,
+      ...(next.walkId === undefined ? {} : { walkId: next.walkId }),
     };
     this.pose(this.lastPose);
   }
@@ -162,10 +184,11 @@ export class DesktopPetMotion {
     this.dragging = {
       start: cursor,
       offset: { x: cursor.x - x, y: cursor.y - y },
-      at: performance.now(),
+      at: now,
       moved: false,
+      follow: { x, y, vx: 0, vy: 0 },
     };
-    this.trail = [{ ...cursor, t: performance.now() }];
+    this.trail = [{ ...cursor, t: now }];
     this.restart();
   }
 
@@ -173,7 +196,10 @@ export class DesktopPetMotion {
     if (!this.dragging) return false;
     const now = performance.now();
     const cursor = screen.getCursorScreenPoint();
-    if (!cancelled) this.moveDrag(cursor, now);
+    if (!cancelled) {
+      const [x, y] = this.window.getPosition();
+      this.moveDrag(cursor, now, { x, y });
+    }
     const clicked = !cancelled && !this.dragging.moved;
     this.sample(cursor, now);
     this.dragging = undefined;
@@ -270,7 +296,7 @@ export class DesktopPetMotion {
     }
   }
 
-  private moveDrag(cursor: Electron.Point, now: number): void {
+  private moveDrag(cursor: Electron.Point, now: number, position: Electron.Point): void {
     const drag = this.dragging;
     if (!drag) return;
     this.sample(cursor, now);
@@ -287,12 +313,18 @@ export class DesktopPetMotion {
       });
       this.effect({ kind: DesktopPetEffectKind.Drag, active: true });
     }
-    const area = screen.getDisplayNearestPoint(cursor).workArea;
-    const point = clampPetPosition(
+    const bounds = petBounds(screen.getDisplayNearestPoint(cursor).workArea);
+    const target = clampPetPosition(
       { x: cursor.x - drag.offset.x, y: cursor.y - drag.offset.y },
-      petBounds(area),
+      bounds,
     );
-    this.window.setPosition(point.x, point.y);
+    drag.follow =
+      this.springDragEnabled && !this.reducedMotion
+        ? stepDragSpring(drag.follow, target, (now - this.lastTime) / 1000, bounds)
+        : { ...target, vx: 0, vy: 0 };
+    const x = Math.round(drag.follow.x);
+    const y = Math.round(drag.follow.y);
+    if (x !== position.x || y !== position.y) this.window.setPosition(x, y);
   }
 
   private tick = (): void => {
@@ -302,7 +334,7 @@ export class DesktopPetMotion {
     const [x, y] = this.window.getPosition();
     let position = { x, y };
     if (this.dragging) {
-      this.moveDrag(cursor, now);
+      this.moveDrag(cursor, now, position);
       const [draggedX, draggedY] = this.window.getPosition();
       position = { x: draggedX, y: draggedY };
       if (now - this.dragging.at > 60_000) {
@@ -345,6 +377,7 @@ export class DesktopPetMotion {
         this.roamingEnabled && this.allowRoam,
       );
       if (surface) {
+        if (this.roam.isWalking()) this.roam.reset(now);
         const nextPosition = clampPetPosition(surface, petBounds(display.workArea));
         if (nextPosition.x !== position.x || nextPosition.y !== position.y)
           this.window.setPosition(nextPosition.x, nextPosition.y);
@@ -371,6 +404,7 @@ export class DesktopPetMotion {
             facing: moved.facing,
             walking: moved.walking,
             orientation: PetOrientation.Upright,
+            walkId: moved.walkId,
           });
         } else {
           this.publishPose({

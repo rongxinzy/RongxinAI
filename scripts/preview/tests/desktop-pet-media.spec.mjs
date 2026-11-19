@@ -11,11 +11,14 @@ import {
 import {
   DesktopPetMotion,
   DESKTOP_PET_MOTIONS,
+  XIAOYUAN_WALK_SECONDS,
 } from '../../../src/shared/desktopPet/motionCatalog.ts';
+import { PetOrientation } from '../../../src/shared/desktopPet/surfaces/constants.ts';
 
 async function bridge(page) {
   await page.addInitScript(() => {
     window.mediaVideos = [];
+    window.walkFrames = [];
     const create = Document.prototype.createElement;
     Document.prototype.createElement = function (...args) {
       const element = create.apply(this, args);
@@ -29,6 +32,9 @@ async function bridge(page) {
       dragEnd() {},
       menu() {},
       open() {},
+      walkFrame(frame) {
+        window.walkFrames.push(frame);
+      },
       hitMask(mask) {
         window.mediaMask = [...mask];
       },
@@ -138,6 +144,80 @@ test('continuous owl media decodes real frames with alpha and two owned slots', 
     .toBe(0);
   await canvas.screenshot({ path: '/tmp/companion-continuous-owl.png', omitBackground: true });
   expect(errors).toEqual([]);
+});
+
+test('Xiaoyuan reports one increasing decoded timeline for a finite native walk', async ({
+  page,
+}) => {
+  await bridge(page);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/desktop-pet.html');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Idle);
+  expect(await page.evaluate(() => window.walkFrames)).toEqual([]);
+  await page.evaluate(pose => window.mediaPose(pose), {
+    facing: 1,
+    walking: true,
+    orientation: PetOrientation.Upright,
+    walkId: 42,
+  });
+  await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Walk);
+  await expect
+    .poll(() => page.evaluate(() => window.walkFrames.at(-1)?.mediaTime))
+    .toBe(XIAOYUAN_WALK_SECONDS);
+  const frames = await page.evaluate(() => window.walkFrames);
+  expect(frames.length).toBeGreaterThan(3);
+  expect(frames[0].mediaTime).toBeLessThan(0.5);
+  expect(
+    frames.every(
+      (frame, index) =>
+        frame.walkId === 42 && (index === 0 || frame.mediaTime > frames[index - 1].mediaTime),
+    ),
+  ).toBe(true);
+  await page.evaluate(pose => window.mediaPose(pose), {
+    facing: 1,
+    walking: false,
+    orientation: PetOrientation.Upright,
+  });
+  await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Idle);
+  expect(await page.evaluate(() => window.walkFrames)).toHaveLength(frames.length);
+});
+
+test('Xiaoyuan sleeps on the decoded final pose and wakes without replaying hidden sleep', async ({
+  page,
+}) => {
+  await bridge(page);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/desktop-pet.html');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Idle);
+  await page.evaluate(value => window.mediaState(value), snapshot(DesktopPetState.Sleeping));
+  await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Doze);
+  await page.evaluate(() => {
+    const video = window.mediaVideos.find(video => video.src.endsWith('/doze.webm'));
+    video.currentTime = video.duration - 0.2;
+  });
+  await expect(canvas).toHaveAttribute('data-media-state', 'empty');
+  const sleepingPose = await canvas.evaluate(canvas => canvas.toDataURL());
+  await page.evaluate(
+    kind => window.mediaEffect({ kind, visible: false }),
+    DesktopPetEffectKind.Visibility,
+  );
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.evaluate(
+    kind => window.mediaEffect({ kind, visible: true }),
+    DesktopPetEffectKind.Visibility,
+  );
+  await expect(canvas).toHaveAttribute('data-reduced-motion', 'true');
+  await expect.poll(() => canvas.evaluate(canvas => canvas.toDataURL())).toBe(sleepingPose);
+  expect(
+    await page.evaluate(() => window.mediaVideos.every(video => !video.hasAttribute('src'))),
+  ).toBe(true);
+
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await expect(canvas).toHaveAttribute('data-reduced-motion', 'false');
+  await page.evaluate(value => window.mediaState(value), snapshot(DesktopPetState.Idle));
+  await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Wake);
 });
 
 for (const character of DESKTOP_PET_BUILTINS.map(pet => ({

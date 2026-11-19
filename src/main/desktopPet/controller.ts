@@ -30,7 +30,7 @@ import type {
   DesktopPetTaskOpen,
 } from '../../shared/desktopPet/types';
 import { desktopPetContract } from '../../shared/desktopPet/contract';
-import { desktopPetBuiltin } from '../../shared/desktopPet/catalog';
+import { DesktopPetBuiltinId, desktopPetBuiltin } from '../../shared/desktopPet/catalog';
 import { isDesktopPetReleased } from '../../shared/desktopPet/availability';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { PiUiEventType, type PiUiEvent } from '../../shared/cowork/piUiEvent';
@@ -63,6 +63,7 @@ let chatterTimer: ReturnType<typeof setTimeout> | undefined;
 let clickTimer: ReturnType<typeof setTimeout> | undefined;
 let clickActionIndex = 0;
 let greeting = false;
+let sleeping = false;
 let chatter = new DesktopPetChatter();
 let reducedMotion = false;
 let status = new DesktopPetStatus();
@@ -78,7 +79,9 @@ const listeners = new Map<string, (event: Electron.IpcMainEvent, payload?: unkno
 
 const currentState = (): DesktopPetState => {
   const state = companionStatus.project(status.state);
-  return greeting && state === DesktopPetState.Idle ? DesktopPetState.Greeting : state;
+  if (state !== DesktopPetState.Idle) return state;
+  if (sleeping) return DesktopPetState.Sleeping;
+  return greeting ? DesktopPetState.Greeting : state;
 };
 export function observeDesktopPetCompanionActivity(activity: CompanionActivity): void {
   greeting = false;
@@ -87,15 +90,21 @@ export function observeDesktopPetCompanionActivity(activity: CompanionActivity):
 
 function sendState(): void {
   if (!pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
+  const settings = getDesktopPetSettings();
+  const isXiaoyuan = settings.characterId === DesktopPetBuiltinId.Xiaoyuan;
+  if (!isXiaoyuan || bubbleOpen || companionStatus.project(status.state) !== DesktopPetState.Idle)
+    sleeping = false;
+  motion?.setSpringDragEnabled(isXiaoyuan);
+  motion?.setMediaDrivenWalk(isXiaoyuan);
   const state = currentState();
   const chatLabel = companionStatus.labelKey(status.state);
   const bubbleKey = chatLabel ? (bubbleOpen ? null : chatLabel) : desktopPetBubbleKey(state);
   const chatterEnabled =
-    !chatLabel && !bubbleKey && !reducedMotion && getDesktopPetSettings().chatter;
+    !sleeping && !chatLabel && !bubbleKey && !reducedMotion && settings.chatter;
   if (!chatterEnabled) chatter.clear();
   const chatterKey = chatterEnabled ? chatter.activeKey() : null;
   pet.webContents.send(DesktopPetIpc.State, {
-    characterId: getDesktopPetSettings().characterId,
+    characterId: settings.characterId,
     state,
     label: t(chatLabel ?? `desktopPet_${state}`),
     bubble: bubbleKey ? t(bubbleKey) : chatterKey ? t(chatterKey) : null,
@@ -271,6 +280,7 @@ function openMainWindow(): void {
 }
 
 function greet(): void {
+  if (sleeping) return;
   clearTimeout(greetingTimer);
   greeting = true;
   sendState();
@@ -281,13 +291,20 @@ function greet(): void {
 }
 
 function playAction(action: DesktopPetPlayableAction, withChatter = true): void {
-  if (!pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
+  if (sleeping || !pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
   motion?.rest();
   pet.webContents.send(DesktopPetIpc.Effect, { kind: DesktopPetEffectKind.Action, action });
   if (withChatter && visible && !reducedMotion && getDesktopPetSettings().chatter) {
     chatter.showAction(action, Date.now());
     sendState();
   }
+}
+
+function setSleeping(value: boolean): void {
+  if (value === sleeping) return;
+  if (value && (currentState() !== DesktopPetState.Idle || bubbleOpen || !visible)) return;
+  sleeping = value;
+  sendState();
 }
 
 function togglePetSetting(key: 'roaming' | 'chatter'): void {
@@ -310,6 +327,7 @@ function showMenu(): void {
   motion?.rest();
   motion?.pause();
   const settings = getDesktopPetSettings();
+  const wake = sleeping;
   Menu.buildFromTemplate([
     { label: t(`desktopPet_${currentState()}`), enabled: false },
     { type: 'separator' },
@@ -327,19 +345,31 @@ function showMenu(): void {
     {
       label: t('desktopPetInteract'),
       submenu: [
-        { label: t('desktopPetGreet'), click: greet },
+        { label: t('desktopPetGreet'), enabled: !wake, click: greet },
         {
           label: t('desktopPetActionPeek'),
+          enabled: !wake,
           click: () => playAction(DesktopPetPlayableAction.Peek),
         },
         {
           label: t('desktopPetActionNod'),
+          enabled: !wake,
           click: () => playAction(DesktopPetPlayableAction.Nod),
         },
         {
           label: t('desktopPetActionFlutter'),
+          enabled: !wake,
           click: () => playAction(DesktopPetPlayableAction.Flutter),
         },
+        ...(settings.characterId === DesktopPetBuiltinId.Xiaoyuan
+          ? [
+              {
+                label: t(wake ? 'desktopPetWake' : 'desktopPetSleep'),
+                enabled: wake || (currentState() === DesktopPetState.Idle && !bubbleOpen),
+                click: () => setSleeping(!wake),
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -451,8 +481,9 @@ export function setDesktopPetEnabled(enabled: boolean): void {
     window,
     persistPosition,
     effect => {
-      if (!window.isDestroyed() && !window.webContents.isDestroyed())
-        window.webContents.send(DesktopPetIpc.Effect, effect);
+      if (window.isDestroyed() || window.webContents.isDestroyed()) return;
+      if (effect.kind === DesktopPetEffectKind.Drag && effect.active) setSleeping(false);
+      window.webContents.send(DesktopPetIpc.Effect, effect);
     },
     sendPose,
     active => {
@@ -496,6 +527,7 @@ export function setDesktopPetEnabled(enabled: boolean): void {
     pet = null;
     visible = false;
     ready = false;
+    sleeping = false;
     publishSettings();
   });
   persistPosition();
@@ -608,6 +640,10 @@ export function initializeDesktopPet(
   bind(DesktopPetIpc.DragEnd, cancelled => {
     if (motion?.end(cancelled === true)) {
       clearClickTimer();
+      if (sleeping) {
+        setSleeping(false);
+        return;
+      }
       clickTimer = setTimeout(() => {
         clickTimer = undefined;
         const action =
@@ -628,6 +664,9 @@ export function initializeDesktopPet(
   bind(DesktopPetIpc.HitMask, payload => {
     if (payload instanceof Uint8Array && payload.length === DESKTOP_PET_SIZE * DESKTOP_PET_SIZE)
       motion?.setMask(payload);
+  });
+  bind(DesktopPetIpc.WalkFrame, payload => {
+    if (visible) motion?.observeWalkFrame(payload);
   });
   bind(DesktopPetIpc.Motion, payload => {
     if (typeof payload !== 'boolean') return;
@@ -668,6 +707,7 @@ export function disposeDesktopPet(): void {
   pet = null;
   menuOpen = false;
   bubbleOpen = false;
+  sleeping = false;
   for (const [channel, listener] of listeners) ipcMain.removeListener(channel, listener);
   listeners.clear();
   screen.removeListener('display-removed', onDisplayChanged);

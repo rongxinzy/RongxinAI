@@ -3,6 +3,11 @@ export interface DesktopPetFrameTarget {
   animate: boolean;
 }
 
+export interface DesktopPetDecodedFrame {
+  video: HTMLVideoElement;
+  mediaTime: number;
+}
+
 export class DesktopPetRenderLoop {
   private generation = 0;
   private frameId: number | undefined;
@@ -10,19 +15,21 @@ export class DesktopPetRenderLoop {
   private videoFrameId: number | undefined;
   private disposed = false;
 
-  constructor(private readonly draw: (now: number) => DesktopPetFrameTarget) {}
+  constructor(
+    private readonly draw: (now: number, frame?: DesktopPetDecodedFrame) => DesktopPetFrameTarget,
+  ) {}
 
-  refresh(): void {
+  refresh(frame?: DesktopPetDecodedFrame): void {
     if (this.disposed) return;
     this.cancel();
     const generation = ++this.generation;
-    const target = this.draw(performance.now());
+    const target = this.draw(performance.now(), frame);
     if (this.disposed || generation !== this.generation || !target.animate) return;
     if (target.video && typeof target.video.requestVideoFrameCallback === 'function') {
       const video = target.video;
       this.video = video;
-      this.videoFrameId = video.requestVideoFrameCallback(() => {
-        if (generation === this.generation) this.refresh();
+      this.videoFrameId = video.requestVideoFrameCallback((_, { mediaTime }) => {
+        if (generation === this.generation) this.refresh({ video, mediaTime });
       });
     } else {
       this.frameId = requestAnimationFrame(() => {
