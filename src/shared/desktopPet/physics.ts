@@ -89,6 +89,30 @@ export interface ThrowState {
   vy: number;
 }
 
+// Drag spring adapted from dsh-pet/src/shared/physics/spring.ts (MIT),
+// upstream 4e589f6dacabbd3170e91e7a213b2a7afff1a09b.
+const DRAG_SPRING_STIFFNESS = 200;
+const DRAG_SPRING_DAMPING = 30;
+const DRAG_SPRING_MAX_STEP = 1 / 30;
+
+export function stepDragSpring(
+  state: ThrowState,
+  target: { x: number; y: number },
+  elapsed: number,
+  bounds: ThrowBounds,
+): ThrowState {
+  const dt = Math.max(0, Math.min(elapsed, DRAG_SPRING_MAX_STEP));
+  const vx =
+    state.vx + ((target.x - state.x) * DRAG_SPRING_STIFFNESS - state.vx * DRAG_SPRING_DAMPING) * dt;
+  const vy =
+    state.vy + ((target.y - state.y) * DRAG_SPRING_STIFFNESS - state.vy * DRAG_SPRING_DAMPING) * dt;
+  const nextX = state.x + vx * dt;
+  const nextY = state.y + vy * dt;
+  const x = Math.max(bounds.minX, Math.min(nextX, bounds.maxX));
+  const y = Math.max(bounds.minY, Math.min(nextY, bounds.maxY));
+  return { x, y, vx: x === nextX ? vx : 0, vy: y === nextY ? vy : 0 };
+}
+
 export const trimTrail = (trail: DragSample[], now: number): DragSample[] => {
   const cutoff = now - TRAIL_KEEP_MS;
   let i = 0;

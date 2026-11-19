@@ -16,6 +16,7 @@ const bridge: DesktopPetBridge = {
   open: () => ipcRenderer.send(DesktopPetIpc.Open),
   hitMask: mask => ipcRenderer.send(DesktopPetIpc.HitMask, mask),
   motion: reduced => ipcRenderer.send(DesktopPetIpc.Motion, reduced),
+  walkFrame: frame => ipcRenderer.send(DesktopPetIpc.WalkFrame, frame),
   onState: listener => {
     const handler = (_event: Electron.IpcRendererEvent, state: DesktopPetSnapshot) =>
       listener(state);

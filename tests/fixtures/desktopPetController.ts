@@ -116,6 +116,9 @@ vi.mock('../../src/main/desktopPet/motion', () => ({
     dispose = mocks.dispose;
     setMask = mocks.setMask;
     setReducedMotion() {}
+    setSpringDragEnabled() {}
+    setMediaDrivenWalk() {}
+    observeWalkFrame() {}
     setRoamingEnabled() {}
     setWindowSnapshot() {}
     setAllowRoam = mocks.allowRoam;

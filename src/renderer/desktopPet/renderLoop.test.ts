@@ -11,22 +11,24 @@ function animationFrame(callback: () => void): number {
 }
 
 function fakeVideo() {
-  const callbacks = new Map<number, () => void>();
+  const callbacks = new Map<number, (now: number, metadata: { mediaTime: number }) => void>();
   let next = 0;
   return {
     callbacks,
-    requestVideoFrameCallback: vi.fn((callback: () => void) => {
-      const id = ++next;
-      callbacks.set(id, callback);
-      return id;
-    }),
+    requestVideoFrameCallback: vi.fn(
+      (callback: (now: number, metadata: { mediaTime: number }) => void) => {
+        const id = ++next;
+        callbacks.set(id, callback);
+        return id;
+      },
+    ),
     cancelVideoFrameCallback: vi.fn((id: number) => {
       callbacks.delete(id);
     }),
-    frame(index = 0) {
+    frame(index = 0, mediaTime = 0) {
       const callback = [...callbacks.values()][index];
       callbacks.clear();
-      callback?.();
+      callback?.(performance.now(), { mediaTime });
     },
   };
 }
@@ -50,8 +52,9 @@ test('active media redraws only for decoded video frames', () => {
   expect(draw).toHaveBeenCalledTimes(2);
   expect(video.callbacks.size).toBe(1);
   expect(raf.size).toBe(0);
-  video.frame();
+  video.frame(0, 0.25);
   expect(draw).toHaveBeenCalledTimes(3);
+  expect(draw).toHaveBeenLastCalledWith(expect.any(Number), { video, mediaTime: 0.25 });
   expect(video.callbacks.size).toBe(1);
   loop.dispose();
   expect(video.cancelVideoFrameCallback).toHaveBeenCalled();

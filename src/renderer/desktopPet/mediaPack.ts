@@ -12,6 +12,7 @@ export interface DesktopPetMediaClip {
   maskUrl: string;
   posterUrl: string;
   loop: boolean;
+  walkId?: number;
 }
 
 // Only bundled, authored media. No external URLs or model-supplied media paths.

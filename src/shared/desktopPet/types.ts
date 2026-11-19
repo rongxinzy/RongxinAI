@@ -48,6 +48,12 @@ export interface DesktopPetPose {
   facing: number;
   walking: boolean;
   orientation: PetOrientation;
+  walkId?: number;
+}
+
+interface DesktopPetWalkFrame {
+  walkId: number;
+  mediaTime: number;
 }
 
 export interface DesktopPetBridge {
@@ -58,6 +64,7 @@ export interface DesktopPetBridge {
   open(): void;
   hitMask(mask: Uint8Array): void;
   motion(reduced: boolean): void;
+  walkFrame(frame: DesktopPetWalkFrame): void;
   onState(listener: (state: DesktopPetSnapshot) => void): () => void;
   onPose(listener: (pose: DesktopPetPose) => void): () => void;
   onEffect(listener: (effect: DesktopPetEffect) => void): () => void;

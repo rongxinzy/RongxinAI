@@ -7,6 +7,7 @@ export const DesktopPetState = {
   Completed: 'completed',
   Error: 'error',
   Greeting: 'greeting',
+  Sleeping: 'sleeping',
 } as const;
 export type DesktopPetState = (typeof DesktopPetState)[keyof typeof DesktopPetState];
 
@@ -14,6 +15,7 @@ export const DesktopPetIpc = {
   Ready: 'desktop-pet:ready',
   State: 'desktop-pet:state',
   Pose: 'desktop-pet:pose',
+  WalkFrame: 'desktop-pet:walk-frame',
   DragStart: 'desktop-pet:drag-start',
   DragEnd: 'desktop-pet:drag-end',
   Menu: 'desktop-pet:menu',
@@ -82,4 +84,5 @@ export const DesktopPetSprite = {
   [DesktopPetState.Completed]: 3,
   [DesktopPetState.Error]: 4,
   [DesktopPetState.Greeting]: 5,
+  [DesktopPetState.Sleeping]: 0,
 } as const;
