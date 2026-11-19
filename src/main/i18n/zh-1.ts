@@ -137,6 +137,8 @@ export const zhMain1 = {
   channelConversationFallback: '{channel}会话',
   taskTimedOut: '[任务超时] 任务因超过最大允许时长而被自动停止。你可以继续对话以从中断处继续。',
   imSessionStoppedReply: '任务已被手动停止。你可以继续发送消息开始新的对话。',
+  imScheduledTaskCreated: '已创建定时任务。',
+  imScheduledTaskCreationFailed: '有一项定时任务创建失败。',
 
   // Thinking-only hint
   taskThinkingOnly:

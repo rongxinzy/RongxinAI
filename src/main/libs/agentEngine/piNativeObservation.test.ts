@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, test, vi } from 'vitest';
@@ -12,13 +12,24 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import { PiEventProjection } from './piEventProjection';
 import { PiRuntimeQueueController } from './piRuntimeQueueController';
+import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { ImageInputVerdict } from './piImageInputFallback';
-import type { ActivePiSession } from './piRuntimeSessionState';
+import { getPiModules, type ActivePiSession, type PiResourceState } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
+import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
 import { PiAgentEventType } from './piStreamConstants';
 import { crc32, deflateSync } from 'node:zlib';
 
-async function createNativeFixture() {
+const skillPaths = vi.hoisted(() => ({ roots: [] as string[] }));
+vi.mock('./piRuntimeSkillDirs', async importOriginal => ({
+  ...(await importOriginal<typeof import('./piRuntimeSkillDirs')>()),
+  resolveZhiyuanSkillDirs: () => skillPaths.roots,
+}));
+
+async function createNativeFixture(options?: {
+  createLoader: (cwd: string, settings: SettingsManager) => Promise<DefaultResourceLoader>;
+  recordRequest: (messages: readonly unknown[]) => void;
+}) {
   const cwd = await mkdtemp(path.join(tmpdir(), 'pi-ownership-audit-'));
   const runtime = await ModelRuntime.create({
     authPath: path.join(cwd, 'auth.json'),
@@ -44,17 +55,20 @@ async function createNativeFixture() {
   });
   await runtime.setRuntimeApiKey(model.provider, 'offline-test');
   const settings = SettingsManager.inMemory();
-  const loader = new DefaultResourceLoader({
-    cwd,
-    agentDir: cwd,
-    settingsManager: settings,
-    noContextFiles: true,
-    noSkills: true,
-    noExtensions: true,
-    noPromptTemplates: true,
-    noThemes: true,
-  });
-  await loader.reload();
+  settings.setFollowUpMode('one');
+  const loader = options
+    ? await options.createLoader(cwd, settings)
+    : new DefaultResourceLoader({
+        cwd,
+        agentDir: cwd,
+        settingsManager: settings,
+        noContextFiles: true,
+        noSkills: true,
+        noExtensions: true,
+        noPromptTemplates: true,
+        noThemes: true,
+      });
+  if (!options) await loader.reload();
   const manager = SessionManager.inMemory(cwd);
   const { session } = await createAgentSession({
     cwd,
@@ -63,7 +77,7 @@ async function createNativeFixture() {
     resourceLoader: loader,
     settingsManager: settings,
     sessionManager: manager,
-    tools: [],
+    tools: options ? ['read'] : [],
   });
   let release: (() => void) | undefined;
   let started: (() => void) | undefined;
@@ -71,7 +85,8 @@ async function createNativeFixture() {
   const firstRequest = new Promise<void>(resolve => {
     started = resolve;
   });
-  session.agent.streamFunction = () => {
+  session.agent.streamFunction = (_model, context) => {
+    options?.recordRequest(context.messages);
     const stream = createAssistantMessageEventStream();
     const message: AssistantMessage = {
       role: 'assistant',
@@ -207,23 +222,28 @@ test('real native queues preserve consecutive steering inputs, follow-ups and im
   const clear = vi.spyOn(session, 'clearQueue');
   session.subscribe(event => {
     if (event.type === PiAgentEventType.MessageStart && event.message.role === 'user') {
-      queue.onNativeUserMessageStart('native-queue', active);
+      queue.onNativeUserMessageStart('native-queue', active, event.message);
     }
   });
-  const running = session.prompt('Start');
+  let running: Promise<void> | undefined;
   try {
-    await fixture.firstRequest;
-    queue.enqueuePendingMessage('native-queue', 'Image follow-up', [
+    queue.enqueuePendingMessage('native-queue', 'Start', [
       { name: 'image.png', mimeType: 'image/png', base64Data: pngData() },
+    ]);
+    await vi.waitFor(() => expect(session.getFollowUpMessages()).toEqual(['Start']));
+    running = session.prompt('Start');
+    await fixture.firstRequest;
+    expect(recorded).toEqual([]);
+    expect(queue.list('native-queue')).toEqual([
+      expect.objectContaining({ text: 'Start', imageAttachments: expect.any(Array) }),
     ]);
     queue.enqueuePendingMessage('native-queue', 'Final follow-up');
     expect((await queue.steerInput('native-queue', 'First steer')).success).toBe(true);
     expect((await queue.steerInput('native-queue', 'Second steer')).success).toBe(true);
     expect(session.getSteeringMessages()).toEqual(['First steer', 'Second steer']);
-    expect(session.getFollowUpMessages()).toEqual(['Image follow-up', 'Final follow-up']);
     fixture.release();
     await running;
-    expect(recorded).toEqual(['First steer', 'Second steer', 'Image follow-up', 'Final follow-up']);
+    expect(recorded).toEqual(['First steer', 'Second steer', 'Start', 'Final follow-up']);
     const users = fixture.manager
       .getBranch()
       .filter(entry => entry.type === 'message' && entry.message.role === 'user');
@@ -233,8 +253,125 @@ test('real native queues preserve consecutive steering inputs, follow-ups and im
     expect(clear).not.toHaveBeenCalled();
   } finally {
     fixture.release();
-    await running.catch(() => {});
+    await running?.catch(() => {});
     session.dispose();
+    await rm(fixture.cwd, { recursive: true, force: true });
+  }
+});
+
+test('native follow-ups see and gain access to their own newly selected Skills in order', async () => {
+  const resourceState: PiResourceState = {
+    systemPrompt: '',
+    skillIds: ['alpha'],
+    skillRoots: {},
+    expertSkillDirs: [],
+    maxOutputTokens: 1024,
+    fileToolsEnabled: true,
+    chatMode: false,
+    unattended: false,
+  };
+  const sessionId = 'queued-skills';
+  const activeSessions = new Map<string, ActivePiSession>();
+  const visibleRequests: Array<{ content: string; skillIds: string[]; roots: string[] }> = [];
+  const recorded: string[] = [];
+  const host = {
+    activeSessions,
+    isSessionRunning: () => true,
+    getMcpServerManager: () => null,
+    persistImageAttachments: () => undefined,
+    recovery: {
+      imageInputVerdictForActive: () => ImageInputVerdict.Supported,
+      reportOmittedImages: vi.fn(),
+    },
+    getOcrCommandFor: () => undefined,
+    getStore: () => null,
+    emit: (event: string, _id: string, message: { content?: string }) => {
+      if (event === 'message') recorded.push(message.content ?? '');
+    },
+  } as unknown as PiRuntimeAdapterHost;
+  const fixture = await createNativeFixture({
+    createLoader: async (cwd, settings) => {
+      const root = path.join(cwd, 'skills');
+      for (const name of ['alpha', 'beta', 'text-to-cad']) {
+        const dir = path.join(root, name);
+        await mkdir(dir, { recursive: true });
+        await writeFile(
+          path.join(dir, 'SKILL.md'),
+          `---\nname: ${name}\ndescription: Real ${name} Skill fixture.\n---\n${name} steps\n`,
+        );
+      }
+      skillPaths.roots = [root];
+      resourceState.skillRoots = { alpha: root };
+      const pi = { ...(await getPiModules()), getAgentDir: () => cwd };
+      return (await createPiRuntimeResourceLoader(host, pi, cwd, resourceState, {
+        sessionId,
+        getRunId: () => null,
+        getApprovalMode: () => WorkbenchApprovalMode.AllowAll,
+        settingsManager: settings,
+      })) as DefaultResourceLoader;
+    },
+    recordRequest: messages => {
+      visibleRequests.push({
+        content: JSON.stringify(messages),
+        skillIds: [...(resourceState.skillIds ?? [])],
+        roots: Object.keys(resourceState.skillRoots),
+      });
+    },
+  });
+  const { session } = fixture;
+  const active = {
+    sessionId,
+    piSession: session,
+    isRunning: true,
+    aborted: false,
+    abortController: new AbortController(),
+    resourceState,
+  } as unknown as ActivePiSession;
+  activeSessions.set(sessionId, active);
+  const queue = new PiRuntimeQueueController(host);
+  session.subscribe(event => {
+    if (event.type === PiAgentEventType.MessageStart && event.message.role === 'user') {
+      queue.onNativeUserMessageStart(sessionId, active, event.message);
+    }
+  });
+  let running: Promise<void> | undefined;
+  try {
+    expect(
+      queue.enqueuePendingMessage(sessionId, 'Use beta', undefined, undefined, ['beta']),
+    ).toEqual(expect.objectContaining({ success: true }));
+    await vi.waitFor(() => expect(session.getFollowUpMessages()).toHaveLength(1));
+    expect(visibleRequests).toHaveLength(0);
+    running = session.prompt('Start');
+    await fixture.firstRequest;
+    expect(visibleRequests[0].content).toContain('<name>alpha</name>');
+    expect(
+      queue.enqueuePendingMessage(sessionId, 'Use CAD', undefined, undefined, ['text-to-cad']),
+    ).toEqual(expect.objectContaining({ success: true }));
+    expect(resourceState.skillIds).toEqual(['alpha']);
+    await vi.waitFor(() => expect(session.getFollowUpMessages()).toHaveLength(2));
+    fixture.release();
+    await running;
+
+    expect(visibleRequests.map(request => request.skillIds)).toEqual([
+      ['alpha'],
+      ['alpha', 'beta'],
+      ['alpha', 'beta', 'text-to-cad'],
+    ]);
+    expect(visibleRequests.map(request => request.roots)).toEqual(
+      visibleRequests.map(request => request.skillIds),
+    );
+    expect(visibleRequests[0].content).not.toContain('<name>beta</name>');
+    expect(visibleRequests[1].content).toContain('<name>beta</name>');
+    expect(visibleRequests[1].content).not.toContain('<name>text-to-cad</name>');
+    expect(visibleRequests[2].content).toContain('<name>text-to-cad</name>');
+    expect(active.pendingCadToolReload).toBe(true);
+    expect(recorded).toEqual(['Use beta', 'Use CAD']);
+    expect(queue.list(sessionId)).toEqual([]);
+  } finally {
+    fixture.release();
+    await running?.catch(() => {});
+    session.dispose();
+    skillPaths.roots = [];
     await rm(fixture.cwd, { recursive: true, force: true });
   }
 });

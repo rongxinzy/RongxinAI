@@ -48,8 +48,11 @@ export interface PiRuntimeTurnHost {
   getActiveSession(sessionId: string): ActivePiSession | undefined;
   emit(event: string, ...args: unknown[]): void;
   flushControlActions(sessionId: string, active: ActivePiSession): Promise<void>;
-  onPiUserMessageStart?: (sessionId: string, active: ActivePiSession) => void;
-  resetNativeQueueDispatch?: (sessionId: string) => void;
+  onPiUserMessageStart?: (
+    sessionId: string,
+    active: ActivePiSession,
+    message: NonNullable<PiEvent['message']>,
+  ) => void;
   flushPendingError(sessionId: string, active: ActivePiSession): void;
   createSessionMemoryCompletion(active: ActivePiSession): SessionMemoryCompletion;
   recordSummaryOmission(sessionId: string, active: ActivePiSession): Promise<void>;
@@ -172,8 +175,8 @@ export class PiRuntimeTurnEvents {
         break;
 
       case 'message_start':
-        if ((event.message as { role?: unknown } | undefined)?.role === 'user') {
-          this.host.onPiUserMessageStart?.(sessionId, active);
+        if (event.message?.role === 'user') {
+          this.host.onPiUserMessageStart?.(sessionId, active, event.message);
         }
         active.requestStartedAt = Date.now();
         active.firstVisibleTextAt = null;
@@ -687,8 +690,9 @@ export class PiRuntimeTurnEvents {
             classified: classifyCoworkError(event.finalError),
           };
         }
-        // Cancellation precedes agent_settled: retain the lane and writer lease.
-        this.host.flushPendingError(sessionId, active);
+        // A scoped caller keeps its session until Pi actually settles. An
+        // exhausted retry can still be followed by native settlement work.
+        if (!active.onSettled) this.host.flushPendingError(sessionId, active);
         break;
 
       case 'agent_settled':
@@ -711,7 +715,8 @@ export class PiRuntimeTurnEvents {
    */
   private handleTurnSettled(sessionId: string, active: ActivePiSession): void {
     active.isRunning = false;
-    this.host.resetNativeQueueDispatch?.(sessionId);
+    const onSettled = active.onSettled;
+    active.onSettled = undefined;
     // Flush artifact capture before completion: the final diff anchors to the
     // last completed answer message.
     active.artifactRecorder?.onRunSettled(active.lastCompletedAnswerMessageId);
@@ -732,6 +737,10 @@ export class PiRuntimeTurnEvents {
     // Run settled with a deferred or surfaced failure: never complete it.
     // flushPendingError is idempotent after auto_retry_end.
     if (active.pendingError || active.errorSurfaced) {
+      onSettled?.({
+        ok: false,
+        error: active.pendingError?.message ?? 'Pi failed before settlement.',
+      });
       this.host.flushPendingError(sessionId, active);
       void this.host.flushControlActions(sessionId, active);
       return;
@@ -773,6 +782,7 @@ export class PiRuntimeTurnEvents {
         void this.host.recordSummaryOmission(sessionId, active);
       }
     }
+    onSettled?.({ ok: true, output: active.lastCompletedAnswerText.trim() || null });
     this.host.emit('complete', sessionId);
     void this.host.flushControlActions(sessionId, active);
   }

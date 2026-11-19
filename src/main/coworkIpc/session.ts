@@ -11,6 +11,7 @@ import { handleIpcContract } from '../ipc/handleIpcContract';
 import { coworkSessionLifecycleContract } from '../../shared/ipc/coworkContract';
 import { persistCoworkImageAttachments } from '../coworkImageAttachments';
 import { reportPiSessionFailure } from '../piSessionFailure';
+import { t } from '../i18n';
 import { resolveCoworkContinuationSkillState } from '../coworkSessionSkills';
 import { WorkbenchApprovalMode } from '../../shared/workbenchTask';
 import { CoworkPermissionMode, CoworkSessionMode } from '../../shared/cowork/constants';
@@ -27,6 +28,9 @@ export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
       try {
         // Work sessions use Pi (SDK mode, instant availability).
         const runtime = deps.getPiRuntimeAdapter();
+        if (runtime.isSessionReservedForDelivery(options.sessionId)) {
+          return { success: false, error: t('modelPoolSessionBusy') };
+        }
         const localStore = deps.getCoworkStore();
         let existingSession = localStore.getSession(options.sessionId, 0, {
           includeArtifacts: false,

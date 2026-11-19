@@ -145,9 +145,8 @@ export class PiRuntimeAdapter
       this.emit(event as 'started', ...(args as [string]));
     },
     flushControlActions: (sessionId, active) => this.queue.flushControlActions(sessionId, active),
-    onPiUserMessageStart: (sessionId, active) =>
-      this.queue.onNativeUserMessageStart(sessionId, active),
-    resetNativeQueueDispatch: sessionId => this.queue.resetNativeDispatch(sessionId),
+    onPiUserMessageStart: (sessionId, active, message) =>
+      this.queue.onNativeUserMessageStart(sessionId, active, message),
     flushPendingError: (sessionId, active) => this.recovery.flushPendingError(sessionId, active),
     createSessionMemoryCompletion: active => this.sessionMemory.createCompletion(active),
     recordSummaryOmission: (sessionId, active) => this.recordSummaryOmission(sessionId, active),
@@ -337,7 +336,20 @@ export class PiRuntimeAdapter
 
   isSessionRunning(sessionId: string): boolean {
     const active = this.activeSessions.get(sessionId);
-    return Boolean(active && active.isRunning && !active.aborted);
+    return (
+      this.initializingSessions.has(sessionId) ||
+      Boolean(active && active.isRunning && !active.aborted)
+    );
+  }
+
+  isSessionReservedForDelivery(sessionId: string): boolean {
+    return (
+      this.isSessionRunning(sessionId) &&
+      Boolean(
+        this.activeSessions.get(sessionId)?.onSettled ||
+        this.initializingSessions.get(sessionId)?.onSettled,
+      )
+    );
   }
 
   /**

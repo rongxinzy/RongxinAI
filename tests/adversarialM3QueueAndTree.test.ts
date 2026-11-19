@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CoworkQueueDelivery } from '../src/shared/cowork/pendingMessageQueue';
 import { ImageInputVerdict } from '../src/main/libs/agentEngine/piImageInputFallback';
 import { PiRuntimeQueueController } from '../src/main/libs/agentEngine/piRuntimeQueueController';
-import type { ActivePiSession } from '../src/main/libs/agentEngine/piRuntimeSessionState';
+import type {
+  ActivePiSession,
+  PiSession,
+} from '../src/main/libs/agentEngine/piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from '../src/main/libs/agentEngine/piRuntimeAdapterHost';
 import { PiRuntimeAdapter } from '../src/main/libs/agentEngine/piRuntimeAdapter';
 
@@ -15,12 +18,20 @@ describe('Milestone 3 Adversarial Challenge: Queue, Tree, & Context Edit', () =>
     let queueController: PiRuntimeQueueController;
     const sessionId = 'adversarial-queue-session';
     const persistedMessages: any[] = [];
+    const nativeFollowUps: Array<{ role: 'user'; content: string }> = [];
 
     beforeEach(() => {
       persistedMessages.length = 0;
+      nativeFollowUps.length = 0;
       mockPiSession = {
         prompt: vi.fn().mockResolvedValue(undefined),
         sendUserMessage: vi.fn().mockResolvedValue(undefined),
+        followUp: vi.fn<PiSession['followUp']>(async (text, _images, options) => {
+          const message = { role: 'user' as const, content: text };
+          options?.onQueued?.(message);
+          nativeFollowUps.push(message);
+          return 'queued';
+        }),
         clearQueue: vi.fn(() => ({ steering: [], followUp: [] })),
       };
 
@@ -69,7 +80,10 @@ describe('Milestone 3 Adversarial Challenge: Queue, Tree, & Context Edit', () =>
       expect(queueController.list(sessionId)).toHaveLength(0);
 
       // A direct prompt starts in Pi: onNativeUserMessageStart should be a no-op
-      queueController.onNativeUserMessageStart(sessionId, activeSession);
+      queueController.onNativeUserMessageStart(sessionId, activeSession, {
+        role: 'user',
+        content: 'Direct prompt',
+      });
 
       expect(mockStore.addMessage).not.toHaveBeenCalled();
       expect(persistedMessages).toHaveLength(0);
@@ -95,7 +109,7 @@ describe('Milestone 3 Adversarial Challenge: Queue, Tree, & Context Edit', () =>
 
       expect(queueController.hasQueuedControlActions(sessionId)).toBe(true);
 
-      queueController.onNativeUserMessageStart(sessionId, activeSession);
+      queueController.onNativeUserMessageStart(sessionId, activeSession, nativeFollowUps[0]);
       // Pi consumes the follow-up before settling.
       activeSession.isRunning = false;
       await queueController.flushControlActions(sessionId, activeSession);

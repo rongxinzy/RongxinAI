@@ -24,6 +24,27 @@ import type { CoworkStore } from '../../coworkStore';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
 
+type NativeTestUserMessage = { role: 'user'; content: string };
+
+function collectNativeFollowUps(): NativeTestUserMessage[] {
+  const messages: NativeTestUserMessage[] = [];
+  mockSession.followUp.mockImplementation(
+    async (
+      content: string,
+      _images: unknown,
+      options: {
+        onQueued: (message: NativeTestUserMessage) => void;
+      },
+    ) => {
+      const message: NativeTestUserMessage = { role: 'user', content };
+      options.onQueued(message);
+      messages.push(message);
+      return 'queued';
+    },
+  );
+  return messages;
+}
+
 describe('PiRuntimeAdapter', () => {
   setupPiRuntimeAdapterSuite();
 
@@ -34,10 +55,10 @@ describe('PiRuntimeAdapter', () => {
       expect((await adapter.steerInput('native-queue', 'First steer')).success).toBe(true);
       expect((await adapter.steerInput('native-queue', 'Second steer')).success).toBe(true);
       expect(mockSession.steer.mock.calls).toEqual([['First steer'], ['Second steer']]);
-      expect(mockSession.prompt.mock.calls).toEqual([
-        ['Start'],
-        ['Follow-up', { streamingBehavior: 'followUp' }],
-      ]);
+      expect(mockSession.prompt.mock.calls).toEqual([['Start']]);
+      expect(mockSession.followUp).toHaveBeenCalledWith('Follow-up', undefined, {
+        onQueued: expect.any(Function),
+      });
       expect(mockSession.clearQueue).not.toHaveBeenCalled();
     });
 
@@ -47,7 +68,8 @@ describe('PiRuntimeAdapter', () => {
       adapter.stopSession('native-stop');
       await new Promise<void>(resolve => setImmediate(resolve));
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(1);
-      expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+      expect(mockSession.prompt).toHaveBeenCalledTimes(1);
+      expect(mockSession.followUp).toHaveBeenCalledTimes(1);
       expect(adapter.isSessionRunning('native-stop')).toBe(false);
       expect(adapter.listPendingMessages('native-stop')).toEqual([]);
     });
@@ -73,9 +95,14 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('dispatches queued follow-ups natively and consumes them on Pi message_start before agent_settled', async () => {
-      let listener: ((event: { type: string; message?: { role: string } }) => void) | null = null;
+      const queued = collectNativeFollowUps();
+      let listener:
+        | ((event: { type: string; message?: { role: string; content: string } }) => void)
+        | null = null;
       mockSession.subscribe.mockImplementation(
-        (callback: (event: { type: string; message?: { role: string } }) => void) => {
+        (
+          callback: (event: { type: string; message?: { role: string; content: string } }) => void,
+        ) => {
           listener = callback;
           return () => {};
         },
@@ -84,42 +111,44 @@ describe('PiRuntimeAdapter', () => {
       adapter.on('complete', sid => completes.push(sid));
       await adapter.startSession('queue-session', 'Start work', { sessionMode: 'work' });
       // Pi emits user message_start for the initial prompt first.
-      listener!({ type: 'message_start', message: { role: 'user' } });
+      listener!({ type: 'message_start', message: { role: 'user', content: 'Start work' } });
 
       const first = adapter.enqueuePendingMessage('queue-session', 'First follow-up');
       adapter.enqueuePendingMessage('queue-session', 'Second follow-up');
 
       // Both follow-ups are dispatched immediately into Pi's native followUp queue.
-      expect(mockSession.prompt).toHaveBeenCalledTimes(3);
-      expect(mockSession.prompt.mock.calls.slice(1)).toEqual([
-        ['First follow-up', { streamingBehavior: 'followUp' }],
-        ['Second follow-up', { streamingBehavior: 'followUp' }],
+      expect(mockSession.prompt).toHaveBeenCalledTimes(1);
+      expect(mockSession.followUp.mock.calls).toEqual([
+        ['First follow-up', undefined, { onQueued: expect.any(Function) }],
+        ['Second follow-up', undefined, { onQueued: expect.any(Function) }],
       ]);
       expect(adapter.listPendingMessages('queue-session')).toHaveLength(2);
 
       // Pi begins each queued follow-up natively with user message_start.
-      listener!({ type: 'message_start', message: { role: 'user' } });
+      listener!({ type: 'message_start', message: queued[0] });
       expect(adapter.listPendingMessages('queue-session')).toHaveLength(1);
-      listener!({ type: 'message_start', message: { role: 'user' } });
+      listener!({ type: 'message_start', message: queued[1] });
       expect(adapter.listPendingMessages('queue-session')).toEqual([]);
 
       // Pi emits agent_settled once after all native follow-ups complete.
       listener!({ type: 'agent_end' });
       listener!({ type: 'agent_settled' });
       await vi.waitFor(() => expect(completes).toEqual(['queue-session']));
-      expect(mockSession.prompt).toHaveBeenCalledTimes(3);
+      expect(mockSession.prompt).toHaveBeenCalledTimes(1);
       expect(first.success).toBe(true);
     });
 
     it('merges a queued turn picks into the session skills without losing the session own', async () => {
+      const nativeFollowUps = collectNativeFollowUps();
       const added: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
+      const updateSession = vi.fn();
       adapter.setCoworkStore({
         addMessage: (_sessionId: string, message: unknown) => {
           added.push(message as { content: string; metadata?: Record<string, unknown> });
           return message;
         },
-        getSession: () => ({ messages: [], experts: [] }),
-        updateSession: vi.fn(),
+        getSession: () => ({ messages: [], experts: [], activeSkillIds: ['alpha-skill'] }),
+        updateSession,
         updateMessage: vi.fn(),
         listSessionArtifacts: vi.fn(),
       } as unknown as CoworkStore);
@@ -143,10 +172,23 @@ describe('PiRuntimeAdapter', () => {
       );
       expect(queued.success).toBe(true);
 
-      listener!({ type: 'message_start', message: { role: 'user' } } as { type: string });
+      // A distinct native user message with identical text cannot activate the Skill.
+      listener!({
+        type: 'message_start',
+        message: { role: 'user', content: 'Second' },
+      } as { type: string });
+      const skillUpdate = [
+        'queued-skills',
+        { activeSkillIds: ['alpha-skill', 'beta-skill'] },
+        { touchUpdatedAt: false },
+      ];
+      expect(updateSession).not.toHaveBeenCalledWith(...skillUpdate);
+      expect(adapter.listPendingMessages('queued-skills')).toHaveLength(1);
+      listener!({ type: 'message_start', message: nativeFollowUps[0] } as { type: string });
+      expect(updateSession).toHaveBeenCalledWith(...skillUpdate);
       listener!({ type: 'agent_end' });
       listener!({ type: 'agent_settled' });
-      await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(2));
+      await vi.waitFor(() => expect(mockSession.followUp).toHaveBeenCalledTimes(1));
 
       // The queued turn records only its own pick as the input attachment…
       expect(added.map(message => message.metadata?.skillIds)).toEqual([undefined, ['beta-skill']]);
@@ -170,6 +212,20 @@ describe('PiRuntimeAdapter', () => {
       expect(adapter.enqueuePendingMessage('chat-session', 'Not allowed')).toMatchObject({
         success: false,
       });
+    });
+
+    it('recreates the native loadout on the first idle turn after a queued CAD attachment', async () => {
+      await adapter.startSession('queued-cad', 'Start work', { sessionMode: 'work' });
+      const active = adapter.activeSessions.get('queued-cad')!;
+      active.isRunning = false;
+      active.requestedSkillIds = ['text-to-cad'];
+      active.resourceState.skillIds = ['text-to-cad'];
+      active.resourceState.skillRoots = { 'text-to-cad': '/skills' };
+      active.pendingCadToolReload = true;
+
+      await adapter.continueSession('queued-cad', 'Open the viewer');
+
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
     });
   });
 

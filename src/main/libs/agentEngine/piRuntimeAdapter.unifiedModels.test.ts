@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   createAgentSession: mocks.createAgentSession,
+  formatSkillsForPrompt: vi.fn(() => ''),
   DefaultResourceLoader: class {
     async reload() {}
   },

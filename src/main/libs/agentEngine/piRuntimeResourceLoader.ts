@@ -6,7 +6,7 @@
  * extensions (authorization, bash guardrails, plan mode, codemode, native MCP).
  */
 
-import type { ToolAnnotations } from '@earendil-works/pi-coding-agent';
+import type { Skill, ToolAnnotations } from '@earendil-works/pi-coding-agent';
 
 import {
   NATIVE_READ_ONLY_TOOLS,
@@ -132,6 +132,14 @@ export async function createPiRuntimeResourceLoader(
   additionalExtensionFactories: PiExtensionFactory[] = [],
 ): Promise<PiResourceLoader> {
   const settingsManager = approvalContext?.settingsManager ?? createPiSettingsManager(pi, cwd);
+  type DiscoveredSkill = Skill & { id?: string };
+  const matchesSkillId = (skill: DiscoveredSkill, ids: readonly string[]): boolean =>
+    ids.includes(skill.id ?? '') || ids.includes(skill.name);
+  let unselectedSkills: DiscoveredSkill[] = [];
+  resourceState.describeQueuedSkills = skillIds =>
+    pi
+      .formatSkillsForPrompt(unselectedSkills.filter(skill => matchesSkillId(skill, skillIds)))
+      .trim();
   const resourceLoader = new pi.DefaultResourceLoader({
     cwd,
     agentDir: pi.getAgentDir(),
@@ -152,20 +160,15 @@ export async function createPiRuntimeResourceLoader(
         : resolveZhiyuanSkillDirs()),
       ...resourceState.expertSkillDirs,
     ],
-    skillsOverride: (base: {
-      skills: Array<{ name?: string; id?: string }>;
-      diagnostics: unknown[];
-    }) =>
-      resourceState.skillIds === undefined
-        ? base
-        : {
-            ...base,
-            skills: base.skills.filter(
-              skill =>
-                resourceState.skillIds?.includes(skill.id || '') ||
-                resourceState.skillIds?.includes(skill.name || ''),
-            ),
-          },
+    skillsOverride: (base: { skills: DiscoveredSkill[]; diagnostics: unknown[] }) => {
+      const selected = resourceState.skillIds;
+      unselectedSkills = selected
+        ? base.skills.filter(skill => !matchesSkillId(skill, selected))
+        : [];
+      return selected
+        ? { ...base, skills: base.skills.filter(skill => matchesSkillId(skill, selected)) }
+        : base;
+    },
     ...createPiPromptOverrides(resourceState, () =>
       collectPiSystemPromptContributions({
         chatMode: resourceState.chatMode,

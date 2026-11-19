@@ -1,5 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { CoworkQueueDelivery } from '../../../shared/cowork/pendingMessageQueue';
+import {
+  CoworkQueueDelivery,
+  CoworkQueueItemStatus,
+} from '../../../shared/cowork/pendingMessageQueue';
 import { ImageInputVerdict } from './piImageInputFallback';
 import { PiRuntimeQueueController } from './piRuntimeQueueController';
 import type { ActivePiSession } from './piRuntimeSessionState';
@@ -17,6 +20,7 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
     mockPiSession = {
       prompt: vi.fn().mockResolvedValue(undefined),
       sendUserMessage: vi.fn().mockResolvedValue(undefined),
+      followUp: vi.fn().mockResolvedValue('queued'),
       clearQueue: vi.fn(() => ({ steering: [], followUp: [] })),
     };
 
@@ -79,8 +83,8 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       expect(list[0].id).toBe(result.item?.id);
 
       // Verify native send called with followUp
-      expect(mockPiSession.sendUserMessage).toHaveBeenCalledWith(expect.anything(), {
-        deliverAs: 'followUp',
+      expect(mockPiSession.followUp).toHaveBeenCalledWith('Process file data', expect.any(Array), {
+        onQueued: expect.any(Function),
       });
     });
 
@@ -89,6 +93,25 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       const result = queueController.enqueuePendingMessage(sessionId, 'Should fail');
       expect(result.success).toBe(false);
       expect(result.error).toContain('not running');
+    });
+
+    it('fails a draft whose native input processing finishes after its submitting turn', async () => {
+      const inputProcessing = Promise.withResolvers<void>();
+      mockPiSession.followUp.mockImplementationOnce(async (text, _images, options) => {
+        await inputProcessing.promise;
+        options.onQueued({ role: 'user', content: text });
+        return 'queued';
+      });
+      expect(queueController.enqueuePendingMessage(sessionId, 'late draft').success).toBe(true);
+      activeSession.submissionToken = Symbol('next submission');
+      inputProcessing.resolve();
+
+      await vi.waitFor(() =>
+        expect(queueController.list(sessionId)).toEqual([
+          expect.objectContaining({ text: 'late draft', status: CoworkQueueItemStatus.Failed }),
+        ]),
+      );
+      expect(mockStore.addMessage).not.toHaveBeenCalled();
     });
   });
 
@@ -100,7 +123,9 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       expect(queueController.list(sessionId)).toHaveLength(1);
 
       // Simulate Pi emitting message_start for user
-      queueController.onNativeUserMessageStart(sessionId, activeSession);
+      const message = { role: 'user', content: 'Queued item' };
+      mockPiSession.followUp.mock.calls[0][2].onQueued(message);
+      queueController.onNativeUserMessageStart(sessionId, activeSession, message);
 
       // Sidecar item is taken and finished
       expect(queueController.list(sessionId)).toHaveLength(0);
@@ -118,10 +143,27 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       expect(queueController.list(sessionId)).toHaveLength(0);
 
       // Fire message_start for direct prompt
-      queueController.onNativeUserMessageStart(sessionId, activeSession);
+      queueController.onNativeUserMessageStart(sessionId, activeSession, {
+        role: 'user',
+        content: 'Direct prompt',
+      });
 
       // No message added since direct prompt is already saved prior to dispatch
       expect(mockStore.addMessage).not.toHaveBeenCalled();
+    });
+
+    it('keeps an accepted native input projectable when Pi drains it in the next run', () => {
+      queueController.enqueuePendingMessage(sessionId, 'retained native follow-up');
+      const message = { role: 'user', content: 'retained native follow-up' };
+      mockPiSession.followUp.mock.calls[0][2].onQueued(message);
+      activeSession.submissionToken = Symbol('next submission');
+      queueController.onNativeUserMessageStart(sessionId, activeSession, message);
+
+      expect(queueController.list(sessionId)).toEqual([]);
+      expect(mockStore.addMessage).toHaveBeenCalledExactlyOnceWith(
+        sessionId,
+        expect.objectContaining({ content: 'retained native follow-up' }),
+      );
     });
   });
 

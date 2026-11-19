@@ -151,6 +151,8 @@ export const enMain1 = {
     '[Task timed out] The task was automatically stopped because it exceeded the maximum allowed duration. You can continue the conversation to pick up where it left off.',
   imSessionStoppedReply:
     'The task was manually stopped. You can send a new message to start a fresh conversation.',
+  imScheduledTaskCreated: 'Scheduled task created.',
+  imScheduledTaskCreationFailed: 'A scheduled task could not be created.',
 
   // OAuth flow messages
   qwenOAuthRequestingDeviceCode: 'Requesting device authorization code...',

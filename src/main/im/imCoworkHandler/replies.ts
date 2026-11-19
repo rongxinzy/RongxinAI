@@ -1,20 +1,25 @@
 /**
- * Reply formatting helpers for IM cowork turns: guard-checked replies,
+ * Reply formatting helpers for IM cowork turns: scheduled-task receipts,
  * raw reminder extraction, error replies, and media-formatted message content.
  */
 
 import { type CoworkError, CoworkErrorKind } from '../../../common/coworkError';
 import type { CoworkMessage } from '../../coworkStore';
 import { t } from '../../i18n';
-import { analyzeIMReply, DEFAULT_IM_EMPTY_REPLY } from '../imReplyGuard';
+import { readIMScheduledTaskReceipts } from '../imScheduledTaskReceipts';
 import type { IMMediaAttachment, IMMessage } from '../types';
 
+export const DEFAULT_IM_EMPTY_REPLY = '处理完成，但没有生成回复。';
+
 /**
- * Extract raw assistant text from accumulated messages, bypassing the
- * reminder-commitment guard.  Used for cron-triggered background deliveries
- * where the reply IS the scheduled reminder, not a promise to create one.
+ * Extract assistant text for the channel. Scheduled delivery already has its
+ * own execution outcome, so it does not include task-creation receipts.
  */
 export function formatIMReplyRaw(messages: CoworkMessage[]): string {
+  return readAssistantText(messages) || DEFAULT_IM_EMPTY_REPLY;
+}
+
+function readAssistantText(messages: CoworkMessage[]): string {
   const parts: string[] = [];
   for (const message of messages) {
     if (message.type === 'assistant' && message.content && !message.metadata?.isThinking) {
@@ -22,29 +27,16 @@ export function formatIMReplyRaw(messages: CoworkMessage[]): string {
       if (text) parts.push(text);
     }
   }
-  return parts.join('\n\n') || DEFAULT_IM_EMPTY_REPLY;
+  return parts.join('\n\n');
 }
 
-/**
- * Format accumulated messages into a reply string
- */
-export function formatIMReply(sessionId: string, messages: CoworkMessage[]): string {
-  const analysis = analyzeIMReply(messages);
-
-  if (analysis.guardApplied) {
-    console.warn(
-      '[IMCoworkHandler] Guarded misleading reminder reply without successful cron.add',
-      JSON.stringify({
-        sessionId,
-        attemptedCronAdds: analysis.attemptedCronAdds,
-        successfulCronAdds: analysis.successfulCronAdds,
-        lastCronAddError: analysis.lastCronAddError,
-        assistantText: analysis.assistantText,
-      }),
-    );
-  }
-
-  return analysis.text;
+/** Preserve the assistant's text and report explicitly observed tool failures. */
+export function formatIMReply(messages: CoworkMessage[]): string {
+  const assistantText = readAssistantText(messages);
+  const { created, failed } = readIMScheduledTaskReceipts(messages);
+  const reply = assistantText || (created ? t('imScheduledTaskCreated') : '');
+  if (failed) return [reply, t('imScheduledTaskCreationFailed')].filter(Boolean).join('\n\n');
+  return reply || DEFAULT_IM_EMPTY_REPLY;
 }
 
 /**

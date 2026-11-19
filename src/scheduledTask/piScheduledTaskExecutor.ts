@@ -1,6 +1,9 @@
 import type { CoworkStore } from '../main/coworkStore';
-import type { CoworkError } from '../common/coworkError';
-import type { PiContinueOptions, PiRuntime } from '../main/libs/agentEngine/piRuntimeTypes';
+import type {
+  PiContinueOptions,
+  PiRuntime,
+  PiSubmissionResult,
+} from '../main/libs/agentEngine/piRuntimeTypes';
 import { getDefaultConversationWorkspacePath } from '../main/defaultConversationWorkspace';
 import { parseManagedSessionKey } from '../main/libs/channelSessionKey';
 import { buildScheduledSessionTitle, CoworkSessionSource } from '../shared/cowork/constants';
@@ -11,7 +14,7 @@ import type { ScheduledTask, ScheduledTaskRun } from './types';
 
 /** Executes one canonical task through the embedded Pi runtime only. */
 export class PiScheduledTaskExecutor {
-  private readonly taskLocks = new Map<string, Promise<void>>();
+  private readonly executionLocks = new Map<string, Promise<void>>();
 
   constructor(
     private readonly runtime: PiRuntime,
@@ -22,29 +25,40 @@ export class PiScheduledTaskExecutor {
     task: ScheduledTask,
     _run: ScheduledTaskRun,
   ): Promise<{ sessionId: string; output: string | null }> {
-    const previous = this.taskLocks.get(task.id) ?? Promise.resolve();
+    const sessionId = this.getBoundSessionId(task);
+    const lockKey = sessionId ? `session:${sessionId}` : `task:${task.id}`;
+    const previous = this.executionLocks.get(lockKey) ?? Promise.resolve();
     let release!: () => void;
     const current = new Promise<void>(resolve => {
       release = resolve;
     });
     const queued = previous.then(() => current);
-    this.taskLocks.set(task.id, queued);
+    this.executionLocks.set(lockKey, queued);
     await previous;
     try {
-      return await this.executeUnlocked(task);
+      return await this.executeUnlocked(task, sessionId);
     } finally {
       release();
-      if (this.taskLocks.get(task.id) === queued) this.taskLocks.delete(task.id);
+      if (this.executionLocks.get(lockKey) === queued) this.executionLocks.delete(lockKey);
     }
   }
 
   private async executeUnlocked(
     task: ScheduledTask,
+    sessionId: string | null,
   ): Promise<{ sessionId: string; output: string | null }> {
     const prompt =
       task.payload.kind === PayloadKind.SystemEvent ? task.payload.text : task.payload.message;
     if (!prompt.trim()) throw new Error(`Scheduled task ${task.id} has an empty prompt`);
-    const session = this.resolveSession(task);
+    const session =
+      (sessionId && this.coworkStore.getSession(sessionId, 0, { includeArtifacts: false })) ||
+      this.createScheduledSession(
+        task,
+        task.sessionTarget === SessionTarget.Task ? (sessionId ?? undefined) : undefined,
+      );
+    if (this.runtime.isSessionRunning(session.id)) {
+      throw new Error(`Scheduled task cannot start while its session is running: ${session.id}`);
+    }
     const completion = waitForPiCompletion(
       this.runtime,
       session.id,
@@ -61,32 +75,28 @@ export class PiScheduledTaskExecutor {
       // into unattended execution, so tools must follow that run policy.
       approvalMode: WorkbenchApprovalMode.AllowAll,
       unattended: true,
+      onSettled: completion.settle,
     };
     try {
       const execution = this.runtime.isSessionActive(session.id)
         ? this.runtime.continueSession(session.id, prompt, options)
         : this.runtime.startSession(session.id, prompt, options);
-      await Promise.all([execution, completion.promise]);
+      const [, output] = await Promise.all([execution, completion.promise]);
+      return { sessionId: session.id, output };
     } catch (error) {
       completion.cancel();
       throw error;
     }
-    return { sessionId: session.id, output: this.finalAssistantOutput(session.id) };
   }
 
-  private resolveSession(task: ScheduledTask) {
+  private getBoundSessionId(task: ScheduledTask): string | null {
     if (task.sessionTarget === SessionTarget.Task) {
-      const taskSessionId = `scheduled-task:${task.id}`;
-      const existing = this.coworkStore.getSession(taskSessionId);
-      if (existing) return existing;
-      return this.createScheduledSession(task, taskSessionId);
+      return `scheduled-task:${task.id}`;
     }
     if (task.sessionTarget === SessionTarget.Main && task.sessionKey) {
-      const sessionId = parseManagedSessionKey(task.sessionKey)?.sessionId ?? task.sessionKey;
-      const existing = this.coworkStore.getSession(sessionId);
-      if (existing) return existing;
+      return parseManagedSessionKey(task.sessionKey)?.sessionId ?? task.sessionKey;
     }
-    return this.createScheduledSession(task);
+    return null;
   }
 
   private createScheduledSession(task: ScheduledTask, id?: string) {
@@ -107,59 +117,30 @@ export class PiScheduledTaskExecutor {
       CoworkSessionSource.Scheduled,
     );
   }
-
-  private finalAssistantOutput(sessionId: string): string | null {
-    const session = this.coworkStore.getSession(sessionId, null);
-    const message = [...(session?.messages ?? [])]
-      .reverse()
-      .find(
-        candidate =>
-          candidate.type === 'assistant' &&
-          candidate.content.trim() &&
-          !candidate.metadata?.isThinking,
-      );
-    return message?.content.trim() || null;
-  }
 }
 
 function waitForPiCompletion(
   runtime: PiRuntime,
   sessionId: string,
   timeoutSeconds?: number,
-): { promise: Promise<void>; cancel: () => void } {
+): {
+  promise: Promise<string | null>;
+  settle: (result: PiSubmissionResult) => void;
+  cancel: () => void;
+} {
   const timeoutMs = Math.max(1, timeoutSeconds ?? 300) * 1000;
-  let timer: ReturnType<typeof setTimeout>;
-  let cleanup = () => {};
-  const promise = new Promise<void>((resolve, reject) => {
-    cleanup = () => {
-      runtime.off('complete', onComplete);
-      runtime.off('error', onError);
-      runtime.off('sessionStopped', onSessionStopped);
+  const { promise, resolve, reject } = Promise.withResolvers<string | null>();
+  const timer = setTimeout(() => {
+    reject(new Error(`Scheduled task Pi run timed out after ${timeoutMs}ms`));
+    runtime.stopSession(sessionId);
+  }, timeoutMs);
+  return {
+    promise,
+    settle: result => {
       clearTimeout(timer);
-    };
-    const onComplete = (id: string) => {
-      if (id !== sessionId) return;
-      cleanup();
-      resolve();
-    };
-    const onError = (id: string, error: CoworkError) => {
-      if (id !== sessionId) return;
-      cleanup();
-      reject(new Error(error.message));
-    };
-    const onSessionStopped = (id: string) => {
-      if (id !== sessionId) return;
-      cleanup();
-      reject(new Error(`Scheduled task Pi session stopped before completion: ${sessionId}`));
-    };
-    timer = setTimeout(() => {
-      cleanup();
-      runtime.stopSession(sessionId);
-      reject(new Error(`Scheduled task Pi run timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-    runtime.on('complete', onComplete);
-    runtime.on('error', onError);
-    runtime.on('sessionStopped', onSessionStopped);
-  });
-  return { promise, cancel: cleanup };
+      if (result.ok === true) resolve(result.output);
+      else reject(new Error(result.error));
+    },
+    cancel: () => clearTimeout(timer),
+  };
 }

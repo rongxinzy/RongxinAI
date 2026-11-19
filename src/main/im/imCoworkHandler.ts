@@ -36,6 +36,7 @@ import {
 } from './imCoworkHandler/permissions';
 import { buildIMCoworkSystemPrompt } from './imCoworkHandler/prompt';
 import {
+  DEFAULT_IM_EMPTY_REPLY,
   formatIMErrorReply,
   formatIMMessageWithMedia,
   formatIMReply,
@@ -484,12 +485,9 @@ export class IMCoworkHandler extends EventEmitter {
     const messages =
       currentTurnStoreMessages.length > 0 ? currentTurnStoreMessages : accumulator.messages;
 
-    // For cron-triggered background deliveries (scheduled task executions),
-    // skip the reminder guard — the assistant text IS the scheduled reminder
-    // itself, not a promise to create one.
     const replyText = accumulator.backgroundDelivery
       ? formatIMReplyRaw(messages)
-      : formatIMReply(sessionId, messages);
+      : formatIMReply(messages);
 
     console.log(
       `[IMCoworkHandler] 会话完成:`,
@@ -517,7 +515,7 @@ export class IMCoworkHandler extends EventEmitter {
     );
 
     if (accumulator.backgroundDelivery) {
-      if (!this.sendAsyncReply || !replyText || replyText === '处理完成，但没有生成回复。') {
+      if (!this.sendAsyncReply || !replyText || replyText === DEFAULT_IM_EMPTY_REPLY) {
         console.warn('[IMCoworkHandler] cannot send async IM reminder reply', replyText);
         return;
       }
@@ -588,7 +586,7 @@ export class IMCoworkHandler extends EventEmitter {
       accumulatorFromPendingPermissions(pendingPermissions);
     if (!accumulator) return;
 
-    const partialReply = formatIMReply(sessionId, accumulator.messages);
+    const partialReply = formatIMReply(accumulator.messages);
     this.messageAccumulators.cleanup(sessionId);
     this.messageAccumulators.emitRunEvent(
       sessionId,

@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest';
 
 import { CoworkErrorKind } from '../../../common/coworkError';
 import { t } from '../../i18n';
-import { UNSCHEDULED_REMINDER_FAILURE_REPLY, DEFAULT_IM_EMPTY_REPLY } from '../imReplyGuard';
 import {
+  DEFAULT_IM_EMPTY_REPLY,
   formatIMErrorReply,
   formatIMMessageWithMedia,
   formatIMReply,
@@ -42,12 +42,12 @@ describe('formatIMReplyRaw', () => {
 describe('formatIMReply', () => {
   test('returns assistant text when no reminder commitment is present', () => {
     const messages = [assistantMessage('这是会议纪要摘要。')];
-    expect(formatIMReply('session-1', messages)).toBe('这是会议纪要摘要。');
+    expect(formatIMReply(messages)).toBe('这是会议纪要摘要。');
   });
 
-  test('guards an unbacked reminder commitment', () => {
-    const messages = [assistantMessage('好的，稍后我会提醒你喝水。')];
-    expect(formatIMReply('session-1', messages)).toBe(UNSCHEDULED_REMINDER_FAILURE_REPLY);
+  test('preserves wording even when it quotes a promise to remind someone', () => {
+    const text = '可将提醒话术写成「稍后我会提醒你喝水」。\n\n这里是其他建议。';
+    expect(formatIMReply([assistantMessage(text)])).toBe(text);
   });
 
   test('keeps the assistant text when a cron.add succeeded', () => {
@@ -72,7 +72,7 @@ describe('formatIMReply', () => {
       },
       assistantMessage('已设置好提醒！'),
     ];
-    expect(formatIMReply('session-1', messages)).toBe('已设置好提醒！');
+    expect(formatIMReply(messages)).toBe('已设置好提醒！');
   });
 
   test('replaces an empty reply with a confirmation when a cron.add succeeded', () => {
@@ -96,7 +96,29 @@ describe('formatIMReply', () => {
         metadata: { toolUseId: 'cron-1', isError: false },
       },
     ];
-    expect(formatIMReply('session-1', messages)).toBe('已创建定时任务。');
+    expect(formatIMReply(messages)).toBe(t('imScheduledTaskCreated'));
+  });
+
+  test('appends a tool failure receipt without replacing assistant content', () => {
+    const text = '这是会议纪要摘要。\n\n我还会提醒你发送。';
+    const messages = [
+      {
+        id: 'tool-use-1',
+        type: 'tool_use',
+        content: 'Using tool: scheduled_task',
+        timestamp: 0,
+        metadata: { toolName: 'scheduled_task', toolUseId: 'task-1' },
+      },
+      {
+        id: 'tool-result-1',
+        type: 'tool_result',
+        content: 'Invalid schedule',
+        timestamp: 0,
+        metadata: { toolUseId: 'task-1', isError: true },
+      },
+      assistantMessage(text),
+    ];
+    expect(formatIMReply(messages)).toBe(`${text}\n\n${t('imScheduledTaskCreationFailed')}`);
   });
 });
 
