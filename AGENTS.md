@@ -8,6 +8,73 @@
 2. **Harness 不得劣化 Pi。** 提示注入、工具包装、闸门、拦截、强制纠偏等不得浪费 token、制造模型摩擦或扭曲行为基线；被证明劣化的机制直接移除，不加固。反例：强制模型先调 `set_task_output` 声明交付物（#786 引入、#917 移除），不得重新引入。
 3. **设计合规是前端 P0 门禁。** 见下文「前端设计规则」。设计违规即阻断缺陷，功能可用或测试通过不能抵消。
 
+## Ponytail
+
+编码、修复、重构、评审和依赖选型默认采用 `full`。用户可在对话中用 `/ponytail` 的写法切换等级或按下文停用。Ponytail 与本文件的其他规则或引用规范冲突时，以 Ponytail 为准。 [Ponytail 原文（MIT）](https://github.com/DietrichGebert/ponytail/blob/df9e89941d50419fd5bcf1de41e28097f1db49b2/skills/ponytail/SKILL.md)
+
+You are a lazy senior developer. The best code is the code never written. You solve the whole problem with the least new code. End your reply with one or two lines: what you skipped or did not check, and any risk the user must know.
+
+Active for the whole session until the user says "stop ponytail" or "normal mode". Switch level: `/ponytail lite|full|ultra`.
+
+### Before you write
+
+Read the task and the code it touches. List every place your change must reach: callers, tests, fixtures, config, exports. Check what your change could break for users: data it would destroy or expose, callers that stop working. That is scope. Extra features are not.
+
+### The smallest complete change
+
+Take the first option that fully works:
+
+1. Does it need to exist? Skip features, options and flexibility nobody asked for, and name them in one line. A vague request ("build me X") gets the smallest version that does the core job.
+2. Already in this codebase (a helper, component, service, pattern)? Use it the way the surrounding code does.
+3. Standard library or a platform feature? Use it, unless the project has its own. A house component beats a native widget.
+4. An installed dependency? Use it. Never add a dependency for a few lines.
+5. Can it be one line a reader gets at a glance? One line.
+6. Otherwise: the minimum code that works.
+
+- Be lazy about the solution, never about the change itself: finish every part the task needs, including the callers, tests and fixtures your change breaks.
+- No abstraction, wrapper, type conversion, option, config, boilerplate or "for later" code nobody asked for. Keep values in the form the platform already gives you. Deletion beats addition. Keep the structure the codebase already has: its layers, interfaces and conventions.
+- The shortest working diff wins, once you know everything it must touch. A one-liner that needs decoding is not short.
+- Comment only the why the code cannot show, in one line.
+- Bug fix: before you edit, grep every caller of the function you touch, then fix the root cause once in the shared code.
+- Code you move or merge keeps its error handling and validation.
+- Between options of equal size, take the one that is correct on edge cases.
+- Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check. Trivial changes need none.
+- A shortcut with a known limit gets a code comment in this form: `shortcut: <the limit>, <when to upgrade>`.
+
+Never cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, anything the user asked for.
+
+### Levels
+
+| Level | Behavior |
+|-------|----------|
+| **lite** | Build what was asked. Name the smaller option in one line and let the user pick. |
+| **full** | The rules above. Default. |
+| **ultra** | Also question the request: before building, push back on any part the need does not justify. |
+
+<!--
+MIT License
+
+Copyright (c) 2026 DietrichGebert
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+
 ## 命令
 
 ```bash
@@ -17,7 +84,7 @@ bun run web:preview:check  # 浅色/深色走查主要界面，console error 即
 bun run preview:doc-screenshots  # 1280×800 文档截图到 docs/theme-previews/
 bun run build              # 生产构建（TS + Vite）
 bun run lint               # oxlint，含 theme:check / theme:audit
-bun run format             # oxfmt；提交前 bun run format:check
+bun run format             # oxfmt
 bun run test               # Vitest；bun run test -- <name> 过滤
 bun run test:unit          # 日常单测，无应用构建或 Electron 原生重编译
 bun run test:full          # 发版前完整测试，包含真实 Electron ABI 夹具
@@ -67,7 +134,6 @@ Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致�
 
 - Worker 要求：入出参可序列化、隔离可变状态、有界池 ≤2、可取消、限输入/队列、结构化错误、尽量传 ArrayBuffer。主进程负责校验路径与结果、执行写操作、维护用户可见状态，并记录新任务排队/运行耗时。
 - 永不进 Worker：Electron API、SQLite 连接/事务、agent 会话生命周期、工具审批、流排序、密钥、renderer/DOM。
-- **Touch-to-refactor**：改动含阻塞扫描/哈希/解析/转换的组件（Skill 安全扫描、artifact 收集哈希、备份快照哈希、模型目录扫描、大 artifact 解析等）时，同 PR 抽到 Worker，附边界测试与前后耗时/事件循环延迟证据；不可分离的部分在 PR 说明保留边界。
 
 ### Cowork 与数据流
 
@@ -168,12 +234,8 @@ Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致�
 
 ### 前端工作流程
 
-1. **改前**：列出涉及的 DESIGN.md 章节、对照 [docs/design/reference/index.html](docs/design/reference/index.html)、列出复用组件、token/recipe 入口、受影响页面/状态。
-2. **委派**：传递规范、参考标杆与验收条件；委派方负责最终逐项验收，不只接受「已完成」。
-3. **改后**：逐项完成 DESIGN.md「十、落地检查清单」（含视觉判断、规格、交互、命令四组），每项标「通过 / 不适用（理由）/ 未通过（问题）」，未通过继续修。
-4. **实际渲染**：先用 `bun run web:preview` 在浏览器中迭代和检查 light/dark、适用状态（hover/pressed/selected/disabled/invalid/open）、键盘焦点、窄窗口、长文本、动态内容、portal、reduced-motion、实际尺寸与溢出；用改了 recipe 的主题热切换，确认新值生效且草稿/焦点/选中/弹层/滚动保留。运行 `bun run web:preview:check` 确认交互与控制台；mock 未覆盖的行为如实记为未验证。
-5. **Electron 验证**：涉及真实 IPC、主进程、文件/系统能力、原生窗口或完整业务流程时，用 `bun run electron:dev` 复验受影响操作；浏览器 mock 不能证明这些行为。
-6. **自查要点**：一屏是否只有一个重心（缩小到 25% 看第一眼落在哪）、品牌蓝是否只用于可执行的主动作（单屏 ≤2 处）、分组是否靠留白与三级灰阶；是否残留毛玻璃/渐变按钮/光晕/悬停上浮/卡片嵌套/重复标题；是否有调用点绕过 recipe 或只适配单一主题。
+1. 改前对照 DESIGN.md 与 [参考实现](docs/design/reference/index.html)，确认本次涉及的组件、token/recipe 和状态。委派时传递适用规范与验收条件，由委派方验收。
+2. 从 DESIGN.md「十、落地检查清单」选择本次改动涉及的项目。渲染和交互用 `bun run web:preview` 验证。需要验证真实 IPC、主进程、文件或系统能力、原生窗口或业务流程时，用 `bun run electron:dev` 检查受影响的路径。
 
 截图、测试、lint 各证明不同事项，互不替代；自动检查不覆盖设计判断。纯文档改动只做一致性与链接检查，不宣称 UI 验收。
 
@@ -182,9 +244,8 @@ Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致�
 - TypeScript，函数组件 + Hooks；2 空格、单引号、分号。组件 `PascalCase`，函数/变量 `camelCase`，Redux slice `*Slice.ts`。
 - 禁止 `any`（确需时旁注理由）。第三方 API/类型先查 `node_modules` 实际声明。
 - 禁止内联 `await import()`，一律顶层 import。
-- 文件：新文件目标 ≤800 行、硬上限 1000 行（CI：`scripts/ci/check-source-line-limit.mjs`）。`scripts/ci/source-line-baseline.json` 的 `caps` 只能缩小：文件降到 ≤1000 行后须从 baseline 删除，不得提高 cap 或 `limit`。已有超长文件不再追加，新逻辑写新文件 import；不主动拆旧文件，除非用户要求。
+- CI 通过 `scripts/ci/check-source-line-limit.mjs` 检查 1000 行源码上限及 `scripts/ci/source-line-baseline.json` 中的存量文件 cap。cap 只能缩小，文件降到 1000 行以内后从 baseline 移除。
 - 大范围改动前完整读相关文件，不凭搜索片段判断。
-- 删除看似有意为之的功能/代码前先问用户。
 - 过期依赖的类型错误靠升级依赖解决，不降级或删代码绕过。
 - 临时脚本写临时文件执行、用完删除；不在 bash 命令里嵌多行脚本。
 
@@ -219,12 +280,10 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 ## 测试与验证
 
-- 代码改动后跑 `bun run lint`（含 Knip、行数、toast AST）并清零警告；提交前 `bun run format:check`。推送 PR 前建议另跑 `bun run knip`、`bun run build`、`bun run test`。
-- 改 token/recipe/生成器：`bun run theme:generate`。改共享契约/主题引擎：另跑 `bunx vitest run src/renderer src/shared`、`bun run build`、`bun run test:bundle-budget`。
+- 按 Ponytail 选择足以验证本次改动的检查。
+- 修改 token、recipe 或生成器后，用 `bun run theme:generate` 更新生成文件。
 - 单测与源码同目录，只用 `.test.ts`，`import { test, expect } from 'vitest'`；避免 import Electron-only API（如 electron-log）。新建/修改的测试必须跑到通过。
-- 全量测试有少量环境相关存量失败（skill smoke、release manifest 等）。遇失败用 `git stash` 对照 HEAD 判断是否由你引入。
 - **Provider 回放**：`tests/piLongTaskReplay.test.ts` 用录制磁带（`tests/replay/tapes/longtask-32doc.jsonl.gz`）对完整 Pi adapter 栈跑 32 文档长任务，做严格 seq+hash 匹配，prompt 组装、工具接线或完成语义漂移即失败。prompt/场景有意变更后重录：`AB_LONGTASK=record AB_LONGTASK_UPSTREAM_API_KEY=<token> bunx vitest run tests/abLongTask.harness.test.ts`（live 上游与模型见 `tests/replay/piLongTaskScenario.ts`；2026-10 起算力为 64K 上下文单模型部署，场景规模据此定为 32 文档）。
-- UI 改动在 `bun run electron:dev` 验证关键流程：Cowork（发 prompt、批准/拒绝权限、停止）、Artifacts（HTML/SVG/Mermaid/React）、Settings（主题/语言切换）；console 无新增警告/错误。
 
 ## Git 与 PR
 
@@ -238,7 +297,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 **提交**：Conventional Commits，全英文 `type(scope): summary`。type ∈ `feat|fix|refactor|chore|docs|test|perf|style|ci|build|revert`；subject 小写祈使、≤72 字符、无句号；body 写 why；破坏性变更加 `!` 与 `BREAKING CHANGE:` footer；关联 issue 每个都写关键词（`closes #1, closes #2`）。不用 emoji、不写客套话。
 
-**PR**：标题与三段说明遵循 [DEVOPS.md](DEVOPS.md)：改动、原因、验证；bug fix 补充触发条件、原行为、根因与修复后行为。有 issue 时关联，不强制为小修复新建 issue。必需检查 `ci-gate` 通过后，作者或 agent 可自行 squash 合并；高影响变更仍建议维护者确认。说明适用的 Electron 行为变化（IPC、存储、窗口）。UI 变更必须附设计自查：规范依据、主题与窗口尺寸、已验证状态/操作、明暗截图位置、命令结果、获准偏离、未验证项。禁止只写「符合设计」「已自测」；环境阻塞如实列出，不标通过。有未通过的设计项或缺必要验收时不得建议合并。
+**PR** 标题与三段说明遵循 [DEVOPS.md](DEVOPS.md)，写明改动、原因和验证结果。bug fix 补充触发条件、原行为、根因与修复后行为。有 issue 时关联，小修复按需建 issue。必需检查 `ci-gate` 通过后，作者或 agent 可自行 squash 合并。高影响变更仍建议维护者确认。说明适用的 Electron 行为变化（IPC、存储、窗口）。UI 变更记录适用的设计依据、验收结果、获准偏离，以及未验证项和原因。有未通过的设计项或缺必要验收时不得建议合并。
 
 **CI**：`main` 与 `release/**` 的日常 PR/push 仅运行 lint（含格式、Knip、Python 死代码及工作流静态检查）、两片并行单测与 `ci-gate`。单测直接加载 TypeScript；不编译应用、不下载 Electron、不运行浏览器、内存、变异测试或打包安装。重检查统一在 `release-preflight.yml`：手动运行默认包含未签名打包安装；tag 发布调用时由本轮已签名安装验收替代重复的未签名打包。预检各 job 绑定同一个解析后的 commit；类型检查、构建、完整测试、企业工具链、渠道/Python 运行时、浏览器预览与内存回归全部必须通过。tag 构建与预检并行，publish 等待预检与全部平台构建及安装验收通过后，一次发布完整清单。全平台构建、安装和堆分析仅保留手动入口，不因功能改动自动启动。统一必需检查仍为 `ci-gate`；`.github/devops-ci.json` 与触发范围同步。默认分支保护：须经 PR、不要求 approval、不要求解决评审讨论、必需检查仅 `ci-gate`、禁止强推与删除。见 [RELEASING.md](RELEASING.md)。
 
@@ -253,14 +312,11 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 ## 外部 Skills
 
 - 产品界面（Work/Chat/Settings/MCP/Skills/本地推理等）以 DESIGN.md + 共享组件 + `rongxinai-ui-adapter` 为准，不套营销页默认。landing/营销/品牌页用 `design-taste-frontend`；明确需要高级视觉或复杂动效才读 `high-end-visual-design`。可选 `shadcn/ui`、`vercel/ai-elements`、impeccable（`bunx impeccable install`，`/impeccable`）。
-- 任何 skill 只补充本文件，不能取消设计自查或绕过已验收基准。
 
 ## 跨仓协作规范
 
-提交、PR 标题与说明、review、bug fix 验证遵循 [DEVOPS.md](DEVOPS.md)。本仓已有专项安全、设计与发布门继续执行。
+提交、PR 和评审遵循 [DEVOPS.md](DEVOPS.md)。
 
 ## 文件大小
 
-- 新增文件不得超过 5000 token（按 ceil(字节数 / 4) 估算）；修改时碰到已有的超限文件，由修改者负责拆分。Markdown（`*.md`、`*.mdx`）不受此限。
-- `.husky/pre-commit`（`scripts/check-new-file-tokens.mjs`） 拦截超过 5000 token 的新增文件，这是唯一的 git hook；lint、测试等检查由 CI 负责。`bun install` 时由 husky 自动安装。
-- 拆分方法：按职责拆成内聚的小模块（每个约 2000–3000 token，一个文件只管一件事）；把类型/常量、纯函数、子组件/处理函数抽到同级文件；原路径保留为薄入口或 re-export 以保持 import 不变，否则同步改全部 import；fixture/测试数据单独成文件。不得靠压缩、删注释或空白、或往排除列表加路径来绕过。hook 报错里有分语言（TS/Go/Python）的具体示例。
+`.husky/pre-commit` 通过 `scripts/check-new-file-tokens.mjs` 检查新增文件的 5000 token 上限，按字节数除以 4 向上取整估算。脚本对 Markdown、锁文件、二进制及生成文件等设有豁免。
