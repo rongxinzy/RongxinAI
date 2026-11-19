@@ -16,8 +16,6 @@ import type { ArtifactRecorder } from '../../artifactLedger/artifactRecorder';
 import type {
   AgentSession,
   CreateAgentSessionOptions,
-  CreateAgentSessionResult,
-  DefaultResourceLoader,
   formatSkillsForPrompt,
 } from '@earendil-works/pi-coding-agent';
 import {
@@ -250,8 +248,8 @@ export interface ActivePiSession {
   pendingTurnMemory?: { userPrompt: string; context: string | null };
   /** Prevents duplicate queue drains when Pi emits multiple settled events. */
   controlActionInFlight: boolean;
-  /** MCP tool manifest generation captured when this Pi session was created. */
-  mcpToolManifestGeneration: number;
+  /** Stored MCP configuration generation loaded by this Pi session. */
+  mcpConfigGeneration: number;
 }
 
 // ── Dynamic imports ──

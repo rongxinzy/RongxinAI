@@ -1,5 +1,5 @@
 import type { McpIntegrationRuntime } from '../libs/mcpIntegrationRuntime';
-import type { McpToolManifestEntry, McpServerManager } from '../libs/mcpServerManager';
+import type { McpServerManager } from '../libs/mcpServerManager';
 import type { McpStore } from '../mcpStore';
 
 /**
@@ -11,9 +11,6 @@ import type { McpStore } from '../mcpStore';
 export interface McpRuntimeState {
   store: McpStore | null;
   serverManager: McpServerManager | null;
-  initPromise: Promise<McpToolManifestEntry[]> | null;
-  /** Bumped whenever the MCP lifecycle restarts, invalidating stale results. */
-  lifecycleGeneration: number;
   activeAuthorizations: Map<string, AbortController>;
   integrationRuntime: McpIntegrationRuntime | null;
   bridgeRefreshPromise: Promise<{ tools: number; error?: string }> | null;
@@ -23,8 +20,6 @@ export interface McpRuntimeState {
 export const mcpRuntime: McpRuntimeState = {
   store: null,
   serverManager: null,
-  initPromise: null,
-  lifecycleGeneration: 0,
   activeAuthorizations: new Map<string, AbortController>(),
   integrationRuntime: null,
   bridgeRefreshPromise: null,

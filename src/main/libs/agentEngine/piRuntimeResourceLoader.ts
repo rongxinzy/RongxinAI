@@ -16,6 +16,7 @@ import {
 } from '../../workbenchTask/riskClassifier';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { buildPiLoadedMcpConfig, buildPiMcpTransportFactory } from './piMcpExtensionBridge';
+import type { McpServerRecord } from '../../mcpStore';
 import { getPiBashPythonEnvViolation } from './piBashToolGuidelines';
 import { PiBuiltinFileToolName } from './piToolConstants';
 import { PiPlanModePrompt } from './piPlanTool';
@@ -134,6 +135,8 @@ export async function createPiRuntimeResourceLoader(
   additionalExtensionFactories: PiExtensionFactory[] = [],
 ): Promise<PiResourceLoader> {
   const settingsManager = approvalContext?.settingsManager ?? createPiSettingsManager(pi, cwd);
+  const mcpSource = host.getMcpServerSource();
+  let mcpRecords: McpServerRecord[] = [];
   type DiscoveredSkill = Skill & { id?: string };
   const matchesSkillId = (skill: DiscoveredSkill, ids: readonly string[]): boolean =>
     ids.includes(skill.id ?? '') || ids.includes(skill.name);
@@ -329,21 +332,19 @@ export async function createPiRuntimeResourceLoader(
       ...(!resourceState.chatMode &&
       resourceState.nativeToolsOnly !== true &&
       pi.createMcpExtension &&
-      host.getMcpServerManager()
+      mcpSource
         ? [
             pi.createMcpExtension({
-              loadConfig: () =>
-                buildPiLoadedMcpConfig(
-                  filterExpertMcpRecords(
-                    host.getMcpServerManager()?.lastEnabledRecords ?? [],
-                    approvalContext?.expertMcpIds,
-                  ),
-                ),
-              createTransport: buildPiMcpTransportFactory(() =>
-                filterExpertMcpRecords(
-                  host.getMcpServerManager()?.lastEnabledRecords ?? [],
+              loadConfig: () => {
+                mcpRecords = filterExpertMcpRecords(
+                  mcpSource.listEnabled(),
                   approvalContext?.expertMcpIds,
-                ),
+                );
+                return buildPiLoadedMcpConfig(mcpRecords);
+              },
+              createTransport: buildPiMcpTransportFactory(
+                () => mcpRecords,
+                mcpSource.refreshOAuthRecord,
               ),
             }),
           ]

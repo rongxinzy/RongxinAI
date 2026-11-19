@@ -121,7 +121,7 @@ beforeEach(() => {
 
 describe('buildPiLoadedMcpConfig', () => {
   it('maps enabled stdio records with exposure, description, and second-based timeouts', () => {
-    const config = buildPiLoadedMcpConfig([record({ exposure: 'direct', timeout: 90_000 })]);
+    const config = buildPiLoadedMcpConfig([record({ exposure: 'direct', timeout: 60 })]);
 
     expect(config.errors).toEqual([]);
     expect(config.autoEnableCodemode).toBe(true);
@@ -136,7 +136,7 @@ describe('buildPiLoadedMcpConfig', () => {
           args: ['-y', 'blender-mcp'],
           exposure: 'direct',
           description: 'Blender MCP',
-          timeout: 90,
+          timeout: 60,
         },
       },
     ]);
@@ -152,6 +152,7 @@ describe('buildPiLoadedMcpConfig', () => {
         args: undefined,
         url: 'https://example.com/mcp',
         headers: { Authorization: 'Bearer x' },
+        timeout: 90.5,
       }),
       record({ id: 'srv-off', enabled: false }),
       record({
@@ -165,6 +166,7 @@ describe('buildPiLoadedMcpConfig', () => {
         command: undefined,
         args: undefined,
         url: 'https://example.com/sse',
+        timeout: 0,
       }),
     ]);
 
@@ -174,6 +176,7 @@ describe('buildPiLoadedMcpConfig', () => {
       url: 'https://example.com/mcp',
       headers: { Authorization: 'Bearer x' },
       description: 'Blender MCP',
+      timeout: 90.5,
     });
     expect(config.servers[1]?.config).toEqual({
       type: 'http',
@@ -291,5 +294,29 @@ describe('buildPiMcpTransportFactory', () => {
         undefined,
       ),
     ).toThrow('no longer configured');
+  });
+
+  it('uses the refreshed OAuth header when Pi connects a configured remote server', async () => {
+    const remote = record({
+      name: 'docs',
+      registryId: 'docs',
+      transportType: 'http',
+      url: 'https://example.com/mcp',
+      headers: { Authorization: 'Bearer old', 'X-Client': 'desktop' },
+    });
+    const refresh = vi.fn(async () => ({
+      ...remote,
+      headers: { Authorization: 'Bearer new', 'X-Client': 'desktop' },
+    }));
+    const factory = buildPiMcpTransportFactory(() => [remote], refresh);
+    const [entry] = buildPiLoadedMcpConfig([remote]).servers;
+    const transport = factory(entry, '/tmp/work');
+    expect(refresh).not.toHaveBeenCalled();
+    await transport.start();
+    expect(refresh).toHaveBeenCalledExactlyOnceWith(remote);
+    expect(sdkMocks.instances[0]?.args[1]).toEqual({
+      requestInit: { headers: { Authorization: 'Bearer new', 'X-Client': 'desktop' } },
+    });
+    await transport.close();
   });
 });

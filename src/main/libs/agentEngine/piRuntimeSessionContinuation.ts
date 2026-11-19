@@ -20,7 +20,6 @@ import { assertCoworkSubmissionContent } from '../../../shared/cowork/submission
 import { HarnessVersion } from '../../../shared/harness';
 import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
 import { WorkbenchContractKind, WorkbenchRunTrigger } from '../../../shared/workbenchTask';
-import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkMessage } from '../../coworkStore';
 import { resolveProjectMemoryContextForPiPrompt } from '../../memory/piRuntimeProjectMemoryPrompt';
 import { collectImagePathReferences } from './piImageInputFallback';
@@ -95,9 +94,9 @@ export async function continuePiRuntimeSession(
   const nextCodemode = options.codemode ?? active.codemodeEnabled;
   // Plan mode is per-turn: an ordinary follow-up clears it again.
   const nextPlanMode = options.planMode === true;
-  const mcpToolTopologyChanged =
-    !active.resourceState.chatMode &&
-    active.mcpToolManifestGeneration !== host.getMcpToolManifestGeneration();
+  const mcpConfigGeneration = host.getMcpConfigGeneration();
+  const mcpConfigurationChanged =
+    !active.resourceState.chatMode && active.mcpConfigGeneration !== mcpConfigGeneration;
   const unattendedTopologyChanged = nextUnattended !== active.unattended;
   // Native tools and resources capture cwd at creation. Reopen the same Pi
   // transcript with the new workspace rather than changing adapter metadata.
@@ -179,7 +178,7 @@ export async function continuePiRuntimeSession(
     promptChanged ||
     skillsChanged ||
     active.pendingSkillReload === true ||
-    mcpToolTopologyChanged
+    mcpConfigurationChanged
   ) {
     const previousSystemPrompt = active.resourceState.systemPrompt;
     const previousSkillIds = active.resourceState.skillIds;
@@ -195,9 +194,9 @@ export async function continuePiRuntimeSession(
       active.requestedSystemPrompt = nextSystemPrompt;
       active.requestedSkillIds = requestedSkillIds;
       active.pendingSkillReload = false;
-      if (mcpToolTopologyChanged) {
-        active.mcpToolManifestGeneration = host.getMcpToolManifestGeneration();
-        console.debug('[PiRuntime] reloaded session in-place after MCP tool manifest refresh');
+      if (mcpConfigurationChanged) {
+        active.mcpConfigGeneration = mcpConfigGeneration;
+        console.debug('[PiRuntime] reloaded session after MCP configuration changed');
       }
       console.debug('[PiRuntime] reloaded session resources after prompt or skill change');
     } catch (error) {

@@ -115,7 +115,7 @@ export abstract class CodingRoomServiceBuiltinControlCommands extends CodingRoom
           );
         }
       } else if (command === BuiltinCodingControlCommand.Mcp) {
-        const snapshot = this.runtime.describeBuiltinMcp?.(target ?? undefined) ?? null;
+        const snapshot = await this.runtime.describeBuiltinMcp?.(target ?? undefined);
         this.appendBuiltinControlMessage(
           lane,
           snapshot

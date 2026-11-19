@@ -277,7 +277,7 @@ test('native follow-ups see and gain access to their own newly selected Skills i
   const host = {
     activeSessions,
     isSessionRunning: () => true,
-    getMcpServerManager: () => null,
+    getMcpServerSource: () => null,
     persistImageAttachments: () => undefined,
     recovery: {
       imageInputVerdictForActive: () => ImageInputVerdict.Supported,

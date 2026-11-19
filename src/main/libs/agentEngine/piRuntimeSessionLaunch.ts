@@ -326,6 +326,7 @@ export async function startPiRuntimeSession(
     const expertMcpIds = Array.isArray(expertSession?.capabilityPolicy?.mcpIds)
       ? (expertSession.capabilityPolicy.mcpIds as string[])
       : [];
+    const mcpConfigGeneration = host.getMcpConfigGeneration();
     const resourceLoader = await createPiRuntimeResourceLoader(
       host,
       pi,
@@ -503,7 +504,7 @@ export async function startPiRuntimeSession(
       lastUsedAt: Date.now(),
       turnFailed: false,
       controlActionInFlight: false,
-      mcpToolManifestGeneration: host.getMcpToolManifestGeneration(),
+      mcpConfigGeneration,
     };
     activeSession = active;
 

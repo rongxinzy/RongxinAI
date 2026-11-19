@@ -61,6 +61,11 @@ export interface PiLoadedMcpConfig {
   errors: string[];
 }
 
+export interface PiMcpServerSource {
+  listEnabled: () => McpServerRecord[];
+  refreshOAuthRecord?: (record: McpServerRecord) => Promise<McpServerRecord>;
+}
+
 /** Synchronous transport contract expected by @earendil-works/pi-mcp. */
 export interface PiMcpTransport {
   start(): Promise<void>;
@@ -77,12 +82,6 @@ const MCP_BRIDGE_SOURCE = 'zhiyuan-store';
 const normalizeExposure = (value: unknown): PiMcpExposure | undefined =>
   value === 'codemode' || value === 'deferred' || value === 'direct' || value === 'hidden'
     ? value
-    : undefined;
-
-/** Record timeouts are milliseconds; Pi's per-request timeout is seconds. */
-const toPiTimeoutSeconds = (timeoutMs: number | undefined): number | undefined =>
-  Number.isFinite(timeoutMs) && (timeoutMs ?? 0) > 0
-    ? Math.max(1, Math.round(timeoutMs! / 1000))
     : undefined;
 
 const toError = (error: unknown): Error =>
@@ -205,7 +204,9 @@ export function buildPiLoadedMcpConfig(records: readonly McpServerRecord[]): PiL
       continue;
     }
     const exposure = normalizeExposure((record as { exposure?: unknown }).exposure);
-    const timeout = toPiTimeoutSeconds(record.timeout);
+    const { timeout } = record;
+    const configuredTimeout =
+      timeout !== undefined && Number.isFinite(timeout) && timeout > 0 ? { timeout } : {};
 
     if (record.transportType === 'stdio') {
       if (!record.command) {
@@ -223,7 +224,7 @@ export function buildPiLoadedMcpConfig(records: readonly McpServerRecord[]): PiL
           ...(record.env && Object.keys(record.env).length > 0 ? { env: { ...record.env } } : {}),
           ...(exposure ? { exposure } : {}),
           ...(record.description ? { description: record.description } : {}),
-          ...(timeout ? { timeout } : {}),
+          ...configuredTimeout,
         },
       });
       continue;
@@ -248,7 +249,7 @@ export function buildPiLoadedMcpConfig(records: readonly McpServerRecord[]): PiL
             : {}),
           ...(exposure ? { exposure } : {}),
           ...(record.description ? { description: record.description } : {}),
-          ...(timeout ? { timeout } : {}),
+          ...configuredTimeout,
         },
       });
       continue;
@@ -267,6 +268,7 @@ export function buildPiLoadedMcpConfig(records: readonly McpServerRecord[]): PiL
  */
 export function buildPiMcpTransportFactory(
   recordsProvider: () => readonly McpServerRecord[],
+  refreshOAuthRecord?: PiMcpServerSource['refreshOAuthRecord'],
 ): (entry: PiMcpServerEntry, cwd: string, authProvider?: unknown) => PiMcpTransport {
   return (entry, _cwd) => {
     const record = recordsProvider().find(server => server.name === entry.name && server.enabled);
@@ -297,21 +299,26 @@ export function buildPiMcpTransportFactory(
       throw new Error(`MCP server "${entry.name}" has no URL`);
     }
     const parsedUrl = new URL(rawUrl);
-    const headers = entry.config.headers
-      ? Object.fromEntries(
-          Object.entries(entry.config.headers).map(([key, value]) => [
-            key,
-            expandMcpTemplate(value, env),
-          ]),
-        )
-      : undefined;
-    const requestInit = headers ? { requestInit: { headers } } : undefined;
+    const configuredHeaders = entry.config.headers;
     const isSse = record?.transportType === 'sse';
 
-    return new DeferredSdkMcpTransport(() =>
-      isSse
+    return new DeferredSdkMcpTransport(async () => {
+      const headers =
+        record && refreshOAuthRecord
+          ? (await refreshOAuthRecord(record)).headers
+          : configuredHeaders;
+      const requestInit = headers
+        ? {
+            requestInit: {
+              headers: Object.fromEntries(
+                Object.entries(headers).map(([key, value]) => [key, expandMcpTemplate(value, env)]),
+              ),
+            },
+          }
+        : undefined;
+      return isSse
         ? new SSEClientTransport(parsedUrl, requestInit)
-        : new StreamableHTTPClientTransport(parsedUrl, requestInit),
-    );
+        : new StreamableHTTPClientTransport(parsedUrl, requestInit);
+    });
   };
 }

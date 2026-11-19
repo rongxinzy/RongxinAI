@@ -46,8 +46,8 @@ export interface CodingRoomRuntime {
   ): Promise<void>;
   /** Compacts a live built-in session's context without sending a model turn. */
   compactBuiltinSession?(sessionId: string): Promise<{ cancelled: boolean }>;
-  /** MCP servers and tools the built-in agent can reach right now. */
-  describeBuiltinMcp?(target?: string): BuiltinCodingMcpSnapshot | null;
+  /** Diagnose configured MCP servers and their tools. */
+  describeBuiltinMcp?(target?: string): Promise<BuiltinCodingMcpSnapshot | null>;
   /** Runs an application-owned action once queued built-in prompts settle. */
   enqueueBuiltinControlAction?(
     sessionId: string,
