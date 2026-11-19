@@ -5,7 +5,10 @@ import {
 } from '../src/shared/cowork/pendingMessageQueue';
 import { ImageInputVerdict } from '../src/main/libs/agentEngine/piImageInputFallback';
 import { PiRuntimeQueueController } from '../src/main/libs/agentEngine/piRuntimeQueueController';
-import type { ActivePiSession } from '../src/main/libs/agentEngine/piRuntimeSessionState';
+import type {
+  ActivePiSession,
+  PiSession,
+} from '../src/main/libs/agentEngine/piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from '../src/main/libs/agentEngine/piRuntimeAdapterHost';
 import type { CoworkMessage } from '../src/main/coworkStore';
 
@@ -14,16 +17,24 @@ describe('Empirical Adversarial Stress Harness: Queue Controller Steer & Follow-
   let mockPiSession: any;
   let mockStore: any;
   let persistedMessages: CoworkMessage[];
+  let nativeFollowUps: Array<{ role: 'user'; content: string }>;
   let activeSession: ActivePiSession;
   let queueController: PiRuntimeQueueController;
   const sessionId = 'stress-session-m3';
 
   beforeEach(() => {
     persistedMessages = [];
+    nativeFollowUps = [];
 
     mockPiSession = {
       prompt: vi.fn().mockResolvedValue(undefined),
       sendUserMessage: vi.fn().mockResolvedValue(undefined),
+      followUp: vi.fn<PiSession['followUp']>(async (text, _images, options) => {
+        const message = { role: 'user' as const, content: text };
+        options?.onQueued?.(message);
+        nativeFollowUps.push(message);
+        return 'queued';
+      }),
       clearQueue: vi.fn(() => ({ steering: [], followUp: [] })),
     };
 
@@ -107,8 +118,9 @@ describe('Empirical Adversarial Stress Harness: Queue Controller Steer & Follow-
       // Native Pi consumes both inputs before its one settlement signal.
       await queueController.flushControlActions(sessionId, activeSession);
       expect(executionLog).toEqual([]);
-      queueController.onNativeUserMessageStart(sessionId, activeSession);
-      queueController.onNativeUserMessageStart(sessionId, activeSession);
+      for (const message of nativeFollowUps) {
+        queueController.onNativeUserMessageStart(sessionId, activeSession, message);
+      }
       expect(persistedMessages.map(message => message.content)).toEqual([
         'FollowUp 1',
         'FollowUp 2',

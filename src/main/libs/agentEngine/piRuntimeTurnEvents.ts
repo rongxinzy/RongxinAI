@@ -53,7 +53,6 @@ export interface PiRuntimeTurnHost {
     active: ActivePiSession,
     message: NonNullable<PiEvent['message']>,
   ) => void;
-  resetNativeQueueDispatch?: (sessionId: string) => void;
   flushPendingError(sessionId: string, active: ActivePiSession): void;
   createSessionMemoryCompletion(active: ActivePiSession): SessionMemoryCompletion;
   recordSummaryOmission(sessionId: string, active: ActivePiSession): Promise<void>;
@@ -718,7 +717,6 @@ export class PiRuntimeTurnEvents {
     active.isRunning = false;
     const onSettled = active.onSettled;
     active.onSettled = undefined;
-    this.host.resetNativeQueueDispatch?.(sessionId);
     // Flush artifact capture before completion: the final diff anchors to the
     // last completed answer message.
     active.artifactRecorder?.onRunSettled(active.lastCompletedAnswerMessageId);

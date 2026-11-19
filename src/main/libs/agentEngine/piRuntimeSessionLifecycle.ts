@@ -32,7 +32,7 @@ export function disposePiSessionForRecreation(
   // A queued control action belongs to the turn that queued it; replaying it
   // after a resource-driven recreation would be an unexpected side effect.
   host.queue.dropControlActions(sessionId);
-  host.queue.resetNativeDispatch(sessionId);
+  host.queue.discardRecreatedSessionFollowUps(sessionId);
   host.recovery.dismissAskUserQuestionsBySession(sessionId);
   host.recovery.dismissCodingElicitationsBySession(sessionId, 'The session was recreated.');
   active.artifactRecorder?.dispose();

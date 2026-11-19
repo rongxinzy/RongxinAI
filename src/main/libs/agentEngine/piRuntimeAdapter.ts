@@ -147,7 +147,6 @@ export class PiRuntimeAdapter
     flushControlActions: (sessionId, active) => this.queue.flushControlActions(sessionId, active),
     onPiUserMessageStart: (sessionId, active, message) =>
       this.queue.onNativeUserMessageStart(sessionId, active, message),
-    resetNativeQueueDispatch: sessionId => this.queue.resetNativeDispatch(sessionId),
     flushPendingError: (sessionId, active) => this.recovery.flushPendingError(sessionId, active),
     createSessionMemoryCompletion: active => this.sessionMemory.createCompletion(active),
     recordSummaryOmission: (sessionId, active) => this.recordSummaryOmission(sessionId, active),

@@ -465,6 +465,7 @@ export async function startPiRuntimeSession(
       lastCompletedAnswerMessageId: null,
       lastCompletedAnswerText: '',
       onSettled: options.onSettled,
+      submissionToken: Symbol(),
       summaryCheckpointGoal: prompt,
       requestStartedAt: null,
       firstVisibleTextAt: null,

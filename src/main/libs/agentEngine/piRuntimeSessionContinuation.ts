@@ -164,6 +164,7 @@ export async function continuePiRuntimeSession(
   }
   active.isRunning = true;
   active.onSettled = options.onSettled;
+  active.submissionToken = Symbol();
   active.turnFailed = false;
   active.errorSurfaced = false;
   active.retryNoticeEmitted = false;

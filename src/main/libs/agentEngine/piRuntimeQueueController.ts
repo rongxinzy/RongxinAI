@@ -10,6 +10,7 @@ import { randomUUID } from 'crypto';
 
 import {
   CoworkQueueDelivery,
+  CoworkQueueItemStatus,
   type CoworkPendingMessage,
 } from '../../../shared/cowork/pendingMessageQueue';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
@@ -44,6 +45,20 @@ export class PiRuntimeQueueController {
 
   resetNativeDispatch(sessionId: string): void {
     this.nativeFollowUps.delete(sessionId);
+  }
+
+  discardRecreatedSessionFollowUps(sessionId: string): void {
+    this.resetNativeDispatch(sessionId);
+    const pending = this.pendingMessageQueue
+      .list(sessionId)
+      .filter(item => item.status === CoworkQueueItemStatus.Pending);
+    for (const item of pending) {
+      this.pendingMessageQueue.restore(sessionId, {
+        ...item,
+        error: 'The session changed before Pi delivered this follow-up.',
+      });
+    }
+    if (pending.length > 0) this.emitQueueUpdated(sessionId);
   }
 
   onNativeUserMessageStart(
@@ -163,10 +178,21 @@ export class PiRuntimeQueueController {
       typeof content === 'string' ? undefined : content.filter(part => part.type === 'image');
     const followUps = this.nativeFollowUps.get(sessionId) ?? new WeakMap<object, QueuedFollowUp>();
     this.nativeFollowUps.set(sessionId, followUps);
+    const submissionToken = active.submissionToken;
     // followUp queues even during initial prompt preparation, when Pi is still idle.
     void active.piSession
       .followUp(promptText, images, {
-        onQueued: message => followUps.set(message, { itemId: item.id, images: imagePreparation }),
+        onQueued: message => {
+          if (
+            this.host.activeSessions.get(sessionId) !== active ||
+            this.nativeFollowUps.get(sessionId) !== followUps ||
+            !active.isRunning ||
+            active.submissionToken !== submissionToken
+          ) {
+            throw new Error('The Work turn ended before Pi accepted this follow-up.');
+          }
+          followUps.set(message, { itemId: item.id, images: imagePreparation });
+        },
       })
       .then(disposition => {
         if (disposition === 'handled')
@@ -189,6 +215,7 @@ export class PiRuntimeQueueController {
         if (!taken) return;
         this.pendingMessageQueue.restore(sessionId, { ...taken, error: message });
         this.emitQueueUpdated(sessionId);
+        void this.flushControlActions(sessionId, active);
       });
 
     return { success: true, item };
@@ -230,7 +257,7 @@ export class PiRuntimeQueueController {
     if (active.resourceState.chatMode) return;
     active.controlActionInFlight = true;
     try {
-      if (active.aborted || active.isRunning) return;
+      if (active.aborted || active.isRunning || this.hasPendingFollowUp(sessionId)) return;
       const action = this.queuedControlActions.get(sessionId)?.shift();
       if (!action) return;
       if (this.queuedControlActions.get(sessionId)?.length === 0) {
@@ -247,7 +274,8 @@ export class PiRuntimeQueueController {
         this.hasQueuedControlActions(sessionId) &&
         this.host.activeSessions.get(sessionId) === active &&
         !active.aborted &&
-        !active.isRunning
+        !active.isRunning &&
+        !this.hasPendingFollowUp(sessionId)
       ) {
         void this.flushControlActions(sessionId, active);
       }

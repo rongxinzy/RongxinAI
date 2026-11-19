@@ -172,6 +172,7 @@ export interface ActivePiSession {
   lastCompletedAnswerMessageId: string | null;
   lastCompletedAnswerText: string;
   onSettled?: PiStartOptions['onSettled'];
+  submissionToken: symbol;
   /** Latest assistant message payload from Pi, including stopReason. */
   lastAssistantMessage?: PiEvent['message'];
   /**
