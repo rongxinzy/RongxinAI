@@ -540,7 +540,7 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.dispose).toHaveBeenCalledOnce();
     });
 
-    it('injects project memory through before_agent_start sections instead of user prompt text', async () => {
+    it('injects project memory through before_agent_start custom messages instead of mutating systemPrompt sections', async () => {
       adapter.setProjectMemoryService({
         buildProjectContext: vi
           .fn()
@@ -568,10 +568,96 @@ describe('PiRuntimeAdapter', () => {
         });
       }
       const sections: Record<string, string> = {};
+      const injectedMessages: unknown[] = [];
       for (const handler of beforeHandlers) {
-        await handler({ prompt: 'Inspect repository', systemPromptOptions: { sections } });
+        const result = (await handler({
+          prompt: 'Inspect repository',
+          systemPromptOptions: { sections },
+        })) as { message?: unknown } | undefined;
+        if (result?.message) injectedMessages.push(result.message);
       }
-      expect(sections.project_memory).toContain('Remember convention X');
+      expect(sections.project_memory).toBeUndefined();
+      expect(injectedMessages).toEqual([
+        {
+          customType: 'project_memory',
+          display: false,
+          content: expect.stringContaining('Remember convention X'),
+        },
+      ]);
+    });
+
+    it('defaults goal-mode Work sessions to high thinkingLevel unless overridden or in Chat mode', async () => {
+      await adapter.startSession('goal-thinking', 'Solve complex task', {
+        sessionMode: 'work',
+        goalMode: true,
+      });
+      expect(mockCreateAgentSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({ thinkingLevel: 'high' }),
+      );
+
+      await adapter.startSession('explicit-thinking', 'Solve complex task', {
+        sessionMode: 'work',
+        goalMode: true,
+        thinkingLevel: 'low',
+      });
+      expect(mockCreateAgentSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({ thinkingLevel: 'low' }),
+      );
+
+      await adapter.startSession('chat-goal', 'Chat message', {
+        sessionMode: 'chat',
+        goalMode: true,
+      });
+      const lastOptions = mockCreateAgentSession.mock.calls.at(-1)?.[0] as {
+        thinkingLevel?: string;
+      };
+      expect(lastOptions.thinkingLevel).toBeUndefined();
+    });
+
+    it('keeps run_skill_script and skill_runtime_capabilities dormant when skillIds is empty and activates them when a skill is attached', async () => {
+      await adapter.startSession('no-skills', 'Hello Pi', {
+        sessionMode: 'work',
+        skillIds: [],
+      });
+
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        tools?: string[];
+        customTools?: Array<{ name: string; defaultActive?: boolean }>;
+      };
+      expect(sessionOptions.tools).not.toContain('+run_skill_script');
+      expect(sessionOptions.tools).not.toContain('+skill_runtime_capabilities');
+      const skillScriptTool = sessionOptions.customTools?.find(t => t.name === 'run_skill_script');
+      const skillCapTool = sessionOptions.customTools?.find(
+        t => t.name === 'skill_runtime_capabilities',
+      );
+      expect(skillScriptTool?.defaultActive).toBe(false);
+      expect(skillCapTool?.defaultActive).toBe(false);
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
+        >;
+      };
+      const beforeHandlers: Array<(event: unknown) => unknown> = [];
+      for (const factory of loaderOptions.extensionFactories ?? []) {
+        factory({
+          on: (event, handler) => {
+            if (event === 'before_agent_start') beforeHandlers.push(handler);
+          },
+        });
+      }
+
+      const active = adapter.activeSessions.get('no-skills')!;
+      active.resourceState.skillIds = ['docx'];
+      const selectedTools = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls'];
+      for (const handler of beforeHandlers) {
+        await handler({
+          prompt: 'Now use docx skill',
+          systemPromptOptions: { sections: {}, selectedTools },
+        });
+      }
+      expect(selectedTools).toContain('run_skill_script');
+      expect(selectedTools).toContain('skill_runtime_capabilities');
     });
   });
 });

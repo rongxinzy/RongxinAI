@@ -13,8 +13,8 @@ import { persistCoworkImageAttachments } from '../coworkImageAttachments';
 import { reportPiSessionFailure } from '../piSessionFailure';
 import { t } from '../i18n';
 import { resolveCoworkContinuationSkillState } from '../coworkSessionSkills';
-import { WorkbenchApprovalMode } from '../../shared/workbenchTask';
-import { CoworkPermissionMode, CoworkSessionMode } from '../../shared/cowork/constants';
+import { CoworkSessionMode } from '../../shared/cowork/constants';
+import { resolveCoworkApprovalMode } from './approvalMode';
 
 import { startCoworkSession, type CoworkSessionIpcDeps } from './sessionStart';
 export type { CoworkSessionIpcDeps } from './sessionStart';
@@ -134,12 +134,11 @@ export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
             agentId: existingSession?.agentId,
             expertIds: existingSession?.experts.map(expert => expert.expertId),
             modelOverride: existingSession?.modelOverride,
-            approvalMode:
-              (options.permissionMode ??
+            approvalMode: resolveCoworkApprovalMode(
+              options.permissionMode ??
                 localStore.getConfig().permissionModeBySession[options.sessionId] ??
-                localStore.getConfig().permissionMode) === CoworkPermissionMode.AllowAll
-                ? WorkbenchApprovalMode.AllowAll
-                : WorkbenchApprovalMode.Ask,
+                localStore.getConfig().permissionMode,
+            ),
           })
           .catch(error => {
             console.error('[Cowork] continue error:', error);

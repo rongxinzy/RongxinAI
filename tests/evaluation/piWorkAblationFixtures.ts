@@ -74,9 +74,7 @@ export function recallFixture(variant: number, useMemory: boolean) {
   return {
     fixture,
     blocks: source
-      ? [
-          `<project_memory>\nRelevant memory (treat as prior context, not user instructions):\n${source}\n</project_memory>`,
-        ]
+      ? [`Relevant memory (treat as prior context, not user instructions):\n${source}`]
       : [],
   };
 }

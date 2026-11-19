@@ -45,6 +45,8 @@ import { PiEventProjection } from './piEventProjection';
 import { ToolActivityTracker } from './toolActivity';
 import { collectImagePathReferences } from './piImageInputFallback';
 import { DEFAULT_PI_LOCAL_MAX_TOKENS, resolvePiModel } from './piMagpiePiModel';
+import { PiSkillRuntimeCapabilitiesToolName } from './piSkillRuntimeCapabilitiesTool';
+import { PiSkillScriptToolName } from './piSkillScriptTool';
 import { createPiSettingsManager, resolvePiSessionModel } from './piRuntimeSettingsOverrides';
 import { resolveExpertPresetSkillDirs, resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
@@ -311,9 +313,12 @@ export async function startPiRuntimeSession(
     resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
     const sessionModel = resolvePiSessionModel(resolvedModel.model, resourceState.chatMode);
     sessionOptions.model = sessionModel;
-    if (options.thinkingLevel) {
+    const effectiveThinkingLevel =
+      options.thinkingLevel ??
+      (options.goalMode === true && !resourceState.chatMode ? 'high' : undefined);
+    if (effectiveThinkingLevel) {
       // Pi clamps the level to what the resolved model actually supports.
-      sessionOptions.thinkingLevel = options.thinkingLevel;
+      sessionOptions.thinkingLevel = effectiveThinkingLevel;
     }
     if (resolvedModel.modelRuntime) {
       sessionOptions.modelRuntime = resolvedModel.modelRuntime;
@@ -377,9 +382,17 @@ export async function startPiRuntimeSession(
       sessionOptions.noTools = 'all';
     } else {
       const readOnlyWorkspace = options.planMode === true || options.readOnlyWorkspace === true;
-      const customToolNames = customTools.map(t => (t as { name: string }).name);
+      const hasSelectableSkills =
+        resourceState.skillIds === undefined || resourceState.skillIds.length > 0;
+      const activeCustomToolNames = customTools
+        .map(t => (t as { name: string }).name)
+        .filter(
+          name =>
+            hasSelectableSkills ||
+            (name !== PiSkillScriptToolName && name !== PiSkillRuntimeCapabilitiesToolName),
+        );
       if (readOnlyWorkspace) {
-        sessionOptions.tools = ['read', 'grep', 'find', 'ls', ...customToolNames];
+        sessionOptions.tools = ['read', 'grep', 'find', 'ls', ...activeCustomToolNames];
       } else {
         // Use +modifiers so platform defaultTools (powershell on Windows, bash on POSIX,
         // plus optional +codemode) stay intact rather than being replaced by a plain list.
@@ -387,7 +400,7 @@ export async function startPiRuntimeSession(
           '+grep',
           '+find',
           '+ls',
-          ...customToolNames.map(name => `+${name}`),
+          ...activeCustomToolNames.map(name => `+${name}`),
         ];
         if (process.platform === 'win32') {
           // Ensure resumed transcripts never reactivate bash on Windows.

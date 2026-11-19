@@ -4,9 +4,9 @@
  */
 import { parseCoworkExecutionMode } from '../../shared/cowork/executionMode';
 import { getChangedSessionPermissionModes } from '../coworkPermissionModeChanges';
-import { WorkbenchApprovalMode } from '../../shared/workbenchTask';
 import type { CoworkStore } from '../coworkStore';
 import { CoworkPermissionMode } from '../../shared/cowork/constants';
+import { resolveCoworkApprovalMode } from './approvalMode';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { coworkConfigContract } from '../../shared/ipc/coworkContract';
 import type { SkillManager } from '../skillManager';
@@ -117,12 +117,7 @@ export const registerCoworkConfigIpc = (deps: CoworkConfigIpcDeps): void => {
           )) {
             deps
               .getPiRuntimeAdapter()
-              .setApprovalModeForSession(
-                sessionId,
-                mode === CoworkPermissionMode.AllowAll
-                  ? WorkbenchApprovalMode.AllowAll
-                  : WorkbenchApprovalMode.Ask,
-              );
+              .setApprovalModeForSession(sessionId, resolveCoworkApprovalMode(mode));
           }
         }
         if (

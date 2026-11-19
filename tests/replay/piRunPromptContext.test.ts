@@ -29,12 +29,28 @@ import { installTestMagpie } from '../helpers/installTestMagpie';
 const mutableApp = app as unknown as Record<string, unknown>;
 if (typeof mutableApp.getAppPath !== 'function') mutableApp.getAppPath = () => process.cwd();
 
+type CapturedMessage = { role: string; content: unknown };
+
 type PromptContext = {
   adapter: PiRuntimeAdapter;
   directory: string;
   store: CoworkStore;
   systemPrompts: string[];
+  requestMessages: CapturedMessage[][];
 };
+
+function messageText(message: CapturedMessage): string {
+  if (typeof message.content === 'string') return message.content;
+  if (Array.isArray(message.content)) {
+    return message.content
+      .filter((part): part is { type?: string; text?: string } =>
+        Boolean(part && typeof part === 'object'),
+      )
+      .map(part => (typeof part.text === 'string' ? part.text : ''))
+      .join('\n');
+  }
+  return '';
+}
 
 async function withPiPromptContext(
   run: (context: PromptContext) => Promise<void>,
@@ -43,16 +59,18 @@ async function withPiPromptContext(
   const directory = await mkdtemp(path.join(tmpdir(), 'pi-run-prompt-'));
   const model = 'offline-prompt-context';
   const systemPrompts: string[] = [];
+  const requestMessages: CapturedMessage[][] = [];
   const upstream = createServer(async (request, response) => {
     const body: Buffer[] = [];
     for await (const chunk of request) body.push(Buffer.from(chunk));
     const { messages } = JSON.parse(Buffer.concat(body).toString('utf8')) as {
-      messages: Array<{ role: string; content: string }>;
+      messages: CapturedMessage[];
     };
+    requestMessages.push(messages);
     systemPrompts.push(
       messages
         .filter(message => message.role === 'system' || message.role === 'developer')
-        .map(message => message.content)
+        .map(messageText)
         .join('\n'),
     );
     const promptTokens = tokensForRequest(systemPrompts.length);
@@ -90,7 +108,7 @@ async function withPiPromptContext(
     database = await SqliteStore.create(directory);
     const store = new CoworkStore(database.getDatabase());
     adapter.setCoworkStore(store);
-    await run({ adapter, directory, store, systemPrompts });
+    await run({ adapter, directory, store, systemPrompts, requestMessages });
     expect(error).not.toHaveBeenCalled();
   } finally {
     adapter.stopAllSessions();
@@ -105,11 +123,11 @@ async function withPiPromptContext(
 }
 
 test(
-  'the native request keeps revised memory across preflight compaction',
+  'the native request keeps system prompt immutable and preserves revised memory across preflight compaction',
   { timeout: 60_000 },
   async () => {
     await withPiPromptContext(
-      async ({ adapter, directory, store, systemPrompts }) => {
+      async ({ adapter, directory, store, systemPrompts, requestMessages }) => {
         const oldFact = 'Original internal release sequence is peach-tulip.';
         const revisedFact = 'Current internal release sequence is lime-dahlia.';
         const otherFact = 'The incident labels use stable names.';
@@ -150,23 +168,35 @@ test(
           sessionMode: 'work',
           confirmationMode: 'modal',
         });
-        expect(systemPrompts[0]).toContain(oldFact);
+        const req0Text = requestMessages[0].map(messageText).join('\n');
+        expect(req0Text).toContain(oldFact);
+        expect(req0Text).toContain(otherFact);
         await adapter.continueSession(session.id, secondPrompt);
 
         expect(systemPrompts).toHaveLength(2);
-        const revisedSystemPrompt = systemPrompts[1];
+        // System prompt at position 0 must remain byte-identical for KV cache hit across turns.
+        expect(systemPrompts[1]).toBe(systemPrompts[0]);
         await adapter.continueSession(session.id, currentPrompt);
 
         expect(completedCompactionAt).toEqual([3]);
         expect(systemPrompts).toHaveLength(4);
-        expect.soft(revisedSystemPrompt).toContain(revisedFact);
-        expect.soft(revisedSystemPrompt).toContain(otherFact);
-        expect.soft(revisedSystemPrompt).not.toContain(oldFact);
-        expect.soft(revisedSystemPrompt.match(/Relevant memory/g)).toHaveLength(1);
+        expect(systemPrompts[3]).toBe(systemPrompts[0]);
 
-        expect(systemPrompts[3]).toContain(revisedFact);
-        expect(systemPrompts[3]).not.toContain(otherFact);
-        expect(systemPrompts[3]).not.toContain(oldFact);
+        const req1InjectedMemory = requestMessages[1]
+          .slice(requestMessages[0].length)
+          .filter(message => messageText(message).includes('Relevant memory'))
+          .map(messageText)
+          .join('\n');
+        expect.soft(req1InjectedMemory).toContain(revisedFact);
+        expect.soft(req1InjectedMemory).not.toContain(otherFact);
+        expect.soft(req1InjectedMemory).not.toContain(oldFact);
+        expect.soft(req1InjectedMemory.match(/Relevant memory/g)).toHaveLength(1);
+        expect(requestMessages[1].map(messageText).join('\n')).toContain(otherFact);
+
+        const req3InjectedMemory = messageText(requestMessages[3].at(-1)!);
+        expect(req3InjectedMemory).toContain(revisedFact);
+        expect(req3InjectedMemory).not.toContain(otherFact);
+        expect(req3InjectedMemory).not.toContain(oldFact);
         expect(buildProjectContext).toHaveBeenCalledTimes(3);
       },
       requestCount => (requestCount === 2 ? 45_000 : 100),

@@ -92,3 +92,33 @@ test('classifies tools using tool annotations when provided (F8)', () => {
     WorkbenchApprovalRiskLevel.Reversible,
   );
 });
+
+test('classifies memory actions and keeps python execution/install sensitive even with annotations', () => {
+  expect(classifyWorkbenchToolRisk('memory', { action: 'recall', query: 'db' })).toBe(
+    WorkbenchApprovalRiskLevel.ReadOnly,
+  );
+  expect(classifyWorkbenchToolRisk('memory', { action: 'list' })).toBe(
+    WorkbenchApprovalRiskLevel.ReadOnly,
+  );
+  expect(classifyWorkbenchToolRisk('memory', { action: 'save', title: 't', content: 'c' })).toBe(
+    WorkbenchApprovalRiskLevel.Reversible,
+  );
+  expect(
+    classifyWorkbenchToolRisk('memory', { action: 'propose_personal', title: 't', content: 'c' }),
+  ).toBe(WorkbenchApprovalRiskLevel.Reversible);
+
+  expect(
+    classifyWorkbenchToolRisk(
+      'python_execute',
+      { code: 'print(1)' },
+      { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    ),
+  ).toBe(WorkbenchApprovalRiskLevel.Unknown);
+  expect(
+    classifyWorkbenchToolRisk(
+      'python_install',
+      { packages: ['pandas'] },
+      { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    ),
+  ).toBe(WorkbenchApprovalRiskLevel.Unknown);
+});

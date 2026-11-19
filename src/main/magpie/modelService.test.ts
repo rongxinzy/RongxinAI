@@ -181,6 +181,10 @@ describe('fallback chains and observability', () => {
     });
     const resolution = await service.resolve('gpt-4o');
     expect(resolution.model.id).toBe('gpt-4o-mini');
+    expect(resolution.provider?.id).toBe('custom-openai');
+    expect(service.peekProviderForModel('custom-openai/gpt-4o-mini')?.baseUrl).toBe(
+      'https://api.openai.com/v1',
+    );
   });
 
   it('delegates recordError to backend', () => {

@@ -20,6 +20,8 @@ import type { McpServerRecord } from '../../mcpStore';
 import { getPiBashPythonEnvViolation } from './piBashToolGuidelines';
 import { PiBuiltinFileToolName } from './piToolConstants';
 import { PiPlanModePrompt } from './piPlanTool';
+import { PiSkillRuntimeCapabilitiesToolName } from './piSkillRuntimeCapabilitiesTool';
+import { PiSkillScriptToolName } from './piSkillScriptTool';
 import {
   PiExtensionEventType,
   type PiBeforeAgentStartSystemPromptOptions,
@@ -47,6 +49,8 @@ export interface PiResourceLoaderApprovalContext {
   getRunId: () => string | null;
   settingsManager?: PiSettingsManager | null;
   getApprovalMode: () => WorkbenchApprovalMode;
+  /** True for ephemeral subagent sessions; skips parent turn memory/plan injection. */
+  isSubagent?: boolean;
   /** Register the pi 1.0 codemode + tool_search extensions (work sessions). */
   enableCodemode?: boolean;
   /** Explicit MCP server IDs bound to the active session expert. */
@@ -254,13 +258,7 @@ export async function createPiRuntimeResourceLoader(
             (extensionApi: PiExtensionApi) => {
               extensionApi.on(PiExtensionEventType.BeforeAgentStart, event => {
                 const active = host.activeSessions.get(approvalContext.sessionId);
-                if (!active) return;
-
-                if (active.planMode === true) {
-                  event.systemPromptOptions.sections.plan_mode = PiPlanModePrompt;
-                } else {
-                  delete event.systemPromptOptions.sections.plan_mode;
-                }
+                if (!active) return undefined;
 
                 if (active.scheduledTaskRun) {
                   event.systemPromptOptions.sections.scheduled_task_result =
@@ -269,26 +267,64 @@ export async function createPiRuntimeResourceLoader(
                   delete event.systemPromptOptions.sections.scheduled_task_result;
                 }
 
+                // Never mutate systemPromptOptions.sections for turn-scoped plan mode
+                // or memory so message 0 stays immutable for upstream KV caching.
+                delete event.systemPromptOptions.sections.plan_mode;
+                delete event.systemPromptOptions.sections.project_memory;
+
+                if (approvalContext.isSubagent) return undefined;
+
+                const hasSelectableSkills =
+                  resourceState.skillIds === undefined || resourceState.skillIds.length > 0;
+                if (
+                  hasSelectableSkills &&
+                  resourceState.fileToolsEnabled &&
+                  !resourceState.chatMode &&
+                  Array.isArray(event.systemPromptOptions.selectedTools)
+                ) {
+                  for (const skillToolName of [
+                    PiSkillScriptToolName,
+                    PiSkillRuntimeCapabilitiesToolName,
+                  ]) {
+                    if (!event.systemPromptOptions.selectedTools.includes(skillToolName)) {
+                      event.systemPromptOptions.selectedTools.push(skillToolName);
+                    }
+                  }
+                }
+
                 // Native preflight compaction may have opened a new context window.
                 const { sessionId } = approvalContext;
                 const pending = active.pendingTurnMemory;
                 active.pendingTurnMemory = undefined;
-                const memory = resourceState.chatMode
+                const memoryDelta = resourceState.chatMode
                   ? null
-                  : host.memoryInjectionDedup.update(sessionId, pending?.context ?? '');
-                if (memory) {
-                  event.systemPromptOptions.sections.project_memory = memory;
-                } else {
-                  delete event.systemPromptOptions.sections.project_memory;
-                }
+                  : host.memoryInjectionDedup.takeDelta(sessionId, pending?.context ?? '');
                 if (pending) {
                   captureMemoryPromptForE2e({
                     sessionId,
                     userPrompt: pending.userPrompt,
-                    memoryContext: memory,
+                    memoryContext: memoryDelta,
                     initialPrompt: pending.userPrompt,
                   });
                 }
+
+                const turnContextParts: string[] = [];
+                if (active.planMode === true) turnContextParts.push(PiPlanModePrompt);
+                if (memoryDelta) turnContextParts.push(memoryDelta);
+                if (turnContextParts.length === 0) return undefined;
+
+                return {
+                  message: {
+                    customType:
+                      active.planMode === true && memoryDelta
+                        ? 'turn_context'
+                        : active.planMode === true
+                          ? 'plan_mode'
+                          : 'project_memory',
+                    content: turnContextParts.join('\n\n'),
+                    display: false,
+                  },
+                };
               });
 
               extensionApi.on(PiExtensionEventType.ToolCall, async event => {

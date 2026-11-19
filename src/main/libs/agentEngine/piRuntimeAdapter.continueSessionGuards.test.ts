@@ -118,7 +118,7 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenLastCalledWith('Second goal');
     });
 
-    it('runs a plan-mode turn read-only, registers plan_write, and injects plan_mode via before_agent_start', async () => {
+    it('runs a plan-mode turn read-only, registers plan_write, and injects plan_mode via before_agent_start custom message', async () => {
       await adapter.startSession('plan-mode', 'Plan the migration', {
         sessionMode: 'work',
         planMode: true,
@@ -144,14 +144,25 @@ describe('PiRuntimeAdapter', () => {
         });
       }
       const sections: Record<string, string> = {};
+      const injectedMessages: Array<{ customType: string; content: string; display: boolean }> = [];
       for (const handler of beforeAgentHandlers) {
-        await handler({ prompt: 'Plan the migration', systemPromptOptions: { sections } });
+        const result = (await handler({
+          prompt: 'Plan the migration',
+          systemPromptOptions: { sections },
+        })) as { message?: { customType: string; content: string; display: boolean } } | undefined;
+        if (result?.message) injectedMessages.push(result.message);
       }
-      expect(sections.plan_mode).toContain('## Plan Mode');
-      expect(sections.plan_mode).toContain('This turn is read-only planning');
+      expect(sections.plan_mode).toBeUndefined();
+      expect(injectedMessages).toHaveLength(1);
+      expect(injectedMessages[0]).toMatchObject({
+        customType: 'plan_mode',
+        display: false,
+      });
+      expect(injectedMessages[0].content).toContain('## Plan Mode');
+      expect(injectedMessages[0].content).toContain('This turn is read-only planning');
     });
 
-    it('injects plan_mode into systemPromptOptions when a live session plans again without polluting user prompt', async () => {
+    it('injects plan_mode as custom message when a live session plans again without mutating system prompt or polluting user prompt', async () => {
       const published: unknown[] = [];
       adapter.on('plan', (_sessionId, plan) => published.push(plan));
       await adapter.startSession('plan-live', 'First task', {
@@ -197,10 +208,21 @@ describe('PiRuntimeAdapter', () => {
         });
       }
       const sections: Record<string, string> = {};
+      const injectedMessages: Array<{ customType: string; content: string; display: boolean }> = [];
       for (const handler of beforeAgentHandlers) {
-        await handler({ prompt: 'Plan the next step', systemPromptOptions: { sections } });
+        const result = (await handler({
+          prompt: 'Plan the next step',
+          systemPromptOptions: { sections },
+        })) as { message?: { customType: string; content: string; display: boolean } } | undefined;
+        if (result?.message) injectedMessages.push(result.message);
       }
-      expect(sections.plan_mode).toContain('## Plan Mode');
+      expect(sections.plan_mode).toBeUndefined();
+      expect(injectedMessages).toHaveLength(1);
+      expect(injectedMessages[0]).toMatchObject({
+        customType: 'plan_mode',
+        display: false,
+      });
+      expect(injectedMessages[0].content).toContain('## Plan Mode');
     });
 
     it('keeps workspace mutations available outside plan mode', async () => {

@@ -47,3 +47,21 @@ test('starts a new context window after reset and keeps sessions isolated', () =
   expect(dedup.update('session-2', '')).toBe('block B');
   expect(dedup.update('session-1', 'block A')).toBe('block A');
 });
+
+test('takeDelta emits only new or revised observations while preserving reset semantics', () => {
+  const dedup = new MemoryInjectionDedup();
+  const recall1 = `${header}\nWorkspace:\n- [memory:1] A\n- [memory:2] B`;
+  expect(dedup.takeDelta('s', '')).toBeNull();
+  expect(dedup.takeDelta('s', recall1)).toBe(recall1);
+  // Identical or reordered recall emits nothing so prefix stays cached.
+  expect(dedup.takeDelta('s', `${header}\nWorkspace:\n- [memory:2] B\n- [memory:1] A`)).toBeNull();
+  // Revised observation emits only the revised observation, while update() still knows all facts.
+  expect(
+    dedup.takeDelta('s', `${header}\nWorkspace:\n- [memory:1] Revised A\n- [memory:2] B`),
+  ).toBe(`${header}\nWorkspace:\n- [memory:1] Revised A`);
+  expect(dedup.update('s', '')).toBe(
+    `${header}\nWorkspace:\n- [memory:1] Revised A\n- [memory:2] B`,
+  );
+  dedup.reset('s');
+  expect(dedup.takeDelta('s', recall1)).toBe(recall1);
+});

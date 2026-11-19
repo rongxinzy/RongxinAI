@@ -5,12 +5,8 @@ import type { CoworkStore } from '../coworkStore';
 import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import { CoworkSessionStartSchema } from '../../shared/ipc/schemas';
 import { CoworkSessionExpertSource } from '../../shared/cowork/sessionExperts';
-import {
-  CoworkExecutionMode,
-  CoworkPermissionMode,
-  CoworkSessionMode,
-} from '../../shared/cowork/constants';
-import { WorkbenchApprovalMode } from '../../shared/workbenchTask';
+import { CoworkExecutionMode, CoworkSessionMode } from '../../shared/cowork/constants';
+import { resolveCoworkApprovalMode } from './approvalMode';
 import {
   resolveCoworkPromptLanguage,
   resolveSessionExpertSnapshots,
@@ -168,10 +164,7 @@ export function prepareCoworkSession(
         sessionMode: options.mode ?? CoworkSessionMode.Work,
         goalMode: options.goalMode,
         codemode: config.codemodeEnabled === true,
-        approvalMode:
-          (options.permissionMode ?? config.permissionMode) === CoworkPermissionMode.AllowAll
-            ? WorkbenchApprovalMode.AllowAll
-            : WorkbenchApprovalMode.Ask,
+        approvalMode: resolveCoworkApprovalMode(options.permissionMode ?? config.permissionMode),
         imageAttachments: storedImages,
         fileAttachments: options.fileAttachments,
         agentId: options.agentId,

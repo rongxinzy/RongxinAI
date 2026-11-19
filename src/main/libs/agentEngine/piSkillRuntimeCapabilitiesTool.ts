@@ -6,7 +6,7 @@ import {
   type SkillRuntimeCapabilities,
 } from '../skillRuntimeCapabilities';
 
-const PiSkillRuntimeCapabilitiesToolName = 'skill_runtime_capabilities';
+export const PiSkillRuntimeCapabilitiesToolName = 'skill_runtime_capabilities';
 
 export const PiSkillRuntimeCapabilitiesParameters = Type.Object(
   {},
@@ -54,7 +54,8 @@ export function buildPiSkillRuntimeCapabilitiesTool(): ToolDefinition<
     name: PiSkillRuntimeCapabilitiesToolName,
     label: 'Inspect Skill Runtimes',
     description:
-      'Read-only probe of application-managed Python, uv, Node, Bash, PowerShell, and prebuilt Skill Python environments.',
+      'Read-only probe of application-managed Python, uv, Node, Bash, PowerShell, and Skill environments.',
+    defaultActive: false,
     parameters: PiSkillRuntimeCapabilitiesParameters,
     outputSchema: PiSkillRuntimeCapabilitiesOutputSchema,
     annotations: PiSkillRuntimeCapabilitiesAnnotations,

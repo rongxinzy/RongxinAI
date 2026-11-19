@@ -11,7 +11,7 @@ import {
   type ZhiyuanModelPoolWorkload as ZhiyuanModelPoolWorkloadValue,
 } from '../../../shared/modelPool/constants';
 import { ModelCapabilityStatus, ProviderName } from '../../../shared/providers';
-import type { MagpieModel } from '../../../shared/magpie/types';
+import type { MagpieModel, MagpieProviderSummary } from '../../../shared/magpie/types';
 import {
   getMagpieModelService,
   hasMagpieModelService,
@@ -19,6 +19,7 @@ import {
 } from '../../magpie/modelService';
 import { zhiyuanManagedProviderBridge } from '../../enterpriseExtension/managedProviderBridge';
 import { ImageInputVerdict, imageInputVerdict } from './piImageInputFallback';
+import { resolveMagpieFallbackMaxTokens, resolveMagpieModelCompat } from './piMagpieModelCompat';
 import type { PiModelRuntime, PiModules, PiResolvedModel } from './piRuntimeSessionState';
 
 export const DEFAULT_PI_LOCAL_MAX_TOKENS = 8192;
@@ -42,6 +43,7 @@ export function buildMagpiePiModel(
   selected: MagpieModel,
   gatewayUrl: string,
   modelPoolRequestContext?: ModelPoolRequestContext,
+  upstreamProvider?: MagpieProviderSummary,
 ): {
   model: Model<MagpieNativeApi> & Record<string, unknown>;
   baseUrl: string;
@@ -78,8 +80,11 @@ export function buildMagpiePiModel(
       )
     : undefined;
   const contextWindow = selected.context_window ?? 32768;
-  const defaultOutputTokens = selected.reasoning === true ? 16384 : DEFAULT_PI_LOCAL_MAX_TOKENS;
-  const maxTokens = Math.min(selected.max_output_tokens ?? defaultOutputTokens, contextWindow);
+  const maxTokens = resolveMagpieFallbackMaxTokens(
+    selected,
+    contextWindow,
+    DEFAULT_PI_LOCAL_MAX_TOKENS,
+  );
   const baseUrl = api === 'anthropic-messages' ? url.origin : `${url.origin}/v1`;
   const imageInput = magpieImageInput(selected);
   const supportsImage = imageInput === ModelCapabilityStatus.Supported;
@@ -96,7 +101,7 @@ export function buildMagpiePiModel(
     contextWindow,
     maxTokens,
     ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
-    compat: { sendSessionAffinityHeaders: true },
+    compat: resolveMagpieModelCompat(selected, api, upstreamProvider),
     headers: {
       ...(modelPoolRequestContext?.conversationId
         ? {
@@ -131,11 +136,10 @@ export async function resolvePiModel(
     if (enterpriseConfig) {
       const api = enterpriseConfig.api;
       const contextWindow = resolution.model.context_window ?? 32768;
-      const defaultOutputTokens =
-        resolution.model.reasoning === true ? 16384 : DEFAULT_PI_LOCAL_MAX_TOKENS;
-      const maxTokens = Math.min(
-        resolution.model.max_output_tokens ?? defaultOutputTokens,
+      const maxTokens = resolveMagpieFallbackMaxTokens(
+        resolution.model,
         contextWindow,
+        DEFAULT_PI_LOCAL_MAX_TOKENS,
       );
       const imageInput = magpieImageInput(resolution.model);
       const supportsImage = imageInput === ModelCapabilityStatus.Supported;
@@ -198,7 +202,12 @@ export async function resolvePiModel(
       baseUrl,
       api,
       maxTokens,
-    } = buildMagpiePiModel(resolution.model, resolution.gatewayUrl, modelPoolRequestContext);
+    } = buildMagpiePiModel(
+      resolution.model,
+      resolution.gatewayUrl,
+      modelPoolRequestContext,
+      resolution.provider,
+    );
     const modelRuntime =
       existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
     modelRuntime.registerProvider('magpie', {
