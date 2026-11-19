@@ -413,31 +413,6 @@ export function classicPageControls() {
         color: 'var(--muted-foreground)',
       },
     }),
-    'page-preset-expert-list-card-1': recipe({
-      base: {
-        'min-height': '5rem',
-        gap: '0.75rem',
-        'border-width': '1px',
-        'border-style': 'solid',
-        'border-color': 'var(--zy-border)',
-        'background-color': 'var(--card)',
-        padding: '1rem',
-        'transition-property': 'color, background-color, border-color, box-shadow',
-        'transition-duration': '150ms',
-        'box-shadow': 'none',
-      },
-      hover: { 'background-color': 'var(--muted)' },
-    }),
-    'page-preset-expert-list-button-1': recipe({
-      base: {
-        height: 'auto',
-        width: 'auto',
-        'border-radius': 'inherit',
-        'border-width': '0px',
-        padding: '0rem',
-      },
-      hover: { 'background-color': 'transparent' },
-    }),
     'page-feishu-instance-settings-button-1': recipe({
       base: {
         height: 'auto',

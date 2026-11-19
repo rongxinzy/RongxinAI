@@ -344,9 +344,18 @@ test('llama.cpp runtime capabilities map declared modalities', () => {
     audioInput: ModelCapabilityStatus.Unsupported,
   });
 
-  expect(parseLlamaCppRuntimeCapabilities({ modalities: { vision: false } })).toEqual({
+  expect(
+    parseLlamaCppRuntimeCapabilities({
+      modalities: { vision: false, audio: true },
+      chat_template_caps: { supports_tools: false },
+    }),
+  ).toEqual({
+    toolCalling: ModelCapabilityStatus.Unsupported,
     imageInput: ModelCapabilityStatus.Unsupported,
+    audioInput: ModelCapabilityStatus.Supported,
   });
+
+  expect(parseLlamaCppRuntimeCapabilities({ chat_template_caps: {} }).toolCalling).toBeUndefined();
 });
 
 test('runtime context never exceeds trained context', () => {
