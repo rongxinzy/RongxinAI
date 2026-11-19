@@ -97,6 +97,16 @@ const snapshot = `(() => {
   try { nonEmptyCanvas = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, index) => index % 4 === 3 && value > 0); } catch {}
   return { bound: !!window.desktopPet, visible: !document.hidden, canvas: {...canvas.dataset}, nonEmptyCanvas };
 })()`;
+const companionSnapshot = `(async () => {
+  const composer = document.querySelector('[data-companion-bubble] textarea');
+  return {
+    bound: !!window.companion,
+    visible: await window.companion?.visibility(),
+    foundBubble: !!document.querySelector('[data-companion-bubble]'),
+    composer: composer && { disabled: composer.disabled, focused: document.activeElement === composer },
+    alert: document.querySelector('[role="alert"]')?.textContent,
+  };
+})()`;
 
 async function observe(executable, name, patch) {
   const profile = path.join(root, `profile-${name}`);
@@ -113,30 +123,57 @@ async function observe(executable, name, patch) {
     const response = await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(1000) });
     return response.json();
   };
-  async function connect(target) {
+  const petTarget = list => list.find(target => /desktop-pet\.html/.test(target.url));
+  const companionTarget = list => list.find(target => /companion\.html/.test(target.url));
+  async function connect(target, surface) {
     const session = await Cdp.connect(target.webSocketDebuggerUrl);
-    open.push(session);
+    open.push({ surface, session });
     await session.send('Runtime.enable');
     await session.send('Log.enable');
     return session;
   }
   try {
     const index = await waitFor(async () => (await targets()).find(target => /\/dist\/index\.html/.test(target.url)), 'main renderer');
-    const main = await connect(index);
+    const main = await connect(index, 'main');
     await waitFor(async () => (await runtime(main, preflight)).result.value?.bound, 'main preload');
     await waitFor(async () => {
       report.initial = await runtime(main, 'window.electron.desktopPet.getSettings()');
       return report.initial.result.value;
     }, 'settings handler');
     report.operation = await runtime(main, `window.electron.desktopPet.setSettings(${JSON.stringify(patch)})`);
-    const pet = await waitFor(async () => (await targets()).find(target => /desktop-pet\.html/.test(target.url)), 'desktop pet renderer', 32);
-    const renderer = await connect(pet);
+    const pet = await waitFor(async () => petTarget(await targets()), 'desktop pet renderer', 32);
+    const renderer = await connect(pet, 'pet');
     report.firstFrame = (await runtime(renderer, snapshot)).result.value;
-    await delay(9_000);
-    report.lateFrame = (await runtime(renderer, snapshot)).result.value;
-    report.mainExceptions = main.observations;
-    report.petExceptions = renderer.observations;
-    report.companion = (await targets()).filter(target => /companion\.html/.test(target.url)).map(target => target.url);
+    await renderer.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+    await waitFor(async () => {
+      report.lateFrame = (await runtime(renderer, snapshot)).result.value;
+      return report.lateFrame?.nonEmptyCanvas && report.lateFrame?.canvas.reducedMotion === 'false';
+    }, 'painting pet with motion enabled', 24);
+    const companion = await waitFor(async () => companionTarget(await targets()), 'hidden companion renderer', 30);
+    const bubble = await connect(companion, 'companion');
+    report.companionBefore = (await runtime(bubble, companionSnapshot)).result.value;
+    report.openCompanion = await runtime(renderer, 'window.desktopPet.open()');
+    await waitFor(async () => {
+      report.companionAfter = await runtime(bubble, companionSnapshot);
+      return report.companionAfter.result.value?.visible && report.companionAfter.result.value?.composer;
+    }, 'showing companion bubble', 30);
+    await delay(1500);
+    report.companionSettled = await runtime(bubble, companionSnapshot);
+    if (app.child.pid) report.openCompanionNative = await snapshotProcesses(executable, app.child.pid);
+    report.closeCompanion = await runtime(renderer, 'window.desktopPet.open()');
+    await waitFor(async () => {
+      report.companionClosed = await runtime(bubble, companionSnapshot);
+      return report.companionClosed.result.value?.visible === false;
+    }, 'hiding companion bubble', 20);
+    report.disable = await runtime(main, 'window.electron.desktopPet.setSettings({ enabled: false })');
+    await waitFor(async () => !petTarget(await targets()), 'closing desktop pet renderer', 20);
+    report.reenable = await runtime(main, 'window.electron.desktopPet.setSettings({ enabled: true })');
+    const reenabled = await waitFor(async () => petTarget(await targets()), 'restoring desktop pet renderer', 25);
+    const restored = await connect(reenabled, 'restored pet');
+    await waitFor(async () => {
+      report.restoredFrame = (await runtime(restored, snapshot)).result.value;
+      return report.restoredFrame?.bound && report.restoredFrame?.nonEmptyCanvas;
+    }, 'painting restored pet', 20);
   } catch (error) {
     report.failure = error.stack;
   } finally {
@@ -146,14 +183,14 @@ async function observe(executable, name, patch) {
     if (existsSync(logFolder)) {
       report.log = readdirSync(logFolder).filter(file => /^main.*\.log$/.test(file)).map(file => readFileSync(path.join(logFolder, file), 'utf8').slice(-70_000));
     }
-    for (const session of open) session.close();
+    report.exceptions = Object.fromEntries(open.map(({ surface, session }) => [surface, session.observations]));
+    for (const { session } of open) session.close();
     await stop(app.child);
     writeFileSync(path.join(evidence, `${name}-app-output.log`), app.output());
     writeFileSync(path.join(evidence, `${name}.json`), JSON.stringify(report, null, 2));
-    const { log, processesAndWindows, ...summary } = report;
+    const { log, processesAndWindows, openCompanionNative, ...summary } = report;
     console.log(JSON.stringify(summary, null, 2));
-    console.log(log?.flatMap(file => file.split(/\r?\n/).filter(line => /desktop.pet|windowsurface|uncaught|child process|error occurred/i.test(line))).join('\n') ?? '');
-    console.log(processesAndWindows?.[0] ?? '');
+    console.log(log?.flatMap(file => file.split(/\r?\n/).filter(line => /\[DesktopPet\]|\[WindowSurface\]|uncaught exception|child process gone|error occurred/i.test(line))).join('\n') ?? '');
   }
 }
 

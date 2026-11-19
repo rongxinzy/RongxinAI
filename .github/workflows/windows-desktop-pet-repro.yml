@@ -29,7 +29,7 @@ jobs:
           if ($actual -ne '9cc119879740479d89dc23c9f8853291ef9a7ed244f4cf16efa720f5f9ecf32d') { throw "Unexpected installer SHA-256 $actual" }
           $root = Join-Path $env:RUNNER_TEMP 'pet-probe'
           New-Item -ItemType Directory -Path $root | Out-Null
-          $proc = Start-Process -FilePath $setup -ArgumentList "--silent --skip-registration --install-dir `"$root\installed`" --runtime-root `"$root\runtimes`" --app-data-root `"$root\data`" --events-log `"$root\install.jsonl`"" -Wait -PassThru
+          $proc = Start-Process -FilePath $setup -ArgumentList "--silent --skip-registration --install-dir `"$root\安装路径`" --runtime-root `"$root\runtimes`" --app-data-root `"$root\data`" --events-log `"$root\install.jsonl`"" -Wait -PassThru
           if ($proc.ExitCode -ne 0) {
             Get-Content "$root\install.jsonl" -Tail 30
             throw "Installer exited with $($proc.ExitCode)"
@@ -37,7 +37,7 @@ jobs:
           "PET_PROBE_ROOT=$root" >> $env:GITHUB_ENV
       - name: Enable the pet through the installed app
         shell: pwsh
-        run: node scripts/ci/windows-desktop-pet-repro.mjs "$env:PET_PROBE_ROOT/installed/知远.exe" --installed
+        run: node scripts/ci/windows-desktop-pet-repro.mjs "$env:PET_PROBE_ROOT/安装路径/知远.exe" --installed
       - uses: actions/upload-artifact@v6
         if: always()
         with:
