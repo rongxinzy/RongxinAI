@@ -40,7 +40,7 @@ export const enMain1 = {
   desktopPet_bubble_thinking: 'Working',
   desktopPet_bubble_waiting: 'Needs approval',
   desktopPet_bubble_completed: 'Done',
-  desktopPet_bubble_error: 'Issue',
+  desktopPet_bubble_error: 'Task failed',
   desktopPet_chatter_1: "Let's keep going today",
   desktopPet_chatter_2: "I'm right here with you",
   desktopPet_chatter_3: 'Just a little stretch...',
