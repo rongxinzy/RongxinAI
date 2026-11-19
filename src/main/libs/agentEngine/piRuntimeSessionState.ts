@@ -232,6 +232,7 @@ export interface ActivePiSession {
   settingsManager: PiSettingsManager | null;
   approvalMode: WorkbenchApprovalMode;
   unattended: boolean;
+  scheduledTaskRun?: boolean;
   /** True while Pi is executing the current Work/Chat turn. */
   isRunning: boolean;
   /** Last time this session was used by a turn; idle sessions may be rebuilt from SQLite. */
@@ -246,9 +247,7 @@ export interface ActivePiSession {
   /** The newly attached CAD Skill needs a new idle session to register its viewer tool. */
   pendingCadToolReload?: boolean;
   /** Newly recalled memory block staged for injection in `before_agent_start`. */
-  pendingTurnMemoryContext?: string | null;
-  /** Deduped memory blocks currently active in this compaction window's system prompt. */
-  injectedProjectMemorySections?: string[];
+  pendingTurnMemory?: { userPrompt: string; context: string | null };
   /** Prevents duplicate queue drains when Pi emits multiple settled events. */
   controlActionInFlight: boolean;
   /** MCP tool manifest generation captured when this Pi session was created. */

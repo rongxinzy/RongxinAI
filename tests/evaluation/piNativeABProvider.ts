@@ -7,6 +7,10 @@ import {
   ZhiyuanModelPoolHeader,
   ZhiyuanModelPoolWorkload,
 } from '../../src/shared/modelPool/constants';
+import {
+  attributePiWorkRequest,
+  type PiWorkRequestByteAttribution,
+} from './piWorkTokenAttribution';
 
 export interface Provider {
   baseUrl: string;
@@ -28,7 +32,16 @@ export interface RequestMetrics {
   systemBytes: number;
   requestBytes: number;
   compaction: boolean;
+  attribution?: PiWorkRequestByteAttribution;
 }
+
+export type LivePiRequest = {
+  model?: string;
+  tools?: Array<{ type?: string; function?: { name?: string } }>;
+  messages?: Array<{ role?: string; content?: unknown }>;
+} & Record<string, unknown>;
+
+export type LiveRequestTransform = (request: LivePiRequest) => LivePiRequest;
 
 export async function provider(): Promise<Provider> {
   const contextWindow = Number(process.env.PI_AB_CONTEXT_WINDOW || 65536);
@@ -122,6 +135,11 @@ export async function forwardRequest(
   config: Provider,
   requests: RequestMetrics[],
   conversationId: string,
+  options?: {
+    transform?: LiveRequestTransform;
+    knownMemory?: readonly string[];
+    captureOnly?: boolean;
+  },
 ): Promise<void> {
   if (req.method !== 'POST' || req.url !== '/v1/chat/completions') {
     res.writeHead(404).end();
@@ -129,14 +147,20 @@ export async function forwardRequest(
   }
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(Buffer.from(chunk));
-  const body = Buffer.concat(chunks).toString('utf8');
-  const request = JSON.parse(body) as {
-    model?: string;
-    tools?: unknown[];
-    messages?: Array<{ role?: string; content?: unknown }>;
-  };
-  if (request.model !== config.model)
+  const originalBody = Buffer.concat(chunks).toString('utf8');
+  const originalRequest = JSON.parse(originalBody) as LivePiRequest;
+  const request = options?.transform?.(originalRequest) ?? originalRequest;
+  const body = request === originalRequest ? originalBody : JSON.stringify(request);
+  if (originalRequest.model !== config.model || request.model !== config.model)
     throw new Error('The compared arms must request the same model.');
+  if (options?.captureOnly) {
+    res.writeHead(400, { 'content-type': 'application/json' }).end(
+      JSON.stringify({
+        error: { message: 'Evaluation captured request; no inference requested.' },
+      }),
+    );
+    return;
+  }
   const instructions =
     request.messages?.filter(message => ['system', 'developer'].includes(message.role ?? '')) ?? [];
   const metrics: RequestMetrics = {
@@ -144,6 +168,7 @@ export async function forwardRequest(
     tools: request.tools?.length ?? 0,
     systemBytes: Buffer.byteLength(JSON.stringify(instructions)),
     requestBytes: Buffer.byteLength(body),
+    attribution: attributePiWorkRequest(request, Buffer.byteLength(body), options?.knownMemory),
     compaction: instructions.some(
       message =>
         typeof message.content === 'string' &&
@@ -153,19 +178,7 @@ export async function forwardRequest(
   requests.push(metrics);
   const abort = new AbortController();
   res.once('close', () => abort.abort());
-  const upstream = await fetch(`${config.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      accept: 'text/event-stream',
-      ...(config.apiKey ? { authorization: `Bearer ${config.apiKey}` } : {}),
-      [ZhiyuanModelPoolHeader.ConversationId]: conversationId,
-      [ZhiyuanModelPoolHeader.Workload]: ZhiyuanModelPoolWorkload.Work,
-    },
-    body,
-    redirect: 'error',
-    signal: AbortSignal.any([abort.signal, AbortSignal.timeout(90000)]),
-  });
+  const upstream = await openLiveResponse(config, body, conversationId, abort.signal);
   metrics.status = upstream.status;
   if (!upstream.ok || !upstream.body) {
     const error = (await upstream.json().catch((): null => null)) as {
@@ -183,7 +196,40 @@ export async function forwardRequest(
   res.writeHead(upstream.status, {
     'content-type': upstream.headers.get('content-type') ?? 'text/event-stream',
   });
-  const reader = upstream.body.getReader();
+  await consumeLiveResponse(upstream.body, metrics, async chunk => {
+    if (!res.write(chunk)) await once(res, 'drain', { signal: abort.signal });
+  });
+  res.end();
+}
+
+function openLiveResponse(
+  config: Provider,
+  body: string,
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const timeout = AbortSignal.timeout(90000);
+  return fetch(`${config.baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      accept: 'text/event-stream',
+      ...(config.apiKey ? { authorization: `Bearer ${config.apiKey}` } : {}),
+      [ZhiyuanModelPoolHeader.ConversationId]: conversationId,
+      [ZhiyuanModelPoolHeader.Workload]: ZhiyuanModelPoolWorkload.Work,
+    },
+    body,
+    redirect: 'error',
+    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+  });
+}
+
+async function consumeLiveResponse(
+  body: ReadableStream<Uint8Array>,
+  metrics: RequestMetrics,
+  forward?: (chunk: Uint8Array) => Promise<void>,
+): Promise<void> {
+  const reader = body.getReader();
   const decoder = new TextDecoder();
   let pending = '';
   try {
@@ -194,12 +240,35 @@ export async function forwardRequest(
       const lines = pending.split('\n');
       pending = lines.pop() ?? '';
       for (const line of lines) observeSseLine(line, metrics);
-      if (!res.write(next.value)) await once(res, 'drain', { signal: abort.signal });
+      if (forward) await forward(next.value);
     }
     observeSseLine(pending + decoder.decode(), metrics);
-    res.end();
   } finally {
     await reader.cancel().catch((): undefined => undefined);
     reader.releaseLock();
   }
+}
+
+export async function probeInputTokens(config: Provider, originalRequest: LivePiRequest) {
+  if (originalRequest.model !== config.model) {
+    throw new Error('Token probe must use the captured model.');
+  }
+  const request: LivePiRequest = { ...originalRequest, max_tokens: 1, stream: true };
+  delete request.max_completion_tokens;
+  const body = JSON.stringify(request);
+  const response = await openLiveResponse(config, body, randomUUID());
+  const metrics: RequestMetrics = {
+    status: response.status,
+    tools: request.tools?.length ?? 0,
+    requestBytes: Buffer.byteLength(body),
+    systemBytes: 0,
+    compaction: false,
+  };
+  if (response.ok && response.body) await consumeLiveResponse(response.body, metrics);
+  else await response.body?.cancel();
+  return {
+    status: metrics.status,
+    observedModel: metrics.model,
+    inputTokens: metrics.input ?? null,
+  };
 }

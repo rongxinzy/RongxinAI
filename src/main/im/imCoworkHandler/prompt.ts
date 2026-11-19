@@ -2,7 +2,6 @@
  * System prompt assembly for IM cowork sessions.
  */
 
-import { buildScheduledTaskEnginePrompt } from '../../../scheduledTask/enginePrompt';
 import { getBranding } from '../../../shared/branding';
 import type { CoworkStore } from '../../coworkStore';
 import { buildIMMediaInstruction } from '../imMediaInstruction';
@@ -18,7 +17,6 @@ export async function buildIMCoworkSystemPrompt(deps: IMCoworkPromptDeps): Promi
   const config = deps.coworkStore.getConfig();
   const imSettings = deps.imStore.getIMSettings();
   const systemPrompt = config.systemPrompt || '';
-  const scheduledTaskPrompt = buildScheduledTaskEnginePrompt();
 
   // Build media instruction for IM media sending capability
   const mediaInstruction = buildIMMediaInstruction(imSettings);
@@ -53,10 +51,6 @@ export async function buildIMCoworkSystemPrompt(deps: IMCoworkPromptDeps): Promi
     if (skillsPrompt) {
       sections.push(skillsPrompt);
     }
-  }
-
-  if (scheduledTaskPrompt) {
-    sections.push(scheduledTaskPrompt);
   }
 
   // Append media instruction at the end so it's always present

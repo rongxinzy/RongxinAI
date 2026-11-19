@@ -18,13 +18,14 @@
 - 选中 Skill 的脚本权限和可信根目录在执行时读取；steer 新增技能同步资源根目录。未选技能仍不得执行。
 - 主会话和子代理使用按模型窗口计算的压缩预算；模型切换即更新，不依赖输出上限是否变化。
 - 固定版本 SDK 的压缩边界补丁按会话记录顺序识别旧消息，避免压缩与后续响应处于同一毫秒时跳过溢出恢复；不在 harness 额外续跑。
-- 记忆单次召回沿用项目/个人/会话 900/250/350 的估算 token 预算。按 observation ID、scope 和内容修订去重；原生压缩成功后开启新的注入边界。可选召回总等待最多 500ms，可取消，超时后不继续发起召回请求。Chat 不注册检查点工具或注入记忆提示。
+- 记忆单次召回沿用项目/个人/会话 900/250/350 的估算 token 预算。在 Pi 的 `before_agent_start` 合并当前召回，同 scope 和 observation ID 仅保留最新文本，按 scope 合并成一个记忆区。原生压缩成功后开启新的注入边界，预检压缩之后仍可使用本轮召回。可选召回总等待最多 500ms，可取消，超时后不继续发起召回请求。Chat 不注册检查点工具或注入记忆提示。
 - 产物仍检查存在性、文件边界和内容哈希。工作区与产物路径使用同一 canonical root，避免 macOS 路径别名造成误阻断。
 
 ## 验证
 
 - `piNativeLongTask.integration.test.ts`：真实安装的 Pi SDK，离线可控 provider 响应。单次 prompt 完成 32 步真实文件写入，固定时钟下覆盖多次 threshold compaction 和 overflow compact-and-retry；结算只发生一次。压缩边界用例在旧补丁下失败、新补丁下通过。它证明执行/压缩接线，不证明真实模型推理质量或吞吐。
 - `piPromptAppend.integration.test.ts`：使用真实 SDK 的资源加载和提示构建，验证 Work/Chat、重载及环境 SYSTEM.md 情况下，专家指令追加一次且原生工具指南完整保留。
+- `piRunPromptContext.test.ts`：经过真实适配器与 Pi SDK，检查修订后的事实替换和预检压缩后的上下文，也检查定时交付指引限于当前定时运行。
 - `piRuntimeAdapter.workQueue.test.ts`：应用 run 在压缩后续跑期间仍活动；成功压缩重置记忆去重，失败压缩不重置；没有 harness 额外提示。
 - `taskService.approvals.test.ts`：并发审批、拒绝后不能复活、实际副作用不重复执行。
 - `piSubagentTool.test.ts`：并行取消、排队任务不启动、子会话小窗口压缩预算。
@@ -50,3 +51,5 @@
 ## Provider 回放限制
 
 历史 `tests/piLongTaskReplay.test.ts` 在本轮开始前已整体 skip；本轮没有启用、改写磁带或放宽 seq/hash 匹配。改变 prompt 后的旧磁带不能证明新模型行为，真实质量对照须独立采集当前授权模型的输出、usage 和产物评分。不得用离线模拟声称真实模型效果已验收。
+
+[真实模型评估](../../tests/evaluation/README.md) 支持在同一模型上评估原生 Pi、Work 和单项消融。请求体按系统提示、结构化工具定义、记忆和对话拆分字节，输入 token 来自服务端 usage。任务结果按实际产物或定时工具收到的参数评分。

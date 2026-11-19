@@ -234,12 +234,29 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('memory-compaction', 'Work', { sessionMode: 'work' });
       const block = 'Workspace:\n- [memory:1] Remember the verified decision';
       const listener = mockSession.subscribe.mock.calls.at(-1)![0];
-      expect(adapter.memoryInjectionDedup.take('memory-compaction', block)).toBeTruthy();
+      const original = adapter.memoryInjectionDedup.update('memory-compaction', block);
+      expect(original).toContain(block);
       listener({ type: 'compaction_end', aborted: false, errorMessage: 'failed' });
-      expect(adapter.memoryInjectionDedup.take('memory-compaction', block)).toBeNull();
+      expect(adapter.memoryInjectionDedup.update('memory-compaction', '')).toBe(original);
       listener({ type: 'compaction_end', aborted: false, result: { summary: 'checkpoint' } });
-      expect(adapter.memoryInjectionDedup.take('memory-compaction', block)).toBeTruthy();
+      expect(adapter.memoryInjectionDedup.update('memory-compaction', '')).toBeNull();
       expect(mockSession.prompt).toHaveBeenCalledOnce();
+    });
+
+    it('retains the active memory window when native preflight rejects a continuation', async () => {
+      const sessionId = 'memory-failed-continuation';
+      await adapter.startSession(sessionId, 'Work', { sessionMode: 'work' });
+      const active = adapter.activeSessions.get(sessionId)!;
+      active.isRunning = false;
+      const block = 'Workspace:\n- [memory:1] Remember the verified decision';
+      const original = adapter.memoryInjectionDedup.update(sessionId, block);
+      const error = new Error('Native preflight failed');
+      mockSession.prompt.mockRejectedValueOnce(error);
+      adapter.on('error', vi.fn());
+
+      await expect(adapter.continueSession(sessionId, 'Next')).rejects.toThrow(error);
+      expect(active.pendingTurnMemory).toBeUndefined();
+      expect(adapter.memoryInjectionDedup.update(sessionId, '')).toBe(original);
     });
 
     const assistantTurn = (

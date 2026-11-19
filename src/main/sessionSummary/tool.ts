@@ -18,12 +18,6 @@ const SessionSummaryPromptGuidelines = [
   'If the turn produced nothing worth remembering, call `session_summary` with `skip: true` and a short reason instead of writing empty content. Skip is an explicit, valid outcome, not an omission.',
 ];
 
-export const SessionSummarySystemPrompt = [
-  '## Session checkpoint',
-  '',
-  '- Checkpoints preserve progress and discoveries across turns and sessions. The host persists them with session/run identity and sequence.',
-].join('\n');
-
 const RelevantFileItemSchema = Type.Object({
   path: Type.String({ description: 'Workspace-relative file path.' }),
   role: Type.Optional(Type.String({ description: 'Role of the file in the turn.' })),

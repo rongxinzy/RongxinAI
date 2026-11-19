@@ -22,7 +22,6 @@ import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
 import { WorkbenchContractKind, WorkbenchRunTrigger } from '../../../shared/workbenchTask';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkMessage } from '../../coworkStore';
-import { captureMemoryPromptForE2e } from '../../memory/memoryPromptE2eCapture';
 import { resolveProjectMemoryContextForPiPrompt } from '../../memory/piRuntimeProjectMemoryPrompt';
 import { collectImagePathReferences } from './piImageInputFallback';
 import { resolvePiModel } from './piMagpiePiModel';
@@ -174,6 +173,7 @@ export async function continuePiRuntimeSession(
 
   active.goalMode = nextGoalMode;
   active.planMode = nextPlanMode;
+  active.scheduledTaskRun = options.scheduledTaskRun === true;
 
   if (
     promptChanged ||
@@ -311,7 +311,6 @@ export async function continuePiRuntimeSession(
   try {
     const projectMemoryContext = await resolveProjectMemoryContextForPiPrompt({
       chatMode: active.resourceState.chatMode,
-      memoryInjectionDedup: host.memoryInjectionDedup,
       projectMemoryService: host.getProjectMemoryService(),
       workspaceRoot: active.workspaceRoot,
       sessionId,
@@ -319,13 +318,7 @@ export async function continuePiRuntimeSession(
       signal: active.abortController.signal,
     });
     if (!isCurrentSession()) return;
-    active.pendingTurnMemoryContext = projectMemoryContext;
-    captureMemoryPromptForE2e({
-      sessionId,
-      userPrompt: prompt,
-      memoryContext: projectMemoryContext,
-      initialPrompt: prompt,
-    });
+    active.pendingTurnMemory = { userPrompt: prompt, context: projectMemoryContext };
     const continuedImagePrompt = preparePiPrompt(
       prompt,
       options.imageAttachments,
@@ -337,7 +330,7 @@ export async function continuePiRuntimeSession(
     await sendPiPrompt(active.piSession, continuedImagePrompt);
   } catch (error) {
     if (!isCurrentSession()) return;
-    host.memoryInjectionDedup.reset(sessionId);
+    active.pendingTurnMemory = undefined;
     active.isRunning = false;
     active.onSettled = undefined;
     const message = error instanceof Error ? error.message : String(error);

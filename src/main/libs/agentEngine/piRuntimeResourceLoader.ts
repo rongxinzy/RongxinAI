@@ -8,6 +8,8 @@
 
 import type { Skill, ToolAnnotations } from '@earendil-works/pi-coding-agent';
 
+import { ScheduledTaskResultGuidance } from '../../../scheduledTask/enginePrompt';
+import { captureMemoryPromptForE2e } from '../../memory/memoryPromptE2eCapture';
 import {
   NATIVE_READ_ONLY_TOOLS,
   NATIVE_REVERSIBLE_TOOLS,
@@ -257,16 +259,32 @@ export async function createPiRuntimeResourceLoader(
                   delete event.systemPromptOptions.sections.plan_mode;
                 }
 
-                const turnMemory = active.pendingTurnMemoryContext?.trim();
-                active.pendingTurnMemoryContext = null;
-                if (turnMemory) {
-                  (active.injectedProjectMemorySections ??= []).push(turnMemory);
+                if (active.scheduledTaskRun) {
+                  event.systemPromptOptions.sections.scheduled_task_result =
+                    ScheduledTaskResultGuidance;
+                } else {
+                  delete event.systemPromptOptions.sections.scheduled_task_result;
                 }
-                if (active.injectedProjectMemorySections?.length) {
-                  event.systemPromptOptions.sections.project_memory =
-                    active.injectedProjectMemorySections.join('\n\n');
+
+                // Native preflight compaction may have opened a new context window.
+                const { sessionId } = approvalContext;
+                const pending = active.pendingTurnMemory;
+                active.pendingTurnMemory = undefined;
+                const memory = resourceState.chatMode
+                  ? null
+                  : host.memoryInjectionDedup.update(sessionId, pending?.context ?? '');
+                if (memory) {
+                  event.systemPromptOptions.sections.project_memory = memory;
                 } else {
                   delete event.systemPromptOptions.sections.project_memory;
+                }
+                if (pending) {
+                  captureMemoryPromptForE2e({
+                    sessionId,
+                    userPrompt: pending.userPrompt,
+                    memoryContext: memory,
+                    initialPrompt: pending.userPrompt,
+                  });
                 }
               });
 

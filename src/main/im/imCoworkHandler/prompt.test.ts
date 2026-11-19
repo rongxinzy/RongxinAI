@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { buildScheduledTaskEnginePrompt } from '../../../scheduledTask/enginePrompt';
+import { RetiredScheduledTaskPrompt } from '../../../scheduledTask/enginePrompt';
 import { getBranding } from '../../../shared/branding';
 import { buildIMCoworkSystemPrompt } from './prompt';
 
@@ -28,7 +28,7 @@ function createIMStore(skillsEnabled = false) {
 }
 
 describe('buildIMCoworkSystemPrompt', () => {
-  test('assembles identity, config prompt, scheduled task and media sections', async () => {
+  test('assembles identity, config prompt and media sections without retired scheduling prose', async () => {
     const prompt = await buildIMCoworkSystemPrompt({
       coworkStore: createCoworkStore('Use the workspace conversation context.') as never,
       imStore: createIMStore() as never,
@@ -37,7 +37,7 @@ describe('buildIMCoworkSystemPrompt', () => {
     const branding = getBranding();
     expect(prompt).toContain(`You are ${branding.productName} (${branding.englishName}).`);
     expect(prompt).toContain('Use the workspace conversation context.');
-    expect(prompt).toContain(buildScheduledTaskEnginePrompt());
+    expect(prompt).not.toContain(RetiredScheduledTaskPrompt);
     expect(prompt).toContain('<im_media_capabilities>');
     expect(prompt.indexOf('You are')).toBeLessThan(prompt.indexOf('Use the workspace'));
     expect(prompt.indexOf('Use the workspace')).toBeLessThan(

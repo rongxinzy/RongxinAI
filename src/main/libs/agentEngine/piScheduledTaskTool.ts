@@ -28,7 +28,7 @@ export function buildPiScheduledTaskTool(input: {
         schedule: {
           type: 'object',
           description:
-            'Schedule: {kind:"at",at} or {kind:"cron",expr,tz} or {kind:"every",everyMs}.',
+            'Schedule: {kind:"at",at} or {kind:"cron",expr,tz} or {kind:"every",everyMs}. For "at", use a future ISO timestamp with an explicit timezone offset.',
         },
         message: { type: 'string', description: 'Prompt executed when the task runs.' },
         delivery: {
