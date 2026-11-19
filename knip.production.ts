@@ -10,8 +10,8 @@ import baseConfig from './knip';
  * green (this is how `src/main/harness/boundaryPolicy.ts` went unnoticed).
  * Knip's `--production` mode ignores test entries, but it only honors entry and
  * project patterns suffixed with `!`, and it stops treating npm scripts as
- * entries. This config therefore restricts the analysis to `src/`: files that
- * ship in the Electron bundles plus `src/**` as project files.
+ * entries. This config therefore restricts the analysis to `src/`, starting
+ * from the Electron bundles and standalone build tools with source there.
  *
  * `bun run knip:production` reports production modules, exports and
  * dependencies that are unreachable without tests. Plain `bun run knip` remains
@@ -51,10 +51,12 @@ const config: KnipConfig = {
         // Invoked by `bun run theme:generate` / `theme:audit`, not imported.
         'src/renderer/theme/scripts/generate-css.ts!',
         'src/renderer/theme/scripts/audit-styles.ts!',
+        // Bundled separately by `bun run build:eval-policy` for headless evaluation.
+        'src/main/evaluation/zhiyuanEvaluationPolicy.ts!',
       ],
       // Renderer UI sources are reachable from index.html, which the Vite
       // plugin supplies as an entry in normal mode; carry that over here.
-      project: ['src/**/*.{ts,tsx,css}!'],
+      project: ['src/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,css}!'],
     },
   },
   ignoreBinaries: baseConfig.ignoreBinaries,
@@ -69,36 +71,8 @@ const config: KnipConfig = {
     'src/main/libs/appUpdateCoordinator.testHarness.ts': ['files'],
     'src/main/magpie/manager.testHarness.ts': ['files'],
     'src/main/im/__tests__/**': ['files'],
-    'src/scheduledTask/fixtures.ts': ['files'],
     // Opt-in Magpie SMOKE (`integration.test.ts` dynamic import); not bundled in app.
     'src/main/magpie/__fixtures__/durableProvider.ts': ['files'],
-    // Pending user decision (architecture review work package A.7): the legacy
-    // scheduled-task surface. The classic theme definitions were removed (N.2,
-    // #1169) and their entries retired with them.
-    'src/scheduledTask/metaStore.ts': ['files'],
-    'src/scheduledTask/modelMapper.ts': ['files'],
-    'src/scheduledTask/origin.ts': ['files'],
-    'src/scheduledTask/policies/**': ['files'],
-    // Not yet triaged; production reachability unverified. Follow-up items —
-    // each must be either wired into production code or deleted, then removed
-    // from this list.
-    'src/main/evaluation/**': ['files'],
-    'src/main/memory/goldenEvaluation.ts': ['files'],
-    'src/main/libs/agentModels.ts': ['files'],
-    'src/main/libs/gatewayLogRotation.ts': ['files'],
-    'src/main/magpie/managementPolicy.ts': ['files'],
-    'src/renderer/components/cowork/directChatSnapshot.ts': ['files'],
-    'src/renderer/components/cowork/hooks/useConversationRailScrollSync.ts': ['files'],
-    'src/renderer/components/expert/presetExpertLabels.ts': ['files'],
-    'src/renderer/components/expert/PresetExpertList.tsx': ['files'],
-    'src/renderer/components/localInference/components/ModelCapabilitySettingsModal.tsx': ['files'],
-    'src/renderer/components/localInference/utils/logFormatting.ts': ['files'],
-    'src/renderer/services/directChatTurnState.ts': ['files'],
-    'src/renderer/services/modelCapabilityProbe.ts': ['files'],
-    'src/renderer/services/thinkingMessageLifecycle.ts': ['files'],
-    'src/renderer/utils/adaptiveTextReveal.ts': ['files'],
-    'src/renderer/utils/debounce.ts': ['files'],
-    'src/renderer/utils/streamingMarkdownSegments.ts': ['files'],
   },
   tags: baseConfig.tags,
   ignoreUnresolved: baseConfig.ignoreUnresolved,

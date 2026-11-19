@@ -34,11 +34,6 @@ export const DeliveryMode = {
 } as const;
 export type DeliveryMode = (typeof DeliveryMode)[keyof typeof DeliveryMode];
 
-// ─── Delivery Channel (magic values) ────────────────────────────────────────
-export const DeliveryChannel = {
-  Last: 'last',
-} as const;
-
 // ─── Session Target ─────────────────────────────────────────────────────────
 export const SessionTarget = {
   Main: 'main',
@@ -66,24 +61,6 @@ export const WakeMode = {
 } as const;
 export type WakeMode = (typeof WakeMode)[keyof typeof WakeMode];
 
-// ─── Task Origin Kind ───────────────────────────────────────────────────────
-export const OriginKind = {
-  Legacy: 'legacy',
-  IM: 'im',
-  Cowork: 'cowork',
-  Manual: 'manual',
-} as const;
-export type OriginKind = (typeof OriginKind)[keyof typeof OriginKind];
-
-// ─── Execution Binding Kind ─────────────────────────────────────────────────
-export const BindingKind = {
-  NewSession: 'new_session',
-  UISession: 'ui_session',
-  IMSession: 'im_session',
-  SessionKey: 'session_key',
-} as const;
-export type BindingKind = (typeof BindingKind)[keyof typeof BindingKind];
-
 // ─── Task / Run Status ──────────────────────────────────────────────────────
 export const TaskStatus = {
   Success: 'success',
@@ -100,16 +77,6 @@ export const DeliveryStatus = {
   Skipped: 'skipped',
 } as const;
 export type DeliveryStatus = (typeof DeliveryStatus)[keyof typeof DeliveryStatus];
-
-// ─── Default Agent ID ───────────────────────────────────────────────────────
-
-// ─── Policy Run-Behavior Descriptions ───────────────────────────────────────
-export const RunBehavior = {
-  newSession: 'Creates a new session on each trigger',
-  uiSession: 'Runs within the associated UI session',
-  imSession: (platform: string) => `Triggers and delivers results via ${platform}`,
-  sessionKey: 'Runs with an explicit managed session key',
-} as const;
 
 // ─── IPC Channels ───────────────────────────────────────────────────────────
 export const IpcChannel = {

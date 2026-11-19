@@ -52,8 +52,6 @@ export const PAGE_HOOK_SELECTORS = {
   'page-session-expert-picker-popover-content-1':
     '.theme-page-session-expert-picker-popover-content-1',
   'page-tool-card-button-1': '.theme-page-tool-card-button-1',
-  'page-preset-expert-list-card-1': '.theme-page-preset-expert-list-card-1',
-  'page-preset-expert-list-button-1': '.theme-page-preset-expert-list-button-1',
   'page-feishu-instance-settings-button-1': '.theme-page-feishu-instance-settings-button-1',
   'page-common-button-1': '.theme-page-common-button-1',
   'page-marketplace-download-sidebar-badge-1': '.theme-page-marketplace-download-sidebar-badge-1',

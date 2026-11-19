@@ -68,7 +68,6 @@ const config: KnipConfig = {
         'scripts/release/verify-release-candidate.mjs',
         'scripts/release/windows/assemble-windows-edition.cjs',
         'scripts/ci/with-download-retries.sh',
-        'scripts/release/upload-update-artifacts.mjs',
         'tests/setup/rebuild-sqlite-for-node.cjs',
         // Bundled by `bun build` in the bench:stream script; Knip does not parse that form.
         'scripts/bench/streamBench.ts',

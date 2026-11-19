@@ -3004,25 +3004,6 @@
   color: var(--muted-foreground);
   line-height: var(--zy-component-text-xs--line-height);
 }
-:where(:root, [data-theme]) :where(.theme-page-preset-expert-list-card-1) {
-  min-height: 5rem;
-  gap: 0.75rem;
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  padding: 1rem;
-  transition-property: color, background-color, border-color, box-shadow;
-  transition-duration: 150ms;
-  box-shadow: none;
-}
-:where(:root, [data-theme]) :where(.theme-page-preset-expert-list-button-1) {
-  height: auto;
-  width: auto;
-  border-radius: inherit;
-  border-width: 0px;
-  padding: 0rem;
-}
 :where(:root, [data-theme]) :where(.theme-page-feishu-instance-settings-button-1) {
   height: auto;
   padding: 0rem;
@@ -6334,16 +6315,6 @@
 }
 }
 @media (hover: hover) {
-:where(:root, [data-theme]) :where(.theme-page-preset-expert-list-card-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
-}
-}
-@media (hover: hover) {
-:where(:root, [data-theme]) :where(.theme-page-preset-expert-list-button-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: transparent;
-}
-}
-@media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-page-common-button-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   color: var(--zy-foreground);
 }
@@ -8426,8 +8397,6 @@ to {
 :where(:root, [data-theme]) :where(.theme-page-image-preview-modal-button-1),
 :where(:root, [data-theme]) :where(.theme-page-session-expert-picker-popover-content-1),
 :where(:root, [data-theme]) :where(.theme-page-tool-card-button-1),
-:where(:root, [data-theme]) :where(.theme-page-preset-expert-list-card-1),
-:where(:root, [data-theme]) :where(.theme-page-preset-expert-list-button-1),
 :where(:root, [data-theme]) :where(.theme-page-feishu-instance-settings-button-1),
 :where(:root, [data-theme]) :where(.theme-page-common-button-1),
 :where(:root, [data-theme]) :where(.theme-page-marketplace-download-sidebar-badge-1),

@@ -5,7 +5,6 @@ import {
   DefaultAgentAvatar,
   DefaultAgentAvatarIcon,
   encodeAgentAvatarIcon,
-  isDesignedAgentAvatarIcon,
   normalizeAgentAvatarIcon,
   parseAgentAvatarIcon,
 } from './avatar';
@@ -27,7 +26,6 @@ describe('agent avatar icon encoding', () => {
 
   test('leaves legacy emoji icons untouched', () => {
     expect(parseAgentAvatarIcon('🤖')).toBeNull();
-    expect(isDesignedAgentAvatarIcon('🤖')).toBe(false);
   });
 
   test('normalizes empty and legacy icons to the default svg avatar', () => {
