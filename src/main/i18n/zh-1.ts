@@ -38,7 +38,7 @@ export const zhMain1 = {
   desktopPet_bubble_thinking: '处理中',
   desktopPet_bubble_waiting: '需要确认',
   desktopPet_bubble_completed: '已完成',
-  desktopPet_bubble_error: '出错了',
+  desktopPet_bubble_error: '有任务失败',
   desktopPet_chatter_1: '今天也一起加油呀',
   desktopPet_chatter_2: '我在这儿陪着你',
   desktopPet_chatter_3: '伸个懒腰……',
