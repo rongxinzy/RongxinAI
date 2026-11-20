@@ -57,6 +57,10 @@ case "${PLATFORM}" in
       -DCMAKE_BUILD_TYPE=Release
       -DGGML_METAL=OFF
       -DLLAMA_OPENSSL=OFF
+      # Release binaries must not inherit AVX-512 from the build runner's CPU.
+      -DGGML_NATIVE=OFF
+      -DGGML_AVX2=ON
+      -DGGML_AVX512=OFF
     )
     EXECUTABLE_NAME=llama-server.exe
     BUILD_CONFIG=(--config Release)
