@@ -439,11 +439,11 @@ export function wrapMagpieNativeApi<TApi extends MagpieNativeApiSurface>(
         return createImmediateOverflowErrorStream(model, message, createEventStream);
       }
       const budgetedAnthropicThinking = usesAnthropicBudgetedThinking(model, options);
+      const thinkingBudget = budgetedAnthropicThinking
+        ? resolveThinkingBudget(options!.reasoning!, options?.thinkingBudgets)
+        : 0;
       const targetMaxTokens = budgetedAnthropicThinking
-        ? Math.min(
-            safeMaxTokens + resolveThinkingBudget(options!.reasoning!, options?.thinkingBudgets),
-            maxOutputCeiling,
-          )
+        ? Math.min(safeMaxTokens + thinkingBudget, maxOutputCeiling)
         : safeMaxTokens;
       const upstreamClamped = clampWithInputAndFixedMargin(
         model.contextWindow,
@@ -453,14 +453,29 @@ export function wrapMagpieNativeApi<TApi extends MagpieNativeApiSurface>(
       );
       const bypassUpstreamFixedReserve =
         model.contextWindow > 0 && upstreamClamped < targetMaxTokens;
-      if (budgetedAnthropicThinking && model.contextWindow > 0) {
-        const effectiveMaxTokens = bypassUpstreamFixedReserve ? targetMaxTokens : upstreamClamped;
+      if (budgetedAnthropicThinking) {
+        const effectiveMaxTokens =
+          model.contextWindow > 0
+            ? bypassUpstreamFixedReserve
+              ? targetMaxTokens
+              : upstreamClamped
+            : targetMaxTokens;
         if (effectiveMaxTokens < MIN_ANTHROPIC_BUDGETED_THINKING_MAX_TOKENS) {
-          return createImmediateOverflowErrorStream(
-            model,
-            `Context window exceeded: estimated input ${estimatedInput} leaves ${effectiveMaxTokens} output tokens in ${model.contextWindow} tokens, below the ${MIN_ANTHROPIC_BUDGETED_THINKING_MAX_TOKENS}-token minimum required for budgeted thinking`,
-            createEventStream,
+          const unclippedTarget = Math.min(requestedMaxTokens + thinkingBudget, model.maxTokens);
+          const fixedMargin = Math.min(
+            CONTEXT_SAFETY_TOKENS,
+            Math.ceil(model.contextWindow * CONTEXT_SAFETY_RATIO),
           );
+          const maxWindowOutputAtZeroInput =
+            model.contextWindow > 0 ? model.contextWindow - fixedMargin : Number.POSITIVE_INFINITY;
+          const canRecoverByCompaction =
+            model.contextWindow > 0 &&
+            unclippedTarget >= MIN_ANTHROPIC_BUDGETED_THINKING_MAX_TOKENS &&
+            maxWindowOutputAtZeroInput >= MIN_ANTHROPIC_BUDGETED_THINKING_MAX_TOKENS;
+          const message = canRecoverByCompaction
+            ? `Context window exceeded: estimated input ${estimatedInput} leaves ${effectiveMaxTokens} output tokens in ${model.contextWindow} tokens, below the ${MIN_ANTHROPIC_BUDGETED_THINKING_MAX_TOKENS}-token minimum required for budgeted thinking`
+            : `Budgeted thinking requires at least ${MIN_ANTHROPIC_BUDGETED_THINKING_MAX_TOKENS} max output tokens, but model "${model.id}" only allows ${Math.min(unclippedTarget, maxWindowOutputAtZeroInput)}`;
+          return createImmediateOverflowErrorStream(model, message, createEventStream);
         }
       }
       const upstreamModel = bypassUpstreamFixedReserve

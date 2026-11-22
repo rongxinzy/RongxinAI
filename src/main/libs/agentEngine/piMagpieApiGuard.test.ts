@@ -251,4 +251,42 @@ test('wrapMagpieNativeApi enforces valid anthropic-messages thinking.budget_toke
   expect(capturedBodies[2]?.max_tokens).toBe(981);
   expect(capturedBodies[2]?.thinking).toMatchObject({ type: 'adaptive' });
   expect(capturedBodies[2]?.thinking?.budget_tokens).toBeUndefined();
+
+  // Static model output ceiling (< 2048) or window (< 2048 even at zero input) cannot be fixed by compaction.
+  const callCountBeforeStaticChecks = captureFetch.mock.calls.length;
+  const lowMaxTokensModel: Model<'anthropic-messages'> = {
+    ...anthropicModel,
+    id: 'claude-low-max',
+    contextWindow: 65536,
+    maxTokens: 1536,
+  };
+  const lowMaxResult = await wrapped
+    .streamSimple(lowMaxTokensModel, makeContext('a'), {
+      apiKey: 'test-key',
+      reasoning: 'medium',
+      fetch: captureFetch as unknown as typeof fetch,
+    })
+    .result();
+  expect(lowMaxResult.stopReason).toBe('error');
+  expect(lowMaxResult.errorMessage).toContain('2048');
+  expect(lowMaxResult.errorMessage).toContain('1536');
+  expect(isContextOverflow(lowMaxResult, 65536)).toBe(false);
+
+  const tinyWindowModel: Model<'anthropic-messages'> = {
+    ...anthropicModel,
+    id: 'claude-tiny-window',
+    contextWindow: 2048,
+    maxTokens: 4096,
+  };
+  const tinyWindowResult = await wrapped
+    .streamSimple(tinyWindowModel, makeContext('a'), {
+      apiKey: 'test-key',
+      reasoning: 'medium',
+      fetch: captureFetch as unknown as typeof fetch,
+    })
+    .result();
+  expect(tinyWindowResult.stopReason).toBe('error');
+  expect(tinyWindowResult.errorMessage).toContain('2048');
+  expect(isContextOverflow(tinyWindowResult, 2048)).toBe(false);
+  expect(captureFetch).toHaveBeenCalledTimes(callCountBeforeStaticChecks);
 });
