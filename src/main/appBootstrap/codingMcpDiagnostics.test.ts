@@ -43,7 +43,7 @@ test('probes only the requested MCP server and closes its connection', async () 
     tools: [{ server: 'selected', name: 'lookup' }],
   });
   expect(refreshMcpOAuthHeaders).toHaveBeenCalledExactlyOnceWith([selected]);
-  expect(reconcile).toHaveBeenCalledExactlyOnceWith([selected]);
+  expect(reconcile).toHaveBeenCalledExactlyOnceWith([selected], expect.any(AbortSignal));
   expect(stop).toHaveBeenCalledOnce();
 });
 

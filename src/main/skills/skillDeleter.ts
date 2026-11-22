@@ -52,13 +52,10 @@ async function performDelete(
     process.platform,
   );
 
-  // Release directory handles held by fs.watch() before deleting;
-  // on Windows, open handles prevent rmSync from removing the directory.
-  ctx.stopWatching();
-  // On Windows, watcher.close() triggers an async kernel operation to release
-  // the directory handle. Yield to the event loop so the handle is fully
-  // released before we attempt deletion.
-  if (process.platform === 'win32') {
+  const releaseWindowsHandles = process.platform === 'win32' && targetDir !== null;
+  if (releaseWindowsHandles) {
+    // Windows releases directory handles asynchronously after watcher.close().
+    ctx.stopWatching();
     await new Promise<void>(resolve => setTimeout(resolve, 100));
   }
   try {
@@ -121,11 +118,11 @@ async function performDelete(
     ctx.saveSkillStateMap(state);
     ctx.notifySkillsChanged();
     console.log('[skills] deleteSkill: completed successfully for "%s"', id);
-    return ctx.listSkills();
+    return await ctx.listSkills();
   } catch (error) {
     console.error('[skills] deleteSkill: failed to remove "%s" at %s:', id, targetDir, error);
     throw error;
   } finally {
-    ctx.startWatching();
+    if (releaseWindowsHandles) ctx.startWatching();
   }
 }

@@ -150,7 +150,7 @@ describe('Adversarial Stress Harness: Payload Truncation Bounds', () => {
         presetId: undefined,
         resolvedModel: {
           model: { provider: 'test', id: 'test-model' },
-          modelRuntime: null,
+          modelRuntime: { registerNativeProvider: vi.fn(), completeSimple: vi.fn() },
           maxOutputTokens: 4096,
         },
         workspaceRoot: '/tmp/workspace',

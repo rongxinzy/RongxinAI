@@ -39,7 +39,6 @@ export interface PiToolAuthorizationResult {
 }
 
 export interface PiToolPermissionGateHost {
-  approvalSessionMap: Map<string, string>;
   getWorkbenchTaskService(): WorkbenchTaskService | null;
   emit(event: 'permissionRequest', sessionId: string, request: PiPermissionRequest): unknown;
   emit(event: 'permissionDismiss', requestId: string): unknown;
@@ -47,8 +46,7 @@ export interface PiToolPermissionGateHost {
 
 type PendingToolApproval = {
   sessionId: string;
-  runId: string | null;
-  toolCallId: string;
+  requestedAt: number;
   resolve: (result: PiToolAuthorizationResult) => void;
 };
 
@@ -90,13 +88,11 @@ export class PiToolPermissionGate {
     const decisionPromise = new Promise<PiToolAuthorizationResult>(resolve => {
       this.pendingApprovals.set(requestId, {
         sessionId: input.sessionId,
-        runId: input.runId,
-        toolCallId: input.toolCallId,
+        requestedAt: performance.now(),
         resolve,
       });
     });
 
-    this.host.approvalSessionMap.set(requestId, input.sessionId);
     this.host.emit('permissionRequest', input.sessionId, {
       requestId,
       toolName: input.toolName,
@@ -107,29 +103,31 @@ export class PiToolPermissionGate {
     return await decisionPromise;
   }
 
-  hasPendingApproval(requestId: string): boolean {
-    return this.pendingApprovals.has(requestId);
+  firstPendingApproval(
+    matches: (sessionId: string) => boolean,
+  ): Pick<PendingToolApproval, 'sessionId' | 'requestedAt'> | undefined {
+    for (const pending of this.pendingApprovals.values()) {
+      if (matches(pending.sessionId)) return pending;
+    }
   }
 
-  resolvePermission(requestId: string, result: PiPermissionResult): boolean {
+  resolvePermission(requestId: string, result: PiPermissionResult): void {
     const pending = this.pendingApprovals.get(requestId);
-    if (!pending) return false;
+    if (!pending) return;
 
     this.pendingApprovals.delete(requestId);
-    this.host.approvalSessionMap.delete(requestId);
 
     const denied = result.behavior === 'deny';
     const reason = denied ? result.message || 'The user denied this action.' : undefined;
     observeWorkbench(pending.sessionId, () => {
       this.host.getWorkbenchTaskService()?.recordToolApprovalDecision?.({
         approvalId: requestId,
-        runId: pending.runId,
         decision: denied ? WorkbenchApprovalDecision.Denied : WorkbenchApprovalDecision.Approved,
         reason,
       });
     });
     pending.resolve(denied ? { allow: false, reason } : { allow: true });
-    return true;
+    this.host.emit('permissionDismiss', requestId);
   }
 
   clearBySession(
@@ -139,11 +137,9 @@ export class PiToolPermissionGate {
     for (const [requestId, pending] of this.pendingApprovals.entries()) {
       if (pending.sessionId !== sessionId) continue;
       this.pendingApprovals.delete(requestId);
-      this.host.approvalSessionMap.delete(requestId);
       observeWorkbench(sessionId, () => {
         this.host.getWorkbenchTaskService()?.recordToolApprovalDecision?.({
           approvalId: requestId,
-          runId: pending.runId,
           decision: WorkbenchApprovalDecision.Expired,
           reason,
         });

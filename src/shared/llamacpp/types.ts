@@ -116,12 +116,6 @@ export type LlamaCppBackendListResult = {
   error?: string;
 };
 
-export type LlamaCppBackendDownloadSizeResult = {
-  success: boolean;
-  sizeBytes?: number;
-  error?: string;
-};
-
 export type LlamaCppRuntimeInstallPlan =
   | {
       kind: 'ready';
@@ -133,12 +127,6 @@ export type LlamaCppRuntimeInstallPlan =
       runtimeRoot: string;
       executablePath: string;
       url: string;
-      fallbackUrls?: string[];
-      companionDownloads?: Array<{
-        assetName: string;
-        url: string;
-        fallbackUrls?: string[];
-      }>;
     }
   | {
       kind: 'needs-manual';

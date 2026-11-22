@@ -1,5 +1,6 @@
 // Windows Job Object owner. No shell and no taskkill fallback.
 #define WIN32_LEAN_AND_MEAN
+#define _WIN32_WINNT 0x0A00
 #include <windows.h>
 #include <string>
 #include <vector>
@@ -18,10 +19,40 @@ static std::wstring quote(const wchar_t* value) {
   }
   result.append(slashes * 2, L'\\'); result += L'"'; return result;
 }
-static int fail(const wchar_t* action) {
-  fwprintf(stderr, L"Python Job Object: %ls failed (%lu)\n", action, GetLastError());
+static int fail(const wchar_t* action, DWORD error = GetLastError()) {
+  fwprintf(stderr, L"Windows Job Object: %ls failed (%lu)\n", action, error);
   return 125;
 }
+
+static DWORD createInJob(HANDLE job, const wchar_t* executable, wchar_t* command,
+                         PROCESS_INFORMATION* child) {
+  SIZE_T bytes = 0;
+  InitializeProcThreadAttributeList(nullptr, 1, 0, &bytes);
+  if (!bytes) return GetLastError();
+  std::vector<BYTE> storage(bytes);
+  STARTUPINFOEXW startup{};
+  startup.StartupInfo.cb = sizeof(startup);
+  startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+  startup.StartupInfo.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+  startup.StartupInfo.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+  startup.StartupInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+  startup.lpAttributeList = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(storage.data());
+  if (!InitializeProcThreadAttributeList(startup.lpAttributeList, 1, 0, &bytes)) {
+    return GetLastError();
+  }
+  // Create the process inside the job so a stopped launcher cannot leave an unowned child.
+  DWORD error = ERROR_SUCCESS;
+  if (!UpdateProcThreadAttribute(startup.lpAttributeList, 0, PROC_THREAD_ATTRIBUTE_JOB_LIST,
+                                 &job, sizeof(job), nullptr, nullptr) ||
+      !CreateProcessW(executable, command, nullptr, nullptr, TRUE,
+                      EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW,
+                      nullptr, nullptr, &startup.StartupInfo, child)) {
+    error = GetLastError();
+  }
+  DeleteProcThreadAttributeList(startup.lpAttributeList);
+  return error;
+}
+
 int wmain(int argc, wchar_t** argv) {
   if (argc < 3) { fwprintf(stderr, L"Usage: job-runner parentPid executable [args...]\n"); return 125; }
   wchar_t* end = nullptr;
@@ -30,29 +61,26 @@ int wmain(int argc, wchar_t** argv) {
   HANDLE parent = OpenProcess(SYNCHRONIZE, FALSE, static_cast<DWORD>(pid));
   if (!parent) return fail(L"OpenProcess(parent)");
   HANDLE job = CreateJobObjectW(nullptr, nullptr);
-  if (!job) { CloseHandle(parent); return fail(L"CreateJobObject"); }
+  if (!job) {
+    const DWORD error = GetLastError();
+    CloseHandle(parent);
+    return fail(L"CreateJobObject", error);
+  }
   JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
   limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
   if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits))) {
-    CloseHandle(job); CloseHandle(parent); return fail(L"SetInformationJobObject");
+    const DWORD error = GetLastError();
+    CloseHandle(job); CloseHandle(parent);
+    return fail(L"SetInformationJobObject", error);
   }
   std::wstring command;
   for (int i = 2; i < argc; ++i) { if (i > 2) command += L' '; command += quote(argv[i]); }
   std::vector<wchar_t> mutableCommand(command.begin(), command.end()); mutableCommand.push_back(0);
-  STARTUPINFOW startup{}; startup.cb = sizeof(startup);
-  startup.dwFlags = STARTF_USESTDHANDLES;
-  startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-  startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-  startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
   PROCESS_INFORMATION child{};
-  if (!CreateProcessW(argv[2], mutableCommand.data(), nullptr, nullptr, TRUE,
-      CREATE_SUSPENDED | CREATE_NO_WINDOW, nullptr, nullptr, &startup, &child)) {
-    CloseHandle(job); CloseHandle(parent); return fail(L"CreateProcess");
-  }
-  // No user instruction runs before assignment. Failure is closed, never uncontained.
-  if (!AssignProcessToJobObject(job, child.hProcess) || ResumeThread(child.hThread) == static_cast<DWORD>(-1)) {
-    TerminateProcess(child.hProcess, 125); CloseHandle(child.hThread); CloseHandle(child.hProcess);
-    CloseHandle(job); CloseHandle(parent); return fail(L"AssignProcessToJobObject/ResumeThread");
+  const DWORD launchError = createInJob(job, argv[2], mutableCommand.data(), &child);
+  if (launchError != ERROR_SUCCESS) {
+    CloseHandle(job); CloseHandle(parent);
+    return fail(L"CreateProcess in job", launchError);
   }
   CloseHandle(child.hThread);
   HANDLE waits[] = { parent, child.hProcess };

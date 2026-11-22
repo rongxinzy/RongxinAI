@@ -12,7 +12,7 @@ import {
 } from './verify-packaged-magpie-signature.mjs';
 
 const require = createRequire(import.meta.url);
-const { upstream } = require('../magpie-runtime.cjs');
+const { upstream, pinnedSource } = require('../magpie-runtime.cjs');
 
 const temporaryDirectories: string[] = [];
 
@@ -48,7 +48,7 @@ test('requires the sealed manifest to keep the compiler digest and the shipped d
   const digest = 'a'.repeat(64);
   const manifest = {
     version: upstream.version,
-    source: { commit: upstream.commit },
+    source: { ...pinnedSource },
     sha256: digest,
     buildSha256: 'b'.repeat(64),
     signing: { platform: 'darwin', format: 'codesign' },
@@ -72,7 +72,7 @@ function writeSignedHelper(app: string, key: string) {
     path.join(directory, 'manifest.json'),
     JSON.stringify({
       version: upstream.version,
-      source: { commit: upstream.commit },
+      source: { ...pinnedSource },
       sha256: digest,
       buildSha256: 'd'.repeat(64),
       signing: { platform: 'darwin', format: 'codesign' },
@@ -93,7 +93,7 @@ function fakeCodesign(verified: string[]) {
   };
 }
 
-test('checks both packaged macOS helpers of a universal app', () => {
+test('checks all packaged macOS helpers when no architecture is supplied', () => {
   const app = path.join(temporaryRoot(), 'App.app');
   const verified: string[] = [];
   for (const key of ['darwin-x64', 'darwin-arm64']) writeSignedHelper(app, key);

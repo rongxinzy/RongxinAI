@@ -11,19 +11,15 @@ import { ActivityIpc } from '../activity/constants';
 
 export const scheduledTasksContractChannels: IpcContractChannels<typeof scheduledTasksContract> = {
   list: ScheduledTaskIpc.List,
-  get: ScheduledTaskIpc.Get,
   create: ScheduledTaskIpc.Create,
   update: ScheduledTaskIpc.Update,
   delete: ScheduledTaskIpc.Delete,
   toggle: ScheduledTaskIpc.Toggle,
   runManually: ScheduledTaskIpc.RunManually,
-  stop: ScheduledTaskIpc.Stop,
   preflight: ScheduledTaskIpc.Preflight,
   listRuns: ScheduledTaskIpc.ListRuns,
   listDeliveries: ScheduledTaskIpc.ListDeliveries,
-  countRuns: ScheduledTaskIpc.CountRuns,
   listAllRuns: ScheduledTaskIpc.ListAllRuns,
-  resolveSession: ScheduledTaskIpc.ResolveSession,
   listChannels: ScheduledTaskIpc.ListChannels,
   listChannelConversations: ScheduledTaskIpc.ListChannelConversations,
 } as const;

@@ -2,23 +2,26 @@
  * Resolves a Pi session model through the owned gateway.
  *
  * The gateway URL must be a loopback origin. Image support follows the
- * catalog modalities, then the learned rejection verdict.
+ * catalog modalities.
  */
 
 import type { Model } from '@earendil-works/pi-ai';
+import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '../../../shared/magpie/constants';
 import {
   ZhiyuanModelPoolHeader,
+  ZhiyuanModelPoolWorkload,
   type ZhiyuanModelPoolWorkload as ZhiyuanModelPoolWorkloadValue,
 } from '../../../shared/modelPool/constants';
 import { ModelCapabilityStatus, ProviderName } from '../../../shared/providers';
 import type { MagpieModel, MagpieProviderSummary } from '../../../shared/magpie/types';
 import {
-  getMagpieModelService,
-  hasMagpieModelService,
   MAGPIE_RUNTIME_API_KEY,
+  MAGPIE_ENTERPRISE_CHAT_WORKLOAD,
+  MagpieWorkHeader,
+  type MagpieModelService,
 } from '../../magpie/modelService';
-import { zhiyuanManagedProviderBridge } from '../../enterpriseExtension/managedProviderBridge';
-import { ImageInputVerdict, imageInputVerdict } from './piImageInputFallback';
+import { t } from '../../i18n';
+import { magpieImageInput } from '../../magpie/catalog';
 import { resolveMagpieFallbackMaxTokens, resolveMagpieModelCompat } from './piMagpieModelCompat';
 import type { PiModelRuntime, PiModules, PiResolvedModel } from './piRuntimeSessionState';
 
@@ -28,18 +31,12 @@ type MagpieNativeApi = 'openai-responses' | 'anthropic-messages' | 'openai-compl
 export interface ModelPoolRequestContext {
   conversationId: string;
   workload: ZhiyuanModelPoolWorkloadValue;
-}
-
-export function magpieImageInput(model: MagpieModel): ModelCapabilityStatus {
-  if (!model.modalities) return ModelCapabilityStatus.Unknown;
-  return model.modalities.input?.includes('image')
-    ? ModelCapabilityStatus.Supported
-    : ModelCapabilityStatus.Unsupported;
+  requirePublishedModel?: boolean;
 }
 
 const MAGPIE_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 
-export function buildMagpiePiModel(
+function buildMagpiePiModel(
   selected: MagpieModel,
   gatewayUrl: string,
   modelPoolRequestContext?: ModelPoolRequestContext,
@@ -48,7 +45,7 @@ export function buildMagpiePiModel(
   model: Model<MagpieNativeApi> & Record<string, unknown>;
   baseUrl: string;
   api: MagpieNativeApi;
-  supportsImage: boolean;
+  imageInput: ModelCapabilityStatus;
   maxTokens: number;
 } {
   const url = new URL(gatewayUrl);
@@ -106,9 +103,6 @@ export function buildMagpiePiModel(
       ...(modelPoolRequestContext?.conversationId
         ? {
             'X-Magpie-Session': modelPoolRequestContext.conversationId,
-            ...(modelPoolRequestContext.workload
-              ? { 'X-Magpie-Workload': modelPoolRequestContext.workload }
-              : {}),
             [ZhiyuanModelPoolHeader.ConversationId]: modelPoolRequestContext.conversationId,
             [ZhiyuanModelPoolHeader.Workload]: modelPoolRequestContext.workload,
           }
@@ -116,123 +110,122 @@ export function buildMagpiePiModel(
     },
   };
 
-  return { model, baseUrl, api, supportsImage, maxTokens };
+  return { model, baseUrl, api, imageInput, maxTokens };
 }
 
 export async function resolvePiModel(
   pi: PiModules,
+  magpieService: MagpieModelService | undefined,
   modelRef?: string,
-  existingModelRuntime?: PiModelRuntime | null,
+  existingModelRuntime?: PiModelRuntime,
   modelPoolRequestContext?: ModelPoolRequestContext,
 ): Promise<PiResolvedModel> {
-  if (hasMagpieModelService()) {
-    const magpieService = getMagpieModelService();
-    const resolution = await magpieService.resolve(modelRef);
-
-    const enterpriseConfig =
-      zhiyuanManagedProviderBridge.getEnterpriseModelConfig(resolution.model.id) ??
-      (modelRef ? zhiyuanManagedProviderBridge.getEnterpriseModelConfig(modelRef) : null);
-
-    if (enterpriseConfig) {
-      const api = enterpriseConfig.api;
-      const contextWindow = resolution.model.context_window ?? 32768;
-      const maxTokens = resolveMagpieFallbackMaxTokens(
-        resolution.model,
-        contextWindow,
-        DEFAULT_PI_LOCAL_MAX_TOKENS,
-      );
-      const imageInput = magpieImageInput(resolution.model);
-      const supportsImage = imageInput === ModelCapabilityStatus.Supported;
-      const providerId = enterpriseConfig.providerKey;
-
-      const customModel: Model<any> & Record<string, unknown> = {
-        id: resolution.model.id,
-        name: resolution.model.display_name || resolution.model.id,
-        provider: providerId,
-        api,
-        baseUrl: enterpriseConfig.baseUrl,
-        reasoning: resolution.model.reasoning === true,
-        input: supportsImage ? ['text', 'image'] : ['text'],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow,
-        maxTokens,
-        compat: { sendSessionAffinityHeaders: true },
-        headers: {
-          ...(modelPoolRequestContext?.conversationId
-            ? {
-                [ZhiyuanModelPoolHeader.ConversationId]: modelPoolRequestContext.conversationId,
-                [ZhiyuanModelPoolHeader.Workload]: modelPoolRequestContext.workload,
-              }
-            : {}),
-        },
-      };
-
-      const modelRuntime =
-        existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: true }));
-      modelRuntime.registerProvider(providerId, {
-        name: providerId,
-        baseUrl: enterpriseConfig.baseUrl,
-        api,
-        models: [customModel],
-      });
-      await modelRuntime.setRuntimeApiKey(
-        providerId,
-        enterpriseConfig.apiKey || 'managed-enterprise',
-      );
-
-      const effectiveImageInput = imageInputVerdict(imageInput);
-      const model =
-        effectiveImageInput === ImageInputVerdict.Supported
-          ? customModel
-          : { ...customModel, input: ['text'] as Array<'text' | 'image'> };
-
-      return {
-        model,
-        endpointKey: enterpriseConfig.baseUrl,
-        modelRuntime,
-        maxOutputTokens: maxTokens,
-        providerName: ProviderName.Custom,
-        capabilities: { imageInput },
-        requestOptions: { apiKey: enterpriseConfig.apiKey || 'managed-enterprise' },
-      };
-    }
+  if (magpieService) {
+    const work = modelPoolRequestContext?.workload === ZhiyuanModelPoolWorkload.Work;
+    const routeOptions = {
+      work,
+      requirePublishedModel: modelPoolRequestContext?.requirePublishedModel,
+    };
+    const resolution = await magpieService.resolve(modelRef, routeOptions);
+    const { isCurrentGateway } = resolution;
+    const localGpu = resolution.gatewayModel.owned_by === LOCAL_GPU_MAGPIE_PROVIDER_ID;
 
     const {
       model: customModel,
       baseUrl,
       api,
+      imageInput,
       maxTokens,
     } = buildMagpiePiModel(
-      resolution.model,
+      resolution.gatewayModel,
       resolution.gatewayUrl,
       modelPoolRequestContext,
       resolution.provider,
     );
     const modelRuntime =
       existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
-    modelRuntime.registerProvider('magpie', {
-      name: 'magpie',
-      baseUrl,
-      api,
-      models: [customModel],
-    });
-    await modelRuntime.setRuntimeApiKey('magpie', MAGPIE_RUNTIME_API_KEY);
+    const scope = work ? resolution.workRequest : resolution.enterpriseChatRequest;
+    const requiresScope = work || Boolean(resolution.enterpriseChatRequest);
+    let scopeKey = scope?.key;
+    let scopeModels = scope?.models;
+    if (requiresScope && (!scopeKey?.() || !scopeModels))
+      throw new Error(t('coworkErrorModelNotFound'));
+    const key = () =>
+      isCurrentGateway() ? (requiresScope ? scopeKey?.() : MAGPIE_RUNTIME_API_KEY) : undefined;
+    const nativeApi =
+      api === 'openai-responses'
+        ? pi.openAIResponsesApi()
+        : api === 'anthropic-messages'
+          ? pi.anthropicMessagesApi()
+          : pi.openAICompletionsApi();
+    modelRuntime.registerNativeProvider(
+      pi.createProvider({
+        id: customModel.provider,
+        baseUrl,
+        api: nativeApi,
+        models: [customModel],
+        auth: {
+          apiKey: {
+            name: 'Desktop model access',
+            check: async () => (key() ? { type: 'api_key' } : undefined),
+            resolve: async ({ signal }) => {
+              signal.throwIfAborted();
+              const apiKey = key();
+              const models = scopeModels?.();
+              if (!apiKey || (requiresScope && !models))
+                throw new Error(t('coworkErrorModelNotFound'));
+              return {
+                auth: {
+                  apiKey,
+                  baseUrl,
+                  ...(models
+                    ? {
+                        headers: {
+                          [MagpieWorkHeader.Workload]: work
+                            ? ZhiyuanModelPoolWorkload.Work
+                            : MAGPIE_ENTERPRISE_CHAT_WORKLOAD,
+                          [MagpieWorkHeader.Models]: models,
+                        },
+                      }
+                    : {}),
+                },
+              };
+            },
+          },
+        },
+      }),
+    );
 
-    const imageInput = magpieImageInput(resolution.model);
-    const effectiveImageInput = imageInputVerdict(imageInput);
-    const model =
-      effectiveImageInput === ImageInputVerdict.Supported
-        ? customModel
-        : { ...customModel, input: ['text'] as Array<'text' | 'image'> };
+    const { id } = resolution.gatewayModel;
+    const { routingGroupId, gatewayUrl } = resolution;
+    const revalidateModelScope = requiresScope
+      ? async () => {
+          if (routingGroupId === undefined && !localGpu && scopeKey?.()) return;
+          const current = await magpieService.resolve(id, routeOptions);
+          if (
+            current.gatewayModel.id !== id ||
+            current.routingGroupId !== routingGroupId ||
+            current.gatewayUrl !== gatewayUrl ||
+            (routingGroupId === undefined &&
+              (current.gatewayModel.owned_by === LOCAL_GPU_MAGPIE_PROVIDER_ID) !== localGpu)
+          ) {
+            throw new Error(t('coworkErrorModelNotFound'));
+          }
+          const currentScope = work ? current.workRequest : current.enterpriseChatRequest;
+          if (!currentScope?.key()) throw new Error(t('coworkErrorModelNotFound'));
+          scopeKey = currentScope.key;
+          scopeModels = currentScope.models;
+        }
+      : undefined;
 
     return {
-      model,
-      endpointKey: baseUrl,
+      model: customModel,
+      isCurrentModelRoute: resolution.isCurrentRoute,
       modelRuntime,
       maxOutputTokens: maxTokens,
       providerName: ProviderName.Magpie,
       capabilities: { imageInput },
-      requestOptions: { apiKey: MAGPIE_RUNTIME_API_KEY },
+      revalidateModelScope,
     };
   }
 

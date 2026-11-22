@@ -16,14 +16,20 @@ test('selected pull requests install and start the generated Ubuntu package', ()
   assert.doesNotMatch(workflow, /pull_request:/);
   assert.doesNotMatch(workflow, /paths:/);
   assert.match(workflow, /runs-on: ubuntu-24\.04/);
-  assert.match(workflow, /bun run dist:linux/);
+  assert.match(
+    workflow,
+    /uses: \.\/\.github\/actions\/build-inference-packages\s+with:\s+mode: verify\s+platform: linux\s+runtime-target: linux-x64\s+inference-edition: lite/,
+  );
+  assert.doesNotMatch(workflow, /bun run dist:linux/);
 
   const packageJson = readFileSync(path.join(root, 'package.json'), 'utf8');
   assert.match(packageJson, /"predist:linux": "[^"]*rebuild:electron-native:linux-packaging/);
-  assert.match(workflow, /sudo apt-get install -y/);
-  assert.match(workflow, /realpath/);
-  assert.match(workflow, /'\/opt\/知远智能体 \(ZhiYuan Agent\)\/知远'/);
-  assert.match(workflow, /verify-linux-renderer\.mjs/);
+  assert.match(packageJson, /"predist:linux": "[^"]*engram:runtime:linux-x64/);
+  assert.doesNotMatch(packageJson, /"dist:linux": "[^"]*engram:runtime:linux-x64/);
+  assert.doesNotMatch(workflow, /engram:runtime:linux-x64/);
+  const build = workflow.indexOf('uses: ./.github/actions/build-inference-packages');
+  const smoke = workflow.indexOf('node scripts/ci/linux-release-acceptance.mjs smoke-deb');
+  assert.ok(smoke > build);
   assert.match(workflow, /linux-deb-install-smoke\.png/);
   assert.match(workflow, /actions\/upload-artifact@v6/);
 });

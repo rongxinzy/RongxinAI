@@ -35,13 +35,7 @@ interface Row {
 
 /** Native selections authorize references, not a general renderer filesystem API. */
 export class CompanionAttachments {
-  constructor(private readonly db: Database.Database) {
-    db.exec(`CREATE TABLE IF NOT EXISTS companion_attachments (
-      id TEXT PRIMARY KEY, pet_id TEXT NOT NULL, path TEXT NOT NULL,
-      name TEXT NOT NULL, bytes INTEGER NOT NULL, expires_at INTEGER NOT NULL
-    ); CREATE INDEX IF NOT EXISTS companion_attachments_expiry
-      ON companion_attachments(expires_at);`);
-  }
+  constructor(private readonly db: Database.Database) {}
 
   private async inspect(file: string) {
     const canonical = await realpath(file);

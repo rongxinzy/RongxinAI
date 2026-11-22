@@ -51,12 +51,11 @@ export class PlaywrightManager {
   /**
    * Connect to Chrome via CDP using Playwright
    */
-  async connectToCDP(port: number = 9222): Promise<string> {
+  async connectToCDP(port: number = 9222, ownedEndpoint?: string): Promise<string> {
     try {
       console.log(`[Playwright] Connecting to CDP on port ${port}`);
 
-      const wsUrl = await this.getCDPWebSocketUrl(port);
-      console.log(`[Playwright] CDP WebSocket URL: ${wsUrl}`);
+      const wsUrl = ownedEndpoint ?? (await this.getCDPWebSocketUrl(port));
 
       const browser = await chromium.connectOverCDP(wsUrl);
       console.log(`[Playwright] Connected to browser`);

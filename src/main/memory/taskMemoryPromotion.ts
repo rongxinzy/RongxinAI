@@ -1,10 +1,10 @@
 import { MemoryScope } from '../../shared/memory';
+import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
 import {
   WorkbenchApprovalEffectStatus,
   WorkbenchContractKind,
   WorkbenchExecutionStatus,
   type WorkbenchApproval,
-  type WorkbenchArtifact,
   type WorkbenchRun,
   type WorkbenchTask,
 } from '../../shared/workbenchTask';
@@ -16,7 +16,7 @@ import type { SessionMemoryCompletion } from './sessionMemoryExtractor';
 export interface SettledWorkbenchRunMemorySource {
   task: WorkbenchTask;
   run: WorkbenchRun;
-  artifacts: WorkbenchArtifact[];
+  artifacts: CoworkPersistedArtifact[];
   approvals: WorkbenchApproval[];
   workspaceRoot: string;
   finalAnswer: string;
@@ -56,10 +56,10 @@ export async function promoteSettledWorkbenchRun(
         id: `artifact:${artifact.id}`,
         kind: AtomicMemorySourceKind.Artifact,
         content: JSON.stringify({
-          reference: artifact.reference,
-          contentHash: artifact.contentHash,
-          provenance: artifact.provenance,
-          metadata: artifact.metadata,
+          reference: artifact.filePath || artifact.title,
+          title: artifact.title,
+          source: artifact.source,
+          role: artifact.role,
         }),
       })),
       ...approvals.map(approval => ({

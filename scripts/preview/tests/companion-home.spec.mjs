@@ -9,22 +9,6 @@ for (const language of ['zh', 'en'])
     }) => {
       const failures = [];
       attachConsoleGuards(page, failures, 'workbench home');
-      await page.addInitScript(() => {
-        let api;
-        window.companionReads = 0;
-        Object.defineProperty(window, 'electron', {
-          configurable: true,
-          get: () => api,
-          set(value) {
-            const bootstrap = value.companion.bootstrap;
-            value.companion.bootstrap = (...args) => {
-              window.companionReads++;
-              return bootstrap(...args);
-            };
-            api = value;
-          },
-        });
-      });
       await page.goto(
         `/?previewScenario=empty&previewSkipBoot=1&language=${language}&theme=${theme}`,
       );
@@ -57,7 +41,20 @@ for (const language of ['zh', 'en'])
       }
       await bubble.reload();
       await expect(input).toHaveValue('A separate companion draft');
-      expect(await page.evaluate(() => window.companionReads)).toBe(0);
+      await input.press('Enter');
+      await expect(bubble.getByText('A separate companion draft', { exact: true })).toBeVisible();
+      await expect(
+        bubble.getByText(
+          language === 'zh'
+            ? '先把最想解决的一件事说给我听。'
+            : 'Tell me the first thing you want to work through.',
+          { exact: true },
+        ),
+      ).toBeVisible();
+      expect(await bubble.evaluate(() => 'answer' in window.companion)).toBe(false);
+      expect(await page.evaluate(() => Object.keys(window.electron.companion))).toEqual([
+        'onWorkbench',
+      ]);
       await page.setViewportSize({ width: 1280, height: 800 });
       await page.screenshot({ path: `/tmp/companion-workbench-${language}-${theme}.png` });
       await bubble.screenshot({ path: `/tmp/companion-bubble-${language}-${theme}.png` });

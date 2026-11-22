@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
-import { themePlugins } from '../../../theme/themes/plugins';
+import { themePresentations } from '../../../theme/themes/presentation';
 import { AppearanceSettingsPanel } from './AppearanceSettingsPanel';
 vi.mock('../../../services/i18n', () => ({
   i18nService: { t: (key: string) => key, getLanguage: () => 'en' },
@@ -46,7 +46,10 @@ test('shows one preview per theme and keeps mode controls separate from theme se
   systemAppearance();
   const callbacks = props();
   const view = render(createElement(AppearanceSettingsPanel, callbacks));
-  expect(view.container.querySelectorAll('[data-theme-preview]')).toHaveLength(themePlugins.length);
+  const previews = view.container.querySelectorAll<HTMLElement>('[data-theme-preview]');
+  expect(previews).toHaveLength(themePresentations.length);
+  expect(previews[0].style.getPropertyValue('--zy-background')).toBe('');
+  expect(previews[0].style.getPropertyValue('--main-background-color')).toBe('#F4F5F7');
   expect(screen.getByRole('button', { name: /Zenith/i })).toHaveAttribute('aria-pressed', 'true');
   // With only one theme, changing theme is not possible - test mode switching instead
   await userEvent.setup().click(screen.getByRole('tab', { name: 'dark' }));
@@ -120,15 +123,15 @@ test('system mode updates all previews live while explicit mode stays fixed and 
     Array.from(view.container.querySelectorAll('[data-theme-preview]'), e =>
       e.getAttribute('data-theme-preview'),
     );
-  expect(previews()).toEqual(themePlugins.map(p => p.appearances.light.meta.id));
+  expect(previews()).toEqual(themePresentations.map(p => p.appearances.light.id));
   system.change(true);
-  expect(previews()).toEqual(themePlugins.map(p => p.appearances.dark.meta.id));
+  expect(previews()).toEqual(themePresentations.map(p => p.appearances.dark.id));
   expect(callbacks.onAppearanceChange).not.toHaveBeenCalled();
   view.rerender(createElement(AppearanceSettingsPanel, callbacks));
-  expect(previews()).toEqual(themePlugins.map(p => p.appearances.light.meta.id));
+  expect(previews()).toEqual(themePresentations.map(p => p.appearances.light.id));
   system.change(false);
   system.change(true);
-  expect(previews()).toEqual(themePlugins.map(p => p.appearances.light.meta.id));
+  expect(previews()).toEqual(themePresentations.map(p => p.appearances.light.id));
   view.unmount();
   expect(system.query.removeEventListener).toHaveBeenCalled();
 });

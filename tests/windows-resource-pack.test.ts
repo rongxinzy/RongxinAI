@@ -76,10 +76,10 @@ describe('Windows offline component identity', () => {
     });
   });
 
-  test('excludes npm launchers because the connector creates its own launcher', () => {
+  test('excludes the Feishu runtime and secrets while retaining other launchers', () => {
     expect(shouldExclude('feishu/runtime/node_modules/.bin/lark-cli.cmd')).toBe(true);
     expect(shouldExclude('feishu/runtime/win32-x64/lark-cli.exe')).toBe(true);
-    expect(shouldExclude('SKILLs/example/node_modules/.bin/example.cmd')).toBe(true);
+    expect(shouldExclude('SKILLs/example/node_modules/.bin/example.cmd')).toBe(false);
     expect(shouldExclude('feishu/skills/document/SKILL.md')).toBe(false);
     expect(shouldExclude('resources/modelscope.tokens.local.json')).toBe(true);
     expect(shouldExclude('secrets/api.token.json')).toBe(true);

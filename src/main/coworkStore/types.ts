@@ -8,7 +8,7 @@ import type {
 } from '../../shared/cowork/constants';
 import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
 
-export type CoworkSessionStatus = 'idle' | 'running' | 'completed' | 'error';
+type CoworkSessionStatus = 'idle' | 'running' | 'completed' | 'error';
 export type CoworkMessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system';
 
 export type AgentSource = 'custom' | 'preset' | 'expert-package' | 'expert-package-member';
@@ -116,13 +116,6 @@ export interface CoworkMessage {
   /** Monotonic persisted order within a session. */
   sequence?: number;
   metadata?: CoworkMessageMetadata;
-}
-
-export interface CoworkConversationReplacementEntry {
-  role: 'user' | 'assistant';
-  text: string;
-  metadata?: Record<string, unknown>;
-  timestamp?: number;
 }
 
 export interface CoworkSession {

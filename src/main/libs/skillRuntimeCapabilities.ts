@@ -148,10 +148,10 @@ async function skillPythonCapabilities(): Promise<Record<string, SkillRuntimeCap
     return result;
   }
   const capabilities = await Promise.all(
-    skillIds.map(skillId => {
+    skillIds.map(async skillId => {
       const requirementsPath = path.join(root, skillId, 'requirements.txt');
-      const executable = resolveOptional(() =>
-        findSkillPythonExecutable(skillId, requirementsPath),
+      const executable = await findSkillPythonExecutable(skillId, requirementsPath).catch(
+        (): null => null,
       );
       return probe(executable, ['--version']);
     }),

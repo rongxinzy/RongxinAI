@@ -1,9 +1,8 @@
 import { observeWorkbench } from '../workbenchTask/observe';
 import path from 'path';
 
-import { app, BrowserWindow } from 'electron';
+import { app } from 'electron';
 
-import { agentRuntime } from './agentRuntimeState';
 import { diagnoseCodingMcp } from './codingMcpDiagnostics';
 import {
   getAgentManager,
@@ -12,9 +11,10 @@ import {
   getSkillManager,
   getStore,
 } from './runtimeServices';
-import { getPiRuntimeAdapter, getWorkbenchTaskService } from './sessionServices';
+import { getWorkbenchTaskService } from './sessionServices';
 import { resolveDefaultAgentModelRef } from './defaultAgentModel';
 import { resolveSessionExpertSnapshots } from './sessionExperts';
+import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { t } from '../i18n';
 import {
   WorkbenchApprovalMode,
@@ -22,42 +22,36 @@ import {
   WorkbenchRunTrigger,
 } from '../../shared/workbenchTask';
 import { CoworkSessionExpertSource } from '../../shared/cowork/sessionExperts';
-import { RuntimeNoticeIpc } from '../../shared/ipc/channels';
-import type { RuntimeRetryNotice } from '../../common/runtimeNotice';
-import type { CoworkToolActivityEvent } from '../../shared/cowork/toolActivity';
-import { CoworkInterruptionCause } from '../../shared/cowork/interruption';
-import { CodingEventKind, CodingStreamUpdateMode } from '../../shared/codingAgent';
 import { CodingAgentProfileRepository } from '../codingAgent/codingAgentProfileRepository';
 import { CodingAgentRegistry } from '../codingAgent/codingAgentRegistry';
-import { CodingRoomRepository } from '../codingAgent/codingRoomRepository';
+import type { CodingRoomRepository } from '../codingAgent/codingRoomRepository';
 import { CodingRoomService } from '../codingAgent/codingRoomService';
 import { resolveAcpAdapterRoot } from '../codingAgent/acp/adapterRoot';
 import { resolveCodingExpertSelection } from '../codingAgent/builtinCodingExpertSelection';
 import { GitWorktreeService } from '../codingAgent/gitWorktreeService';
-import { normalizePiMessage, normalizePiToolActivity } from '../codingAgent/piCodingEventAdapter';
-import { probeCoworkModelReadiness } from '../libs/coworkUtil';
+import { bindCodingRoomPiEvents } from '../codingAgent/piCodingEventAdapter';
+import type { MagpieModelService } from '../magpie/modelService';
+import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import type { PiThinkingLevel } from '../libs/agentEngine/piRuntimeTypes';
 
-let codingCommandCatalogGeneration = 0;
-export const bumpCodingCommandCatalog = (): void => {
-  codingCommandCatalogGeneration += 1;
-};
+export function createCodingRoomRuntime() {
+  let codingCommandCatalogGeneration = 0;
+  const bumpCommandCatalog = () => {
+    codingCommandCatalogGeneration += 1;
+  };
+  let codingRoom: { service: CodingRoomService; detach: () => void } | undefined;
 
-let codingCommandCatalogWatchInstalled = false;
-const ensureCodingCommandCatalogWatch = (): void => {
-  if (codingCommandCatalogWatchInstalled) return;
-  codingCommandCatalogWatchInstalled = true;
-  // Skills are watched on disk, so a skill dropped into the skills folder also
-  // reaches open lanes through this notification.
-  getSkillManager().onSkillsChanged(bumpCodingCommandCatalog);
-};
-
-export const getCodingRoomService = (): CodingRoomService => {
-  ensureCodingCommandCatalogWatch();
-  if (!agentRuntime.codingRoomService) {
-    const runtime = getPiRuntimeAdapter();
-    agentRuntime.codingRoomService = new CodingRoomService(
-      new CodingRoomRepository(getStore().getDatabase()),
+  function start(
+    models: MagpieModelService,
+    runtime: PiRuntimeAdapter,
+    repository: CodingRoomRepository,
+  ): CodingRoomService {
+    if (codingRoom) return codingRoom.service;
+    const worktrees = new GitWorktreeService();
+    const previewWorktreeDiff = (workspaceRoot: string) =>
+      worktrees.getWorktreeDiffPreview(workspaceRoot);
+    const service = new CodingRoomService(
+      repository,
       new CodingAgentRegistry(
         new CodingAgentProfileRepository(getStore().getDatabase()),
         () => {
@@ -91,8 +85,15 @@ export const getCodingRoomService = (): CodingRoomService => {
             permissionMode === WorkbenchApprovalMode.AllowAll
               ? permissionMode
               : WorkbenchApprovalMode.Ask;
+          const expertSelection = expertIds
+            ? await resolveCodingExpertSelection({
+                expertIds,
+                resolveSnapshots: resolveSessionExpertSnapshots,
+              })
+            : null;
+          if (lifecycleRuntime.isQuitting) throw new Error('The application is shutting down.');
           const coworkStoreInstance = getCoworkStore();
-          if (!coworkStoreInstance.getSession(sessionId)) {
+          if (coworkStoreInstance.getPiHistoryKey(sessionId) === undefined) {
             coworkStoreInstance.createSession(
               t('coworkDefaultSessionTitle'),
               workspaceRoot,
@@ -105,17 +106,12 @@ export const getCodingRoomService = (): CodingRoomService => {
               sessionId,
             );
           }
-          const expertSelection = expertIds
-            ? resolveCodingExpertSelection({
-                expertIds,
-                resolveSnapshots: resolveSessionExpertSnapshots,
-              })
-            : null;
           // Resolving comes first: a stale expert id throws. Pi's agent_start
           // event is the single source of truth for the running state.
-          const sharedOptions = {
+          await runtime.continueSession(sessionId, prompt, {
             workspaceRoot,
-            sessionMode: 'work' as const,
+            sessionMode: 'work',
+            _skipUserMessage: true,
             approvalMode,
             planTool: true,
             codingElicitation: true,
@@ -127,20 +123,6 @@ export const getCodingRoomService = (): CodingRoomService => {
             ...(expertSelection
               ? { expertIds: expertSelection.expertIds, systemPrompt: expertSelection.systemPrompt }
               : {}),
-          };
-          // One lane keeps one Pi transcript: reusing the live session preserves
-          // the earlier turns that startSession would discard.
-          if (runtime.isSessionActive(sessionId)) {
-            await runtime.continueSession(sessionId, prompt, {
-              ...sharedOptions,
-              _skipUserMessage: true,
-            });
-            return;
-          }
-          await runtime.startSession(sessionId, prompt, {
-            ...sharedOptions,
-            confirmationMode: 'modal',
-            skipInitialUserMessage: true,
           });
         },
         setBuiltinApprovalMode: (sessionId, mode) =>
@@ -152,9 +134,8 @@ export const getCodingRoomService = (): CodingRoomService => {
           }),
         cancelBuiltinSession: async sessionId => runtime.stopSession(sessionId),
         commandCatalogGeneration: () => codingCommandCatalogGeneration,
-        listCommandChoices: () => ({
-          skills: getSkillManager()
-            .listSkills()
+        listCommandChoices: async () => ({
+          skills: (await getSkillManager().listSkills())
             .filter(skill => skill.enabled)
             .map(skill => ({
               id: skill.id,
@@ -199,34 +180,33 @@ export const getCodingRoomService = (): CodingRoomService => {
         enqueueBuiltinMessage: (sessionId, prompt) =>
           runtime.enqueuePendingMessage(sessionId, prompt),
         steerBuiltinMessage: (sessionId, prompt) => runtime.steerInput(sessionId, prompt),
-        getBuiltinWorkbenchLink: sessionId => {
-          return (
-            observeWorkbench(sessionId, () => {
-              const detail = getWorkbenchTaskService().getCurrent(sessionId);
-              const runId = detail?.task.activeRunId ?? detail?.runs[0]?.id;
-              return detail && runId ? { taskId: detail.task.id, runId } : null;
-            }) ?? null
-          );
-        },
+        getBuiltinWorkbenchLink: sessionId =>
+          observeWorkbench(sessionId, () =>
+            getWorkbenchTaskService().repository.getLatestRunLinkForSession(sessionId),
+          ) ?? null,
         beginExternalWorkbenchRun: ({ sessionId, goal, workspaceRoot }) => {
           return (
             observeWorkbench(sessionId, () => {
-              const workbench = getWorkbenchTaskService().beginRun({
-                sessionId,
-                goal,
-                contract: {
-                  kind: WorkbenchContractKind.GenericWork,
-                  metadata: { codingAgent: true, workspaceRoot },
+              const workbench = getWorkbenchTaskService().beginRun(
+                {
+                  sessionId,
+                  goal,
+                  contract: {
+                    kind: WorkbenchContractKind.GenericWork,
+                    metadata: { codingAgent: true },
+                  },
+                  trigger: WorkbenchRunTrigger.Message,
                 },
-                trigger: WorkbenchRunTrigger.Message,
-              });
-              getWorkbenchTaskService().updateRunContext(workbench.run.id, {
-                model: 'external-agent',
-                provider: 'external-agent',
-                reasoningProfile: 'external',
-                workspaceRoot,
-                skillIds: [],
-              });
+                {
+                  context: {
+                    model: 'external-agent',
+                    provider: 'external-agent',
+                    reasoningProfile: 'external',
+                    workspaceRoot,
+                    skillIds: [],
+                  },
+                },
+              );
               return { taskId: workbench.task.id, runId: workbench.run.id };
             }) ?? null
           );
@@ -248,9 +228,9 @@ export const getCodingRoomService = (): CodingRoomService => {
             });
           });
         },
-        failExternalWorkbenchRun: ({ sessionId, error }) => {
+        failExternalWorkbenchRun: ({ sessionId, runId, error }) => {
           observeWorkbench(sessionId, () =>
-            getWorkbenchTaskService().failRun(sessionId, { message: error }),
+            getWorkbenchTaskService().failRun(sessionId, { message: error }, runId),
           );
         },
         cancelExternalWorkbenchRun: ({ sessionId, runId }) => {
@@ -264,14 +244,7 @@ export const getCodingRoomService = (): CodingRoomService => {
               : { behavior: 'deny', message: 'The user denied this coding permission.' },
           ),
         validateBuiltinModel: async () => {
-          const probe = await probeCoworkModelReadiness();
-          if (probe.ok === false) throw new Error(probe.error);
-        },
-        createIsolatedWorkspace: async ({ workspaceRoot, laneId, baseline }) => {
-          const service = new GitWorktreeService(
-            path.join(app.getPath('userData'), 'coding-worktrees'),
-          );
-          return await service.create({ repositoryRoot: workspaceRoot, laneId, baseline });
+          await models.resolve(undefined, { work: true });
         },
         getWorkspaceBaseline: async workspaceRoot => {
           try {
@@ -280,22 +253,12 @@ export const getCodingRoomService = (): CodingRoomService => {
             return null;
           }
         },
-        getWorkspaceDiff: async workspaceRoot =>
-          await new GitWorktreeService(
-            path.join(app.getPath('userData'), 'coding-worktrees'),
-          ).getWorktreeDiffPreview(workspaceRoot),
-        applyWorkspacePatch: async ({ workspaceRoot, patch }) =>
-          await new GitWorktreeService(
-            path.join(app.getPath('userData'), 'coding-worktrees'),
-          ).applyPatch(workspaceRoot, patch),
-        getIsolatedWorkspaceDiff: async workspaceRoot =>
-          await new GitWorktreeService(
-            path.join(app.getPath('userData'), 'coding-worktrees'),
-          ).getWorktreeDiffPreview(workspaceRoot),
-        applyIsolatedWorkspaceDiff: async ({ workspaceRoot, isolatedWorkspaceRoot }) =>
-          await new GitWorktreeService(
-            path.join(app.getPath('userData'), 'coding-worktrees'),
-          ).applyWorktreeDiff({
+        getWorkspaceDiff: previewWorktreeDiff,
+        applyWorkspacePatch: ({ workspaceRoot, patch }) =>
+          worktrees.applyPatch(workspaceRoot, patch),
+        getIsolatedWorkspaceDiff: previewWorktreeDiff,
+        applyIsolatedWorkspaceDiff: ({ workspaceRoot, isolatedWorkspaceRoot }) =>
+          worktrees.applyWorktreeDiff({
             repositoryRoot: workspaceRoot,
             worktreeRoot: isolatedWorkspaceRoot,
           }),
@@ -312,131 +275,27 @@ export const getCodingRoomService = (): CodingRoomService => {
         ),
       },
     );
-    // The coding room consumes non-final full-text messageUpdate events for
-    // Replace-mode stream records; declaring lane interest here lets every
-    // other session skip the full-text bus during streaming.
-    runtime.registerStreamingTextInterestResolver(
-      sessionId => agentRuntime.codingRoomService?.isBuiltinLaneSession(sessionId) ?? false,
-    );
-    agentRuntime.codingRoomService.registry.hydrate();
-    // Precise routing: sessions cached as non-lane skip normalization and
-    // recording entirely; a session's first event still flows through so the
-    // lazy lane mapping can register (see shouldTrackSession).
-    const isTrackedSession = (sessionId: string): boolean =>
-      agentRuntime.codingRoomService?.shouldTrackSession(sessionId) ?? true;
-    runtime.on('message', (sessionId: string, message: unknown) => {
-      if (!isTrackedSession(sessionId)) return;
-      const metadata =
-        message && typeof message === 'object' && 'metadata' in message
-          ? (message as { metadata?: unknown }).metadata
-          : null;
-      const isThinking =
-        metadata && typeof metadata === 'object' && !Array.isArray(metadata)
-          ? (metadata as { isThinking?: unknown }).isThinking === true
-          : false;
-      if (isThinking) {
-        agentRuntime.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Reasoning, {
-          message,
-          streamUpdateMode: CodingStreamUpdateMode.Replace,
-        });
-        return;
-      }
-      const normalized = normalizePiMessage(message);
-      if (normalized)
-        agentRuntime.codingRoomService?.recordBuiltinEvent(
-          sessionId,
-          normalized.kind,
-          normalized.payload,
-        );
-    });
-    runtime.on(
-      'messageUpdate',
-      (
-        sessionId: string,
-        messageId: string,
-        content: string,
-        metadata?: Record<string, unknown>,
-      ) => {
-        if (!isTrackedSession(sessionId)) return;
-        const isThinking = metadata?.isThinking === true;
-        agentRuntime.codingRoomService?.recordBuiltinEvent(
-          sessionId,
-          isThinking ? CodingEventKind.Reasoning : CodingEventKind.MessageDelta,
-          {
-            content,
-            messageId,
-            streamUpdateMode: CodingStreamUpdateMode.Replace,
-          },
-        );
+    service.registry.hydrate();
+    const stopPiEvents = bindCodingRoomPiEvents(runtime, service);
+    const stopSkillChanges = getSkillManager().onSkillsChanged(bumpCommandCatalog);
+    codingRoom = {
+      service,
+      detach: () => {
+        stopPiEvents();
+        stopSkillChanges();
       },
-    );
-    runtime.on('toolActivity', (sessionId: string, event: CoworkToolActivityEvent) => {
-      if (!isTrackedSession(sessionId)) return;
-      const normalized = normalizePiToolActivity(event);
-      if (normalized)
-        agentRuntime.codingRoomService?.recordBuiltinEvent(
-          sessionId,
-          normalized.kind,
-          normalized.payload,
-        );
-    });
-    runtime.on('permissionRequest', (sessionId: string, request: unknown) => {
-      if (!isTrackedSession(sessionId)) return;
-      const requestId =
-        request &&
-        typeof request === 'object' &&
-        typeof (request as { requestId?: unknown }).requestId === 'string'
-          ? (request as { requestId: string }).requestId
-          : null;
-      agentRuntime.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Permission, {
-        requestId,
-        request,
-      });
-    });
-    runtime.on('plan', (sessionId: string, plan: { entries?: unknown }) => {
-      if (!isTrackedSession(sessionId)) return;
-      agentRuntime.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Plan, {
-        entries: Array.isArray(plan?.entries) ? plan.entries : [],
-      });
-    });
-    runtime.on(
-      'codingElicitationRequest',
-      (sessionId: string, request: { requestId: string; question: string }) => {
-        if (!isTrackedSession(sessionId)) return;
-        agentRuntime.codingRoomService?.recordBuiltinElicitation(sessionId, request);
-      },
-    );
-    runtime.on('complete', (sessionId: string) => {
-      if (!isTrackedSession(sessionId)) return;
-      agentRuntime.codingRoomService?.recordBuiltinEvent(
-        sessionId,
-        CodingEventKind.TurnComplete,
-        {},
-      );
-    });
-    runtime.on('error', (sessionId: string, error: unknown) => {
-      if (!isTrackedSession(sessionId)) return;
-      agentRuntime.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnFailed, {
-        error,
-      });
-    });
-    runtime.on(
-      'retryNotice',
-      (sessionId: string, notice: Omit<RuntimeRetryNotice, 'sessionId'>) => {
-        // Transient status: the shared prompt tells the user the model answered
-        // with an error while Pi keeps retrying, instead of leaving the turn
-        // looking frozen until the retry cycle settles.
-        const payload: RuntimeRetryNotice = { sessionId, ...notice };
-        for (const window of BrowserWindow.getAllWindows()) {
-          if (!window.isDestroyed()) window.webContents.send(RuntimeNoticeIpc.Notice, payload);
-        }
-      },
-    );
-    runtime.on('sessionInterrupted', interruption => {
-      if (interruption.cause !== CoworkInterruptionCause.UserStop) {
-        agentRuntime.codingRoomService?.recordBuiltinInterruption(interruption);
-      }
-    });
+    };
+    return service;
   }
-  return agentRuntime.codingRoomService;
-};
+
+  return {
+    start,
+    bumpCommandCatalog,
+    stop() {
+      codingRoom?.detach();
+      return codingRoom?.service.shutdown();
+    },
+  };
+}
+
+export type CodingRoomRuntime = ReturnType<typeof createCodingRoomRuntime>;

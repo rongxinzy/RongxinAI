@@ -1,32 +1,12 @@
-import { ProviderName } from '../../shared/providers';
-import { LlamaCppAgentEligibilityReason } from '../../shared/llamacpp';
-import { t } from '../i18n';
 import {
-  getLlamaCppModelAgentEligibility,
-  isLlamaCppModelRunning,
-} from './llamacppRunningModelRegistry';
+  LlamaCppAgentEligibilityReason,
+  type LlamaCppAgentEligibility,
+} from '../../shared/llamacpp';
+import { t } from '../i18n';
 
-export function assertLlamaCppWorkModeContext(input: {
-  providerName: string;
-  modelId: string;
-}): void {
-  if (input.providerName !== ProviderName.LlamaCpp) {
-    return;
-  }
-
-  const normalizedModelId = normalizeLlamaCppModelId(input.modelId);
-  if (!normalizedModelId) {
-    return;
-  }
-
-  if (!isLlamaCppModelRunning(normalizedModelId)) {
-    throw new Error(t('coworkLlamaCppModelNotRunning'));
-  }
-
-  const eligibility = getLlamaCppModelAgentEligibility(normalizedModelId);
-  if (!eligibility || eligibility.eligible) {
-    return;
-  }
+export function assertLlamaCppWorkModeContext(eligibility: LlamaCppAgentEligibility | null): void {
+  if (!eligibility) throw new Error(t('coworkLlamaCppModelNotRunning'));
+  if (eligibility.eligible) return;
 
   switch (eligibility.reason) {
     case LlamaCppAgentEligibilityReason.RuntimeContextUnknown:
@@ -51,26 +31,22 @@ export function assertLlamaCppWorkModeContext(input: {
   }
 }
 
-function normalizeLlamaCppModelId(modelId: string): string {
-  const trimmed = modelId.trim();
-  if (!trimmed) return '';
-  const prefix = `${ProviderName.LlamaCpp}/`;
-  return trimmed.startsWith(prefix) ? trimmed.slice(prefix.length) : trimmed;
-}
-
 export const WORK_MODE_MIN_CONTEXT_WINDOW = 16384;
 
+export function isWorkModeContextTooSmall(contextWindow?: number): contextWindow is number {
+  return (
+    typeof contextWindow === 'number' &&
+    Number.isFinite(contextWindow) &&
+    contextWindow > 0 &&
+    contextWindow < WORK_MODE_MIN_CONTEXT_WINDOW
+  );
+}
+
 export function assertWorkModeContextWindow(input: {
-  providerName: string;
   modelId: string;
   contextWindow?: number;
 }): void {
-  if (
-    typeof input.contextWindow === 'number' &&
-    Number.isFinite(input.contextWindow) &&
-    input.contextWindow > 0 &&
-    input.contextWindow < WORK_MODE_MIN_CONTEXT_WINDOW
-  ) {
+  if (isWorkModeContextTooSmall(input.contextWindow)) {
     throw new Error(
       t('coworkWorkContextWindowTooSmall', {
         model: input.modelId,

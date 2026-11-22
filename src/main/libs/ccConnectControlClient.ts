@@ -12,8 +12,12 @@ export class CcConnectControlClient {
     private readonly token: string,
   ) {}
 
-  async healthCheck(expectedPid?: number): Promise<CcConnectHealth> {
-    const response = await this.request('/v1/cc-connect/cron/health', { method: 'GET' }, 200);
+  async healthCheck(expectedPid?: number, signal?: AbortSignal): Promise<CcConnectHealth> {
+    const response = await this.request(
+      '/v1/cc-connect/cron/health',
+      { method: 'GET', signal },
+      200,
+    );
     const health: unknown = await response.json();
     const requiredCapabilities = [
       CcConnectProtocol.Capability.TriggerOnlyCron,

@@ -1,27 +1,8 @@
-import type { CoworkMessage, CoworkStore } from './coworkStore';
 import type { CoworkPersistedArtifact } from '../shared/cowork/artifacts';
 import { ArtifactLedger } from './artifactLedger/artifactLedger';
 
 export interface CoworkSessionReadOptions {
   includeArtifacts?: boolean;
-}
-
-export function readCoworkSessionMessages(
-  store: Pick<CoworkStore, 'countSessionMessages' | 'getPagedSessionMessages'>,
-  sessionId: string,
-  messageLimit: number | null,
-  readAll: () => CoworkMessage[],
-): { totalMessages: number; messageOffset: number; messages: CoworkMessage[] } {
-  const totalMessages = store.countSessionMessages(sessionId);
-  const limit = messageLimit === null ? totalMessages : Math.max(0, messageLimit);
-  const messageOffset = Math.max(0, totalMessages - limit);
-  const messages =
-    limit === 0
-      ? []
-      : messageOffset > 0
-        ? store.getPagedSessionMessages(sessionId, limit, messageOffset)
-        : readAll();
-  return { totalMessages, messageOffset, messages };
 }
 
 /**

@@ -14,17 +14,19 @@ import type {
  * `orchestrator` service config field at registration time.
  */
 export interface LlamaCppModelOrchestrator {
-  reconnect(): Promise<LlamaCppModelDaemonStatus | null>;
-  status(): Promise<LlamaCppStatusSnapshot>;
+  reconnect(options?: { requireResponsive?: boolean }): Promise<LlamaCppModelDaemonStatus | null>;
+  start(): Promise<LlamaCppStatusSnapshot>;
   listRunningModels(): Promise<LlamaCppRunningModel[]>;
   ensureModel(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelDaemonStatus>;
   stopModel(modelName: string): Promise<LlamaCppModelDaemonStatus>;
+  deleteModelFile(modelName: string, modelPath: string): Promise<void>;
   stopAll(): Promise<LlamaCppModelDaemonStatus>;
   applyConfig(config: LlamaCppServiceConfig): Promise<LlamaCppModelDaemonStatus>;
   applyConfigIfRunning(config: LlamaCppServiceConfig): Promise<LlamaCppModelDaemonStatus>;
   restart(config: LlamaCppServiceConfig): Promise<LlamaCppStatusSnapshot>;
-  stopService(): Promise<void>;
+  stopService(options?: { requireIdle?: boolean }): Promise<void>;
   getCachedRunningModels(): LlamaCppRunningModel[];
+  /** Capture shutdown settings synchronously. Process teardown may outlive SQLite. */
   shutdownForQuit(): Promise<void>;
   gatewayBaseUrl(): string | null;
   getLanToken(): string;

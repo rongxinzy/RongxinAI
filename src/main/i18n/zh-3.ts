@@ -119,10 +119,6 @@ export const zhMain3 = {
   // Community account authentication
   communityAuthLoginIncomplete: '登录未完成，请重试。',
   communityAuthServiceUnavailable: '登录服务暂时不可用，请稍后重试。',
-  modelPoolLoginRequired: '请先登录知远账号后使用免费模型。',
-  modelPoolEntitlementRequired: '当前账号没有免费模型权益。',
-  modelPoolQuotaExceeded: '今日免费模型额度已用完，请明日再试。',
-  modelPoolServiceUnavailable: '免费模型服务暂时不可用，请稍后重试。',
   modelPoolSessionBusy: '当前会话仍在处理，请稍后再试。',
   modelPoolStreamInterrupted: '回答意外中断，已保留收到的内容。请重试或要求继续。',
 

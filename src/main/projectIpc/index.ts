@@ -1,4 +1,4 @@
-/** Project directory IPC: default base dir, directory creation, scratch dir, random workspaces. */
+/** Project directory IPC: default base dir, scratch dir and random workspaces. */
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -22,39 +22,6 @@ export const registerProjectIpc = (deps: ProjectIpcDeps): void => {
           success: false,
           path: null,
           error: error instanceof Error ? error.message : 'Failed to resolve default project path',
-        };
-      }
-    },
-
-    projectCreateDirectory: async (_event, options) => {
-      try {
-        const name = options.name.trim();
-        if (!name || /[\\/:*?"<>|]/.test(name) || name === '.' || name === '..') {
-          return {
-            success: false,
-            path: null,
-            code: 'invalid-name' as const,
-            error: 'Invalid project name',
-          };
-        }
-        const baseDir = options.baseDir?.trim() || deps.getDefaultProjectBaseDir();
-        const targetPath = path.join(baseDir, name);
-        if (fs.existsSync(targetPath)) {
-          return {
-            success: false,
-            path: null,
-            code: 'already-exists' as const,
-            error: 'A directory with this name already exists',
-          };
-        }
-        await fs.promises.mkdir(targetPath, { recursive: true });
-        console.log('[Project] created project directory:', targetPath);
-        return { success: true, path: targetPath };
-      } catch (error) {
-        return {
-          success: false,
-          path: null,
-          error: error instanceof Error ? error.message : 'Failed to create project directory',
         };
       }
     },

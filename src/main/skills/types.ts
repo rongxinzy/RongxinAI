@@ -79,37 +79,33 @@ export type SkillScriptRunResult = {
 
 /** A skill install parked until the user confirms a security report. */
 export type PendingSkillInstall = {
-  tempDir: string;
   cleanupPath: string | null;
   root: string;
   skillDirs: string[];
   timer: NodeJS.Timeout;
-  isUpgrade?: boolean;
-  existingSkillDir?: string;
   iconUrl?: string;
   displayName?: string;
 };
 
 /**
- * The slice of {@link SkillManager} that install/upgrade/delete flows need.
+ * The slice of {@link SkillManager} that install/delete flows need.
  * Kept as an interface so the extracted modules stay decoupled from the
  * manager class (no import cycles).
  */
 export interface SkillManagerContext {
   readonly pendingInstalls: Map<string, PendingSkillInstall>;
-  readonly upgradingSkillIds: Set<string>;
   readonly deletingSkillIds: Set<string>;
   ensureSkillsRoot(): string;
   getBundledSkillsRoot(): string;
-  listSkills(): SkillRecord[];
+  listSkills(): Promise<SkillRecord[]>;
   isBuiltInSkillId(id: string): boolean;
   loadSkillStateMap(): SkillStateMap;
   saveSkillStateMap(map: SkillStateMap): void;
   persistSkillInstallState(ids: string[], options: SkillInstallOptions): void;
-  setSkillEnabled(id: string, enabled: boolean): SkillRecord[];
+  setSkillsEnabled(ids: string[], enabled: boolean): Promise<SkillRecord[]>;
   notifySkillsChanged(): void;
   startWatching(): void;
   stopWatching(): void;
-  resolveSkillDir(skillId: string): string;
+  resolveSkillDir(skillId: string): Promise<string>;
   ensureSkillDependencies(skillDir: string): Promise<{ success: boolean; error?: string }>;
 }

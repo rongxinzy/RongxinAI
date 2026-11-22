@@ -1,45 +1,111 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { spawnSync } from 'node:child_process';
 import * as XLSX from 'xlsx';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { resolveSkillScriptPath, runManagedSkillScript } from './skillRuntimeRunner';
+import {
+  resolveSkillScriptPath,
+  runManagedSkillScript,
+  startManagedSkillProcess,
+} from './skillRuntimeRunner';
+import { getSkillsRoot } from './coworkUtil';
+
+vi.mock('./anysearchGatewayCredentials', () => ({
+  resolveAnySearchGateway: () => ({
+    url: 'https://search.example.invalid',
+    token: 'fixture-search-authorization',
+  }),
+}));
 
 describe('skillRuntimeRunner', () => {
   const roots: string[] = [];
 
   afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     for (const root of roots.splice(0)) {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it('keeps script execution inside the selected skill directory', () => {
+  it.skipIf(process.platform === 'win32').each(['abort', 'timeout'] as const)(
+    'reaps descendants when a managed Skill script reaches %s',
+    async trigger => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-runtime-tree-'));
+      roots.push(root);
+      const scriptDir = path.join(root, 'fixture', 'scripts');
+      fs.mkdirSync(scriptDir, { recursive: true });
+      const ready = path.join(root, 'child.pid');
+      fs.writeFileSync(
+        path.join(scriptDir, 'tree.mjs'),
+        `import { spawn } from 'node:child_process';
+        spawn(process.execPath, ['-e', \`
+          process.on('SIGTERM', () => {});
+          require('node:fs').writeFileSync(process.argv[1], String(process.pid));
+          setInterval(() => {}, 1000);
+        \`, ${JSON.stringify(ready)}], { stdio: 'inherit' });
+        setInterval(() => {}, 1000);`,
+      );
+      const controller = new AbortController();
+      const result = runManagedSkillScript({
+        skillsRoot: root,
+        skillId: 'fixture',
+        script: 'scripts/tree.mjs',
+        workspaceRoot: root,
+        signal: controller.signal,
+        timeoutMs: trigger === 'timeout' ? 2_000 : 10_000,
+      });
+      let pid: number | undefined;
+      const isRunning = (id: number) => {
+        const state = spawnSync('ps', ['-o', 'stat=', '-p', String(id)], { encoding: 'utf8' });
+        return state.status === 0 && !state.stdout.trim().startsWith('Z');
+      };
+      try {
+        await vi.waitFor(() => expect(fs.existsSync(ready)).toBe(true));
+        pid = Number(fs.readFileSync(ready, 'utf8'));
+        expect(pid).toBeGreaterThan(1);
+        expect(isRunning(pid)).toBe(true);
+        if (trigger === 'abort') controller.abort();
+        await expect(result).resolves.toMatchObject({
+          ok: false,
+          status: trigger === 'abort' ? 'aborted' : 'timed-out',
+        });
+        await vi.waitFor(() => expect(isRunning(pid!)).toBe(false));
+      } finally {
+        controller.abort();
+        if (pid && isRunning(pid)) process.kill(pid, 'SIGKILL');
+        await result;
+      }
+    },
+  );
+
+  it('keeps script execution inside the selected skill directory', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-runtime-'));
     roots.push(root);
     const skillDir = path.join(root, 'xlsx', 'scripts');
     fs.mkdirSync(skillDir, { recursive: true });
     fs.writeFileSync(path.join(skillDir, 'reader.py'), 'print("ok")\n');
 
-    const valid = resolveSkillScriptPath(root, 'xlsx', 'scripts/reader.py');
+    const valid = await resolveSkillScriptPath(root, 'xlsx', 'scripts/reader.py');
     const realRoot = fs.realpathSync(root);
     expect(valid).toEqual({
       scriptPath: path.join(realRoot, 'xlsx', 'scripts', 'reader.py'),
       skillDir: path.join(realRoot, 'xlsx'),
     });
 
-    const escaped = resolveSkillScriptPath(root, 'xlsx', '../outside.py');
+    const escaped = await resolveSkillScriptPath(root, 'xlsx', '../outside.py');
     expect('errorCode' in escaped && escaped.errorCode).toBe('SKILL_SCRIPT_OUTSIDE_ROOT');
   });
 
-  it('reports a missing script distinctly from a missing runtime', () => {
+  it('reports a missing script distinctly from a missing runtime', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-runtime-'));
     roots.push(root);
     fs.mkdirSync(path.join(root, 'pdf'), { recursive: true });
 
-    const result = resolveSkillScriptPath(root, 'pdf', 'scripts/inspect.py');
+    const result = await resolveSkillScriptPath(root, 'pdf', 'scripts/inspect.py');
     expect('errorCode' in result && result.errorCode).toBe('SKILL_SCRIPT_NOT_FOUND');
     expect('error' in result && result.error).toContain('Skill script not found');
   });
@@ -66,14 +132,14 @@ describe('skillRuntimeRunner', () => {
     expect(result.stderr).toContain('input file is not readable');
   });
 
-  it('runs a Node Skill script without a shell command string', async () => {
+  it('checks the Node Skill script once before running it without a shell command string', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-runtime-'));
     roots.push(root);
     fs.mkdirSync(path.join(root, 'presentation-studio', 'scripts'), { recursive: true });
-    fs.writeFileSync(
-      path.join(root, 'presentation-studio', 'scripts', 'probe.mjs'),
-      'process.stdout.write(process.argv.slice(2).join("|"));\n',
-    );
+    const script = path.join(root, 'presentation-studio', 'scripts', 'probe.mjs');
+    fs.writeFileSync(script, 'process.stdout.write(process.argv.slice(2).join("|"));\n');
+    const canonicalScript = await fs.promises.realpath(script);
+    const realpath = vi.spyOn(fs.promises, 'realpath');
 
     const result = await runManagedSkillScript({
       skillsRoot: root,
@@ -86,6 +152,92 @@ describe('skillRuntimeRunner', () => {
     expect(result.ok).toBe(true);
     expect(result.runtime).toBe('node');
     expect(result.stdout).toBe('a b|c');
+    expect(realpath.mock.calls.filter(([candidate]) => candidate === canonicalScript)).toHaveLength(
+      1,
+    );
+  });
+
+  it('starts a long-lived Skill after the same path check', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-runtime-process-'));
+    roots.push(root);
+    const skillDir = path.join(root, 'fixture');
+    fs.mkdirSync(skillDir);
+    fs.writeFileSync(
+      path.join(skillDir, 'serve.mjs'),
+      'process.stdout.write("ready"); setInterval(() => {}, 1000);',
+    );
+    const process = await startManagedSkillProcess({
+      skillId: 'fixture',
+      script: 'serve.mjs',
+      skillsRoot: root,
+      workspaceRoot: root,
+    });
+    try {
+      await expect(process.waitForOutput(stdout => stdout === 'ready', 3_000)).resolves.toEqual({
+        stdout: 'ready',
+        stderr: '',
+      });
+      expect(process.isRunning()).toBe(true);
+    } finally {
+      await process.stop();
+    }
+  });
+
+  it('routes the bundled search skill through the native gateway and leaves shadow scripts alone', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-runtime-search-'));
+    roots.push(root);
+    fs.writeFileSync(path.join(root, 'query.txt'), '  现有实现  \n');
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        data: { results: [{ title: 'Source', url: 'https://example.com/source' }] },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const options = {
+      skillId: 'web-search',
+      script: 'scripts/search.mjs',
+      workspaceRoot: root,
+      args: ['@query.txt', '20'],
+    };
+    const bundled = await runManagedSkillScript({ ...options, skillsRoot: getSkillsRoot() });
+    expect(bundled).toMatchObject({ ok: true, command: null });
+    expect(bundled.stdout).toContain(
+      '**URL:** [https://example.com/source](https://example.com/source)',
+    );
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      'https://search.example.invalid/v1/search',
+      expect.objectContaining({
+        body: JSON.stringify({ query: '现有实现', max_results: 20 }),
+        headers: expect.objectContaining({ authorization: 'Bearer fixture-search-authorization' }),
+      }),
+    );
+    expect(JSON.stringify(bundled)).not.toContain('fixture-search-authorization');
+
+    const shadow = path.join(root, 'web-search', 'scripts');
+    fs.mkdirSync(shadow, { recursive: true });
+    fs.writeFileSync(path.join(shadow, 'search.mjs'), 'process.stdout.write("shadow ran");');
+    expect(await runManagedSkillScript({ ...options, skillsRoot: root })).toMatchObject({
+      ok: true,
+      stdout: 'shadow ran',
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['x'.repeat(501), '10'],
+    ['query', '2extra'],
+  ])('rejects invalid bundled search input before calling the gateway', async (query, count) => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ data: { results: [] } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await runManagedSkillScript({
+      skillsRoot: getSkillsRoot(),
+      skillId: 'web-search',
+      script: 'scripts/search.mjs',
+      args: [query, count],
+      workspaceRoot: getSkillsRoot(),
+    });
+    expect(result).toMatchObject({ ok: false, errorCode: 'SKILL_SCRIPT_FAILED' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('bounds captured stdout and reports truncation', async () => {

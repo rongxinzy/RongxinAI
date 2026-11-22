@@ -47,7 +47,9 @@ test('Kylin package builds on a native Kylin V11 x64 runner with Chinese default
   expect(workflow).toContain('${ID:-}" == "kylin"');
   expect(workflow).toContain('ZHIYUAN_DEFAULT_LOCALE: zh-CN');
   expect(workflow).toContain('ZHIYUAN_GO_PROXY: https://goproxy.cn,direct');
-  expect(workflow).toContain('Magpie build failed after $attempt attempts');
+  expect(workflow).toMatch(
+    /prepare-magpie-runtime\s+with:\s+target: linux-x64\s+build-attempts: '3'/,
+  );
   expect(workflow).toContain('bun run dist:kylin:x64');
   expect(workflow).toContain('rpm -qip');
   expect(workflow).toContain('name: kylin-v11-x64-rpm');

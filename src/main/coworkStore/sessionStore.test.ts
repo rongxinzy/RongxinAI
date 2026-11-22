@@ -14,6 +14,7 @@ import {
   CoworkExecutionMode,
   CoworkSessionMode,
   CoworkSessionSource,
+  CoworkSessionStatus,
 } from '../../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../../shared/cowork/sessionExperts';
 import {
@@ -37,10 +38,12 @@ test('sessions are grouped by workspace independently of their agent snapshot', 
 
   expect(first.workspaceId).toBe(second.workspaceId);
   expect(first.agentId).not.toBe(second.agentId);
-  expect(store.countSessions(undefined, first.workspaceId)).toBe(2);
   expect(
-    store.listSessions(10, 0, undefined, first.workspaceId).map(session => session.id),
-  ).toEqual(expect.arrayContaining([first.id, second.id]));
+    store
+      .listSessions(10, 0, undefined, first.workspaceId)
+      .sessions.map(session => session.id)
+      .sort(),
+  ).toEqual([first.id, second.id].sort());
 });
 
 test('round-trips sessions using only the product session identity', () => {
@@ -60,9 +63,28 @@ test('round-trips sessions using only the product session identity', () => {
   expect(columns.map(column => column.name)).not.toContain('claude_session_id');
 });
 
+test('recreating the same session at the same millisecond assigns new Pi history', () => {
+  const { store } = harness;
+  const now = vi.spyOn(Date, 'now').mockReturnValue(1720000000000);
+  const id = 'scheduled-task:recreated';
+  const create = () =>
+    store.createSession('task', '/tmp/task', '', 'local', [], 'main', '', 'work', id);
+  try {
+    const first = create();
+    const firstKey = store.getPiHistoryKey(id);
+    expect(firstKey).toEqual(expect.any(String));
+    expect(store.deleteSessions([id])).toBe(1);
+    expect(create().createdAt).toBe(first.createdAt);
+    expect(store.getPiHistoryKey(id)).toEqual(expect.any(String));
+    expect(store.getPiHistoryKey(id)).not.toBe(firstKey);
+  } finally {
+    now.mockRestore();
+  }
+});
+
 test('listSessions paginates independently by session source', () => {
   const { db, store } = harness;
-  const workspace = store.ensureWorkspace('/tmp/workspace-source');
+  const workspace = store.workspaces.ensureWorkspace('/tmp/workspace-source');
   const scheduled = store.createSession(
     'scheduled',
     workspace.path,
@@ -89,14 +111,18 @@ test('listSessions paginates independently by session source', () => {
   expect(
     store
       .listSessions(6, 0, undefined, workspace.id, CoworkSessionMode.Work, scheduledSources)
-      .map(session => session.id),
+      .sessions.map(session => session.id),
   ).toEqual([scheduled.id]);
-  expect(
-    store.countSessions(undefined, workspace.id, CoworkSessionMode.Work, scheduledSources),
-  ).toBe(1);
-  expect(store.countSessions(undefined, workspace.id, CoworkSessionMode.Work, regularSources)).toBe(
-    8,
+  const regularPage = store.listSessions(
+    6,
+    0,
+    undefined,
+    workspace.id,
+    CoworkSessionMode.Work,
+    regularSources,
   );
+  expect(regularPage.sessions).toHaveLength(6);
+  expect(regularPage.hasMore).toBe(true);
 });
 
 test('listSessions filters by mode without mixing work and chat history', () => {
@@ -124,11 +150,15 @@ test('listSessions filters by mode without mixing work and chat history', () => 
   );
 
   expect(
-    store.listSessions(10, 0, undefined, undefined, CoworkSessionMode.Chat).map(s => s.id),
-  ).toEqual(expect.arrayContaining([chat.id, otherChat.id]));
-  expect(store.countSessions(undefined, undefined, CoworkSessionMode.Chat)).toBe(2);
+    store
+      .listSessions(10, 0, undefined, undefined, CoworkSessionMode.Chat)
+      .sessions.map(s => s.id)
+      .sort(),
+  ).toEqual([chat.id, otherChat.id].sort());
   expect(
-    store.listSessions(10, 0, undefined, work.workspaceId, CoworkSessionMode.Work).map(s => s.id),
+    store
+      .listSessions(10, 0, undefined, work.workspaceId, CoworkSessionMode.Work)
+      .sessions.map(s => s.id),
   ).toEqual([work.id]);
 });
 
@@ -169,7 +199,7 @@ test('session expert snapshots persist independently from workspace and agent st
     }),
   ]);
 
-  store.replaceSessionExperts(session.id, []);
+  store.updateSessionPrompt(session.id, { expertSnapshots: [] });
   expect(store.getSession(session.id)?.experts).toEqual([]);
 });
 
@@ -199,6 +229,24 @@ test('updateSession can patch model override without refreshing the session upda
   const session = store.getSession(sid);
   expect(session?.modelOverride).toBe('deepseek/qwen3.6-plus');
   expect(session?.updatedAt).toBe(1000);
+});
+
+test('settling an already idle session leaves its last message activity timestamp alone', () => {
+  const { db, store } = harness;
+  const sid = 'sess-idle';
+  insertSessionRow(db, sid);
+  db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(1000, sid);
+
+  store.updateSession(sid, { status: CoworkSessionStatus.Idle });
+  expect(store.getSession(sid)?.updatedAt).toBe(1000);
+
+  store.updateSession(sid, { status: CoworkSessionStatus.Error });
+  store.updateSession(sid, { status: CoworkSessionStatus.Idle });
+  expect(store.getSession(sid)).toMatchObject({ status: CoworkSessionStatus.Idle });
+  expect(store.getSession(sid)!.updatedAt).toBeGreaterThan(1000);
+
+  store.updateSession(sid, { status: CoworkSessionStatus.Idle, title: 'Updated title' });
+  expect(store.getSession(sid)?.title).toBe('Updated title');
 });
 
 test('getSession returns all messages when one has corrupt metadata', () => {
@@ -330,28 +378,36 @@ test('setSessionPinned assigns per-workspace pin order and re-pins at the tail',
   expect(store.setSessionPinned('missing-session', true)).toBeNull();
 });
 
-test('deleteSessionsByAgentId removes and reports only that agent sessions', () => {
+test('finalization snapshots select only the owned sessions', () => {
   const { store } = harness;
   const first = store.createSession('a1', '/tmp/agent-a', '', 'local', [], 'agent-a');
   const second = store.createSession('a2', '/tmp/agent-a', '', 'local', [], 'agent-a');
   store.createSession('b1', '/tmp/agent-b', '', 'local', [], 'agent-b');
 
-  const removed = store.deleteSessionsByAgentId('agent-a').sort();
+  const removed = store.getSessionFinalizationSnapshots({ agentId: 'agent-a' }).map(row => row.id);
 
-  expect(removed).toEqual([first.id, second.id].sort());
+  expect(removed.sort()).toEqual([first.id, second.id].sort());
+  expect(store.deleteSessions(removed)).toBe(2);
   expect(store.getSession(first.id)).toBeNull();
   expect(store.getSession(second.id)).toBeNull();
-  expect(store.countSessions('agent-b')).toBe(1);
+  expect(store.listSessions(10, 0, 'agent-b').sessions).toHaveLength(1);
 });
 
-test('resetRunningSessions returns running sessions to idle', () => {
+test('reads old running markers as idle without rewriting sidebar recency', () => {
   const { db, store } = harness;
   const sid = store.createSession('running', '/tmp/reset-running').id;
-  db.prepare("UPDATE cowork_sessions SET status = 'running' WHERE id = ?").run(sid);
+  db.prepare("UPDATE cowork_sessions SET status = 'running', updated_at = 1 WHERE id = ?").run(sid);
 
-  expect(store.resetRunningSessions()).toBe(1);
-  expect(store.getSession(sid)?.status).toBe('idle');
-  expect(store.resetRunningSessions()).toBe(0);
+  expect(store.getSession(sid)).toMatchObject({ status: CoworkSessionStatus.Idle, updatedAt: 1 });
+  expect(store.listSessions().sessions).toEqual([
+    expect.objectContaining({ id: sid, status: CoworkSessionStatus.Idle, updatedAt: 1 }),
+  ]);
+  expect(
+    db.prepare('SELECT status, updated_at FROM cowork_sessions WHERE id = ?').get(sid),
+  ).toEqual({
+    status: 'running',
+    updated_at: 1,
+  });
 });
 
 test('listRecentCwds returns unique normalized directories newest first', () => {

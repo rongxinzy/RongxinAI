@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, test } from 'vitest';
+import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { build } from 'esbuild';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
@@ -42,13 +42,15 @@ test('gateway uses each model exact endpoint and credential, clamps output, and 
           },
     ),
   );
-  const gateway = await startAISphereGateway(
-    service,
-    async (url, options) => {
-      calls.push({ url, key: options?.headers?.Authorization, body: options?.body });
-      return new Response('tools are not supported', { status: 400 });
-    },
-    new AISphereRequestPool(workerFile),
+  const start = vi.fn(() =>
+    startAISphereGateway(
+      service,
+      async (url, options) => {
+        calls.push({ url, key: options?.headers?.Authorization, body: options?.body });
+        return new Response('tools are not supported', { status: 400 });
+      },
+      new AISphereRequestPool(workerFile),
+    ),
   );
   const values = new Map<string, unknown>();
   await service.initialize(
@@ -58,9 +60,11 @@ test('gateway uses each model exact endpoint and credential, clamps output, and 
         values.set(key, value);
       },
     },
-    gateway.baseUrl,
+    start,
   );
+  expect(start).not.toHaveBeenCalled();
   await service.connect('http://platform.test');
+  const gateway = await start.mock.results[0]!.value;
   try {
     for (const model of ['a', 'b']) {
       const response = await fetch(gateway.baseUrl + AISphere.ChatPath, {
@@ -88,8 +92,12 @@ test('gateway uses each model exact endpoint and credential, clamps output, and 
       body: '{}',
     });
     expect(unauthorized.status).toBe(403);
+    await service.disconnect();
+    await expect(fetch(gateway.baseUrl + AISphere.ChatPath)).rejects.toThrow();
+    await service.connect('http://platform.test');
+    expect(start).toHaveBeenCalledTimes(2);
   } finally {
-    await gateway.close();
+    await service.shutdown();
   }
 });
 

@@ -19,8 +19,7 @@ export function scheduledTaskFixture(cwd: string): LiveFixture {
   return {
     prompt: `我确认请创建定时任务，不需要再询问。名称为「${name}」，每周一上午 09:15 执行（机器已经设置为北京时间），执行内容原样为「${message}」，不发送通知。请调用应用的定时任务功能保存，再简短确认。`,
     allowTool: tool => tool === 'scheduled_task',
-    prepareWork: adapter =>
-      adapter.setScheduledTaskService(service as unknown as ScheduledTaskService),
+    workDependencies: { scheduledTaskService: service as unknown as ScheduledTaskService },
     score: async () => ({
       actual: calls.map(({ name, payload, schedule, delivery }) => ({
         name,
@@ -59,11 +58,12 @@ export function recallFixture(variant: number, useMemory: boolean) {
       tool === 'write' &&
       typeof input.path === 'string' &&
       path.resolve(cwd, input.path) === path.join(cwd, 'result.json'),
-    prepareWork: adapter =>
-      adapter.setProjectMemoryService({
+    workDependencies: {
+      projectMemoryService: {
         buildProjectContext: async () => source,
         registerSession: async (): Promise<void> => {},
-      } as unknown as ProjectMemoryService),
+      } as unknown as ProjectMemoryService,
+    },
     score: async () => ({
       actual: await readJsonArtifact(cwd),
       expected: useMemory ? fact : { code: null, cutoff: null },

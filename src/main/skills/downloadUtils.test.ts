@@ -1,6 +1,50 @@
-import { expect, test } from 'vitest';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { session } from 'electron';
+import JSZip from 'jszip';
+import { expect, test, vi } from 'vitest';
 
-import { isNpmPackageSpec, isRemoteZipUrl } from './downloadUtils';
+import {
+  downloadGithubArchive,
+  downloadZipUrl,
+  isNpmPackageSpec,
+  isRemoteZipUrl,
+} from './downloadUtils';
+
+vi.mock('electron', () => ({ session: { defaultSession: { fetch: vi.fn() } } }));
+
+test('GitHub ref fallback and remote ZIP downloads resolve the extracted skill root', async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), 'skill-download-'));
+  const archive = new JSZip();
+  archive.file('example/SKILL.md', '# Example');
+  const bytes = Uint8Array.from(await archive.generateAsync({ type: 'uint8array' }));
+  const fetch = vi.mocked(session.defaultSession.fetch);
+  fetch.mockResolvedValueOnce(new Response(null, { status: 404 }));
+  fetch.mockResolvedValueOnce(new Response(bytes));
+  fetch.mockResolvedValueOnce(new Response(bytes));
+
+  try {
+    const githubRoot = await downloadGithubArchive(
+      { owner: 'owner', repo: 'example' },
+      tempRoot,
+      'v1',
+    );
+    const zipRoot = await downloadZipUrl('https://example.com/example.zip', tempRoot);
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      'https://github.com/owner/example/archive/refs/heads/v1.zip',
+      'https://github.com/owner/example/archive/refs/tags/v1.zip',
+      'https://example.com/example.zip',
+    ]);
+    expect(githubRoot).toBe(path.join(tempRoot, 'github-archive', 'example'));
+    expect(zipRoot).toBe(path.join(tempRoot, 'remote-skill', 'example'));
+    expect(await readFile(path.join(githubRoot, 'SKILL.md'), 'utf8')).toBe('# Example');
+    expect(await readFile(path.join(zipRoot, 'SKILL.md'), 'utf8')).toBe('# Example');
+  } finally {
+    fetch.mockReset();
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
 
 test('isNpmPackageSpec: accepts plain, scoped and versioned specs', () => {
   expect(isNpmPackageSpec('some-skill')).toBe(true);

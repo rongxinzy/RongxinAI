@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { hasVisiblePromptContent } from '../cowork/submissionContent';
 import { WorkbenchExecutionStatus } from '../workbenchTask/constants';
 import { CompanionUnavailableReason } from './constants';
 import { COMPANION_MAX_ATTACHMENTS } from './attachments';
@@ -7,7 +8,7 @@ export const companionTaskRequest = z
   .object({
     petId: z.uuid(),
     requestId: z.string().trim().min(1).max(128),
-    text: z.string().trim().min(1).max(32_000),
+    text: z.string().trim().max(32_000).refine(hasVisiblePromptContent, 'Prompt is required.'),
     workspaceId: z.string().min(1).max(128),
     attachmentIds: z.array(z.uuid()).max(COMPANION_MAX_ATTACHMENTS).optional(),
   })

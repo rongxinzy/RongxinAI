@@ -14,6 +14,7 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
 
   beforeEach(() => {
     mockHost = {
+      getModelService: () => undefined,
       getStore: vi.fn(() => null),
       getWorkbench: vi.fn(() => null),
       transcript: {

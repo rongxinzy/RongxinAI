@@ -4,7 +4,6 @@ import {
   COMPANION_PAGE,
   COMPANION_SHORTCUT,
   CompanionComposerMode,
-  CompanionRequestState,
 } from '../../shared/companion/constants';
 import { companionContract } from '../../shared/companion/contract';
 import { CompanionIpc as IpcChannel } from '../../shared/ipc/channels';
@@ -17,10 +16,8 @@ import { handleIpcContract } from '../ipc/handleIpcContract';
 import type { SqliteStore } from '../sqliteStore';
 import { t } from '../i18n';
 import type { CompanionProfiles } from './profiles';
-import type { CompanionActivity } from './activity';
-import type { PiCompanionRuntime } from './durableRuntime.mjs';
+import type { CompanionChat } from './chat';
 import type { CompanionTasks } from './tasks';
-import type { CompanionMemoryBackend as CompanionMemoryService } from '../../shared/companion/memory';
 import type { CompanionBubblePlacement } from '../../shared/companion/bubble';
 import { anchorCompanionBubble } from './bubbleAnchor';
 
@@ -29,15 +26,12 @@ interface Options {
   getMainWindow(): BrowserWindow | null;
   getCompanions(): {
     profiles: CompanionProfiles;
-    runtime: PiCompanionRuntime;
-    memory?: CompanionMemoryService | null;
+    chat: CompanionChat;
   };
   getTasks(): CompanionTasks;
   openTask(sessionId: string): void;
-  onProfileChanged(profile: CompanionProfile): void;
   getPetWindow?(): BrowserWindow | null;
-  onBubbleVisibility?(visible: boolean): void;
-  onActivity?(activity: CompanionActivity): void;
+  onVisibilityChanged?(): void;
 }
 
 let options: Options | null = null;
@@ -46,6 +40,8 @@ let shortcutAvailable = false;
 let unsubscribe: (() => void) | undefined;
 let unsubscribeTasks: (() => void) | undefined;
 let unsubscribeActivity: (() => void) | undefined;
+let unsubscribeProfiles: (() => void) | undefined;
+let drainRequests: (() => Promise<void>) | undefined;
 let choosingDialog = false;
 let bubblePlacement: CompanionBubblePlacement | undefined;
 let bubbleAnchor: ReturnType<typeof anchorCompanionBubble> | undefined;
@@ -58,13 +54,19 @@ export function isCompanionWindow(candidate: BrowserWindow): boolean {
   return candidate === window;
 }
 
+export function isCompanionWindowVisible(): boolean {
+  return windowVisible;
+}
+
 function syncCompanionVisibility(visible: boolean): void {
-  if (!window || window.isDestroyed()) return;
   if (visible) bubbleAnchor?.activate();
   else bubbleAnchor?.deactivate();
   if (windowVisible === visible) return;
   windowVisible = visible;
-  window.webContents.send(IpcChannel.Visibility, visible);
+  if (window && !window.isDestroyed() && !window.webContents.isDestroyed()) {
+    window.webContents.send(IpcChannel.Visibility, visible);
+  }
+  options?.onVisibilityChanged?.();
 }
 
 /** Host suppression also updates draft/dialog visibility when native hide events are absent. */
@@ -76,18 +78,7 @@ export function hideCompanionWindow(): void {
   syncCompanionVisibility(false);
 }
 
-export function updateActiveCompanionAppearance(
-  characterId: CompanionProfile['characterId'],
-): void {
-  if (!options) return;
-  const { profiles } = options.getCompanions();
-  const active = profiles.active();
-  if (active.characterId === characterId) return;
-  profiles.changeAppearance(active.petId, characterId);
-  changed();
-}
-
-function preferences(mode = requestedMode): CompanionWindowContext {
+function preferences(mode?: CompanionComposerMode): CompanionWindowContext {
   const config = options?.store.get<{ language?: string; theme?: string; themeStyle?: string }>(
     'app_config',
   );
@@ -100,19 +91,24 @@ function preferences(mode = requestedMode): CompanionWindowContext {
   };
 }
 
-async function snapshot(): Promise<CompanionWindowState> {
+async function snapshot(owner: BrowserWindow): Promise<CompanionWindowState> {
   if (!options) throw new Error('Companion window is not initialized');
-  const { profiles, runtime } = options.getCompanions();
+  const { profiles, chat } = options.getCompanions();
   const identities = profiles.visibleSnapshot();
   const active = identities.profiles.find(profile => profile.petId === identities.activePetId)!;
-  const availability = await runtime.resume(active);
-  const conversation = await runtime.history(active);
+  const availability = await chat.availability(active);
+  if (!options || owner !== window || owner.isDestroyed())
+    throw new Error('Companion window closed during the request');
+  const conversation = chat.history(active);
   const taskSnapshot = options.getTasks().snapshot(active.petId);
-  const context = preferences(requestedMode);
-  requestedMode = undefined;
+  let mode: CompanionComposerMode | undefined;
+  if (owner === window && !owner.isDestroyed()) {
+    mode = requestedMode;
+    requestedMode = undefined;
+  }
   return {
     ...identities,
-    context,
+    context: preferences(mode),
     availability,
     shortcutAvailable,
     conversation,
@@ -122,24 +118,24 @@ async function snapshot(): Promise<CompanionWindowState> {
   };
 }
 
-function surfaces(): BrowserWindow[] {
-  return [window, options?.getMainWindow()].filter((candidate): candidate is BrowserWindow =>
-    Boolean(candidate && !candidate.isDestroyed()),
-  );
-}
-
 function assertWindow(event: Electron.IpcMainInvokeEvent): BrowserWindow {
-  const owner = surfaces().find(
-    candidate =>
-      event.sender === candidate.webContents &&
-      event.senderFrame === candidate.webContents.mainFrame,
-  );
-  if (!owner) throw new Error('Companion IPC requires an owned main frame');
+  const owner = window;
+  if (
+    !options ||
+    !owner ||
+    owner.isDestroyed() ||
+    owner.webContents.isDestroyed() ||
+    event.sender !== owner.webContents ||
+    event.senderFrame !== owner.webContents.mainFrame
+  )
+    throw new Error('Companion IPC requires an owned main frame');
   return owner;
 }
 
 function changed(): void {
-  for (const surface of surfaces()) surface.webContents.send(IpcChannel.Changed);
+  if (window && !window.isDestroyed() && !window.webContents.isDestroyed()) {
+    window.webContents.send(IpcChannel.Changed);
+  }
 }
 
 function activeProfile(petId: string): CompanionProfile {
@@ -148,72 +144,36 @@ function activeProfile(petId: string): CompanionProfile {
   return profile;
 }
 
-function memoryService(): CompanionMemoryService {
-  const service = options?.getCompanions().memory;
-  if (!service) throw new Error(t('companionMemoryUnavailable'));
-  return service;
-}
-
 export function initializeCompanionWindow(next: Options): void {
   if (options) return;
   options = next;
-  if (next.onActivity)
-    unsubscribeActivity = next.getCompanions().runtime.onActivity(next.onActivity);
-  let line: Promise<unknown> = Promise.resolve();
+  const { profiles, chat } = next.getCompanions();
+  unsubscribeProfiles = profiles.onChanged(changed);
+  unsubscribeActivity = chat.onActivity(({ petId }) => {
+    if (petId === profiles.active().petId) changed();
+  });
+  let line = Promise.resolve();
+  drainRequests = () => line;
   let queued = 0;
-  const publishedReplies = new Set<string>();
   const serialized = <T>(
     event: Electron.IpcMainInvokeEvent,
-    operation: () => Promise<T> | T,
+    operation: (owner: BrowserWindow) => Promise<T> | T,
   ): Promise<T> => {
     assertWindow(event);
     if (queued >= 8) throw new Error('Companion window request queue is full');
     queued++;
     const result = line
-      .then(() => {
-        assertWindow(event);
-        return operation();
-      })
+      .then(() => operation(assertWindow(event)))
       .finally(() => {
         queued--;
       });
-    line = result.catch(() => {});
+    line = result.then(
+      () => {},
+      () => {},
+    );
     return result;
   };
   handleIpcContract(companionContract, {
-    listMemories: (event, petId) =>
-      serialized(event, () => {
-        activeProfile(petId);
-        return memoryService().list(petId);
-      }),
-    saveMemory: (event, input) =>
-      serialized(event, async () => {
-        activeProfile(input.petId);
-        const saved = await memoryService().save(input);
-        changed();
-        return saved;
-      }),
-    forgetMemory: (event, petId, id) =>
-      serialized(event, async () => {
-        activeProfile(petId);
-        const forgotten = await memoryService().forget(petId, id);
-        changed();
-        return forgotten;
-      }),
-    confirmMemory: (event, input) =>
-      serialized(event, async () => {
-        activeProfile(input.petId);
-        const saved = await memoryService().confirm(input);
-        changed();
-        return saved;
-      }),
-    shareMemory: (event, input) =>
-      serialized(event, async () => {
-        activeProfile(input.petId);
-        const id = await memoryService().shareConfirmed(input.petId, input.id, input.requestId);
-        changed();
-        return id;
-      }),
     chooseWorkspace: async event => {
       const owner = assertWindow(event);
       if (choosingDialog) throw new Error('A companion dialog is already open');
@@ -223,16 +183,17 @@ export function initializeCompanionWindow(next: Options): void {
           title: t('companionPickFolder'),
           properties: ['openDirectory', 'createDirectory'],
         });
-        assertWindow(event);
         if (selection.canceled || !selection.filePaths[0]) return null;
-        return await next.getTasks().chooseWorkspace(selection.filePaths[0]);
+        return await serialized(event, () =>
+          next.getTasks().chooseWorkspace(selection.filePaths[0]),
+        );
       } finally {
         choosingDialog = false;
       }
     },
     visibility: event => {
       assertWindow(event);
-      return windowVisible;
+      return isCompanionWindowVisible();
     },
     chooseFiles: async (event, petId) => {
       const owner = assertWindow(event);
@@ -266,17 +227,14 @@ export function initializeCompanionWindow(next: Options): void {
       }),
     bootstrap: event => serialized(event, snapshot),
     select: (event, petId) =>
-      serialized(event, async () => {
-        const selected = next.getCompanions().profiles.select(petId);
-        next.onProfileChanged(selected);
-        const state = await snapshot();
-        changed();
-        return state;
+      serialized(event, owner => {
+        profiles.select(petId);
+        return snapshot(owner);
       }),
     submit: (event, request) =>
-      serialized(event, async () => {
+      serialized(event, () => {
         const profile = activeProfile(request.petId);
-        const result = await next.getCompanions().runtime.submit(
+        return chat.submit(
           profile,
           request.requestId,
           request.text,
@@ -288,30 +246,11 @@ export function initializeCompanionWindow(next: Options): void {
               }
             : undefined,
         );
-        if (result.receipt) changed();
-        return result;
       }),
-    answer: (event, receipt) =>
-      serialized(event, async () => {
-        const result = await next
-          .getCompanions()
-          .runtime.answer(activeProfile(receipt.petId), receipt);
-        if (result.state !== CompanionRequestState.Accepted) {
-          const key = `${receipt.petId}:${receipt.submissionId}`;
-          if (!publishedReplies.has(key)) {
-            publishedReplies.add(key);
-            if (publishedReplies.size > 128)
-              publishedReplies.delete(publishedReplies.values().next().value!);
-            changed();
-          }
-        }
-        return result;
-      }),
-    stop: (event, petId) =>
-      serialized(event, async () => {
-        await next.getCompanions().runtime.stop(activeProfile(petId));
-        changed();
-      }),
+    stop: (event, petId) => {
+      assertWindow(event);
+      next.getCompanions().chat.stop(activeProfile(petId));
+    },
     submitTask: (event, request) =>
       serialized(event, () =>
         next.getTasks().submit(next.getCompanions().profiles.active(), request),
@@ -320,12 +259,12 @@ export function initializeCompanionWindow(next: Options): void {
       serialized(event, () =>
         next.getTasks().snapshot(next.getCompanions().profiles.active().petId),
       ),
-    stopTask: (event, sessionId) =>
-      serialized(event, () =>
-        next.getTasks().stop(next.getCompanions().profiles.active().petId, sessionId),
-      ),
+    stopTask: (event, sessionId) => {
+      assertWindow(event);
+      next.getTasks().stop(next.getCompanions().profiles.active().petId, sessionId);
+    },
     hide: event => {
-      if (assertWindow(event) !== window) throw new Error('Only the quick window can hide itself');
+      assertWindow(event);
       hideCompanionWindow();
     },
     openWorkbench: (event, sessionId) => {
@@ -356,10 +295,12 @@ export function initializeCompanionWindow(next: Options): void {
   });
   unsubscribeTasks = next.getTasks().onChanged(sessionId => {
     try {
+      const recipient = window;
+      if (!recipient || recipient.isDestroyed() || recipient.webContents.isDestroyed()) return;
       const petId = next.getCompanions().profiles.active().petId;
-      if (next.getTasks().owned(petId, sessionId))
-        for (const surface of surfaces())
-          surface.webContents.send(IpcChannel.TasksChanged, next.getTasks().snapshot(petId));
+      const tasks = next.getTasks();
+      if (!tasks.owned(petId, sessionId)) return;
+      recipient.webContents.send(IpcChannel.TasksChanged, tasks.snapshot(petId));
     } catch (error) {
       console.warn(`[Companion] Failed to project task for session ${sessionId}:`, error);
     }
@@ -412,7 +353,7 @@ export function prepareCompanionWindow(): void {
   windowReady = false;
   bubbleAnchor = anchorCompanionBubble(
     created,
-    { ...options, hideWindow: hideCompanionWindow },
+    { getPetWindow: options.getPetWindow, hideWindow: hideCompanionWindow },
     placement => {
       bubblePlacement = placement;
       created.webContents.send(IpcChannel.Context, preferences());
@@ -443,6 +384,9 @@ export function prepareCompanionWindow(): void {
       window = null;
       windowReady = false;
       showRequested = false;
+      requestedMode = undefined;
+      bubbleAnchor = undefined;
+      syncCompanionVisibility(false);
     }
   });
   created.webContents.on('render-process-gone', (_event, details) => {
@@ -480,8 +424,10 @@ export function openCompanionWindow(mode?: CompanionComposerMode): void {
   showReadyWindow();
 }
 
-export function disposeCompanionWindow(): void {
+export function disposeCompanionWindow(): Promise<void> | undefined {
   options = null;
+  const drained = drainRequests?.();
+  drainRequests = undefined;
   choosingDialog = false;
   requestedMode = undefined;
   unsubscribe?.();
@@ -490,6 +436,8 @@ export function disposeCompanionWindow(): void {
   unsubscribeTasks = undefined;
   unsubscribeActivity?.();
   unsubscribeActivity = undefined;
+  unsubscribeProfiles?.();
+  unsubscribeProfiles = undefined;
   if (shortcutAvailable) globalShortcut.unregister(COMPANION_SHORTCUT);
   shortcutAvailable = false;
   window?.destroy();
@@ -501,4 +449,5 @@ export function disposeCompanionWindow(): void {
   showRequested = false;
   for (const definition of Object.values(companionContract))
     ipcMain.removeHandler(definition.channel);
+  return drained;
 }

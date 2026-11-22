@@ -10,6 +10,7 @@ import {
 } from '../../shared/codingAgent';
 import { CodingAgentRegistry } from './codingAgentRegistry';
 import { CodingRoomRepository } from './codingRoomRepository';
+import { recoverInterruptedCodingRoom } from '../appBootstrap/recoverInterruptedWork';
 import {
   createService,
   openCodingRoomDatabase,
@@ -30,7 +31,7 @@ test('reacquires the workspace writer lease before resuming a builtin elicitatio
   });
   const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-elicitation-lease-'));
   trackTempDirectory(workspaceRoot);
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Elicitation lease',
     sourceFolders: [workspaceRoot],
     defaultProfileId: CodingAgentProfileId.Builtin,
@@ -69,7 +70,7 @@ test('blocks builtin prompts while an elicitation awaits an answer', async () =>
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/elicitation-prompt-block';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: CodingAgentProfileId.Builtin,
     title: 'Await clarification',
@@ -91,7 +92,8 @@ test('blocks builtin prompts while an elicitation awaits an answer', async () =>
 
 test('cancels a stale question and frees its lane after an application restart', async () => {
   const db = openCodingRoomDatabase();
-  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const repository = new CodingRoomRepository(db);
+  const service = createService(repository, new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -99,7 +101,7 @@ test('cancels a stale question and frees its lane after an application restart',
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/elicitation-restart';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: CodingAgentProfileId.Builtin,
     title: 'Resume after restart',
@@ -116,7 +118,7 @@ test('cancels a stale question and frees its lane after an application restart',
   );
 
   // A restart drops the in-process Pi session but keeps the persisted question.
-  expect(service.recoverInterruptedState()).toBe(1);
+  expect(db.transaction(() => recoverInterruptedCodingRoom(repository))()).toBe(1);
 
   const recovered = service.bootstrap(workspaceRoot);
   expect(recovered.lanes[0].status).toBe(CodingLaneStatus.Idle);
@@ -145,7 +147,7 @@ test('cancels a pending elicitation before stopping its session and blocks delet
   });
   const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-elicitation-cancel-'));
   trackTempDirectory(workspaceRoot);
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Elicitation cancellation',
     sourceFolders: [workspaceRoot],
     defaultProfileId: CodingAgentProfileId.Builtin,

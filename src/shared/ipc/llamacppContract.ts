@@ -1,6 +1,5 @@
 /**
- * llama.cpp IPC contract (work package M.4, second domain): the 37 invoke
- * methods of the local-inference surface bound to one zod definition.
+ * Local-inference IPC calls and their shared validation.
  *
  * Strategy for this slice: **arguments are validated strictly** (launch and
  * install inputs, config writes, log-session reads, backend references and
@@ -14,9 +13,7 @@ import { z } from 'zod';
 import { LlamaCppIpcChannel } from '../llamacpp/constants';
 import { defineIpcContract } from './contract';
 import type {
-  LlamaCppBackendDownloadSizeResult,
   LlamaCppBackendListResult,
-  LlamaCppBackendRef,
   LlamaCppCancelInstallResult,
   LlamaCppCancelModelLoadResult,
   LlamaCppGatewayLanTokenResult,
@@ -27,11 +24,9 @@ import type {
   LlamaCppModelUnloadResult,
   LlamaCppOpenModelLaunchLogWindowResult,
   LlamaCppReadModelLaunchLogFileResult,
-  LlamaCppRuntimeCapabilities,
   LlamaCppRuntimeImportResult,
   LlamaCppRuntimeInstallResult,
   LlamaCppRuntimeInstallSnapshot,
-  LlamaCppRuntimeListDevicesResult,
   LlamaCppRuntimeUninstallResult,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
@@ -190,30 +185,10 @@ export const llamacppContract = defineIpcContract({
     args: emptyArgs,
     result: typed<LlamaCppRuntimeUninstallResult>(),
   },
-  listRuntimeDevices: {
-    channel: LlamaCppIpcChannel.ListRuntimeDevices,
-    args: z.tuple([BackendRefInputSchema]),
-    result: typed<LlamaCppRuntimeListDevicesResult>(),
-  },
   listBackends: {
     channel: LlamaCppIpcChannel.ListBackends,
     args: emptyArgs,
     result: typed<LlamaCppBackendListResult>(),
-  },
-  getBackendDownloadSize: {
-    channel: LlamaCppIpcChannel.GetBackendDownloadSize,
-    args: z.tuple([BackendRefInputSchema]),
-    result: typed<LlamaCppBackendDownloadSizeResult>(),
-  },
-  getBackendSelection: {
-    channel: LlamaCppIpcChannel.GetBackendSelection,
-    args: emptyArgs,
-    result: typed<LlamaCppBackendRef | undefined>(),
-  },
-  setBackendSelection: {
-    channel: LlamaCppIpcChannel.SetBackendSelection,
-    args: z.tuple([BackendRefInputSchema]),
-    result: typed<LlamaCppRuntimeInstallResult>(),
   },
   installBackend: {
     channel: LlamaCppIpcChannel.InstallBackend,
@@ -224,11 +199,6 @@ export const llamacppContract = defineIpcContract({
     channel: LlamaCppIpcChannel.UninstallBackend,
     args: z.tuple([BackendRefInputSchema]),
     result: typed<LlamaCppRuntimeUninstallResult>(),
-  },
-  getRuntimeCapabilities: {
-    channel: LlamaCppIpcChannel.GetRuntimeCapabilities,
-    args: emptyArgs,
-    result: typed<LlamaCppRuntimeCapabilities>(),
   },
   importRuntime: {
     channel: LlamaCppIpcChannel.ImportRuntime,
@@ -286,11 +256,6 @@ export const llamacppContract = defineIpcContract({
     args: emptyArgs,
     result: z.array(typed<LlamaCppRunningModel>()),
   },
-  refreshRunningModelBindings: {
-    channel: LlamaCppIpcChannel.RefreshRunningModelBindings,
-    args: emptyArgs,
-    result: z.void(),
-  },
   importModelFiles: {
     channel: LlamaCppIpcChannel.ImportModelFiles,
     args: z.tuple([z.array(z.string())]),
@@ -300,11 +265,6 @@ export const llamacppContract = defineIpcContract({
     channel: LlamaCppIpcChannel.DeleteModel,
     args: z.tuple([z.string()]),
     result: typed<LlamaCppDeleteModelResult>(),
-  },
-  showModel: {
-    channel: LlamaCppIpcChannel.ShowModel,
-    args: z.tuple([z.string()]),
-    result: typed<LlamaCppModel>(),
   },
   getModelPreferences: {
     channel: LlamaCppIpcChannel.GetModelPreferences,

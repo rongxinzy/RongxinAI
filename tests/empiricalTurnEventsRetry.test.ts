@@ -3,30 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CoworkErrorKind } from '../src/common/coworkError';
 import { setLanguage } from '../src/main/i18n';
 import {
-  LlamaCppAgentEligibilityReason,
-  type LlamaCppAgentModelEligibility,
-} from '../src/shared/llamacpp';
-import { ProviderName } from '../src/shared/providers';
-import type { NvidiaSmiSnapshot } from '../src/shared/hardware';
-
-// ── Hoisted mocks for LlamaCpp Running Model Registry ────────────────────────
-const hoistedRegistry = vi.hoisted(() => ({
-  isLlamaCppModelRunning: vi.fn(),
-  getLlamaCppModelAgentEligibility: vi.fn(),
-}));
-
-vi.mock('../src/main/libs/llamacppRunningModelRegistry', () => ({
-  isLlamaCppModelRunning: hoistedRegistry.isLlamaCppModelRunning,
-  getLlamaCppModelAgentEligibility: hoistedRegistry.getLlamaCppModelAgentEligibility,
-}));
-
-import {
-  assertLlamaCppWorkModeContext,
-  assertWorkModeContextWindow,
-  WORK_MODE_MIN_CONTEXT_WINDOW,
-} from '../src/main/libs/llamacppWorkModeContextGuard';
-import { resolveAutomaticLlamaCppContextSize } from '../src/shared/llamacpp/defaults';
-import {
   PiRuntimeTurnEvents,
   type PiRuntimeTurnHost,
 } from '../src/main/libs/agentEngine/piRuntimeTurnEvents';
@@ -35,8 +11,6 @@ import type { ActivePiSession } from '../src/main/libs/agentEngine/piRuntimeSess
 describe('Empirical Verification Harness — Context Window Guard, Sizing & Auto-Retry', () => {
   beforeEach(() => {
     setLanguage('en');
-    hoistedRegistry.isLlamaCppModelRunning.mockReset();
-    hoistedRegistry.getLlamaCppModelAgentEligibility.mockReset();
   });
 
   // Suite 3: Event flow & cancellation matrix in piRuntimeTurnEvents

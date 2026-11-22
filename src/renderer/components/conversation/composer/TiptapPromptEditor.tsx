@@ -39,6 +39,7 @@ interface TiptapPromptEditorProps {
   draftDoc?: Record<string, unknown> | null;
   externalVersion?: number;
   onChange: (value: string, doc?: Record<string, unknown>) => void;
+  onReady?: () => void;
   placeholder?: string;
   disabled?: boolean;
   attachments?: CoworkAttachment[];
@@ -68,6 +69,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
       draftDoc = null,
       externalVersion = 0,
       onChange,
+      onReady,
       placeholder = '',
       disabled = false,
       attachments = [],
@@ -272,6 +274,12 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
       editor,
       selector: ({ editor: active }) => (!active ? value.trim().length === 0 : active.isEmpty),
     });
+
+    useEffect(() => {
+      if (editor && mountedRef.current && !editor.isDestroyed && editor.view.dom.isConnected) {
+        onReady?.();
+      }
+    }, [editor, onReady]);
 
     useEffect(() => {
       if (!editor || editor.isDestroyed) return;

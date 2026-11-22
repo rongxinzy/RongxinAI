@@ -12,6 +12,7 @@ import {
 import path from 'node:path';
 import { createCoworkStoreHarness } from '../coworkStore/coworkStore.testHarness';
 import { CompanionAttachments } from './attachments';
+import { initializeCompanionSchema } from './schema';
 import { CompanionAttachmentIssue } from '../../shared/companion/constants';
 import {
   COMPANION_MAX_ATTACHMENT_BYTES,
@@ -30,6 +31,7 @@ afterEach(async () => {
 async function fixture() {
   const { db } = createCoworkStoreHarness();
   close.push(() => db.close());
+  initializeCompanionSchema(db);
   const directory = await mkdtemp('/tmp/companion-files-');
   directories.push(directory);
   const file = path.join(directory, 'notes.md');

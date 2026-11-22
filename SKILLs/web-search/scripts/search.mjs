@@ -7,11 +7,11 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_SERVER_URL } from '../server/standaloneControl.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_DIR = path.dirname(__dirname);
-const DEFAULT_SERVER_URL = 'http://127.0.0.1:8923';
 let ACTIVE_SERVER_URL = process.env.WEB_SEARCH_SERVER || DEFAULT_SERVER_URL;
 const CONNECTION_CACHE = path.join(PROJECT_DIR, '.connection');
 
@@ -163,16 +163,19 @@ function isConnectionRuntimeError(responseText) {
 }
 
 async function repairServerRuntime() {
+  const server = new URL(ACTIVE_SERVER_URL);
+  const local = new URL(DEFAULT_SERVER_URL);
+  if (![local.hostname, 'localhost'].includes(server.hostname) || server.port !== local.port || server.protocol !== local.protocol) {
+    return false;
+  }
   console.error('Detected broken web-search runtime, trying automatic repair...');
   fs.rmSync(CONNECTION_CACHE, { force: true });
-  runHelperScript('stop-server.mjs');
   const startRes = runHelperScript('start-server.mjs', [], { WEB_SEARCH_FORCE_REPAIR: '1' });
   if (startRes.status !== 0) {
     console.error('✗ Failed to repair web-search runtime');
     printRecentServerLogs();
     return false;
   }
-  await sleep(2000);
   return true;
 }
 
@@ -199,10 +202,8 @@ async function getConnection(attempt = 1) {
       if (await repairServerRuntime()) return getConnection(2);
     }
     if (attempt === 1 && isConnectionRuntimeError(launchRes.text)) {
-      fs.rmSync(CONNECTION_CACHE, { force: true });
-      runHelperScript('stop-server.mjs');
-      const repairStart = runHelperScript('start-server.mjs', [], { WEB_SEARCH_FORCE_REPAIR: '1' });
-      if (repairStart.status === 0) return getConnection(2);
+      await cleanupBrowser();
+      return getConnection(2);
     }
     console.error('✗ Failed to launch browser');
     console.error(launchRes.text);
@@ -215,10 +216,8 @@ async function getConnection(attempt = 1) {
       if (await repairServerRuntime()) return getConnection(2);
     }
     if (attempt === 1 && isConnectionRuntimeError(connectRes.text)) {
-      fs.rmSync(CONNECTION_CACHE, { force: true });
-      runHelperScript('stop-server.mjs');
-      const repairStart = runHelperScript('start-server.mjs', [], { WEB_SEARCH_FORCE_REPAIR: '1' });
-      if (repairStart.status === 0) return getConnection(2);
+      await cleanupBrowser();
+      return getConnection(2);
     }
     console.error('✗ Failed to connect to browser');
     console.error(connectRes.text);

@@ -11,8 +11,6 @@
 
 import { observeWorkbench } from '../../workbenchTask/observe';
 
-import { randomUUID } from 'crypto';
-
 import { classifyCoworkError } from '../../../common/coworkError';
 import { normalizeSingleExpertIds } from '../../../shared/cowork/sessionExperts';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
@@ -20,37 +18,48 @@ import { assertCoworkSubmissionContent } from '../../../shared/cowork/submission
 import { HarnessVersion } from '../../../shared/harness';
 import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
 import { WorkbenchContractKind, WorkbenchRunTrigger } from '../../../shared/workbenchTask';
-import type { CoworkMessage } from '../../coworkStore';
 import { resolveProjectMemoryContextForPiPrompt } from '../../memory/piRuntimeProjectMemoryPrompt';
 import { collectImagePathReferences } from './piImageInputFallback';
 import { resolvePiModel } from './piMagpiePiModel';
-import { resolvePiSessionModel } from './piRuntimeSettingsOverrides';
 import { resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 import { resolvePiSkillRoots } from './piSkillRoots';
 import {
   getPiModules,
   haveSameStringList,
   normalizeSkillIds,
+  persistPiUserMessage,
   preparePiPrompt,
   sendPiPrompt,
 } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
-import type { PiContinueOptions, PiSessionPatch } from './piRuntimeTypes';
+import {
+  isPiCompanionChatSession,
+  type PiContinueOptions,
+  type PiSessionPatch,
+} from './piRuntimeTypes';
 
 export async function continuePiRuntimeSession(
   host: PiRuntimeAdapterHost,
   sessionId: string,
   prompt: string,
-  options: PiContinueOptions = {},
+  options: Omit<PiContinueOptions, 'companionChat'> = {},
 ): Promise<void> {
   assertCoworkSubmissionContent({ prompt, imageAttachments: options.imageAttachments });
+  const companionChat = isPiCompanionChatSession(sessionId);
+  if (!companionChat) {
+    const capture = host.waitForPriorArtifactCapture(sessionId);
+    if (capture) await capture;
+  }
   host.evictIdleSessions();
   const explicitExpertIds = normalizeSingleExpertIds(options.expertIds);
   const nextUnattended = options.unattended === true;
   const active = host.activeSessions.get(sessionId);
   if (
-    host.isSessionRunning(sessionId) &&
-    (options.onSettled || active?.onSettled || host.initializingSessions.get(sessionId)?.onSettled)
+    active?.revalidatingModelScope ||
+    (host.isSessionRunning(sessionId) &&
+      (options.onSettled ||
+        active?.onSettled ||
+        host.initializingSessions.get(sessionId)?.onSettled))
   ) {
     throw new Error('A Pi run is already active in this session.');
   }
@@ -61,11 +70,13 @@ export async function continuePiRuntimeSession(
     console.log(
       `[PiRuntime] continueSession: session ${sessionId} not active or was aborted, recreating session`,
     );
-    const storedSession = host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false });
+    const storedSession = host
+      .getStore(sessionId)
+      ?.getSession(sessionId, 0, { includeArtifacts: false });
     const chatMode =
       options.sessionMode === CoworkSessionMode.Chat ||
       storedSession?.mode === CoworkSessionMode.Chat;
-    return await host.startSession(sessionId, prompt, {
+    return await host.launchSession(sessionId, prompt, {
       ...options,
       sessionMode: chatMode ? CoworkSessionMode.Chat : CoworkSessionMode.Work,
       skipInitialUserMessage: options._skipUserMessage,
@@ -98,6 +109,7 @@ export async function continuePiRuntimeSession(
   const mcpConfigurationChanged =
     !active.resourceState.chatMode && active.mcpConfigGeneration !== mcpConfigGeneration;
   const unattendedTopologyChanged = nextUnattended !== active.unattended;
+  const modelRouteChanged = !active.isRunning && !active.isCurrentModelRoute();
   // Native tools and resources capture cwd at creation. Reopen the same Pi
   // transcript with the new workspace rather than changing adapter metadata.
   if (
@@ -106,12 +118,20 @@ export async function continuePiRuntimeSession(
       options.modelOverride !== active.requestedModelOverride) ||
     !haveSameStringList(requestedExpertIds, active.requestedExpertIds) ||
     nextCodemode !== active.codemodeEnabled ||
-    unattendedTopologyChanged
+    unattendedTopologyChanged ||
+    modelRouteChanged
   ) {
     host.disposeSessionForRecreation(sessionId, active);
-    return await host.startSession(sessionId, prompt, {
+    return await host.launchSession(sessionId, prompt, {
       ...options,
       sessionMode: requestedSessionMode,
+      workspaceRoot: options.workspaceRoot ?? active.workspaceRoot,
+      modelOverride:
+        options.modelOverride ??
+        active.requestedModelOverride ??
+        (modelRouteChanged && typeof active.model.id === 'string' ? active.model.id : undefined),
+      approvalMode: options.approvalMode ?? active.approvalMode,
+      confirmationMode: active.confirmationMode,
       skipInitialUserMessage: options._skipUserMessage,
       systemPrompt: requestedSystemPrompt ?? active.requestedSystemPrompt,
       skillIds: requestedSkillIds,
@@ -144,7 +164,7 @@ export async function continuePiRuntimeSession(
     (active.pendingCadToolReload && nextSkillRoots['text-to-cad'])
   ) {
     host.disposeSessionForRecreation(sessionId, active);
-    return await host.startSession(sessionId, prompt, {
+    return await host.launchSession(sessionId, prompt, {
       ...options,
       sessionMode: requestedSessionMode,
       skipInitialUserMessage: options._skipUserMessage,
@@ -157,18 +177,35 @@ export async function continuePiRuntimeSession(
     });
   }
 
+  const signal = active.abortController.signal;
+  const isCurrentSession = () => host.activeSessions.get(sessionId) === active && !signal.aborted;
+  if (!active.isRunning && active.revalidateModelScope) {
+    active.revalidatingModelScope = true;
+    active.onSettled = options.onSettled;
+    try {
+      await active.revalidateModelScope();
+    } catch (error) {
+      if (!isCurrentSession()) return;
+      active.onSettled = undefined;
+      throw error;
+    } finally {
+      active.revalidatingModelScope = false;
+    }
+    if (!isCurrentSession()) return;
+  }
+
   if (options.approvalMode !== undefined) {
     active.approvalMode = options.approvalMode;
   }
   active.isRunning = true;
   active.onSettled = options.onSettled;
-  active.submissionToken = Symbol();
+  const submissionToken = Symbol();
+  active.submissionToken = submissionToken;
+  const isCurrentTurn = () => isCurrentSession() && active.submissionToken === submissionToken;
   active.turnFailed = false;
   active.errorSurfaced = false;
   active.retryNoticeEmitted = false;
   active.retryAttempts = 0;
-  const isCurrentSession = () =>
-    host.activeSessions.get(sessionId) === active && !active.abortController.signal.aborted;
 
   active.goalMode = nextGoalMode;
   active.planMode = nextPlanMode;
@@ -190,7 +227,7 @@ export async function continuePiRuntimeSession(
       // Pi reloads the existing ResourceLoader without replacing transcript
       // state, model, MCP tools, or custom expert tools.
       await active.piSession.reload();
-      if (!isCurrentSession()) return;
+      if (!isCurrentTurn()) return;
       active.requestedSystemPrompt = nextSystemPrompt;
       active.requestedSkillIds = requestedSkillIds;
       active.pendingSkillReload = false;
@@ -200,47 +237,42 @@ export async function continuePiRuntimeSession(
       }
       console.debug('[PiRuntime] reloaded session resources after prompt or skill change');
     } catch (error) {
-      if (!isCurrentSession()) return;
+      if (!isCurrentTurn()) return;
       active.resourceState.systemPrompt = previousSystemPrompt;
       active.resourceState.skillIds = previousSkillIds;
       active.resourceState.skillRoots = previousSkillRoots;
       active.isRunning = false;
       active.onSettled = undefined;
       const message = error instanceof Error ? error.message : String(error);
-      host.emit('error', sessionId, classifyCoworkError(message));
+      host.recovery.reportSessionError(sessionId, classifyCoworkError(message));
       throw error;
     }
   }
 
   active.workbenchRunId = null;
   observeWorkbench(sessionId, () => {
-    const workbenchTaskService = host.getWorkbenchTaskService();
+    const workbenchTaskService = host.getWorkbenchTaskService(sessionId);
     if (workbenchTaskService && !active.resourceState.chatMode) {
       const workflowKind = WorkbenchContractKind.GenericWork;
-      const workbench = workbenchTaskService.beginRun({
-        sessionId,
-        goal: prompt,
-        contract: { kind: workflowKind },
-        trigger: WorkbenchRunTrigger.Message,
-        preparedRunId: options._workbenchRunId,
-        preparedTaskId: options._workbenchTaskId,
-      });
-      active.workbenchRunId = workbench.run.id;
-      active.harnessModelProfile = {
-        ...active.harnessModelProfile,
-        workflowKind,
-      };
-      workbenchTaskService.measurement?.recordModelProfile(
-        workbench.run.id,
-        active.harnessModelProfile,
+      const workbench = workbenchTaskService.beginRun(
+        {
+          sessionId,
+          goal: prompt,
+          contract: { kind: workflowKind },
+          trigger: WorkbenchRunTrigger.Message,
+        },
+        {
+          context: {
+            model: active.harnessModelProfile.model,
+            provider: active.harnessModelProfile.provider,
+            reasoningProfile: active.harnessModelProfile.reasoningProfile,
+            workspaceRoot: active.workspaceRoot,
+            skillIds: requestedSkillIds,
+          },
+          profile: { workflowKind, harnessVersion: active.harnessModelProfile.harnessVersion },
+        },
       );
-      workbenchTaskService.updateRunContext(workbench.run.id, {
-        model: active.harnessModelProfile.model,
-        provider: active.harnessModelProfile.provider,
-        reasoningProfile: active.harnessModelProfile.reasoningProfile,
-        workspaceRoot: active.workspaceRoot,
-        skillIds: requestedSkillIds ?? [],
-      });
+      active.workbenchRunId = workbench.run.id;
     }
   });
   // Reset turn state
@@ -267,7 +299,9 @@ export async function continuePiRuntimeSession(
   active.summaryCheckpointWorkVersion = undefined;
   active.summaryCheckpointGoal = prompt;
   active.turnExperts = (
-    host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false })?.experts ?? []
+    active.requestedExpertIds.length
+      ? (host.getStore(sessionId)?.getSessionExperts(sessionId) ?? [])
+      : []
   )
     .filter(expert => active.requestedExpertIds.includes(expert.expertId))
     .map(expert => ({
@@ -276,64 +310,52 @@ export async function continuePiRuntimeSession(
       presetId: expert.packageId,
     }));
 
-  // Emit user message (persisted to SQLite, same as startSession).
-  if (!options._skipUserMessage) {
-    const storedImages = host.persistImageAttachments(sessionId, options.imageAttachments);
-    // Same rule as startSession: the chips on this user turn are the skills the
-    // user attached to this input, not the turn's execution set.
-    const attachedSkillIds = options.attachedSkillIds;
-    const userMsg = {
-      id: randomUUID(),
-      type: 'user',
-      content: prompt,
-      timestamp: Date.now(),
-      metadata:
-        attachedSkillIds?.length ||
-        storedImages?.length ||
-        options.fileAttachments?.length ||
-        active.turnExperts.length
-          ? {
-              ...(attachedSkillIds?.length ? { skillIds: attachedSkillIds } : {}),
-              ...(storedImages?.length ? { imageAttachments: storedImages } : {}),
-              ...(options.fileAttachments?.length
-                ? { fileAttachments: options.fileAttachments }
-                : {}),
-              ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
-            }
-          : undefined,
-    } as CoworkMessage;
-    const store = host.getStore();
-    const persisted = store ? store.addMessage(sessionId, userMsg) : userMsg;
-    host.emit('message', sessionId, persisted);
-  }
-
   try {
+    let imageAttachments = options.imageAttachments;
+    if (!companionChat && !options._skipUserMessage) {
+      imageAttachments = imageAttachments?.length
+        ? await host.persistImageAttachments(sessionId, imageAttachments, signal, isCurrentTurn)
+        : undefined;
+      if (!isCurrentTurn()) return;
+      assertCoworkSubmissionContent({ prompt, imageAttachments });
+      persistPiUserMessage(host, sessionId, prompt, {
+        skillIds: options.attachedSkillIds,
+        imageAttachments,
+        fileAttachments: options.fileAttachments,
+        experts: active.turnExperts.length ? active.turnExperts : undefined,
+      });
+    }
+
     const projectMemoryContext = await resolveProjectMemoryContextForPiPrompt({
       chatMode: active.resourceState.chatMode,
-      projectMemoryService: host.getProjectMemoryService(),
+      projectMemoryService: companionChat ? null : host.getProjectMemoryService(),
       workspaceRoot: active.workspaceRoot,
       sessionId,
       userPrompt: prompt,
-      signal: active.abortController.signal,
+      signal,
     });
-    if (!isCurrentSession()) return;
+    if (!isCurrentTurn()) return;
     active.pendingTurnMemory = { userPrompt: prompt, context: projectMemoryContext };
-    const continuedImagePrompt = preparePiPrompt(
+    const preparation = preparePiPrompt(
       prompt,
-      options.imageAttachments,
+      imageAttachments,
       host.recovery.imageInputVerdictForActive(active),
-      host.getOcrCommandFor(),
+      companionChat ? undefined : host.getOcrCommandFor(),
       collectImagePathReferences(options.fileAttachments),
+      signal,
     );
+    const continuedImagePrompt = preparation instanceof Promise ? await preparation : preparation;
+    if (!isCurrentTurn()) return;
     host.recovery.reportOmittedImages(sessionId, continuedImagePrompt);
     await sendPiPrompt(active.piSession, continuedImagePrompt);
   } catch (error) {
-    if (!isCurrentSession()) return;
+    if (!isCurrentTurn()) return;
     active.pendingTurnMemory = undefined;
     active.isRunning = false;
     active.onSettled = undefined;
     const message = error instanceof Error ? error.message : String(error);
-    host.emit('error', sessionId, classifyCoworkError(message));
+    host.recovery.failWorkbenchRun(sessionId, active.workbenchRunId, message);
+    host.recovery.reportSessionError(sessionId, classifyCoworkError(message));
     throw error;
   }
 }
@@ -357,43 +379,45 @@ export async function patchPiRuntimeSession(
 
   if (!patch.model) return;
 
-  try {
-    const pi = await getPiModules();
-    const resolvedModel = await resolvePiModel(pi, patch.model, active.modelRuntime, {
+  const pi = await getPiModules();
+  const resolvedModel = await resolvePiModel(
+    pi,
+    host.modelService,
+    patch.model,
+    active.modelRuntime,
+    {
       conversationId: sessionId,
       workload: active.resourceState.chatMode
         ? ZhiyuanModelPoolWorkload.Chat
         : ZhiyuanModelPoolWorkload.Work,
-    });
-    const model = resolvePiSessionModel(resolvedModel.model, active.resourceState.chatMode);
-    await active.piSession.setModel(model);
-    active.model = model;
-    active.requestedModelOverride = patch.model;
-    active.modelRuntime = resolvedModel.modelRuntime;
-    active.modelRequestOptions = resolvedModel.requestOptions;
-    active.capabilities = {
-      ...active.capabilities,
-      ...resolvedModel.capabilities,
-    };
-    const reasoning = resolvedModel.model.reasoning;
-    active.harnessModelProfile = {
-      provider: resolvedModel.providerName,
-      model:
-        typeof resolvedModel.model.id === 'string' ? resolvedModel.model.id : patch.model.trim(),
-      reasoningProfile:
-        typeof reasoning === 'string' ? reasoning : reasoning === true ? 'enabled' : 'default',
-      workflowKind: active.resourceState.chatMode
-        ? WorkbenchContractKind.Chat
-        : WorkbenchContractKind.GenericWork,
-      harnessVersion: HarnessVersion,
-    };
-    const maxOutputTokens = resolvedModel.maxOutputTokens;
-    if (active.resourceState.maxOutputTokens !== maxOutputTokens) {
-      active.resourceState.maxOutputTokens = maxOutputTokens;
-      await active.piSession.reload();
-    }
-    console.log('[PiRuntime] Model updated via patchSession:', patch.model);
-  } catch (err) {
-    console.warn('[PiRuntime] Failed to update model via patchSession:', err);
+    },
+  );
+  const model = resolvedModel.model;
+  await active.piSession.setModel(model);
+  active.model = model;
+  active.requestedModelOverride = patch.model;
+  active.modelRuntime = resolvedModel.modelRuntime;
+  active.isCurrentModelRoute = resolvedModel.isCurrentModelRoute;
+  active.revalidateModelScope = resolvedModel.revalidateModelScope;
+  active.capabilities = {
+    ...active.capabilities,
+    ...resolvedModel.capabilities,
+  };
+  const reasoning = resolvedModel.model.reasoning;
+  active.harnessModelProfile = {
+    provider: resolvedModel.providerName,
+    model: typeof resolvedModel.model.id === 'string' ? resolvedModel.model.id : patch.model.trim(),
+    reasoningProfile:
+      typeof reasoning === 'string' ? reasoning : reasoning === true ? 'enabled' : 'default',
+    workflowKind: active.resourceState.chatMode
+      ? WorkbenchContractKind.Chat
+      : WorkbenchContractKind.GenericWork,
+    harnessVersion: HarnessVersion,
+  };
+  const maxOutputTokens = resolvedModel.maxOutputTokens;
+  if (active.resourceState.maxOutputTokens !== maxOutputTokens) {
+    active.resourceState.maxOutputTokens = maxOutputTokens;
+    await active.piSession.reload();
   }
+  console.log('[PiRuntime] Model updated via patchSession:', patch.model);
 }

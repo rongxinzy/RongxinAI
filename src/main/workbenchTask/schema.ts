@@ -41,6 +41,7 @@ const CURRENT_SCHEMA_DDL = `
     ended_at INTEGER,
     context_json TEXT,
     failure_json TEXT,
+    terminal_after_sequence INTEGER,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     FOREIGN KEY (task_id) REFERENCES workbench_tasks(id),
@@ -65,27 +66,6 @@ const CURRENT_SCHEMA_DDL = `
 
   CREATE INDEX IF NOT EXISTS idx_workbench_run_events_run_sequence
     ON workbench_run_events(run_id, sequence);
-
-  CREATE TABLE IF NOT EXISTS workbench_artifacts (
-    id TEXT PRIMARY KEY,
-    task_id TEXT NOT NULL,
-    run_id TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    mime_type TEXT NOT NULL,
-    reference TEXT NOT NULL,
-    content_hash TEXT NOT NULL,
-    provenance TEXT NOT NULL,
-    verification_status TEXT NOT NULL,
-    metadata_json TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    FOREIGN KEY (task_id) REFERENCES workbench_tasks(id),
-    FOREIGN KEY (run_id) REFERENCES workbench_runs(id),
-    UNIQUE(run_id, reference, content_hash)
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_workbench_artifacts_task
-    ON workbench_artifacts(task_id, created_at);
 
   CREATE TABLE IF NOT EXISTS workbench_approvals (
     id TEXT PRIMARY KEY,
@@ -115,7 +95,6 @@ const CURRENT_SCHEMA_DDL = `
 
 function reconcileLegacyWorkbenchTaskSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'workbench_runs', 'context_json', 'TEXT');
-  addColumnIfMissing(db, 'workbench_runs', 'final_answer_json', 'TEXT');
 }
 
 const WORKBENCH_TASK_MIGRATIONS: Migration[] = [
@@ -123,6 +102,11 @@ const WORKBENCH_TASK_MIGRATIONS: Migration[] = [
     version: 1,
     name: 'legacy-reconcile',
     up: reconcileLegacyWorkbenchTaskSchema,
+  },
+  {
+    version: 2,
+    name: 'terminal-event-order',
+    up: db => addColumnIfMissing(db, 'workbench_runs', 'terminal_after_sequence', 'INTEGER'),
   },
 ];
 

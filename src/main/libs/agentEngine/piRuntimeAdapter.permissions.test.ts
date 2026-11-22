@@ -7,6 +7,7 @@
  */
 
 import {
+  createTestPiRuntime,
   adapter,
   createTemporaryWorkspace,
   mockCreateAgentSession,
@@ -42,7 +43,7 @@ describe('PiRuntimeAdapter', () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
+      const adapter = createTestPiRuntime({ workbenchTaskService: service });
       const requests: string[] = [];
       const interruptions: Array<{
         cause: string;
@@ -228,7 +229,7 @@ describe('PiRuntimeAdapter', () => {
       });
       adapter.on('permissionDismiss', requestId => dismissals.push(requestId));
 
-      await adapter.startSession('test', 'Ask me something');
+      await adapter.startSession('test', 'Ask me something', { confirmationMode: 'modal' });
       const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
         customTools?: Array<{
           name: string;
@@ -252,6 +253,7 @@ describe('PiRuntimeAdapter', () => {
         ],
       });
       await vi.waitFor(() => expect(permissionRequests).toHaveLength(1));
+      expect(adapter.getPendingModalPermissionSessionId()).toBe('test');
 
       adapter.respondToPermission(permissionRequests[0].requestId, {
         behavior: 'allow',
@@ -262,6 +264,7 @@ describe('PiRuntimeAdapter', () => {
         content: [{ text: 'Continue?: Yes' }],
       });
       expect(dismissals).toEqual([permissionRequests[0].requestId]);
+      expect(adapter.getPendingModalPermissionSessionId()).toBeUndefined();
     });
 
     it('keeps AskUserQuestion waits isolated to their owning Pi session', async () => {
@@ -326,24 +329,48 @@ describe('PiRuntimeAdapter', () => {
 
   // ── Cleanup ──
 
-  it('dismisses pending workbench approvals when a session stops', async () => {
+  it('expires and dismisses only the stopped session’s pending approval', async () => {
     const dismissals: string[] = [];
+    const requests = new Map<string, string>();
     adapter.on('permissionDismiss', requestId => dismissals.push(requestId));
-    await adapter.startSession('test', 'Hello');
-    const approvalSessionMap = (adapter as unknown as { approvalSessionMap: Map<string, string> })
-      .approvalSessionMap;
-    approvalSessionMap.set('approval-1', 'test');
+    adapter.on('permissionRequest', (sessionId, request) => {
+      requests.set(sessionId, request.requestId);
+    });
+    const approve = (sessionId: string) =>
+      adapter.authorizeToolCall({
+        sessionId,
+        runId: null,
+        toolCallId: sessionId,
+        toolName: 'bash',
+        toolInput: { command: 'printf test' },
+        approvalMode: WorkbenchApprovalMode.Ask,
+      });
+    await adapter.startSession('a', 'A', { confirmationMode: 'modal' });
+    await adapter.startSession('b', 'B', { confirmationMode: 'modal' });
+    await adapter.startSession('channel', 'Channel', { confirmationMode: 'text' });
+    const channel = approve('channel');
+    const first = approve('a');
+    const second = approve('b');
+    expect(requests.size).toBe(3);
+    expect(adapter.getPendingModalPermissionSessionId()).toBe('a');
 
-    adapter.stopSession('test');
+    adapter.stopSession('a');
 
-    expect(approvalSessionMap.has('approval-1')).toBe(false);
-    expect(dismissals).toEqual(['approval-1']);
+    await expect(first).resolves.toMatchObject({ allow: false });
+    expect(dismissals).toEqual([requests.get('a')]);
+    expect(adapter.getPendingModalPermissionSessionId()).toBe('b');
+    adapter.respondToPermission(requests.get('b')!, { behavior: 'allow' });
+    await expect(second).resolves.toEqual({ allow: true });
+    expect(dismissals).toEqual([requests.get('a'), requests.get('b')]);
+    expect(adapter.getPendingModalPermissionSessionId()).toBeUndefined();
+    adapter.respondToPermission(requests.get('channel')!, { behavior: 'deny' });
+    await expect(channel).resolves.toMatchObject({ allow: false });
   });
 
   describe('onSessionDeleted', () => {
     it('should stop the session', async () => {
       await adapter.startSession('test', 'Hello');
-      adapter.onSessionDeleted('test');
+      await adapter.onSessionDeleted('test');
       expect(adapter.isSessionActive('test')).toBe(false);
     });
   });

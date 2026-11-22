@@ -11,8 +11,10 @@
 
 import { randomUUID } from 'crypto';
 
-import type { CoworkMessage, CoworkStore } from '../../coworkStore';
+import type { CoworkMessage } from '../../coworkStore';
+import type { CoworkMessageStore } from '../../coworkStore/messageStore';
 import { t } from '../../i18n';
+import { CoworkSessionStatus } from '../../../shared/cowork/constants';
 import { hasReportedTokenUsage } from '../../../shared/cowork/messageUsage';
 import type { ActivePiSession, PiStartupLatency, PiUsage } from './piRuntimeSessionState';
 import {
@@ -22,7 +24,12 @@ import {
 } from './piRuntimeSessionState';
 
 export interface PiAssistantTranscriptHost {
-  getStore(): CoworkStore | null;
+  getMessageStore(
+    sessionId: string,
+  ): Pick<
+    CoworkMessageStore,
+    'addMessage' | 'deleteMessage' | 'getMessage' | 'updateMessage'
+  > | null;
   emitMessage(sessionId: string, message: CoworkMessage): void;
   emitMessageUpdate(
     sessionId: string,
@@ -81,9 +88,9 @@ export class PiAssistantTranscript {
         entry.kind === 'thinking'
           ? { isStreaming: true, isFinal: false, isThinking: true, streamReopen: true }
           : { isStreaming: true, isFinal: false, streamReopen: true };
-      if (this.host.getStore()) {
+      if (this.host.getMessageStore(sessionId)) {
         this.host
-          .getStore()
+          .getMessageStore(sessionId)
           .updateMessage(sessionId, messageId, { metadata }, { touchUpdatedAt: false });
       }
       this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
@@ -161,7 +168,7 @@ export class PiAssistantTranscript {
     messageId: string,
     active: ActivePiSession,
   ): void {
-    const store = this.host.getStore();
+    const store = this.host.getMessageStore(sessionId);
     if (!store?.deleteMessage) return;
     const existing = store.getMessage(sessionId, messageId);
     if (!existing || existing.metadata?.isThinking) return;
@@ -214,10 +221,12 @@ export class PiAssistantTranscript {
     if (kind === 'thinking') {
       active.thinkingLifecycle.start(seed.timestamp);
     }
-    const created = this.host.getStore() ? this.host.getStore().addMessage(sessionId, seed) : seed;
+    const created = this.host.getMessageStore(sessionId)
+      ? this.host.getMessageStore(sessionId).addMessage(sessionId, seed)
+      : seed;
     if (kind === 'thinking') active.thinkingMessageId = created.id;
     else active.assistantMessageId = created.id;
-    if (this.host.getStore()) {
+    if (this.host.getMessageStore(sessionId)) {
       this.persistedContentLengthByMessageId.set(created.id, initialContent.length);
       this.lastCheckpointAtByMessageId.set(created.id, Date.now());
     }
@@ -230,7 +239,7 @@ export class PiAssistantTranscript {
    * message. SQLite only persists a checkpoint of the body (growth threshold
    * or interval floor; the finalize write is authoritative); the full-text bus
    * event goes out — throttled — only while the session has streaming-text
-   * subscribers (IM mirrors, coding lanes). It never feeds the renderer stream.
+   * subscribers (coding lanes). It never feeds the renderer stream.
    */
   streamInto(
     sessionId: string,
@@ -296,8 +305,10 @@ export class PiAssistantTranscript {
             isFinal: true,
             ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
           };
-    if (this.host.getStore()) {
-      this.host.getStore().updateMessage(sessionId, messageId, { content, metadata });
+    if (this.host.getMessageStore(sessionId)) {
+      this.host
+        .getMessageStore(sessionId)
+        .updateMessage(sessionId, messageId, { content, metadata });
     }
     this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
     this.noteFinalized(sessionId, messageId);
@@ -345,9 +356,9 @@ export class PiAssistantTranscript {
       const metadata = finalize ? finalMetadata : streamingMetadata;
       this.flushPendingMessageUpdate(sessionId, entry.messageId, content, metadata);
       if (!finalize) {
-        if (this.host.getStore()) {
+        if (this.host.getMessageStore(sessionId)) {
           this.host
-            .getStore()
+            .getMessageStore(sessionId)
             .updateMessage(
               sessionId,
               entry.messageId,
@@ -372,9 +383,9 @@ export class PiAssistantTranscript {
             // A placeholder row that survives (it holds streamed text) must
             // still get the final metadata so later loads stop treating it as
             // streaming; a removed row makes this write a no-op.
-            if (this.host.getStore()) {
+            if (this.host.getMessageStore(sessionId)) {
               this.host
-                .getStore()
+                .getMessageStore(sessionId)
                 .updateMessage(
                   sessionId,
                   entry.messageId,
@@ -388,14 +399,14 @@ export class PiAssistantTranscript {
         }
       }
       this.clearThrottleMapsForMessage(entry.messageId);
-      if (!this.host.getStore()) continue;
-      const existing = this.host.getStore().getMessage(sessionId, entry.messageId);
+      if (!this.host.getMessageStore(sessionId)) continue;
+      const existing = this.host.getMessageStore(sessionId).getMessage(sessionId, entry.messageId);
       const mergedMetadata = {
         ...existing?.metadata,
         ...metadata,
       };
       this.host
-        .getStore()
+        .getMessageStore(sessionId)
         .updateMessage(
           sessionId,
           entry.messageId,
@@ -412,10 +423,10 @@ export class PiAssistantTranscript {
     this.finalizeMessage(sessionId, active, 'thinking', active.thinkingText);
   }
 
-  markFinalAnswer(sessionId: string, active: ActivePiSession): void {
+  markFinalAnswer(sessionId: string, active: ActivePiSession): boolean {
     const messageId = active.lastCompletedAnswerMessageId;
     const content = active.lastCompletedAnswerText;
-    if (!messageId || !content.trim()) return;
+    if (!messageId || !content.trim()) return false;
 
     const metadata = {
       isStreaming: false,
@@ -423,14 +434,16 @@ export class PiAssistantTranscript {
       isFinalAnswer: true,
       ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
     };
-    if (this.host.getStore()) {
-      const message = this.host.getStore().getMessage(sessionId, messageId);
-      this.host.getStore().updateMessage(sessionId, messageId, {
-        content,
-        metadata: { ...message?.metadata, ...metadata },
-      });
-    }
+    const store = this.host.getMessageStore(sessionId);
+    const message = store?.getMessage(sessionId, messageId);
+    const settled = store?.updateMessage(
+      sessionId,
+      messageId,
+      { metadata: { ...message?.metadata, ...metadata } },
+      { sessionStatus: CoworkSessionStatus.Idle },
+    );
     this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
+    return settled === true;
   }
 
   /**
@@ -480,7 +493,7 @@ export class PiAssistantTranscript {
       return;
     }
 
-    const message = this.host.getStore()?.getMessage(sessionId, messageId);
+    const message = this.host.getMessageStore(sessionId)?.getMessage(sessionId, messageId);
     if (!message) return;
 
     const usage = hasValidContextUsage
@@ -522,7 +535,7 @@ export class PiAssistantTranscript {
         : {}),
       ...(reportedUsage && hasReportedTokenUsage(reportedUsage) ? { usage: reportedUsage } : {}),
     };
-    this.host.getStore()?.updateMessage(sessionId, messageId, { metadata });
+    this.host.getMessageStore(sessionId)?.updateMessage(sessionId, messageId, { metadata });
     this.host.emitMessageUpdate(sessionId, messageId, message.content, metadata);
   }
 
@@ -547,7 +560,7 @@ export class PiAssistantTranscript {
     metadata: Record<string, unknown>,
   ): void {
     this.noteThrottleMessage(sessionId, messageId);
-    if (!this.host.getStore()) return;
+    if (!this.host.getMessageStore(sessionId)) return;
     const persistedLength = this.persistedContentLengthByMessageId.get(messageId);
     if (persistedLength !== undefined) {
       const growth = content.length - persistedLength;
@@ -567,7 +580,7 @@ export class PiAssistantTranscript {
     this.persistedContentLengthByMessageId.set(messageId, content.length);
     this.lastCheckpointAtByMessageId.set(messageId, Date.now());
     this.host
-      .getStore()
+      .getMessageStore(sessionId)
       .updateMessage(sessionId, messageId, { content, metadata }, { touchUpdatedAt: false });
   }
 

@@ -9,6 +9,7 @@ const { parseArgs } = require('node:util');
 const {
   TARGETS,
   upstream,
+  pinnedSource,
   targetFor,
   binaryName,
   sha256File,
@@ -16,6 +17,7 @@ const {
 } = require('./magpie-runtime.cjs');
 
 const projectRoot = path.resolve(__dirname, '..');
+const workCallerPatch = path.join(projectRoot, 'resources', 'magpie', 'work-caller.patch');
 
 function run(command, args, options = {}) {
   return execFileSync(command, args, { stdio: 'inherit', windowsHide: true, ...options });
@@ -150,6 +152,9 @@ function build(options = {}) {
       ? Object.keys(TARGETS)
       : [options.target || `${process.platform}-${process.arch}`];
   keys.forEach(targetFor);
+  const patch = fs.readFileSync(workCallerPatch);
+  if (crypto.createHash('sha256').update(patch).digest('hex') !== upstream.patchSha256)
+    throw new Error('Magpie Work caller patch SHA-256 mismatch');
   const cache = path.join(projectRoot, '.cache', 'magpie');
   const outputRoot = path.join(projectRoot, 'resources', 'magpie');
   if (!options.force) {
@@ -211,16 +216,26 @@ function build(options = {}) {
       if (sha256File(path.join(source, filename)) !== expected)
         throw new Error(`Pinned ${filename} SHA-256 mismatch`);
     }
+    run('git', ['-c', 'core.autocrlf=false', 'apply', '--whitespace=error-all', '-'], {
+      cwd: source,
+      env: { ...env, GIT_CEILING_DIRECTORIES: work },
+      input: patch,
+      stdio: ['pipe', 'inherit', 'inherit'],
+    });
     const sourceTreeSha256 = treeDigest(source);
+    if (sourceTreeSha256 !== upstream.patchedTreeSha256)
+      throw new Error('Magpie patched source SHA-256 mismatch');
     for (const key of keys) {
       const target = targetFor(key);
       const staging = path.join(work, key);
       fs.mkdirSync(staging);
       const executable = path.join(staging, binaryName(key));
-      console.log(`[magpie-build] Building unchanged ${upstream.commit} for ${key}`);
+      console.log(
+        `[magpie-build] Building pinned ${upstream.commit} with the Work caller patch for ${key}`,
+      );
       run(go, buildArguments(executable), { cwd: source, env: cleanGoEnvironment(cache, target) });
       if (treeDigest(source) !== sourceTreeSha256)
-        throw new Error('The build modified upstream source files');
+        throw new Error('The build modified the patched source files');
       fs.chmodSync(executable, 0o755);
       const sha256 = sha256File(executable);
       const manifest = {
@@ -232,15 +247,7 @@ function build(options = {}) {
         sha256,
         buildSha256: sha256,
         sizeBytes: fs.statSync(executable).size,
-        source: {
-          repository: upstream.repository,
-          commit: upstream.commit,
-          tree: upstream.tree,
-          archiveSha256: upstream.archiveSha256,
-          treeSha256: sourceTreeSha256,
-          goModSha256: upstream.goModSha256,
-          goSumSha256: upstream.goSumSha256,
-        },
+        source: pinnedSource,
         toolchain: { version: upstream.goVersion },
         build: {
           version: upstream.version,
@@ -288,7 +295,7 @@ if (require.main === module) {
     });
     if (values.help) {
       console.log(
-        'Build unchanged, pinned Magpie CLI source.\nUsage: bun run magpie:build -- --target all|linux-x64|linux-arm64|darwin-x64|darwin-arm64|win32-x64|win32-arm64 [--source clean-checkout] [--go /path/to/go]\nRequires Git, tar, and the exact official Go SDK pinned in resources/magpie/upstream.json.',
+        'Build pinned Magpie CLI source with the verified Work caller patch.\nUsage: bun run magpie:build -- --target all|linux-x64|linux-arm64|darwin-x64|darwin-arm64|win32-x64|win32-arm64 [--source clean-checkout] [--go /path/to/go]\nRequires Git, tar, and the exact official Go SDK pinned in resources/magpie/upstream.json.',
       );
     } else build(values);
   } catch (error) {

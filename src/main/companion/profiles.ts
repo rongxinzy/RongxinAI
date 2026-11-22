@@ -18,10 +18,12 @@ const profile = z.object({
   createdAt: z.number().int().nonnegative(),
 });
 const saved = z.object({ activePetId: z.uuid(), profiles: z.array(profile).min(1).max(32) });
+type ProfileSnapshot = z.infer<typeof saved>;
 
 export interface CompanionProfileStore {
   get<T>(key: string): T | undefined;
   set(key: string, value: unknown): void;
+  onDidChange(key: string, listener: (value: unknown, previous: unknown) => void): () => void;
 }
 
 /** One host-owned identity collection; appearances never serve as storage keys. */
@@ -31,16 +33,21 @@ export class CompanionProfiles {
     private readonly available: (id: string) => boolean = isDesktopPetReleased,
   ) {}
 
-  snapshot(): { activePetId: string; profiles: CompanionProfile[] } {
-    const result = saved.safeParse(this.store.get(STORE_KEY));
-    if (result.success) {
-      const ids = new Set(result.data.profiles.map(item => item.petId));
-      if (ids.size === result.data.profiles.length && ids.has(result.data.activePetId))
-        return result.data;
-      throw new Error('Companion identities are inconsistent');
-    }
+  private storedSnapshot(): ProfileSnapshot | undefined {
+    const raw = this.store.get(STORE_KEY);
+    if (raw === undefined) return;
     // Never replace an existing malformed identity collection and strand its history.
-    if (this.store.get(STORE_KEY) !== undefined) throw new Error('Invalid companion identities');
+    const result = saved.safeParse(raw);
+    if (!result.success) throw new Error('Invalid companion identities');
+    const ids = new Set(result.data.profiles.map(item => item.petId));
+    if (ids.size !== result.data.profiles.length || !ids.has(result.data.activePetId))
+      throw new Error('Companion identities are inconsistent');
+    return result.data;
+  }
+
+  snapshot(): ProfileSnapshot {
+    const state = this.storedSnapshot();
+    if (state) return state;
     const profiles = DESKTOP_PET_BUILTINS.map(item => ({
       petId: randomUUID(),
       personaId: item.id,
@@ -55,8 +62,7 @@ export class CompanionProfiles {
     return value;
   }
 
-  visibleSnapshot(): { activePetId: string; profiles: CompanionProfile[] } {
-    const state = this.snapshot();
+  private visibleProfiles(state: ProfileSnapshot): ProfileSnapshot {
     const profiles = state.profiles
       .filter(item => this.available(item.personaId))
       .map(item =>
@@ -65,6 +71,31 @@ export class CompanionProfiles {
     const active = profiles.find(item => item.petId === state.activePetId) ?? profiles[0];
     if (!active) throw new Error('No released companion identity is available');
     return { activePetId: active.petId, profiles };
+  }
+
+  visibleSnapshot(): ProfileSnapshot {
+    return this.visibleProfiles(this.snapshot());
+  }
+
+  onChanged(listener: (activePetChanged: boolean) => void): () => void {
+    return this.store.onDidChange(STORE_KEY, (value, previous) => {
+      if (previous === undefined) return;
+      listener(
+        (value as ProfileSnapshot | undefined)?.activePetId !==
+          (previous as ProfileSnapshot | null)?.activePetId,
+      );
+    });
+  }
+
+  storedActive(): CompanionProfile | undefined {
+    try {
+      const state = this.storedSnapshot();
+      if (!state) return;
+      const visible = this.visibleProfiles(state);
+      return visible.profiles.find(item => item.petId === visible.activePetId);
+    } catch (error) {
+      console.warn('[Companion] Failed to restore the active appearance:', error);
+    }
   }
 
   active(): CompanionProfile {

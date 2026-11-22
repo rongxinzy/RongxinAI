@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { open } from 'fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { expect, test, vi } from 'vitest';
@@ -10,15 +11,20 @@ import { prefillInstallInputFromMarketplace } from './llamacppModelInstallation'
 import { syncModelCatalog } from './modelCatalogSync';
 import { toCatalogUpsert } from './modelCatalogUpdateTypes';
 
+vi.mock('fs/promises', async importOriginal => {
+  const fs = await importOriginal<typeof import('fs/promises')>();
+  return { ...fs, open: vi.fn(fs.open) };
+});
+
 const bundled = path.resolve('resources/model-catalog.sqlite');
 const seedRepo = 'Qwen/Qwen3-0.6B-GGUF';
 
-test('the bundled catalog searches, pages, and resolves an install with the remote catalog unavailable', async () => {
+test('the bundled catalog searches, pages, and resolves verified installs offline', async () => {
   const data = mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-catalog-'));
   try {
-    const network = vi.fn(() => Promise.reject(new Error('Overseas catalog blocked')));
     const catalog = new LocalModelCatalog(bundled, data);
-    const service = new MarketplaceService(() => '', { localCatalog: catalog, fetchImpl: network });
+    const modelsDir = path.join(data, 'models');
+    const service = new MarketplaceService(() => modelsDir, catalog);
     const first = await service.search({ query: 'qwen', task: 'chat', limit: 1 });
     expect(first.source).toBe('local-sqlite');
     expect(first.totalCount).toBeGreaterThan(10);
@@ -34,7 +40,15 @@ test('the bundled catalog searches, pages, and resolves an install with the remo
     expect(new URL(install.downloadUrl!).hostname).toBe('www.modelscope.cn');
     expect(install.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(install.revision).toMatch(/^[a-f0-9]{40}$/);
-    expect(network).not.toHaveBeenCalled();
+    const installedPath = path.join(modelsDir, 'modelscope', seedRepo, install.filePath!);
+    mkdirSync(path.dirname(installedPath), { recursive: true });
+    writeFileSync(installedPath, 'GGUF');
+    const installed = await service.search({ query: seedRepo });
+    expect(installed.models).toContainEqual(
+      expect.objectContaining({ repoId: seedRepo, installed: true, installedPath }),
+    );
+    const signal = AbortSignal.abort(new Error('Cancelled'));
+    await expect(service.search({ query: seedRepo }, signal)).rejects.toThrow('Cancelled');
   } finally {
     rmSync(data, { recursive: true, force: true });
   }
@@ -103,6 +117,61 @@ test('a mismatched delta cannot replace the last usable local catalog', async ()
       }),
     ).rejects.toThrow('does not match');
     expect(new LocalModelCatalog(bundled, data).find(seedRepo)).not.toBeNull();
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
+
+test('a staged update stays unpublished if its asynchronous disk sync fails', async () => {
+  const data = mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-catalog-'));
+  try {
+    const catalog = new LocalModelCatalog(bundled, data);
+    const { revision, updatedAt } = catalog.getVersion();
+    const model = catalog.find(seedRepo)!;
+    await catalog.applyUpdate({
+      baseRevision: revision,
+      revision: revision + 1,
+      updatedAt,
+      upserts: [toCatalogUpsert(0, { ...model, name: 'Published revision' })],
+      deletes: [],
+    });
+
+    const syncStarted = Promise.withResolvers<void>();
+    const diskSync = Promise.withResolvers<void>();
+    const { open: actualOpen } = await vi.importActual<typeof import('fs/promises')>('fs/promises');
+    vi.mocked(open).mockImplementationOnce(async (...args) => {
+      const file = await actualOpen(...args);
+      vi.spyOn(file, 'sync').mockImplementation(() => {
+        syncStarted.resolve();
+        return diskSync.promise;
+      });
+      return file;
+    });
+
+    const updating = catalog.applyUpdate({
+      baseRevision: revision + 1,
+      revision: revision + 2,
+      updatedAt,
+      upserts: [toCatalogUpsert(0, { ...model, name: 'Unpublished revision' })],
+      deletes: [],
+    });
+    const phase = await Promise.race([
+      syncStarted.promise.then(() => 'sync'),
+      updating.then(() => 'published'),
+    ]);
+    expect(phase).toBe('sync');
+    try {
+      expect(new LocalModelCatalog(bundled, data).find(seedRepo)?.name).toBe('Published revision');
+      expect(readdirSync(data)).not.toContain(`model-catalog-${revision + 2}.sqlite`);
+    } finally {
+      diskSync.reject(new Error('Injected disk sync failure'));
+      await expect(updating).rejects.toThrow('Injected disk sync failure');
+    }
+    expect(new LocalModelCatalog(bundled, data).getVersion().revision).toBe(revision + 1);
+    expect(readdirSync(data).toSorted()).toEqual([
+      `model-catalog-${revision + 1}.sqlite`,
+      'model-catalog-current',
+    ]);
   } finally {
     rmSync(data, { recursive: true, force: true });
   }

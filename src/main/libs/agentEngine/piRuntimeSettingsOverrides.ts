@@ -1,10 +1,4 @@
-/**
- * Pi SettingsManager and session model budget overrides.
- *
- * Extracted from PiRuntimeAdapter: pure helpers that build the in-memory Pi
- * settings manager, select native platform tools (PowerShell on Windows), and
- * clamp model/output budgets to Cowork chat-mode limits.
- */
+/** In-memory Pi settings plus application transport and platform tool defaults. */
 
 import { applyPiEmbeddedHttpIdleTimeout } from './piHttpIdleTimeout';
 import { type PiModules, type PiSettingsManager } from './piRuntimeSessionState';
@@ -29,11 +23,4 @@ export function createPiSettingsManager(pi: PiModules, cwd: string): PiSettingsM
   applyPiEmbeddedHttpIdleTimeout(settingsManager);
   applyPiPlatformToolOverrides(settingsManager);
   return settingsManager;
-}
-
-export function resolvePiSessionModel(
-  model: Record<string, unknown>,
-  _chatMode: boolean,
-): Record<string, unknown> {
-  return model;
 }

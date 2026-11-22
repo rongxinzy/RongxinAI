@@ -2,6 +2,132 @@ import { expect, test } from '@playwright/test';
 import { attachConsoleGuards, home, previewSearch } from '../shared/harness.mjs';
 import { historyMessages, installConversation } from '../shared/conversationFixture.mjs';
 
+test('Email AI Diagnostics prefills and focuses after the first composer finishes loading', async ({
+  page,
+  baseURL,
+}) => {
+  const errors = [];
+  attachConsoleGuards(page, errors, 'ask-ai');
+  const composer = Promise.withResolvers();
+  await page.route(
+    '**/src/renderer/components/conversation/ConversationStage.tsx*',
+    async route => {
+      await composer.promise;
+      await route.continue();
+    },
+  );
+
+  const editor = page.locator('.cowork-prompt-editor');
+  const failure = 'Fixture IMAP connection refused';
+  const readDraft = () =>
+    page.evaluate(async () => {
+      const { store } = await import(
+        new URL('/src/renderer/store/index.ts', window.location.href).href
+      );
+      const { PromptDraftKey } = await import(
+        new URL('/src/renderer/components/cowork/promptInput/constants.ts', window.location.href)
+          .href
+      );
+      const { draftPrompts, promptFocusRequest } = store.getState().cowork;
+      return { stored: draftPrompts[PromptDraftKey.Home], request: promptFocusRequest };
+    });
+  try {
+    await page.goto(`${baseURL}${previewSearch()}`, { waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveTitle('ZhiYuan Agent');
+    await page.getByText('Login', { exact: true }).first().click();
+    await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Messaging', exact: true }).click();
+    await page
+      .getByText('Email Settings', { exact: true })
+      .locator('xpath=ancestor::div[button][1]')
+      .getByRole('button', { name: 'Configure', exact: true })
+      .click();
+    const email = page.getByRole('dialog', { name: 'Email Settings' });
+    await expect(email).toBeVisible();
+    await page.evaluate(message => {
+      window.electron.skills.testEmailConnectivity = async () => ({
+        success: true,
+        result: {
+          verdict: 'fail',
+          testedAt: Date.now(),
+          checks: [{ code: 'imap_connection', level: 'fail', message, durationMs: 20 }],
+        },
+      });
+    }, failure);
+    await email.getByRole('combobox', { name: /Email Provider/ }).click();
+    await page.getByRole('option', { name: 'Gmail', exact: true }).click();
+    await email.getByLabel(/Email Address/).fill('diagnostics@example.test');
+    const password = 'preview-fixture-password';
+    await email.getByLabel(/^Password/).fill(password);
+    await email.getByRole('button', { name: 'Test Connectivity', exact: true }).click();
+    await expect(email.getByText(failure, { exact: true })).toBeVisible();
+    await expect(editor).toHaveCount(0);
+
+    await page.clock.install();
+    await email.getByRole('button', { name: 'AI Diagnostics', exact: true }).click();
+    await page.clock.runFor(100);
+    await expect(editor).toHaveCount(0);
+    const { request } = await readDraft();
+    expect(request.text).toContain(`IMAP connection failed: ${failure}`);
+    expect(request.text).not.toContain(password);
+    composer.resolve();
+    await expect(editor).toContainText(failure);
+    await expect(editor).toBeFocused();
+    expect((await editor.innerText()).split(failure)).toHaveLength(2);
+    await expect.poll(readDraft).toEqual({ stored: request.text, request: null });
+    await expect(page.locator('[data-turn-id]')).toHaveCount(0);
+    await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+
+    const original = await editor.elementHandle();
+    await page.evaluate(async draftKey => {
+      const { store } = await import(
+        new URL('/src/renderer/store/index.ts', window.location.href).href
+      );
+      const { requestPromptFocus } = await import(
+        new URL('/src/renderer/store/slices/coworkSlice.ts', window.location.href).href
+      );
+      store.dispatch(requestPromptFocus({ draftKey, text: 'Updated email diagnostics' }));
+    }, request.draftKey);
+    await expect(editor).toHaveText('Updated email diagnostics');
+    await expect(editor).toBeFocused();
+    await expect.poll(readDraft).toEqual({ stored: 'Updated email diagnostics', request: null });
+    await editor.fill('Keep these diagnostic edits');
+    await page.clock.runFor(1_000);
+    await expect(editor).toHaveText('Keep these diagnostic edits');
+    expect(await original.evaluate(node => node.isConnected)).toBe(true);
+    expect(errors).toEqual([]);
+  } finally {
+    composer.resolve();
+  }
+});
+
+test('a new task keeps the home draft when a prefill targeted the previous session', async ({
+  page,
+  baseURL,
+}) => {
+  await home(page, baseURL, previewSearch());
+  const editor = page.locator('.cowork-prompt-editor');
+  await editor.fill('Keep this home draft');
+  await installConversation(page, historyMessages(1, 1));
+  await editor.fill('Keep this session draft');
+
+  await page.getByRole('button', { name: 'New Task', exact: true }).evaluate(async button => {
+    const { store } = await import(
+      new URL('/src/renderer/store/index.ts', window.location.href).href
+    );
+    const { requestPromptFocus } = await import(
+      new URL('/src/renderer/store/slices/coworkSlice.ts', window.location.href).href
+    );
+    const draftKey = store.getState().cowork.currentSessionId;
+    store.dispatch(requestPromptFocus({ draftKey, text: 'For the previous session' }));
+    button.click();
+  });
+  await expect(editor).toHaveText('Keep this home draft');
+  await expect(editor).toBeFocused();
+  await installConversation(page, historyMessages(1, 1));
+  await expect(editor).toHaveText('Keep this session draft');
+});
+
 test('mention Enter/Tab selects a skill; first submission preserves the editor and focus', async ({
   page,
   baseURL,

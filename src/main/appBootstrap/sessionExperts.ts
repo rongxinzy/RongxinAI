@@ -7,7 +7,8 @@ import {
   CoworkSessionExpertSource,
   normalizeSingleExpertIds,
 } from '../../shared/cowork/sessionExperts';
-import { resolveBundledPresetExpertSnapshot } from '../presetExpertSnapshot';
+import path from 'node:path';
+import { readPresetExpertAsync } from '../workbenchTask/artifactWorkerPool';
 import { getAgentManager, getSkillManager, getStore } from './runtimeServices';
 import type { AppConfigSettings } from './appConfigSettings';
 
@@ -38,7 +39,9 @@ export const haveSameExpertIds = (
   );
 };
 
-export const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessionExpertInput[] => {
+export const resolveSessionExpertSnapshots = async (
+  expertIds: string[],
+): Promise<CoworkSessionExpertInput[]> => {
   const normalizedExpertIds = normalizeSingleExpertIds(expertIds);
   const snapshots: CoworkSessionExpertInput[] = [];
   for (const expertId of normalizedExpertIds) {
@@ -60,11 +63,14 @@ export const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessio
       const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
       // The main session loads only the selected agent's file: the lead for
       // teams, the single file for standalone agents.
-      const liveSnapshot = resolveBundledPresetExpertSnapshot(
-        bundledSkillsRoot,
-        packageId,
-        expert.id,
-      );
+      const liveSnapshot = await readPresetExpertAsync({
+        skillsRoot: path.resolve(bundledSkillsRoot),
+        presetId: packageId,
+        agentId: expert.id,
+      }).catch((error): null => {
+        console.warn(`[PresetExpert] unable to load live preset '${packageId}':`, error);
+        return null;
+      });
       if (liveSnapshot) {
         promptSnapshot = liveSnapshot.promptSnapshot;
         skillIds = liveSnapshot.skillIds;

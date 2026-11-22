@@ -15,6 +15,7 @@
 
 /** Errors thrown or returned verbatim, with no trailing detail. */
 export const CodingErrorMessage = {
+  RoomShuttingDown: 'Coding Room is shutting down.',
   // Workspace
   WorkspaceNotFound: 'Coding workspace was not found.',
   WorkspaceRootRequired: 'Coding workspace root is required.',
@@ -114,9 +115,6 @@ export const CodingErrorMessage = {
   LaneTurnActive: 'This coding agent lane already has an active turn.',
   RecoveryNotRequired: 'The coding session does not require recovery confirmation.',
   HandoffSameMission: 'Handoffs require lanes in the same coding mission.',
-  MissionNotFound: 'Coding mission was not found.',
-  MissionNoImplementation: 'The coding mission has no implementation assignment.',
-  RuntimeIsolatedUnsupported: 'The coding runtime cannot create an isolated workspace.',
   CollaboratorPreviewIsolatedOnly:
     'Only isolated collaborator worktrees can be previewed for application.',
   CollaboratorApplyIsolatedOnly: 'Only isolated collaborator worktrees can be applied.',
@@ -194,6 +192,7 @@ export type CodingErrorDetailMessage =
 
 /** i18n key for every message above. The record must stay exhaustive. */
 export const CodingErrorI18nKey: Record<CodingErrorMessage | CodingErrorDetailMessage, string> = {
+  [CodingErrorMessage.RoomShuttingDown]: 'codingErrorRoomShuttingDown',
   [CodingErrorMessage.WorkspaceNotFound]: 'codingErrorWorkspaceNotFound',
   [CodingErrorMessage.WorkspaceRootRequired]: 'codingErrorWorkspaceRootRequired',
   [CodingErrorMessage.WorkspaceNameRequired]: 'codingErrorWorkspaceNameRequired',
@@ -271,9 +270,6 @@ export const CodingErrorI18nKey: Record<CodingErrorMessage | CodingErrorDetailMe
   [CodingErrorMessage.LaneTurnActive]: 'codingErrorLaneTurnActive',
   [CodingErrorMessage.RecoveryNotRequired]: 'codingErrorRecoveryNotRequired',
   [CodingErrorMessage.HandoffSameMission]: 'codingErrorHandoffSameMission',
-  [CodingErrorMessage.MissionNotFound]: 'codingErrorMissionNotFound',
-  [CodingErrorMessage.MissionNoImplementation]: 'codingErrorMissionNoImplementation',
-  [CodingErrorMessage.RuntimeIsolatedUnsupported]: 'codingErrorRuntimeIsolatedUnsupported',
   [CodingErrorMessage.CollaboratorPreviewIsolatedOnly]:
     'codingErrorCollaboratorPreviewIsolatedOnly',
   [CodingErrorMessage.CollaboratorApplyIsolatedOnly]: 'codingErrorCollaboratorApplyIsolatedOnly',

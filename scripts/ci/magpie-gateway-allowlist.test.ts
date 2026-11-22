@@ -8,7 +8,7 @@ import { afterEach, expect, test } from 'vitest';
 import { isPinnedMagpieGatewayBinary } from './magpie-gateway-allowlist.mjs';
 
 const require = createRequire(import.meta.url);
-const { TARGETS, upstream, binaryName } = require('../magpie-runtime.cjs');
+const { TARGETS, upstream, pinnedSource, binaryName } = require('../magpie-runtime.cjs');
 
 const temporaryDirectories: string[] = [];
 const marker = ['open', 'claw'].join('');
@@ -40,7 +40,7 @@ function writePinnedBinary(
     version: upstream.version,
     sha256: digest,
     buildSha256: digest,
-    source: { commit: upstream.commit },
+    source: { ...pinnedSource },
     ...manifestPatch,
   };
   fs.writeFileSync(path.join(directory, 'manifest.json'), JSON.stringify(manifest));

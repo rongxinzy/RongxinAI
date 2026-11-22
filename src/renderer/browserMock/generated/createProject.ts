@@ -10,14 +10,6 @@ export function createProject(runtime: BrowserMockRuntime): Window['electron']['
         path: '/home/user/preview',
       };
     },
-    createDirectory: async _p0 => {
-      void _p0;
-      runtime.warnOnce('project.createDirectory');
-      return {
-        success: true,
-        path: '/home/user/preview',
-      };
-    },
     ensureScratchDir: async () => {
       runtime.warnOnce('project.ensureScratchDir');
       return {

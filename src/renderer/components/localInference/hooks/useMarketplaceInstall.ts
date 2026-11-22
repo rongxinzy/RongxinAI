@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
-import type {
-  LlamaCppInstallProgress,
-  LlamaCppModel as OllamaModel,
-} from '../../../../shared/llamacpp';
+import type { LlamaCppInstallProgress, LlamaCppModel } from '../../../../shared/llamacpp';
 import type { MarketplaceModel } from '../../../../shared/marketplace';
 import { i18nService } from '../../../services/i18n';
 import { LOCAL_INFERENCE_PROGRESS_DISMISS_MS } from '../constants';
@@ -19,7 +16,7 @@ import { isPullInProgress } from '../utils/progress';
 
 type UseMarketplaceInstallInput = {
   showToast: (message: string, kind?: LocalInferenceToastKindType) => void;
-  refreshLocalModels: () => Promise<OllamaModel[]>;
+  refreshLocalModels: () => Promise<LlamaCppModel[]>;
   markMarketplaceInstalled: (name: string) => void;
 };
 

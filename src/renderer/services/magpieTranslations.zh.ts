@@ -318,7 +318,8 @@ export const magpieTranslationsZh = {
 
   // Provider add wizard & unified edit dialog
   providerWizardStep1Title: '选择模型服务商',
-  providerWizardStep2Title: '填写密钥并测试连接',
+  providerWizardStep2Title: '配置并测试连接',
+  providerWizardOptionalKey: 'API 密钥（选填）',
   providerWizardStep3Title: '选择要启用的模型',
   providerWizardStepProgress: '第 {step} 步，共 {total} 步',
   providerWizardSearchPlaceholder: '搜索服务商名称或关键字…',
@@ -328,7 +329,7 @@ export const magpieTranslationsZh = {
   providerWizardCustomCardDesc: '兼容 OpenAI 或 Anthropic 接口的任何中转或自建服务',
   providerWizardPlanToggle: '使用包月 / Token 套餐密钥',
   providerWizardPlanHint: '开启后将自动切换为对应的套餐专属接口地址。',
-  providerWizardTestingConnection: '正在验证密钥并拉取可用模型…',
+  providerWizardTestingConnection: '正在测试连接并获取可用模型…',
   providerWizardAutoTestSuccess: '连接成功，已发现 {count} 个可用模型',
   providerWizardApiKeyNotice: '您的密钥仅保存在本机钥匙串与本地配置中，不会上传至第三方。',
   providerWizardSelectModels: '勾选需要启用的模型（{selected}/{total}）',
@@ -370,7 +371,6 @@ export const magpieTranslationsZh = {
   modelsZeroOrgTitle: '连接组织平台',
   modelsZeroOrgDesc: '接入企业或团队统一分配的模型权限与模型清单。',
   modelsZeroOrgAction: '配置组织平台',
-  modelsZeroNoConfigNeeded: '无需密钥',
   modelsPickerSearchPlaceholder: '搜索模型名称或服务商…',
   modelsPickerRecentGroup: '最近使用',
   modelsPickerGroupsGroup: '模型组',

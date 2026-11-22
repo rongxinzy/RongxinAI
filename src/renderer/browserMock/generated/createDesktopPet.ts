@@ -26,12 +26,6 @@ export function createDesktopPet(runtime: BrowserMockRuntime): Window['electron'
         chatter: false,
       };
     },
-    onSettingsChanged: _p0 => {
-      return runtime.subscribe('desktopPet.onSettingsChanged', _p0);
-    },
-    onOpenTask: _p0 => {
-      return runtime.subscribe('desktopPet.onOpenTask', _p0);
-    },
     getPendingTask: async () => {
       runtime.warnOnce('desktopPet.getPendingTask');
       return {
@@ -39,10 +33,15 @@ export function createDesktopPet(runtime: BrowserMockRuntime): Window['electron'
         sessionId: '',
       };
     },
-    resolveTask: async (_p0, _p1) => {
+    resolveTask: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('desktopPet.resolveTask');
+    },
+    onSettingsChanged: _p0 => {
+      return runtime.subscribe('desktopPet.onSettingsChanged', _p0);
+    },
+    onOpenTask: _p0 => {
+      return runtime.subscribe('desktopPet.onOpenTask', _p0);
     },
   };
 }

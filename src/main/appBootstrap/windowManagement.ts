@@ -9,6 +9,8 @@ import { resolveThemeFromConfig } from './appConfigSettings';
 
 const WINDOW_STATE_SAVE_DEBOUNCE_MS = 300;
 const MIN_RELOAD_INTERVAL_MS = 5000;
+let windowStateSaveTimer: ReturnType<typeof setTimeout> | undefined;
+let lastReloadAt = 0;
 
 export const getTitleBarOverlayOptions = () => {
   const config = getStore().get<AppConfigSettings>('app_config');
@@ -63,21 +65,22 @@ const getCurrentAppWindowState = () => {
   };
 };
 
+export const cancelPersistAppWindowState = () => {
+  clearTimeout(windowStateSaveTimer);
+  windowStateSaveTimer = undefined;
+};
+
 export const persistAppWindowState = () => {
+  cancelPersistAppWindowState();
   const state = getCurrentAppWindowState();
   if (!state) return;
   getStore().set(AppWindowStoreKey.State, state);
 };
 
 export const schedulePersistAppWindowState = () => {
-  if (lifecycleRuntime.windowStateSaveTimer) {
-    clearTimeout(lifecycleRuntime.windowStateSaveTimer);
-  }
-
-  lifecycleRuntime.windowStateSaveTimer = setTimeout(() => {
-    lifecycleRuntime.windowStateSaveTimer = null;
-    persistAppWindowState();
-  }, WINDOW_STATE_SAVE_DEBOUNCE_MS);
+  if (lifecycleRuntime.isQuitting) return;
+  clearTimeout(windowStateSaveTimer);
+  windowStateSaveTimer = setTimeout(persistAppWindowState, WINDOW_STATE_SAVE_DEBOUNCE_MS);
 };
 
 export const showSystemMenu = (position?: { x?: number; y?: number }) => {
@@ -114,13 +117,11 @@ export const scheduleReload = (reason: string, webContents?: WebContents) => {
     return;
   }
   const now = Date.now();
-  if (now - lifecycleRuntime.lastReloadAt < MIN_RELOAD_INTERVAL_MS) {
-    console.warn(
-      `Skipping reload (${reason}); last reload was ${now - lifecycleRuntime.lastReloadAt}ms ago.`,
-    );
+  if (now - lastReloadAt < MIN_RELOAD_INTERVAL_MS) {
+    console.warn(`Skipping reload (${reason}); last reload was ${now - lastReloadAt}ms ago.`);
     return;
   }
-  lifecycleRuntime.lastReloadAt = now;
+  lastReloadAt = now;
   console.warn(`Reloading window due to ${reason}`);
   target.reloadIgnoringCache();
 };

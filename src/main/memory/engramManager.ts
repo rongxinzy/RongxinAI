@@ -11,6 +11,7 @@ import {
   EngramEnvironment,
   EngramManagerPhase,
 } from './constants';
+import { stopOwnedProcess } from '../libs/ownedProcessStop';
 import { resolveEngramBinary } from './binaryResolver';
 import type { EngramConnection, EngramManagerStatus } from './types';
 
@@ -19,7 +20,10 @@ const HEALTH_POLL_MS = 100;
 const MAX_RESTART_ATTEMPTS = 3;
 const RESTART_DELAYS_MS = [500, 1_000, 2_000] as const;
 
-interface EngramProcess extends Pick<ChildProcess, 'once' | 'kill' | 'pid'> {}
+interface EngramProcess extends Pick<
+  ChildProcess,
+  'on' | 'once' | 'removeListener' | 'kill' | 'pid' | 'exitCode' | 'signalCode'
+> {}
 
 export interface EngramManagerOptions {
   userDataPath: string;
@@ -41,9 +45,11 @@ export class EngramManager {
   };
   private connection: EngramConnection | null = null;
   private child: EngramProcess | null = null;
+  private childStop: Promise<void> | undefined;
   private startPromise: Promise<EngramConnection | null> | null = null;
   private restartTimer: NodeJS.Timeout | null = null;
   private shouldRun = false;
+  private closed = false;
   private generation = 0;
 
   constructor(private readonly options: EngramManagerOptions) {}
@@ -52,18 +58,20 @@ export class EngramManager {
     return { ...this.status };
   }
 
-  getConnection(): EngramConnection | null {
-    if (this.status.phase !== EngramManagerPhase.Running || !this.status.available) return null;
-    return this.connection ? { ...this.connection } : null;
-  }
-
   start(): Promise<EngramConnection | null> {
-    this.shouldRun = true;
-    if (this.connection) return Promise.resolve({ ...this.connection });
+    if (this.closed || this.childStop) return Promise.resolve(null);
     if (this.startPromise) return this.startPromise;
-    this.startPromise = this.startInternal()
+    if (this.connection) return Promise.resolve({ ...this.connection });
+    if (this.child) return Promise.resolve(null); // An earlier stop could not confirm exit.
+    this.shouldRun = true;
+    const generation = ++this.generation;
+    this.startPromise = this.startInternal(generation)
       .catch(async (error: unknown): Promise<null> => {
-        await this.disposeCurrentInstance();
+        if (generation !== this.generation) return null;
+        await this.disposeCurrentInstance()?.catch(stopError => {
+          console.warn('[MemoryRuntime] Failed to stop the unhealthy process:', stopError);
+        });
+        if (generation !== this.generation) return null;
         this.status = {
           phase: EngramManagerPhase.Degraded,
           available: false,
@@ -71,25 +79,23 @@ export class EngramManager {
           error: error instanceof Error ? error.message : String(error),
         };
         console.warn('[MemoryRuntime] Failed to start local memory service:', error);
-        this.scheduleRestart();
         return null;
       })
       .finally(() => {
         this.startPromise = null;
+        if (this.status.phase === EngramManagerPhase.Degraded) this.scheduleRestart();
       });
     return this.startPromise;
   }
 
   async stop(): Promise<void> {
+    this.closed = true;
     this.shouldRun = false;
     this.generation += 1;
     this.status = { ...this.status, phase: EngramManagerPhase.Stopping, available: false };
     if (this.restartTimer) clearTimeout(this.restartTimer);
     this.restartTimer = null;
-    const child = this.child;
-    this.child = null;
-    this.connection = null;
-    child?.kill();
+    await this.disposeCurrentInstance();
     this.status = {
       phase: EngramManagerPhase.Stopped,
       available: false,
@@ -97,7 +103,7 @@ export class EngramManager {
     };
   }
 
-  private async startInternal(): Promise<EngramConnection | null> {
+  private async startInternal(generation: number): Promise<EngramConnection | null> {
     const binaryPath = resolveEngramBinary({
       env: this.options.env,
       resourcesPath: this.options.resourcesPath,
@@ -111,14 +117,15 @@ export class EngramManager {
         restartAttempts: this.status.restartAttempts,
         error: 'Bundled memory runtime is unavailable.',
       };
+      this.shouldRun = false;
       console.warn('[MemoryRuntime] Bundled runtime is unavailable; continuing without memory.');
       return null;
     }
 
     this.status = { ...this.status, phase: EngramManagerPhase.Starting, available: false };
-    const generation = ++this.generation;
     const token = randomBytes(32).toString('hex');
     const backendPort = await (this.options.reservePort ?? reserveLoopbackPort)();
+    if (generation !== this.generation) return null;
     const dataDirectory = path.join(this.options.userDataPath, ...ENGRAM_DATA_DIRECTORY_SEGMENTS);
     fs.mkdirSync(dataDirectory, { recursive: true });
     const childEnvironment: NodeJS.ProcessEnv = {
@@ -138,21 +145,19 @@ export class EngramManager {
     // the adapter sends the bearer token on every request anyway. The only
     // client is the in-process adapter, so no proxy hop is needed.
     this.connection = { url: `http://${ENGRAM_LOOPBACK_HOST}:${backendPort}`, token };
-    child.once('exit', () => this.handleUnexpectedExit(generation));
-    child.once('error', error => this.handleUnexpectedExit(generation, error));
+    child.once('exit', () => {
+      this.handleUnexpectedExit(generation);
+      if (this.child === child) this.child = null;
+      if (this.status.phase === EngramManagerPhase.Degraded) this.scheduleRestart();
+    });
+    child.on('error', error => {
+      if (child.pid === undefined) this.handleUnexpectedExit(generation, error);
+      else console.warn('[MemoryRuntime] Local memory process error:', error);
+    });
 
-    const healthy = await this.waitForHealth(this.connection);
-    if (!healthy || generation !== this.generation) {
-      await this.disposeCurrentInstance();
-      this.status = {
-        phase: EngramManagerPhase.Degraded,
-        available: false,
-        restartAttempts: this.status.restartAttempts,
-        error: 'Memory runtime failed its startup health check.',
-      };
-      this.scheduleRestart();
-      return null;
-    }
+    const healthy = await this.waitForHealth(this.connection, generation);
+    if (generation !== this.generation) return null;
+    if (!healthy) throw new Error('Memory runtime failed its startup health check.');
 
     this.status = {
       phase: EngramManagerPhase.Running,
@@ -163,18 +168,19 @@ export class EngramManager {
     return { ...this.connection };
   }
 
-  private async waitForHealth(connection: EngramConnection): Promise<boolean> {
+  private async waitForHealth(connection: EngramConnection, generation: number): Promise<boolean> {
     const checkHealth = this.options.checkHealth ?? defaultHealthCheck;
     const deadline = Date.now() + START_TIMEOUT_MS;
-    while (Date.now() < deadline) {
+    while (generation === this.generation && Date.now() < deadline) {
       if (await checkHealth(connection).catch(() => false)) return true;
+      if (generation !== this.generation) break;
       await new Promise(resolve => setTimeout(resolve, HEALTH_POLL_MS));
     }
     return false;
   }
 
   private handleUnexpectedExit(generation: number, error?: Error): void {
-    if (generation !== this.generation || !this.shouldRun) return;
+    if (generation !== this.generation || !this.connection) return;
     this.generation += 1;
     this.child = null;
     this.connection = null;
@@ -189,11 +195,11 @@ export class EngramManager {
     } else {
       console.warn('[MemoryRuntime] Local memory service exited unexpectedly.');
     }
-    this.scheduleRestart();
   }
 
   private scheduleRestart(): void {
-    if (!this.shouldRun || this.restartTimer) return;
+    if (!this.shouldRun || this.child || this.childStop || this.startPromise || this.restartTimer)
+      return;
     const delays = this.options.restartDelaysMs ?? RESTART_DELAYS_MS;
     if (this.status.restartAttempts >= Math.min(MAX_RESTART_ATTEMPTS, delays.length)) return;
     const attempt = this.status.restartAttempts + 1;
@@ -205,12 +211,22 @@ export class EngramManager {
     }, delay);
   }
 
-  private async disposeCurrentInstance(): Promise<void> {
-    this.generation += 1;
-    const child = this.child;
-    this.child = null;
+  private disposeCurrentInstance(): Promise<void> | undefined {
     this.connection = null;
-    child?.kill();
+    if (this.childStop) return this.childStop;
+    const child = this.child;
+    if (!child?.pid) {
+      this.child = null;
+      return;
+    }
+    this.childStop = stopOwnedProcess(child)
+      .then(() => {
+        this.child = null;
+      })
+      .finally(() => {
+        this.childStop = undefined;
+      });
+    return this.childStop;
   }
 }
 

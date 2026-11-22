@@ -9,6 +9,10 @@ import {
   SqliteBackupManager,
 } from './libs/sqliteBackup/sqliteBackupManager';
 import { applyCoreSchema } from './coreSchema';
+import { initializeScheduledTaskSchema } from '../scheduledTask/schema';
+import { initializeActivitySchema } from './activity/schema';
+import { initializeCompanionSchema } from './companion/schema';
+import { initializeIMSchema } from './im/schema';
 import { initializeWorkbenchTaskSchema } from './workbenchTask/schema';
 import { initializeCodingAgentSchema } from './codingAgent/schema';
 import { initializeTodoSchema } from './todo/schema';
@@ -35,38 +39,41 @@ export class SqliteStore {
 
     let db = await openSqliteDatabaseWithRecovery(basePath, dbPath);
 
-    const autoBackupEnabled = SqliteStore.readSqliteAutoBackupEnabled(db);
-    if (autoBackupEnabled) {
-      const backupManager = new SqliteBackupManager(basePath);
-      const health = backupManager.verifyDatabaseHealth(db);
-      if (!health.ok) {
-        const healthReason = 'reason' in health ? health.reason : 'unknown reason';
-        console.warn(`[SqliteBackup] Startup health check failed: ${healthReason}`);
-        try {
+    try {
+      if (SqliteStore.readSqliteAutoBackupEnabled(db)) {
+        const backupManager = new SqliteBackupManager(basePath);
+        const health = await backupManager.verifyDatabaseHealth(dbPath);
+        if (health.ok === false) {
+          console.warn(`[SqliteBackup] Startup health check failed: ${health.reason}`);
           db.close();
-        } catch {
-          // Ignore close failures before restore.
+          const restoreResult = await backupManager.restoreLatestBackup(dbPath);
+          if (!restoreResult.restored) {
+            console.warn(
+              '[SqliteBackup] No valid snapshot was restored; continuing with database reinitialization',
+            );
+          }
+          db = await openSqliteDatabaseWithRecovery(basePath, dbPath);
         }
-        const restoreResult = await backupManager.restoreLatestBackup(dbPath);
-        if (!restoreResult.restored) {
-          console.warn(
-            '[SqliteBackup] No valid snapshot was restored; continuing with database reinitialization',
-          );
-        }
-        db = await openSqliteDatabaseWithRecovery(basePath, dbPath);
       }
-    }
 
-    const store = new SqliteStore(db, dbPath);
-    store.initializeTables(basePath);
-    return store;
+      const store = new SqliteStore(db, dbPath);
+      store.initializeTables(basePath);
+      return store;
+    } catch (error) {
+      if (db.open) db.close();
+      throw error;
+    }
   }
 
   private initializeTables(basePath: string) {
     applyCoreSchema(this.db, basePath);
+    initializeCompanionSchema(this.db);
+    initializeIMSchema(this.db);
     initializeWorkbenchTaskSchema(this.db);
     initializeCodingAgentSchema(this.db);
     initializeTodoSchema(this.db);
+    initializeScheduledTaskSchema(this.db);
+    initializeActivitySchema(this.db);
   }
 
   onDidChange<T = unknown>(

@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createElement, useState } from 'react';
+import { createElement, useCallback, useState, type ComponentProps } from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
-import Sidebar from './Sidebar';
+import SidebarView from './Sidebar';
 import { CoworkSessionSource } from '../../shared/cowork/constants';
+import { useAppKeyboardShortcuts } from '../app/useAppKeyboardShortcuts';
 import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../types/cowork';
 import { WorkMode } from '../store/workMode/constants';
 
@@ -25,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   clearWorkspaceSelection: vi.fn(async () => {}),
   switchAgent: vi.fn(),
   newShortcut: 'CmdOrCtrl+N',
+  searchShortcut: 'CmdOrCtrl+K',
 }));
 vi.mock('react-redux', () => ({
   useDispatch: () => mocks.dispatch,
@@ -47,7 +49,7 @@ vi.mock('../services/agent', () => ({ agentService: { switchAgent: mocks.switchA
 vi.mock('../services/config', () => ({
   configService: {
     updateConfig: vi.fn(),
-    getConfig: () => ({ shortcuts: { newChat: mocks.newShortcut } }),
+    getConfig: () => ({ shortcuts: { newChat: mocks.newShortcut, search: mocks.searchShortcut } }),
   },
 }));
 vi.mock('../services/cowork', () => ({
@@ -93,6 +95,19 @@ vi.mock('./agentSidebar/MyAgentSidebarTree', () => ({
 }));
 vi.mock('./agentSidebar/AgentTaskRow', () => ({ default: () => null }));
 
+function Sidebar(
+  props: Omit<ComponentProps<typeof SidebarView>, 'searchOpen' | 'onSearchOpenChange'>,
+) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  useAppKeyboardShortcuts({
+    onNewChat: props.onNewChat,
+    onSearch: openSearch,
+    onShowSettings: props.onShowSettings,
+  });
+  return createElement(SidebarView, { ...props, searchOpen, onSearchOpenChange: setSearchOpen });
+}
+
 const props = () => ({
   activeView: 'cowork' as const,
   isCollapsed: false,
@@ -111,6 +126,8 @@ const props = () => ({
   onToggleCollapse: vi.fn(),
   codingSelection: null as never,
   onCodingSelectionChange: vi.fn(),
+  onCreateCodingSession: vi.fn(),
+  onOpenCodingAgentManager: vi.fn(),
 });
 
 const sessions: CoworkSessionSummary[] = [
@@ -152,6 +169,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.mode = WorkMode.Work;
   mocks.newShortcut = 'CmdOrCtrl+N';
+  mocks.searchShortcut = 'CmdOrCtrl+K';
   mocks.listSessionsForSearch.mockResolvedValue({ success: true, sessions });
   mocks.loadSession.mockResolvedValue({ id: 'loaded' });
   window.electron = { platform: 'darwin' } as typeof window.electron;
@@ -194,7 +212,8 @@ test('opens duplicate-titled tasks by stable id and preserves cross-agent naviga
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 });
 
-test('keeps global shortcut usable while collapsed and restores the task draft', async () => {
+test('uses the configured search shortcut while collapsed and restores the task draft', async () => {
+  mocks.searchShortcut = 'CmdOrCtrl+Shift+F';
   const user = userEvent.setup();
   const handlers = props();
   const view = render(
@@ -203,13 +222,20 @@ test('keeps global shortcut usable while collapsed and restores the task draft',
       null,
       createElement(Sidebar, { ...handlers, isCollapsed: true }),
       createElement('input', { 'aria-label': 'draft' }),
+      createElement('input', { 'aria-label': 'shortcut input', 'data-shortcut-input': 'true' }),
     ),
   );
   const draft = screen.getByRole('textbox', { name: 'draft' });
   await user.type(draft, 'Keep draft');
-  await act(async () => {
-    window.dispatchEvent(new Event('cowork:shortcut:search'));
-  });
+  fireEvent.keyDown(draft, { key: 'k', metaKey: true });
+  expect(screen.queryByRole('dialog')).toBeNull();
+  fireEvent.keyDown(draft, { key: 'F', metaKey: true, shiftKey: true, repeat: true });
+  expect(screen.queryByRole('dialog')).toBeNull();
+  await user.click(screen.getByRole('textbox', { name: 'shortcut input' }));
+  await user.keyboard('{Meta>}{Shift>}F{/Shift}{/Meta}');
+  expect(screen.queryByRole('dialog')).toBeNull();
+  await user.click(draft);
+  await user.keyboard('{Meta>}{Shift>}F{/Shift}{/Meta}');
   await screen.findByRole('option', { name: /Same title Project/ });
   await waitFor(() => expect(screen.getByRole('combobox')).toHaveFocus());
   await user.keyboard('{Escape}');
@@ -284,8 +310,11 @@ test('makes collapsed content inert without remounting the tree', async () => {
   const view = render(createElement(Sidebar, handlers));
   const treeInput = screen.getByRole('textbox', { name: 'tree state' });
   await user.type(treeInput, 'Retain');
+  await user.keyboard('{Meta>}k{/Meta}');
+  expect(await screen.findByRole('dialog')).toBeVisible();
   view.rerender(createElement(Sidebar, { ...handlers, isCollapsed: true }));
   expect(treeInput.closest('[inert]')).not.toBeNull();
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   view.rerender(createElement(Sidebar, handlers));
   expect(treeInput.closest('[inert]')).toBeNull();
   expect(screen.getByRole('textbox', { name: 'tree state' })).toHaveValue('Retain');

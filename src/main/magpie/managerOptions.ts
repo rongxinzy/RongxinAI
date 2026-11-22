@@ -8,6 +8,7 @@ export interface MagpieManagerOptions {
   privateHome: string;
   /** Tests must supply temporary HOME and USERPROFILE; production retains the real CLI home. */
   environment?: NodeJS.ProcessEnv;
+  enterpriseForward?: () => { key: string; origin: string } | undefined;
   verify?: typeof verifyMagpieBinary;
   spawn?: typeof spawn;
   fetch?: typeof fetch;
@@ -16,8 +17,6 @@ export interface MagpieManagerOptions {
   startupTimeoutMs?: number;
   recoveryRetryDelayMs?: number;
   platform?: NodeJS.Platform;
-  jobRunnerPath?: string | false;
-  killProcessTree?: (pid: number) => Promise<void>;
   parseCatalog?: typeof parseMagpieCatalog;
   serviceEnabled?: { read(): boolean; write(enabled: boolean): void };
   subscriptionAccounts?: { read(): boolean; write(enabled: boolean): void | Promise<void> };

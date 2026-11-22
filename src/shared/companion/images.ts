@@ -13,8 +13,6 @@ export const CompanionImageIssue = {
   Unavailable: 'companion_image_unavailable',
   Unsupported: 'companion_image_unsupported',
 } as const;
-export const CompanionImageEntry = { User: 'zhiyuan.companion.image-input' } as const;
-
 export const COMPANION_IMAGE_MIME_TYPES = [
   'image/png',
   'image/jpeg',

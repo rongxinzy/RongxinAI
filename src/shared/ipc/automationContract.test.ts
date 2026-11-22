@@ -143,14 +143,9 @@ describe('scheduledTasks contract results', () => {
     ).toBe(false);
   });
 
-  test('delete/stop keep the boolean result field handlers return', () => {
-    // delete reports whether the job existed; stop returns false when a Pi
-    // Run was already claimed.
+  test('delete keeps the boolean result field', () => {
     expect(
       scheduledTasksContract.delete.result.safeParse({ success: true, result: false }).success,
-    ).toBe(true);
-    expect(
-      scheduledTasksContract.stop.result.safeParse({ success: true, result: true }).success,
     ).toBe(true);
   });
 
@@ -196,7 +191,6 @@ describe('activity contract', () => {
             updatedAt: 1770000001000,
             sessionId: 's-1',
             taskName: 'Nightly report',
-            inputPreview: 'Generate the nightly report',
             replyPreview: 'Report attached',
           },
           {

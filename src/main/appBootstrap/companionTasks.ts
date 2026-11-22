@@ -1,25 +1,41 @@
 import { CompanionTasks } from '../companion/tasks';
-import { getMagpieModelService } from '../magpie/modelService';
-import { getAgentManager, getCoworkStore, getStore } from './runtimeServices';
-import { getPiRuntimeAdapter, getWorkbenchTaskService } from './sessionServices';
-import { coworkImageRoot } from '../coworkImageAttachments';
-import { app } from 'electron';
-import { resolveSessionWorkingDirectory, resolveTaskWorkingDirectory } from './workspacePaths';
+import { CompanionChat } from '../companion/chat';
+import { CompanionProfiles } from '../companion/profiles';
+import type { MagpieModelService } from '../magpie/modelService';
+import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
+import { getStore } from './runtimeServices';
+import { coworkSessionDependencies } from './sessionServices';
 
-let tasks: CompanionTasks | undefined;
-export function getCompanionTasks(): CompanionTasks {
-  tasks ??= new CompanionTasks({
-    db: getStore().getDatabase(),
-    models: getMagpieModelService(),
-    tasks: getWorkbenchTaskService(),
-    sessions: {
-      getCoworkImageRoot: () => coworkImageRoot(app.getPath('userData')),
-      getCoworkStore,
-      getAgentManager,
-      getPiRuntimeAdapter,
-      resolveSessionWorkingDirectory,
-      resolveTaskWorkingDirectory,
+function createCompanionServices(models: MagpieModelService, runtime: PiRuntimeAdapter) {
+  const store = getStore();
+  const db = store.getDatabase();
+  return {
+    companions: {
+      profiles: new CompanionProfiles(store),
+      chat: new CompanionChat(db, models, runtime),
     },
-  });
-  return tasks;
+    tasks: new CompanionTasks({
+      db,
+      models,
+      sessions: coworkSessionDependencies,
+    }),
+  };
+}
+
+let services: ReturnType<typeof createCompanionServices> | undefined;
+
+export function initializeCompanionServices(
+  models: MagpieModelService,
+  runtime: PiRuntimeAdapter,
+): void {
+  services ??= createCompanionServices(models, runtime);
+}
+
+export function interruptCompanionChat(): void {
+  services?.companions.chat.interrupt();
+}
+
+export function getCompanionServices() {
+  if (!services) throw new Error('Companion services are not initialized');
+  return services;
 }

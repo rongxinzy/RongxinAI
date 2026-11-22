@@ -115,7 +115,7 @@ describe('image errors retain native execution ownership', () => {
       fail('400 image input is not supported');
       listener({ type: PiAgentEventType.AgentSettled });
       if (action === 'stop') adapter.stopSession('image');
-      else adapter.onSessionDeleted('image');
+      else await adapter.onSessionDeleted('image');
       await new Promise<void>(resolve => setImmediate(resolve));
       expect(continuation).not.toHaveBeenCalled();
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(1);

@@ -1,17 +1,48 @@
-import { it, expect } from 'vitest';
+import { it, expect, vi } from 'vitest';
+import { build } from 'esbuild';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { createServer, type IncomingHttpHeaders } from 'node:http';
 import fs from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
+import Database from 'better-sqlite3';
+import { AISphere } from '../../shared/aisphere';
+import { ApiFormat } from '../../shared/providers';
+import { CompanionRequestState } from '../../shared/companion/constants';
+import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
+import { CoworkSessionMode } from '../../shared/cowork/constants';
+import {
+  MAGPIE_ROUTING_GROUP_PREFIX,
+  MagpieProviderRouting,
+} from '../../shared/magpie/routingUsage';
+import { ZhiyuanModelPoolWorkload } from '../../shared/modelPool/constants';
+import { CompanionChat } from '../companion/chat';
+import { initializeCompanionSchema } from '../companion/schema';
+import { ZhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
+import { startEnterpriseModelGateway } from '../enterpriseExtension/modelGateway';
+import { startAISphereGateway } from '../extensions/aisphere/gateway';
+import { AISphereRequestPool } from '../extensions/aisphere/requestPool';
+import { AISphereService } from '../extensions/aisphere/service';
+import { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import { projectMagpieCatalog } from './catalog';
+import { RETIRED_OLLAMA_HOST_PROVIDER_ID } from './hostProviders';
 import { MagpieManager } from './manager';
 import { verifyMagpieBinary } from './integrity';
+import { MAGPIE_RUNTIME_API_KEY, MagpieModelService, MagpieWorkHeader } from './modelService';
+
+vi.mock('../libs/coworkUtil', async importOriginal => ({
+  ...(await importOriginal<typeof import('../libs/coworkUtil')>()),
+  applyApplicationRuntimeEnv: vi.fn(),
+}));
+
 // Opt-in: build the pinned binary first. All agent configuration stays in a disposable HOME.
 it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
   'discovers and updates a fixture CLI through unchanged upstream HTTP APIs, then stops',
   async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-magpie-integration-'));
+    const resourcesRoot = path.resolve(process.env.ZHIYUAN_MAGPIE_RESOURCES || 'resources/magpie');
     const config = path.join(root, '.codex', 'config.toml');
     await fs.mkdir(path.dirname(config));
     await fs.writeFile(config, 'model = "fixture-before"\n');
@@ -21,8 +52,17 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
         models: [{ slug: 'fixture-after', display_name: 'Fixture model', visibility: 'list' }],
       }),
     );
+    let windowsChild: ChildProcess | undefined;
+    const spawnWindowsHelper = ((...args: Parameters<typeof spawn>) => {
+      expect(args[0]).toBe(
+        path.join(path.dirname(resourcesRoot), 'python-runtime', 'job-runner.exe'),
+      );
+      windowsChild = spawn(...args);
+      return windowsChild;
+    }) as typeof spawn;
     const manager = new MagpieManager({
-      resourcesRoot: path.resolve(process.env.ZHIYUAN_MAGPIE_RESOURCES || 'resources/magpie'),
+      resourcesRoot,
+      spawn: process.platform === 'win32' ? spawnWindowsHelper : undefined,
       parseCatalog: async bytes =>
         projectMagpieCatalog(JSON.parse(new TextDecoder().decode(bytes))),
       privateHome: path.join(root, 'service'),
@@ -45,7 +85,15 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
         }),
     });
     try {
-      expect((await manager.start()).state).toBe('running');
+      const started = await manager.start();
+      expect(started).toMatchObject({ state: 'running', gatewayUrl: expect.any(String) });
+      if (process.platform === 'win32') {
+        expect(windowsChild).toMatchObject({
+          pid: expect.any(Number),
+          exitCode: null,
+          signalCode: null,
+        });
+      }
       const field = (await manager.agents()).agents
         .find(a => a.id === 'codex')
         ?.models.find(f => f.key === 'model');
@@ -60,9 +108,24 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
       ).toBe(chosen);
       expect(await fs.readFile(config, 'utf8')).toContain(`model = "${chosen}"`);
       expect(await manager.models()).toEqual([]);
-      expect((await manager.stop()).state).toBe('stopped');
+      expect((await manager.shutdown()).state).toBe('stopped');
+      if (windowsChild) {
+        expect(windowsChild.exitCode ?? windowsChild.signalCode).not.toBeNull();
+      }
+      await expect
+        .poll(
+          async () => {
+            try {
+              await fetch(`${started.gatewayUrl}/api/hello`, { signal: AbortSignal.timeout(500) });
+            } catch (error) {
+              return (error as { cause?: NodeJS.ErrnoException }).cause?.code;
+            }
+          },
+          { timeout: 5000 },
+        )
+        .toBe('ECONNREFUSED');
     } finally {
-      await manager.stop();
+      await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });
     }
   },
@@ -70,14 +133,20 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
 );
 
 it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
-  'registers a running GPU fixture with upstream provider API, exposes metadata, and revokes its catalog',
+  'preserves a running GPU binding and a custom provider when retiring the old Ollama binding on restart',
   async () => {
-    const { createServer } = await import('node:http');
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-magpie-provider-'));
     const upstream = createServer((req, res) => {
       res.setHeader('content-type', 'application/json');
       if (req.url === '/v1/models')
-        res.end(JSON.stringify({ data: [{ id: 'gpu-fixture', object: 'model' }] }));
+        res.end(
+          JSON.stringify({
+            data: ['gpu-fixture', 'retired-fixture', 'custom-fixture'].map(id => ({
+              id,
+              object: 'model',
+            })),
+          }),
+        );
       else {
         res.statusCode = 404;
         res.end('{}');
@@ -99,12 +168,15 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
         }),
     });
     try {
-      expect((await manager.start()).state).toBe('running');
+      const started = await manager.start();
+      expect(started.state).toBe('running');
       const binding = {
         id: 'zhiyuan-host-gpu',
         name: 'GPU fixture',
         api: 'openai-completions' as const,
         baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        // Native Magpie rejects adding the same endpoint and key twice.
+        apiKey: 'gpu-fixture-key',
         models: [
           {
             id: 'gpu-fixture',
@@ -129,6 +201,70 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
       expect(await manager.models()).toEqual([]);
       await manager.syncHostProviders([binding]);
       expect((await manager.models()).map(m => m.id)).toEqual(['zhiyuan-host-gpu/gpu-fixture']);
+
+      const retiredModel = `${RETIRED_OLLAMA_HOST_PROVIDER_ID}/retired-fixture`;
+      const customProvider = 'custom-loopback-fixture';
+      const customModel = `${customProvider}/custom-fixture`;
+      await manager.syncHostProviders([
+        binding,
+        {
+          id: RETIRED_OLLAMA_HOST_PROVIDER_ID,
+          name: 'Old Ollama fixture',
+          api: binding.api,
+          baseUrl: binding.baseUrl,
+          models: [{ id: 'retired-fixture' }],
+        },
+      ]);
+      const customInput = {
+        name: 'External loopback fixture',
+        api: binding.api,
+        baseUrl: binding.baseUrl,
+        models: ['custom-fixture'],
+      };
+      expect(await manager.testProvider(customInput)).toMatchObject({
+        ok: true,
+        discoveredModels: expect.arrayContaining(['custom-fixture']),
+      });
+      await manager.saveProvider({ ...customInput, id: customProvider });
+
+      const rawModels = async (gatewayUrl: string): Promise<string[]> => {
+        const response = await fetch(`${gatewayUrl}/v1/models`, {
+          signal: AbortSignal.timeout(5_000),
+        });
+        expect(response.ok).toBe(true);
+        const { data } = (await response.json()) as { data: { id: string }[] };
+        return data.map(model => model.id);
+      };
+      const retainedModels = ['zhiyuan-host-gpu/gpu-fixture', customModel];
+      expect(await rawModels(started.gatewayUrl!)).toEqual(
+        expect.arrayContaining([...retainedModels, retiredModel]),
+      );
+      expect((await manager.stop()).state).toBe('stopped');
+      const restarted = await manager.start();
+      expect(restarted.state).toBe('running');
+      const firstModels = await rawModels(restarted.gatewayUrl!);
+      expect(firstModels).toEqual(expect.arrayContaining(retainedModels));
+      expect(firstModels).not.toContain(retiredModel);
+      await expect(
+        manager.updatePreferences({ disabledModels: [customModel] }),
+      ).resolves.toMatchObject({
+        disabledModels: [customModel],
+      });
+      expect(await rawModels(restarted.gatewayUrl!)).not.toContain(customModel);
+      await expect(manager.updatePreferences({ disabledModels: [] })).resolves.toMatchObject({
+        disabledModels: [],
+      });
+      expect(await rawModels(restarted.gatewayUrl!)).toEqual(
+        expect.arrayContaining(retainedModels),
+      );
+      const providerState = await manager.managementRequest('/api/providers');
+      expect(providerState.ok).toBe(true);
+      expect(await providerState.json()).toMatchObject({
+        providers: expect.arrayContaining([
+          expect.objectContaining({ id: RETIRED_OLLAMA_HOST_PROVIDER_ID, off: true }),
+          expect.objectContaining({ id: customProvider, off: false }),
+        ]),
+      });
     } finally {
       await manager.stop();
       await new Promise<void>(resolve => upstream.close(() => resolve()));
@@ -207,30 +343,75 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
   60_000,
 );
 
-it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
-  'runs a native Durable submission through the real gateway to one loopback SSE generation',
-  async () => {
-    const { createServer } = await import('node:http');
-    const { BACKGROUND_CONTEXT: context } = await import('@earendil-works/chord/context');
-    const { createRegistry, Harness, MemoryStorage } = await import('@earendil-works/pi-durable');
-    const { resolveDurableProvider } = await import('./__fixtures__/durableProvider');
-    const { MagpieModelService, installMagpieModelService } = await import('./modelService');
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-magpie-durable-'));
+it
+  .skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')
+  .each(['local', 'organization', 'enterprise', 'enterprise-anthropic'])(
+  'runs companion Pi turns through the real %s gateway and restores native history',
+  async provider => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-magpie-companion-'));
+    const anthropic = provider === 'enterprise-anthropic';
+    const isEnterprise = provider === 'enterprise' || anthropic;
     const requests: Record<string, unknown>[] = [];
+    const headers: IncomingHttpHeaders[] = [];
+    const organizationKey = 'organization-fixture-key';
     const upstream = createServer(async (req, res) => {
       if (req.url === '/v1/models') {
         res.setHeader('content-type', 'application/json');
         res.end(JSON.stringify({ data: [{ id: 'native-fixture', object: 'model' }] }));
         return;
       }
-      if (req.method !== 'POST' || req.url !== '/v1/chat/completions') {
+      const upstreamPath = anthropic ? '/per-model/v1/messages' : '/v1/chat/completions';
+      if (req.method !== 'POST' || req.url !== upstreamPath) {
         res.writeHead(404).end();
+        return;
+      }
+      if (
+        provider !== 'local' &&
+        (anthropic ? req.headers['x-api-key'] : req.headers.authorization) !==
+          (anthropic ? organizationKey : `Bearer ${organizationKey}`)
+      ) {
+        res.writeHead(401).end();
         return;
       }
       let body = '';
       for await (const chunk of req) body += chunk.toString();
       requests.push(JSON.parse(body));
+      headers.push(req.headers);
       res.writeHead(200, { 'content-type': 'text/event-stream' });
+      if (anthropic) {
+        for (const event of [
+          {
+            type: 'message_start',
+            message: {
+              id: 'fixture-message',
+              type: 'message',
+              role: 'assistant',
+              model: 'native-fixture',
+              content: [],
+              stop_reason: null,
+              stop_sequence: null,
+              usage: { input_tokens: 1, output_tokens: 0 },
+            },
+          },
+          { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+          {
+            type: 'content_block_delta',
+            index: 0,
+            delta: { type: 'text_delta', text: 'Native gateway answer' },
+          },
+          { type: 'content_block_stop', index: 0 },
+          {
+            type: 'message_delta',
+            delta: { stop_reason: 'end_turn', stop_sequence: null },
+            usage: { output_tokens: 1 },
+          },
+          { type: 'message_stop' },
+        ]) {
+          res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+        }
+        res.end();
+        return;
+      }
       const event = (delta: object, finish_reason: string | null) => {
         res.write(
           `data: ${JSON.stringify({
@@ -248,7 +429,11 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
     });
     await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
     const address = upstream.address() as { port: number };
+    const enterprise = isEnterprise ? new ZhiyuanManagedProviderBridge() : undefined;
+    let enterpriseGateway: Awaited<ReturnType<typeof startEnterpriseModelGateway>> | undefined;
+    let logout: (() => void) | undefined;
     const manager = new MagpieManager({
+      enterpriseForward: () => enterpriseGateway,
       resourcesRoot: path.resolve(process.env.ZHIYUAN_MAGPIE_RESOURCES || 'resources/magpie'),
       privateHome: path.join(root, 'service'),
       environment: {
@@ -267,69 +452,232 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
           return hash.digest('hex');
         }),
     });
-    let dispose: (() => void) | undefined;
-    let harness: Awaited<ReturnType<typeof Harness.open>> | undefined;
+    let organization: AISphereService | undefined;
+    const db = new Database(':memory:');
+    initializeCompanionSchema(db);
+    let runtime: PiRuntimeAdapter | undefined;
     try {
+      const baseUrl = `http://127.0.0.1:${address.port}/v1`;
+      if (enterprise) {
+        logout = enterprise.registerSource({
+          providerKey: 'custom_enterprise',
+          exclusive: true,
+          snapshot: async () => ({
+            enabled: true,
+            baseUrl: anthropic ? baseUrl.replace(/\/v1$/, '/per-model') : baseUrl,
+            apiFormat: anthropic ? ApiFormat.Anthropic : ApiFormat.OpenAI,
+            apiKey: organizationKey,
+            models: [
+              {
+                id: 'native-fixture',
+                name: 'Native Enterprise',
+                contextWindow: 32768,
+                maxTokens: 4096,
+              },
+            ],
+          }),
+        });
+        await enterprise.refresh();
+        enterpriseGateway = await startEnterpriseModelGateway(enterprise);
+      }
       expect((await manager.start()).state).toBe('running');
-      await manager.syncHostProviders([
-        {
+      organization =
+        provider === 'organization'
+          ? new AISphereService(async url =>
+              Response.json(
+                url.endsWith(AISphere.VerifyPath)
+                  ? { data: 'ok' }
+                  : {
+                      code: 0,
+                      model_list: [
+                        {
+                          name: 'native-fixture',
+                          url: `${baseUrl}/chat/completions`,
+                          api_key: organizationKey,
+                          context_length: 32768,
+                          max_output: 4096,
+                        },
+                      ],
+                    },
+              ),
+            )
+          : undefined;
+      if (organization) {
+        const workerFile = path.join(root, 'aisphereWorker.cjs');
+        await build({
+          entryPoints: [path.resolve('src/main/extensions/aisphere/requestWorker.ts')],
+          outfile: workerFile,
+          bundle: true,
+          platform: 'node',
+          format: 'cjs',
+        });
+        await organization.initialize({ get: () => undefined, set: () => {} }, () =>
+          startAISphereGateway(organization, undefined, new AISphereRequestPool(workerFile)),
+        );
+        await organization.connect('http://organization.test');
+      }
+      const binding = enterprise?.hostProviders(enterpriseGateway?.origin)[0] ??
+        organization?.hostProvider() ?? {
           id: 'zhiyuan-host-native',
           name: 'Native fixture',
-          api: 'openai-completions',
-          baseUrl: `http://127.0.0.1:${address.port}/v1`,
+          api: 'openai-completions' as const,
+          baseUrl,
           models: [{ id: 'native-fixture', contextWindow: 32768, maxTokens: 4096 }],
-        },
-      ]);
-      const modelId = 'zhiyuan-host-native/native-fixture';
-      dispose = installMagpieModelService(
-        new MagpieModelService(manager, {
+        };
+      await manager.syncHostProviders([binding]);
+      const modelId = `${binding.id}/native-fixture`;
+      const modelService = new MagpieModelService(
+        manager,
+        {
           readDefaultModelId: () => modelId,
           writeDefaultModelId: () => {},
-        }),
-      );
-      const provider = await resolveDurableProvider('native-gateway-fixture');
-      expect(provider.model.modelId).toBe(modelId);
-      harness = await Harness.open(
-        new MemoryStorage(),
-        {
-          models: provider.models,
-          registry: createRegistry(),
+          allowedModel: model =>
+            enterprise?.allowedModel(model.canonical_id ?? model.id) ??
+            organization?.allowedModel(model.id, model.owned_by) ??
+            true,
         },
-        context,
+        manager.routingUsage,
       );
-      const session = await harness.root(context, { agent: { model: provider.model } });
-      const submission = await session.submit(
-        {
-          type: 'input',
-          content: 'Say hello',
-          requestId: 'native-gateway-once',
-        },
-        context,
+      runtime = new PiRuntimeAdapter({ modelService, piSessionStoreRoot: root });
+      const chat = new CompanionChat(db, modelService, runtime);
+      const profile = {
+        petId: randomUUID(),
+        personaId: DesktopPetBuiltinId.Xiaoyuan,
+        characterId: DesktopPetBuiltinId.Xiaoyuan,
+        createdAt: Date.now(),
+      };
+      const { availability, receipt } = await chat.submit(
+        profile,
+        'native-gateway-once',
+        'Say hello',
       );
-      expect((await submission.wait(context)).status).toBe('done');
-      expect((await session.context(context)).messages).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            role: 'assistant',
-            content: [{ type: 'text', text: 'Native gateway answer' }],
-          }),
-        ]),
-      );
+      expect(availability.modelId).toBe(modelId);
+      expect(receipt).not.toBeNull();
+      await expect
+        .poll(() => chat.history(profile), { timeout: 15_000 })
+        .toMatchObject({
+          lastReply: { ...receipt, state: CompanionRequestState.Answered },
+          messages: [
+            { role: 'user', text: 'Say hello' },
+            { role: 'assistant', text: 'Native gateway answer' },
+          ],
+        });
       expect(requests).toHaveLength(1);
       expect(requests[0]).toMatchObject({ model: 'native-fixture', stream: true });
-      expect(
-        (
-          await session.submit(
-            { type: 'input', content: 'Say hello', requestId: 'native-gateway-once' },
-            context,
-          )
-        ).id,
-      ).toBe(submission.id);
+      expect(requests[0].tools ?? []).toEqual([]);
+      expect(JSON.stringify(requests[0])).toContain('You are Xiaoyuan');
+      expect((await chat.submit(profile, 'native-gateway-once', 'Say hello')).receipt).toEqual(
+        receipt,
+      );
       expect(requests).toHaveLength(1);
+
+      runtime.stopAllSessions();
+      runtime = new PiRuntimeAdapter({ modelService, piSessionStoreRoot: root });
+      const reopened = new CompanionChat(db, modelService, runtime);
+      expect(reopened.history(profile).messages.at(-1)?.text).toBe('Native gateway answer');
+      const next = (await reopened.submit(profile, 'after-restart', 'Continue')).receipt!;
+      await expect
+        .poll(() => reopened.history(profile).lastReply, { timeout: 15_000 })
+        .toEqual({ ...next, state: CompanionRequestState.Answered });
+      expect(requests).toHaveLength(2);
+      expect(JSON.stringify(requests[1].messages)).toContain('Native gateway answer');
+
+      if (provider !== 'organization') {
+        const gatewayUrl = manager.status().gatewayUrl!;
+        const workKey = manager.workKeyResolver(gatewayUrl)!()!;
+        const groupId = 'native-work-fixture';
+        await manager.routingUsage.saveRoutingGroup({
+          id: groupId,
+          name: 'Native Work fixture',
+          members: [modelId],
+          routing: MagpieProviderRouting.Ordered,
+        });
+        const errors: unknown[] = [];
+        runtime.on('error', (_sessionId, error) => errors.push(error));
+        for (const [index, route] of [
+          modelId,
+          `${MAGPIE_ROUTING_GROUP_PREFIX}${groupId}`,
+        ].entries()) {
+          await runtime.startSession(`native-scoped-work-${index}`, 'Say hello in Work', {
+            workspaceRoot: root,
+            modelOverride: route,
+            sessionMode: CoworkSessionMode.Work,
+          });
+        }
+        expect(errors).toEqual([]);
+        expect(requests).toHaveLength(4);
+        for (const index of [2, 3]) {
+          expect(requests[index]).toMatchObject({ model: 'native-fixture', stream: true });
+          expect(Object.values(headers[index]).join('\n')).not.toContain(workKey);
+          expect(headers[index][MagpieWorkHeader.Models.toLowerCase()]).toBeUndefined();
+        }
+
+        for (const [key, workload, models, expected] of [
+          [MAGPIE_RUNTIME_API_KEY, ZhiyuanModelPoolWorkload.Work, [modelId], 401],
+          [workKey, undefined, [modelId], 401],
+          [workKey, ZhiyuanModelPoolWorkload.Work, ['different/model'], 403],
+        ] as const) {
+          const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${key}`,
+              ...(workload ? { [MagpieWorkHeader.Workload]: workload } : {}),
+              [MagpieWorkHeader.Models]: JSON.stringify(models),
+            },
+            body: JSON.stringify({
+              model: modelId,
+              messages: [{ role: 'user', content: 'Hello' }],
+            }),
+          });
+          await response.body?.cancel();
+          expect(response.status).toBe(expected);
+        }
+        expect(requests).toHaveLength(4);
+      }
+      if (enterpriseGateway) {
+        expect(headers.map(header => header['x-zhiyuan-workload'])).toEqual([
+          'chat',
+          'chat',
+          'work',
+          'work',
+        ]);
+        expect(headers.every(header => Boolean(header['x-zhiyuan-conversation-id']))).toBe(true);
+        expect(headers.every(header => header['x-zhiyuan-enterprise-forward'] === undefined)).toBe(
+          true,
+        );
+        const payload = JSON.stringify({
+          model: 'native-fixture',
+          messages: [{ role: 'user', content: 'Hello' }],
+        });
+        const hostEndpoint = binding.baseUrl + (anthropic ? '/v1/messages' : '/chat/completions');
+        const denied = await fetch(hostEndpoint, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${binding.apiKey}` },
+          body: payload,
+        });
+        expect(denied.status).toBe(403);
+        await denied.body?.cancel();
+        logout?.();
+        const revoked = await fetch(hostEndpoint, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${binding.apiKey}`,
+            'x-zhiyuan-enterprise-forward': enterpriseGateway.key,
+          },
+          body: payload,
+        });
+        expect(revoked.status).toBe(403);
+        await revoked.body?.cancel();
+        expect(requests).toHaveLength(4);
+      }
     } finally {
-      await harness?.close(context);
-      dispose?.();
+      runtime?.stopAllSessions();
+      db.close();
       await manager.stop();
+      await organization?.shutdown();
+      logout?.();
+      await enterpriseGateway?.close();
       upstream.closeAllConnections();
       await new Promise<void>(resolve => upstream.close(() => resolve()));
       await fs.rm(root, { recursive: true, force: true });

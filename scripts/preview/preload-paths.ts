@@ -3,7 +3,7 @@
  * generator's preload ↔ IElectronAPI verification.
  *
  * The walker mirrors object-literal structure (nested objects, computed keys,
- * `...spread` of `createIpcInvokers(<channelMap>)`, and `as <type>` casts)
+ * spreads of `createIpcInvokers(<channelMap>)`, including parenthesized casts)
  * without a full TypeScript parse; channel-map spreads are expanded from the
  * zod-free `*.channels.ts` modules the preload imports.
  */
@@ -177,15 +177,20 @@ function collectPathsFromObjectLiteralText(
     }
     if (source.slice(index, index + 3) === '...') {
       index = skipWhitespace(source, index + 3);
-      const spread = readCreateIpcInvokersCall(source, index);
-      if (spread) {
+      const wrapped = source[index] === '(';
+      const spread = readCreateIpcInvokersCall(source, wrapped ? index + 1 : index);
+      const afterCall = spread ? skipWhitespace(source, spread.end) : index;
+      if (
+        spread &&
+        (!wrapped || source[afterCall] === ')' || /^as\b/.test(source.slice(afterCall)))
+      ) {
         const methodNames = channelMaps?.get(spread.channelMapIdentifier);
         if (methodNames) {
           for (const name of methodNames) {
             paths.add(prefix ? `${prefix}.${name}` : name);
           }
         }
-        index = spread.end;
+        index = wrapped ? skipBalanced(source, index, '(', ')') : spread.end;
       } else {
         index = skipExpressionValue(source, index);
       }

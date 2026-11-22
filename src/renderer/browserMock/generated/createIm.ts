@@ -196,6 +196,20 @@ export function createIm(runtime: BrowserMockRuntime): Window['electron']['im'] 
       runtime.warnOnce('im.getLocalIp');
       return '';
     },
+    dingtalkLoginStart: async () => {
+      runtime.warnOnce('im.dingtalkLoginStart');
+      return {
+        url: 'https://example.com',
+        deviceCode: '',
+      };
+    },
+    dingtalkLoginPoll: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.dingtalkLoginPoll');
+      return {
+        done: false,
+      };
+    },
     addDingTalkInstance: async _p0 => {
       void _p0;
       runtime.warnOnce('im.addDingTalkInstance');

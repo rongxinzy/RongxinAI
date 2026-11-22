@@ -7,8 +7,6 @@
  * and cancellable subagents). Pi owns execution and completion.
  */
 
-import path from 'path';
-
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
@@ -18,15 +16,14 @@ import { type HarnessActivationEvent } from '../../../shared/harness';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { toToolActivityInput } from './toolActivity';
 import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
+import type { BundledPresetMember } from '../../presetExpertSnapshot';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
 import { getPythonRuntimeService } from '../../pythonRuntime/host';
-import { getSkillsRoot } from '../coworkUtil';
 import { createPiAskUserQuestionTool } from './piAskUserQuestion';
 import { createPiCodingElicitationTool } from './piCodingElicitation';
 import { createPiPlanTool } from './piPlanTool';
 import { buildPiSubagentTool } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
-import { resolvePiSkillRoots } from './piSkillRoots';
 import { buildPiCadViewerTool } from './piCadViewerTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
 import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
@@ -37,7 +34,6 @@ import { buildPiScheduledTaskTool } from './piScheduledTaskTool';
 import { shouldExposeAskUserQuestionTool } from './piUnattendedPolicy';
 import { buildPiWebSearchTool } from './piWebSearchTool';
 import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
-import { resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 import type { PiModules, PiResolvedModel, PiResourceState } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
 import type { PiStartOptions } from './piRuntimeTypes';
@@ -55,12 +51,12 @@ interface PiSessionCustomToolsParams {
   recordActivation: (event: HarnessActivationEvent) => void;
 }
 
-export function buildPiSessionCustomTools(
+export async function buildPiSessionCustomTools(
   host: PiRuntimeAdapterHost,
   params: PiSessionCustomToolsParams,
-): {
+): Promise<{
   customTools: ToolDefinition[];
-} {
+}> {
   const {
     pi,
     sessionId,
@@ -171,7 +167,7 @@ export function buildPiSessionCustomTools(
           host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false })?.workspaceId ??
           null,
         sessionKey: sessionId,
-        defaultDelivery: host.getScheduledTaskDeliveryForSession?.(sessionId) ?? null,
+        getDefaultDelivery: () => host.getScheduledTaskDeliveryForSession?.(sessionId) ?? null,
       }),
     );
   }
@@ -228,18 +224,22 @@ export function buildPiSessionCustomTools(
       );
     subagentPresetId = leadAgent?.presetId;
   }
+  const memberProfiles = subagentPresetId
+    ? await host
+        .readPresetMembers(subagentPresetId, abortSignal)
+        .catch((error): BundledPresetMember[] => {
+          abortSignal.throwIfAborted();
+          console.warn(
+            `[PiSubagentTool] failed to load team members for session ${sessionId}:`,
+            error,
+          );
+          return [];
+        })
+    : undefined;
   const subagentTool = resourceState.chatMode
     ? null
     : buildPiSubagentTool({
-        getPiAgentsDir: () => host.getPiAgentsDir(),
-        presetId: subagentPresetId,
-        loadBundledMembers: subagentPresetId
-          ? presetId =>
-              host.resolveBundledMemberProfiles(presetId)?.map(member => ({
-                ...member,
-                source: 'member' as const,
-              })) ?? null
-          : undefined,
+        memberProfiles,
         resolvedModel,
         getResolvedModel: () => {
           const active = host.activeSessions.get(sessionId);
@@ -253,7 +253,6 @@ export function buildPiSessionCustomTools(
         },
         signal: abortSignal,
         workspaceRoot,
-        webSearchSkillPath: path.join(getSkillsRoot(), 'web-search'),
         onChildToolActivity: childEvent => {
           const active = host.activeSessions.get(sessionId);
           if (!active) return;
@@ -285,27 +284,21 @@ export function buildPiSessionCustomTools(
             if (removeActivity) host.emit('toolActivity', sessionId, removeActivity);
           }
         },
-        createPiResourceLoader: (
-          cwd,
-          systemPrompt,
-          maxOutputTokens,
-          skillIds,
-          extensionFactories,
-        ) =>
+        createPiResourceLoader: (cwd, systemPrompt, maxOutputTokens) =>
           createPiRuntimeResourceLoader(
             host,
             pi,
             cwd,
             {
               systemPrompt,
-              skillIds: skillIds ?? [],
+              skillIds: [],
               maxOutputTokens,
               fileToolsEnabled: true,
               unattended: resourceState.unattended,
               chatMode: resourceState.chatMode,
               nativeToolsOnly: true,
               expertSkillDirs: [],
-              skillRoots: resolvePiSkillRoots(skillIds ?? [], resolveZhiyuanSkillDirs(), []),
+              skillRoots: {},
             },
             {
               sessionId,
@@ -316,7 +309,6 @@ export function buildPiSessionCustomTools(
                 options.approvalMode ??
                 WorkbenchApprovalMode.Ask,
             },
-            extensionFactories,
           ),
       });
   if (subagentTool) {

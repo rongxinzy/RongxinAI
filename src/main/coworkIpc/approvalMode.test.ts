@@ -17,7 +17,6 @@ describe('resolveCoworkApprovalMode', () => {
   it('auto-approves reversible workspace edits under Ask->Auto while prompting for sensitive tools', async () => {
     const requestedTools: string[] = [];
     const gate = new PiToolPermissionGate({
-      approvalSessionMap: new Map(),
       getWorkbenchTaskService: () => null,
       emit: (event, _sidOrId, payload) => {
         if (event === 'permissionRequest' && payload && typeof payload === 'object') {

@@ -11,6 +11,7 @@ import { PetOrientation } from '../../shared/desktopPet/surfaces/constants';
 import { WindowSurfaceWalker } from '../../shared/desktopPet/surfaces/walker';
 import type { WindowSurfaceSnapshot } from '../../shared/desktopPet/surfaces/types';
 import type { DesktopPetEffect, DesktopPetPose } from '../../shared/desktopPet/types';
+import type { DesktopPetWalkFrame } from '../../shared/desktopPet/contract';
 import { DesktopPetRoam } from './roam';
 import {
   estimateReleaseVelocity,
@@ -92,7 +93,7 @@ export class DesktopPetMotion {
     this.roam.setMediaDriven(enabled, performance.now());
   }
 
-  observeWalkFrame(frame: unknown): void {
+  observeWalkFrame(frame: DesktopPetWalkFrame): void {
     this.roam.observeMediaFrame(frame, performance.now());
   }
 

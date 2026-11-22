@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import type { LlamaCppBackendRef } from '../../../shared/llamacpp';
-import { resolveLlamaCppExecutableName } from '../llamacppRuntimeInstaller';
+import { resolveLlamaCppExecutableName } from '../llamacppRuntimeConstants';
 
 export function buildVersionBackend(version: string, backend: string): string {
   return `${version}/${backend}`;

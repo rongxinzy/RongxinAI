@@ -6,7 +6,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const { upstream } = require('../magpie-runtime.cjs');
+const { upstream, isPinnedSource } = require('../magpie-runtime.cjs');
 
 const MAC_TARGETS = ['darwin-x64', 'darwin-arm64'];
 
@@ -20,8 +20,8 @@ export function assertDeveloperIdHardenedRuntime(info) {
 }
 
 export function assertSealedMagpieManifest(manifest, digest) {
-  if (manifest.version !== upstream.version || manifest.source?.commit !== upstream.commit) {
-    throw new Error('Packaged Magpie does not match the pinned upstream release');
+  if (manifest.version !== upstream.version || !isPinnedSource(manifest.source)) {
+    throw new Error('Packaged Magpie does not match the pinned patched build');
   }
   if (manifest.sha256 !== digest) {
     throw new Error('Magpie SHA-256 does not match the sealed manifest');
@@ -46,8 +46,7 @@ function codesignInfo(binary, spawn = spawnSync) {
   return output;
 }
 
-// Each per-arch .app only ships the helper for its own architecture (see
-// contextTargets in scripts/magpie-runtime.cjs); a universal .app ships both.
+// When no architecture is supplied, verify the helpers present in the app.
 export function resolveMagpieTargets(appPath, targets = []) {
   if (targets.length > 0) {
     for (const key of targets) {

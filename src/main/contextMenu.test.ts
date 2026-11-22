@@ -9,7 +9,8 @@ const electronMocks = vi.hoisted(() => ({
 
 vi.mock('electron', () => ({ ipcMain: electronMocks.ipcMain }));
 
-import { ContextMenuAction, isContextMenuAction } from '../shared/contextMenu';
+import { ContextMenuAction } from '../shared/contextMenu';
+import { ContextMenuIpc } from '../shared/ipc/channels';
 import { createContextMenuOpenEvent, registerContextMenu } from './contextMenu';
 
 beforeEach(() => {
@@ -19,14 +20,21 @@ beforeEach(() => {
 
 function createWindow(): {
   window: Electron.BrowserWindow;
-  webContents: { on: ReturnType<typeof vi.fn>; removeListener: ReturnType<typeof vi.fn> };
+  webContents: {
+    mainFrame: object;
+    on: ReturnType<typeof vi.fn>;
+    removeListener: ReturnType<typeof vi.fn>;
+    copy: ReturnType<typeof vi.fn>;
+  };
   setDestroyed: (destroyed: boolean) => void;
 } {
   let destroyed = false;
   const webContents = {
     isDestroyed: vi.fn(() => destroyed),
+    mainFrame: {},
     on: vi.fn(),
     removeListener: vi.fn(),
+    copy: vi.fn(),
   };
   const window = {
     isDestroyed: vi.fn(() => destroyed),
@@ -80,9 +88,24 @@ describe('context menu IPC payload', () => {
     });
   });
 
-  test('accepts only declared context menu actions', () => {
-    expect(isContextMenuAction(ContextMenuAction.Copy)).toBe(true);
-    expect(isContextMenuAction('delete')).toBe(false);
+  test('runs only declared context menu actions from the owning main frame', () => {
+    const { window, webContents, setDestroyed } = createWindow();
+    registerContextMenu(window);
+    const [channel, execute] = electronMocks.ipcMain.on.mock.calls[0];
+    expect(channel).toBe(ContextMenuIpc.Execute);
+    const sender = { sender: webContents, senderFrame: webContents.mainFrame };
+
+    execute(sender, 'delete');
+    execute(sender, ContextMenuAction.Copy, 'extra argument');
+    execute({ ...sender, senderFrame: {} }, ContextMenuAction.Copy);
+    execute({ ...sender, sender: {} }, ContextMenuAction.Copy);
+    expect(webContents.copy).not.toHaveBeenCalled();
+
+    execute(sender, ContextMenuAction.Copy);
+    expect(webContents.copy).toHaveBeenCalledOnce();
+    setDestroyed(true);
+    expect(() => execute(sender, ContextMenuAction.Copy)).not.toThrow();
+    expect(webContents.copy).toHaveBeenCalledOnce();
   });
 
   test('removes IPC listeners without touching destroyed webContents', () => {
@@ -103,6 +126,7 @@ describe('context menu IPC payload', () => {
     unregister();
 
     expect(webContents.removeListener).toHaveBeenCalledOnce();
-    expect(electronMocks.ipcMain.removeListener).toHaveBeenCalledOnce();
+    const [channel, listener] = electronMocks.ipcMain.on.mock.calls[0];
+    expect(electronMocks.ipcMain.removeListener).toHaveBeenCalledExactlyOnceWith(channel, listener);
   });
 });

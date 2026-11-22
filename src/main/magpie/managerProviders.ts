@@ -1,8 +1,8 @@
 import type { MagpieManagerOptions } from './managerOptions';
 import {
   HOST_PROVIDER_PREFIX,
-  RETIRED_STRATA_HOST_PROVIDER_ID,
   hostProviderPayload,
+  isRetiredHostProviderId,
   type MagpieHostProvider,
 } from './hostProviders';
 
@@ -32,6 +32,7 @@ import {
 
 interface ProviderContext {
   state(): MagpieStatus;
+  catalogOwner(): AbortSignal | undefined;
   ensureRunning(): Promise<MagpieStatus>;
   managementJson(
     route: string,
@@ -47,8 +48,11 @@ interface ProviderContext {
 
 /** Provider synchronization, editing and diagnostics for one owned manager. */
 export class MagpieManagerProviders {
-  private hostSync: Promise<void> = Promise.resolve();
-  private hostSignatures = new Map<string, string>();
+  private hostSync?: {
+    owner: AbortSignal;
+    pending: Promise<void>;
+    signatures: Map<string, string>;
+  };
   private readonly recentErrors = new RecentErrors();
   private cachedActiveProviderCount = 0;
   private providersListHydrated = false;
@@ -61,30 +65,24 @@ export class MagpieManagerProviders {
     };
   }
 
-  clearHostSignatures(): void {
-    this.hostSignatures.clear();
-  }
-
   resetHydration(): void {
     this.providersListHydrated = false;
     this.cachedActiveProviderCount = 0;
   }
 
-  /** Retire the managed provider persisted by older Windows installations. */
-  async disableRetiredStrataProvider(signal: AbortSignal): Promise<void> {
+  async disableRetiredHostProviders(signal: AbortSignal): Promise<void> {
     const state = await this.context.managementJson('/api/providers', { signal });
     const providers: { id?: string; off?: boolean }[] = Array.isArray(state.providers)
       ? state.providers
       : [];
-    if (
-      providers.some(provider => provider?.id === RETIRED_STRATA_HOST_PROVIDER_ID && !provider.off)
-    ) {
+    for (const provider of providers) {
+      if (!isRetiredHostProviderId(provider?.id) || provider.off === true) continue;
       await this.context.managementJson(
         '/api/provider/off',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: RETIRED_STRATA_HOST_PROVIDER_ID }),
+          body: JSON.stringify({ id: provider.id }),
           signal,
         },
         2_000,
@@ -92,18 +90,28 @@ export class MagpieManagerProviders {
     }
   }
 
+  private requestForOwner(owner: AbortSignal, route: string, init?: RequestInit) {
+    return this.context.managementJson(route, { ...init, signal: owner });
+  }
+
   /** Main-only authoritative host binding snapshot; external Provider credentials never enter here. */
-  syncHostProviders(definitions: readonly MagpieHostProvider[]): Promise<void> {
+  syncHostProviders(definitions: readonly MagpieHostProvider[], owner: AbortSignal): Promise<void> {
+    if (owner.aborted || this.context.catalogOwner() !== owner)
+      return Promise.reject(
+        new Error('Model service changed while synchronizing managed providers'),
+      );
     const payloads = definitions.map(hostProviderPayload);
     const ids = new Set(payloads.map(p => String(p.id)));
     if (ids.size !== payloads.length)
       return Promise.reject(new Error('Duplicate host provider id'));
-    const run = this.hostSync
+    const current = this.hostSync?.owner === owner ? this.hostSync : undefined;
+    const signatures = current?.signatures ?? new Map<string, string>();
+    const request = (route: string, init?: RequestInit) => this.requestForOwner(owner, route, init);
+    const run = (current?.pending ?? Promise.resolve())
       .catch((): void => undefined)
       .then(async () => {
-        await this.context.ensureRunning();
         // Discover only reserved ids. Do not forward or log the management response.
-        const state = await this.context.managementJson('/api/providers');
+        const state = await request('/api/providers');
         const existing = new Map<string, boolean>(
           (Array.isArray(state.providers) ? state.providers : []).flatMap((p: unknown) =>
             p &&
@@ -118,13 +126,13 @@ export class MagpieManagerProviders {
         for (const [id, off] of existing) {
           if (!ids.has(id)) {
             if (!off) {
-              await this.context.managementJson('/api/provider/off', {
+              await request('/api/provider/off', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id }),
               });
             }
-            this.hostSignatures.delete(id);
+            signatures.delete(id);
           }
         }
         for (const payload of payloads) {
@@ -146,8 +154,8 @@ export class MagpieManagerProviders {
             JSON.stringify(actual.chosen ?? []) === JSON.stringify(payload.models) &&
             JSON.stringify(actual.contexts ?? {}) === JSON.stringify(payload.contexts) &&
             JSON.stringify(actual.outputs ?? {}) === JSON.stringify(payload.outputs);
-          if (existing.has(id) && this.hostSignatures.get(id) === signature && sameTarget) continue;
-          await this.context.managementJson('/api/provider/save', {
+          if (existing.has(id) && signatures.get(id) === signature && sameTarget) continue;
+          await request('/api/provider/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -161,17 +169,17 @@ export class MagpieManagerProviders {
           // Upstream preserves provider disabled state across provider/save; a host endpoint returning
           // after unload/logout must explicitly re-enable that same reserved provider.
           if (existing.has(id) && actual?.off === true) {
-            await this.context.managementJson('/api/provider/on', {
+            await request('/api/provider/on', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id }),
             });
           }
-          this.hostSignatures.set(id, signature);
+          signatures.set(id, signature);
         }
         this.providersListHydrated = false;
       });
-    this.hostSync = run;
+    this.hostSync = { owner, pending: run, signatures };
     return run;
   }
 
@@ -188,15 +196,19 @@ export class MagpieManagerProviders {
     return this.context.diagnostics();
   }
 
-  async providers(): Promise<MagpieProviderSummary[]> {
-    if (this.context.state().state !== 'running') return [];
+  async providers(probeStoredKeys: boolean): Promise<MagpieProviderSummary[]> {
+    const owner = this.context.catalogOwner();
+    if (!owner) return [];
     try {
-      const state = await this.context.managementJson('/api/providers');
-      const rawList = Array.isArray(state.providers) ? state.providers : [];
+      const state = await this.requestForOwner(owner, '/api/providers');
       const list = projectMagpieProviderSummaries(state);
-      await enrichMagpieProviderSummariesWithStoredKeys(list, rawList, id =>
-        this.fetchStoredProviderKey(id),
-      );
+      if (probeStoredKeys) {
+        const rawList = Array.isArray(state.providers) ? state.providers : [];
+        await enrichMagpieProviderSummariesWithStoredKeys(list, rawList, id =>
+          this.fetchStoredProviderKey(id, owner),
+        );
+      }
+      owner.throwIfAborted();
       this.cachedActiveProviderCount = list.filter(p => !p.off).length;
       this.providersListHydrated = true;
       return list;
@@ -205,13 +217,24 @@ export class MagpieManagerProviders {
     }
   }
 
-  private async fetchStoredProviderKey(providerId: string): Promise<string | undefined> {
-    const body = await this.context.managementJson('/api/provider/key', {
+  private async fetchStoredProviderKey(
+    providerId: string,
+    owner = this.context.catalogOwner(),
+  ): Promise<string | undefined> {
+    if (!owner) throw new Error('Model service is unavailable');
+    const body = await this.requestForOwner(owner, '/api/provider/key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: providerId }),
     });
     return parseMagpieProviderKeyResponse(body);
+  }
+
+  private async startProviderEdit(): Promise<AbortSignal> {
+    await this.context.ensureRunning();
+    const owner = this.context.catalogOwner();
+    if (!owner) throw new Error('Model service is unavailable');
+    return owner;
   }
 
   async saveProvider(input: MagpieSaveProviderInput): Promise<MagpieProviderSummary[]> {
@@ -232,8 +255,8 @@ export class MagpieManagerProviders {
     }
     // Fail before starting the service on a value upstream would reject.
     const contexts = normalizeProviderContexts(input.contexts);
-    await this.context.ensureRunning();
-    const state = await this.context.managementJson('/api/providers');
+    const owner = await this.startProviderEdit();
+    const state = await this.requestForOwner(owner, '/api/providers');
     const existingList = Array.isArray(state.providers) ? state.providers : [];
     const existing = input.id
       ? existingList.find((p: Record<string, unknown>) => p.id === input.id)
@@ -261,7 +284,7 @@ export class MagpieManagerProviders {
       baseUrl,
     );
 
-    await this.context.managementJson('/api/provider/save', {
+    await this.requestForOwner(owner, '/api/provider/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -297,9 +320,9 @@ export class MagpieManagerProviders {
     if (typeof id !== 'string' || id.startsWith(HOST_PROVIDER_PREFIX)) {
       throw new Error('Host-managed providers cannot be toggled via user settings');
     }
-    await this.context.ensureRunning();
-    const name = await this.providerName(id);
-    await this.context.managementJson(enabled ? '/api/provider/on' : '/api/provider/off', {
+    const owner = await this.startProviderEdit();
+    const name = await this.providerName(owner, id);
+    await this.requestForOwner(owner, enabled ? '/api/provider/on' : '/api/provider/off', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
@@ -315,17 +338,17 @@ export class MagpieManagerProviders {
     if (typeof id !== 'string' || id.startsWith(HOST_PROVIDER_PREFIX)) {
       throw new Error('Host-managed providers cannot be deleted via user settings');
     }
-    await this.context.ensureRunning();
+    const owner = await this.startProviderEdit();
     // Best effort: a failed listing must not stop the delete it only names.
-    const name = await this.providerName(id);
+    const name = await this.providerName(owner, id);
     try {
-      await this.context.managementJson('/api/provider/delete', {
+      await this.requestForOwner(owner, '/api/provider/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
     } catch {
-      await this.context.managementJson('/api/provider/off', {
+      await this.requestForOwner(owner, '/api/provider/off', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
@@ -338,9 +361,9 @@ export class MagpieManagerProviders {
     return this.context.providers();
   }
 
-  private async providerName(id: string): Promise<string | undefined> {
+  private async providerName(owner: AbortSignal, id: string): Promise<string | undefined> {
     try {
-      const state = await this.context.managementJson('/api/providers');
+      const state = await this.requestForOwner(owner, '/api/providers');
       const list = Array.isArray(state.providers) ? state.providers : [];
       const row = list.find((provider: Record<string, unknown>) => provider.id === id);
       return row && 'name' in row && typeof row.name === 'string' ? row.name : undefined;

@@ -25,7 +25,7 @@ import { WorkbenchApprovalMode } from '@shared/workbenchTask';
 import { CoworkExecutionMode } from '../../src/shared/cowork/constants';
 import { CoworkStore } from '../../src/main/coworkStore';
 import { composeCoworkSystemPrompt } from '../../src/main/coworkPrompt/composer';
-import { installTestMagpie } from '../helpers/installTestMagpie';
+import { createTestMagpie } from '../helpers/createTestMagpie';
 import { PiRuntimeAdapter } from '../../src/main/libs/agentEngine/piRuntimeAdapter';
 import { SqliteStore } from '../../src/main/sqliteStore';
 import { initializeWorkbenchTaskSchema } from '../../src/main/workbenchTask/schema';
@@ -197,7 +197,6 @@ export async function runLongTaskScenario(
   let tapeServer: PiProviderTapeServer | null = null;
   let store: SqliteStore | null = null;
   let adapter: PiRuntimeAdapter | null = null;
-  let disposeGateway: (() => void) | undefined;
   try {
     if (options.mode !== 'live') {
       if (!options.tapePath) throw new Error(`${options.mode} mode requires tapePath`);
@@ -264,7 +263,7 @@ export async function runLongTaskScenario(
     if (!tapeServer) {
       throw new Error('Live long-task runs must go through the local model gateway.');
     }
-    const gateway = installTestMagpie({
+    const gateway = createTestMagpie({
       gatewayUrl: `http://127.0.0.1:${tapeServer.port}`,
       defaultModelId: LONGTASK_MODEL_ID,
       acceptUnknownModels: false,
@@ -274,16 +273,17 @@ export async function runLongTaskScenario(
       max_output_tokens: 4096,
     });
     gateway.setImage(LONGTASK_MODEL_ID, false);
-    disposeGateway = gateway.dispose;
 
     const db = store.getDatabase();
     initializeWorkbenchTaskSchema(db);
     const coworkStore = new CoworkStore(db);
     const workbenchTaskService = new WorkbenchTaskService(db);
 
-    adapter = new PiRuntimeAdapter();
-    adapter.setCoworkStore(coworkStore);
-    adapter.setWorkbenchTaskService(workbenchTaskService);
+    adapter = new PiRuntimeAdapter({
+      modelService: gateway.modelService,
+      coworkStore,
+      workbenchTaskService,
+    });
 
     const counts: LongTaskScenarioSummary['counts'] = { total: 0, byType: {} };
     const errors: string[] = [];
@@ -393,7 +393,6 @@ export async function runLongTaskScenario(
     };
   } finally {
     if (adapter) await adapter.stopAllSessions();
-    disposeGateway?.();
     if (tapeServer) await tapeServer.close();
     if (store) store.close();
     vi.useRealTimers();

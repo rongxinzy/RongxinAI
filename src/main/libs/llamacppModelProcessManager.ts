@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events';
 import type { LlamaCppModelLaunchInput, LlamaCppServiceConfig } from '../../shared/llamacpp';
 import { buildLlamaCppServeEnv, buildLlamaServerModelArgs } from './llamacppServe';
 import { LlamaCppModelPortAllocator } from './llamacppModelPortAllocator';
-import { stopLlamaCppModelProcess } from './llamacppModelProcessStop';
+import { stopOwnedProcess } from './ownedProcessStop';
 
 const LOCAL_MODEL_HOST = '127.0.0.1';
 const STARTUP_POLL_INTERVAL_MS = 250;
@@ -40,6 +40,7 @@ type LlamaCppModelProcessManagerOptions = {
   getExecutablePath: () => Promise<string | null>;
   getServiceConfig: () => LlamaCppServiceConfig;
   startupTimeoutMs: () => number;
+  shutdownSignal?: AbortSignal;
 };
 
 export class LlamaCppModelProcessManager extends EventEmitter {
@@ -66,6 +67,8 @@ export class LlamaCppModelProcessManager extends EventEmitter {
   }
 
   async ensureRunning(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelProcessSnapshot> {
+    const { shutdownSignal } = this.options;
+    shutdownSignal?.throwIfAborted();
     const modelName = input.model.trim();
     const modelPath = input.modelPath?.trim();
     if (!modelName) throw new Error('Model name is required.');
@@ -79,9 +82,14 @@ export class LlamaCppModelProcessManager extends EventEmitter {
     if (existing) return await existing.startup;
 
     const executablePath = await this.options.getExecutablePath();
+    shutdownSignal?.throwIfAborted();
     if (!executablePath) throw new Error('llama.cpp runtime is not installed.');
 
     const lease = await this.portAllocator.reserve(modelName);
+    if (shutdownSignal?.aborted) {
+      this.portAllocator.release(modelName);
+      shutdownSignal.throwIfAborted();
+    }
     const config = this.options.getServiceConfig();
     const child = spawn(
       executablePath,
@@ -136,7 +144,7 @@ export class LlamaCppModelProcessManager extends EventEmitter {
     const record = this.processes.get(normalizedModelName);
     if (!record) return;
     if (record.stopping) return await record.stopping;
-    record.stopping = stopLlamaCppModelProcess(record.child)
+    record.stopping = stopOwnedProcess(record.child)
       .then(() => {
         if (this.processes.get(normalizedModelName) === record) {
           this.processes.delete(normalizedModelName);
@@ -150,7 +158,15 @@ export class LlamaCppModelProcessManager extends EventEmitter {
   }
 
   async stopAll(): Promise<void> {
-    await Promise.all(Array.from(this.processes.keys()).map(modelName => this.stop(modelName)));
+    const results = await Promise.allSettled(
+      Array.from(this.processes.keys(), modelName => this.stop(modelName)),
+    );
+    const failures = results.flatMap(result =>
+      result.status === 'rejected' ? [result.reason] : [],
+    );
+    if (failures.length === 1) throw failures[0];
+    if (failures.length > 1)
+      throw new AggregateError(failures, 'Failed to stop local model processes.');
   }
 
   private subscribeToOutput(record: ManagedModelProcess): void {

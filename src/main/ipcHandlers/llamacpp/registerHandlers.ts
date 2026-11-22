@@ -1,36 +1,32 @@
 // ipcMain handler registration for llama.cpp (#1069).
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import fs from 'fs';
 
-import type { NvidiaSmiSnapshot } from '../../../shared/hardware';
 import type {
+  LlamaCppBackendRef,
   LlamaCppImportModelFilesResult,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
   LlamaCppModelLaunchInput,
   LlamaCppModelLaunchResult,
-  LlamaCppModelPreference,
-  LlamaCppModelPreferences,
   LlamaCppModelUnloadResult,
   LlamaCppRuntimeInstallSnapshot,
   LlamaCppServiceConfig,
-  LlamaCppSetModelPreferenceInput,
   LlamaCppStatusSnapshot,
 } from '../../../shared/llamacpp';
 import {
   LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID,
+  LlamaCppBackendError,
   LlamaCppIpcChannel,
   LlamaCppModelLaunchLogPhase,
   LlamaCppOrchestrator,
 } from '../../../shared/llamacpp';
-import {
-  ModelCapabilityStatus,
-  parseLlamaCppRuntimeCapabilities,
-  type ModelCapabilities,
-} from '../../../shared/providers';
-import { LlamaCppModelResidencyMode } from '../../../shared/llamacpp';
 import { t } from '../../i18n';
 import { LlamaCppManager } from '../../libs/llamacppManager';
+import { readCurrentBackendRef, syncCurrentBackend } from '../../libs/llamacppBackendManager';
+import { removeCurrentBackendLink } from '../../libs/llamacppBackendManager/paths';
+import { switchLlamaCppBackend } from '../../libs/llamacppBackendVersionSwitch';
+import { getUserLlamaCppRuntimeRoot } from '../../libs/llamacppRuntimePaths';
 import { llamacppContract } from '../../../shared/ipc/llamacppContract';
 import { handleIpcContract, handleIpcContractSubset } from '../../ipc/handleIpcContract';
 import { createLlamaCppModelLaunchLogger } from '../../libs/llamacppModelLaunchLog';
@@ -50,8 +46,10 @@ import {
   LlamaCppModelResidencyState,
 } from '../../libs/llamacppModelResidencyManager';
 import { createLlamaCppRuntimeInstallState } from '../../libs/llamacppRuntimeInstallState';
-import { buildLlamaCppRunningModelBinding } from '../../libs/llamacppAgentBinding';
-import { applyLlamaCppServiceTransition } from '../../libs/llamacppServiceTransition';
+import {
+  buildLlamaCppRunningModelBindings,
+  type LocalGpuSnapshot,
+} from '../../libs/llamacppAgentBinding';
 import { LlamaCppServiceTransitionLock } from '../../libs/llamacppServiceTransitionLock';
 import { getNvidiaSmiSnapshot } from '../../libs/nvidiaSmi';
 import { getSystemMemorySnapshot } from '../../libs/systemMemory';
@@ -60,8 +58,6 @@ import { registerLlamaCppModelLaunchLogIpcHandlers } from '../llamacppModelLaunc
 import {
   broadcastLlamaCppModelResidencyState,
   getLlamaCppLoadedModelLimitViolation,
-  getRequiredVramRecoveryMiB,
-  getTotalFreeVramMiB,
   hasRecoveredVram,
   throwIfLlamaCppModelLoadCancelled,
   toUserFacingLlamaCppModelLoadError,
@@ -75,7 +71,6 @@ import {
   getLlamaCppModelPreferenceInputName,
   getLlamaCppModelPreferences,
   getLlamaCppServiceConfig,
-  migrateLegacyLlamaCppConfig,
   sanitizeLlamaCppBackendRef,
   sanitizeLlamaCppServiceConfig,
   sanitizeUpdatedModelPreferences,
@@ -87,19 +82,6 @@ const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
 const LLAMACPP_MODEL_PREFERENCES_KEY = 'llamacpp_model_preferences';
 const LLAMACPP_UNLOAD_VRAM_POLL_TIMEOUT_MS = 5_000;
 const LLAMACPP_UNLOAD_VRAM_POLL_INTERVAL_MS = 250;
-const LLAMACPP_UNLOAD_CONFIRM_TIMEOUT_MS = 8_000;
-const LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS = 400;
-const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
-const LLAMACPP_STARTUP_BINDING_SYNC_ATTEMPTS = 30;
-const LLAMACPP_STARTUP_BINDING_SYNC_INTERVAL_MS = 1_000;
-const LLAMACPP_MODEL_PREFERENCE_CAPABILITY_KEYS = [
-  'toolCalling',
-  'imageInput',
-  'videoInput',
-  'audioInput',
-  'documentInput',
-  'reasoning',
-] as const;
 
 const LlamaCppServiceStatus = {
   Running: 'running',
@@ -119,69 +101,73 @@ export function registerLlamaCppIpcHandlers(
     /** Notified after a LAN token regeneration so the imported gateway key is replaced. */
     onLanAccessTokenRegenerated?: () => void | Promise<void>;
   },
-): LlamaCppModelOrchestrator {
+) {
+  let closing = false;
+  const pending = new Set<Promise<unknown>>();
+  const runWhileOpen = async <T>(run: () => T): Promise<Awaited<T>> => {
+    if (closing) throw new Error(t('llamacppLoadModelServiceUnavailable'));
+    const operation = Promise.resolve(run());
+    pending.add(operation);
+    try {
+      return await operation;
+    } finally {
+      pending.delete(operation);
+    }
+  };
   const broadcast = (channel: string, payload: unknown): void => {
     BrowserWindow.getAllWindows().forEach(win => {
       if (win.isDestroyed()) return;
       win.webContents.send(channel, payload);
     });
   };
+  const projectBindings = (
+    runningModels: Awaited<ReturnType<LlamaCppModelOrchestrator['listRunningModels']>>,
+  ) =>
+    buildLlamaCppRunningModelBindings(
+      runningModels,
+      getLlamaCppModelPreferences(options.getStore()),
+    );
   const updateRunningModelBindings = async (
-    runningModels: Awaited<ReturnType<LlamaCppManager['listRunningModels']>>,
+    runningModels: Parameters<typeof projectBindings>[0],
+    baseUrl = daemon.gatewayBaseUrl(),
   ): Promise<boolean> => {
-    const store = options.getStore();
-    const modelPreferences = getLlamaCppModelPreferences(store);
-    const client = runningModels.length > 0 ? await manager.client() : null;
-    const bindingModels = (
-      await Promise.all(
-        runningModels.map(async runningModel => {
-          const model = buildLlamaCppRunningModelBinding(runningModel);
-          if (!model) return null;
-          let detectedCapabilities: Partial<ModelCapabilities> = {};
-          try {
-            if (client) {
-              detectedCapabilities = parseLlamaCppRuntimeCapabilities(
-                await client.showModel(model.id),
-              );
-            }
-          } catch {
-            // Runtime metadata is optional; context and loaded state remain usable.
-          }
-          const preference = modelPreferences[model.id];
-          const preferenceCapabilities = preference?.capabilities;
-          const capabilities = {
-            ...detectedCapabilities,
-            ...(runningModel.supportsThinkingToggle === true
-              ? { reasoning: ModelCapabilityStatus.Supported }
-              : {}),
-            ...(preferenceCapabilities ?? {}),
-          };
-          return {
-            ...model,
-            ...(preference?.ctxSize ? { contextWindow: preference.ctxSize } : {}),
-            ...(preference?.maxTokens ? { maxTokens: preference.maxTokens } : {}),
-            ...(Object.keys(capabilities).length ? { capabilities } : {}),
-          };
-        }),
-      )
-    ).filter((model): model is NonNullable<typeof model> => Boolean(model));
-    await options.onModelBindingsChanged?.(daemon.gatewayBaseUrl(), bindingModels);
+    if (closing) return false;
+    await options.onModelBindingsChanged?.(baseUrl, projectBindings(runningModels));
     broadcast(LlamaCppIpcChannel.ModelBindingsChanged, undefined);
     return true;
+  };
+
+  const readCurrentBindingState = async () => {
+    const generation = bindingRefreshGeneration;
+    const isCurrent = () =>
+      !closing && !bindingRefreshSuppressed && generation === bindingRefreshGeneration;
+    if (!isCurrent()) return;
+    try {
+      const snapshot = await daemon.reconnect();
+      if (isCurrent()) {
+        return {
+          runningModels: snapshot?.runningModels ?? [],
+          baseUrl: snapshot?.gatewayBaseUrl ?? null,
+        };
+      }
+    } catch (error) {
+      if (isCurrent()) throw error;
+    }
   };
 
   const refreshRunningModelBindings = async (
     input: { preserveExistingWhenEmpty?: boolean } = {},
   ): Promise<LlamaCppModelBindingRefreshResult> => {
-    if (bindingRefreshSuppressed) {
+    if (closing || bindingRefreshSuppressed) {
       return { changed: false, hasRunningModels: false };
     }
     const refreshGeneration = bindingRefreshGeneration;
     try {
-      const runningModels = await daemon.listRunningModels();
-      if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) {
+      const snapshot = await readCurrentBindingState();
+      if (!snapshot || closing || refreshGeneration !== bindingRefreshGeneration) {
         return { changed: false, hasRunningModels: false };
       }
+      const { runningModels, baseUrl } = snapshot;
       if (input.preserveExistingWhenEmpty && runningModels.length === 0) {
         // Router health can precede automatic model loading; do not erase bindings during that gap.
         return { changed: false, hasRunningModels: false };
@@ -194,11 +180,11 @@ export function registerLlamaCppIpcHandlers(
         }
       }
       return {
-        changed: await updateRunningModelBindings(runningModels),
+        changed: await updateRunningModelBindings(runningModels, baseUrl),
         hasRunningModels: runningModels.length > 0,
       };
     } catch (error) {
-      if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) {
+      if (closing || bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) {
         return { changed: false, hasRunningModels: false };
       }
       // Fail closed in the unified catalog while the local runtime cannot be reached.
@@ -235,8 +221,15 @@ export function registerLlamaCppIpcHandlers(
       getStore: options.getStore,
       getServiceConfig: resolveServiceConfig,
       getModelsDir: () => manager.getModelsDir(),
-      getPresetPath: () => manager.getPresetPath(),
-      acquireModelLease: (modelName, load) => residency.acquire(modelName, load),
+      stopPreviousDaemon: async () => {
+        const leftover = createDaemonOrchestrator();
+        if (await leftover.reconnect({ requireResponsive: true })) await leftover.stopService();
+      },
+      acquireModelLease: (modelName, load) => {
+        if (closing || serviceTransitionLock.isActive())
+          throw new Error(t('llamacppLoadModelServiceUnavailable'));
+        return runWhileOpen(() => residency.acquire(modelName, load));
+      },
     });
   // The implementation is chosen once, at registration, from the config's
   // `orchestrator` field (default router); a switch takes effect on the next
@@ -244,44 +237,21 @@ export function registerLlamaCppIpcHandlers(
   const useRouterOrchestrator = resolveServiceConfig().orchestrator !== LlamaCppOrchestrator.Daemon;
   const routerOrchestrator = useRouterOrchestrator ? createRouterOrchestrator() : null;
   const daemon: LlamaCppModelOrchestrator = routerOrchestrator ?? createDaemonOrchestrator();
-  const stopLeftoverDaemonBeforeStart = async (): Promise<void> => {
-    if (!routerOrchestrator) return;
-    // Upgrades from the daemon build may leave a detached daemon (spawned with
-    // keepRunningOnAppQuit) holding config.port. Stop it through the existing
-    // controller before the router gateway binds; nothing to do when none is
-    // registered.
-    const leftover = new LlamaCppModelDaemonController({
-      userDataPath: app.getPath('userData'),
-      getStore: options.getStore,
-      getServiceConfig: resolveServiceConfig,
-    });
-    const reconnected = await leftover.reconnect().catch((): null => null);
-    if (reconnected) {
-      await leftover.stopService().catch((error: unknown) => {
-        console.warn('[LlamaCpp] failed to stop the leftover model daemon:', error);
-      });
-    }
-  };
   const loadModelLock = new LlamaCppModelLoadLock();
   let activeModelLoad: { modelName: string; controller: AbortController } | null = null;
   let loadModelCore: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
   const residency = new LlamaCppModelResidencyManager({
-    getPolicy: modelName => {
-      const serviceStatus =
-        typeof manager.getStatus === 'function' ? manager.getStatus() : undefined;
-      if (serviceStatus?.managedByApp === false) {
-        return { mode: LlamaCppModelResidencyMode.Forever };
-      }
-      return getLlamaCppModelPreferences(options.getStore())[modelName]?.residency;
-    },
-    unload: async modelName => {
-      await daemon.stopModel(modelName);
-      const confirmation = await waitForLlamaCppModelUnloadConfirmation({
-        modelName,
-        listRunningModels: () => daemon.listRunningModels(),
-      });
-      await updateRunningModelBindings(confirmation.runningModels);
-    },
+    getPolicy: modelName =>
+      closing ? undefined : getLlamaCppModelPreferences(options.getStore())[modelName]?.residency,
+    unload: modelName =>
+      runWhileOpen(async () => {
+        await daemon.stopModel(modelName);
+        const confirmation = await waitForLlamaCppModelUnloadConfirmation({
+          modelName,
+          listRunningModels: readRunningModels,
+        });
+        await updateRunningModelBindings(confirmation.runningModels);
+      }),
     onStateChanged: snapshot => broadcastLlamaCppModelResidencyState(broadcast, snapshot),
   });
   const serviceTransitionLock = new LlamaCppServiceTransitionLock();
@@ -294,19 +264,73 @@ export function registerLlamaCppIpcHandlers(
   let bindingRefreshGeneration = 0;
   let startupBindingSyncGeneration = 0;
 
+  const suspendBindingReads = async <T>(run: () => Promise<T>): Promise<T> => {
+    bindingRefreshSuppressed = true;
+    bindingRefreshGeneration += 1;
+    startupBindingSyncGeneration += 1;
+    try {
+      return await run();
+    } finally {
+      bindingRefreshSuppressed = false;
+    }
+  };
+
   const scheduleStartupModelBindingSync = (): void => {
+    if (closing) return;
     const syncGeneration = ++startupBindingSyncGeneration;
     void waitForLlamaCppStartupModelBindings({
-      refresh: async () =>
-        (await refreshRunningModelBindings({ preserveExistingWhenEmpty: true })).hasRunningModels,
+      refresh: () =>
+        runWhileOpen(
+          async () =>
+            (await refreshRunningModelBindings({ preserveExistingWhenEmpty: true }))
+              .hasRunningModels,
+        ),
       isCurrent: () => syncGeneration === startupBindingSyncGeneration,
     });
   };
-  const getDedicatedServiceStatus = async (): Promise<LlamaCppStatusSnapshot> => {
-    return await daemon.status();
+  const readRunningModels = async () => (await daemon.reconnect())?.runningModels ?? [];
+  const readServiceStatus = async (): Promise<LlamaCppStatusSnapshot> => {
+    return (
+      (await daemon.reconnect())?.status ?? {
+        status: LlamaCppServiceStatus.Stopped,
+        managedByApp: true,
+        checkedAt: new Date().toISOString(),
+      }
+    );
   };
 
-  migrateLegacyLlamaCppConfig(options.getStore());
+  const changeModelsDir = async (
+    store: SqliteStore,
+    previous: LlamaCppServiceConfig | undefined,
+    next: LlamaCppServiceConfig,
+  ): Promise<void> => {
+    if (loadModelLock.getActiveModelName()) throw new Error(t('llamacppLoadModelInProgress'));
+    if (next.modelsDir) await fs.promises.mkdir(next.modelsDir, { recursive: true });
+    try {
+      await suspendBindingReads(async () => {
+        const runtime = await daemon.reconnect({ requireResponsive: true }).catch(error => {
+          throw new Error(t('llamacppLoadModelServiceUnavailable'), { cause: error });
+        });
+        store.set(LLAMACPP_SERVICE_CONFIG_KEY, next);
+        if (runtime?.status.status !== LlamaCppServiceStatus.Running) return;
+        residency.reset();
+        try {
+          const status = await daemon.restart(resolveServiceConfig());
+          if (status.status !== LlamaCppServiceStatus.Running) {
+            throw new Error(status.error || t('llamacppServiceStartupUnknown'));
+          }
+        } catch (error) {
+          if (previous) store.set(LLAMACPP_SERVICE_CONFIG_KEY, previous);
+          else store.delete(LLAMACPP_SERVICE_CONFIG_KEY);
+          throw error;
+        }
+      });
+    } finally {
+      await refreshRunningModelBindings();
+    }
+  };
+
+  enforceLlamaCppParallelTwo(options.getStore());
   const runtimeInstallState = createLlamaCppRuntimeInstallState();
   manager.on('install-progress', progress => {
     if (progress.modelId === LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID) {
@@ -323,6 +347,14 @@ export function registerLlamaCppIpcHandlers(
     install: (signal: AbortSignal) => Promise<RuntimeInstallResult>,
   ): Promise<RuntimeInstallResult> => {
     if (activeRuntimeInstall) return activeRuntimeInstall;
+    if (serviceTransitionLock.isActive()) {
+      const error = LlamaCppBackendError.SwitchRequiresStoppedService;
+      return Promise.resolve({
+        success: false,
+        error,
+        plan: { kind: 'needs-manual', message: error },
+      });
+    }
     const controller = new AbortController();
     runtimeInstallState.start();
     runtimeInstallController = controller;
@@ -335,15 +367,62 @@ export function registerLlamaCppIpcHandlers(
     return installPromise;
   };
 
+  const stopRuntime = async (requireIdle = false) => {
+    await suspendBindingReads(() => daemon.stopService({ requireIdle }));
+    residency.reset();
+    await updateRunningModelBindings([], null);
+  };
+  const hasModelWork = () =>
+    Boolean(loadModelLock.getActiveModelName()) || residency.hasActiveWork();
+  const activateBackend = (ref: LlamaCppBackendRef, signal: AbortSignal) =>
+    runServiceTransition(async () => {
+      signal.throwIfAborted();
+      const root = getUserLlamaCppRuntimeRoot();
+      const previous = readCurrentBackendRef(root);
+      if (previous?.versionBackend === ref.versionBackend) return;
+      try {
+        await suspendBindingReads(() =>
+          switchLlamaCppBackend({
+            runtime: daemon,
+            busy: hasModelWork,
+            activate: () => {
+              signal.throwIfAborted();
+              syncCurrentBackend(root, ref);
+              residency.reset();
+            },
+            restore: () =>
+              previous ? syncCurrentBackend(root, previous) : removeCurrentBackendLink(root),
+          }),
+        );
+      } finally {
+        await refreshRunningModelBindings();
+      }
+    });
+  const installRuntime = (ref?: LlamaCppBackendRef) =>
+    runRuntimeInstall(signal => {
+      const installOptions = {
+        signal,
+        activate: (backend: LlamaCppBackendRef) => activateBackend(backend, signal),
+      };
+      return ref
+        ? manager.setBackendSelection(ref, installOptions)
+        : manager.installRuntime(installOptions);
+    });
+  const uninstallRuntime = (ref?: LlamaCppBackendRef) =>
+    runServiceTransition(async () => {
+      if (activeRuntimeInstall) throw new Error(LlamaCppBackendError.SwitchRequiresStoppedService);
+      await daemon.reconnect({ requireResponsive: true });
+      await stopRuntime();
+      return manager.uninstallRuntime(ref);
+    });
+
   const impls: Record<string, unknown> = {};
-  const registerImpl = (method: string, fn: unknown): void => {
-    impls[method] = fn;
+  const registerImpl = (method: string, fn: (...args: never[]) => unknown): void => {
+    impls[method] = (...args: never[]) => runWhileOpen(() => fn(...args));
   };
 
-  registerImpl('status', async () => await getDedicatedServiceStatus());
-  registerImpl('install', async () =>
-    runRuntimeInstall(signal => manager.installRuntime({ signal })),
-  );
+  registerImpl('status', readServiceStatus);
+  registerImpl('install', () => installRuntime());
   registerImpl('getRuntimeInstallSnapshot', (): LlamaCppRuntimeInstallSnapshot =>
     runtimeInstallState.snapshot(),
   );
@@ -358,45 +437,15 @@ export function registerLlamaCppIpcHandlers(
     const result = await install.catch((): RuntimeInstallResult | undefined => undefined);
     return { success: true as const, cancelled: Boolean(result?.cancelled) };
   });
-  registerImpl('uninstallRuntime', async () => {
-    await daemon.stopService();
-    await updateRunningModelBindings([]);
-    return await manager.uninstallRuntime();
-  });
-  registerImpl('listRuntimeDevices', async (_event: unknown, input: unknown) => {
-    const ref = sanitizeLlamaCppBackendRef(input);
-    return await manager.listRuntimeDevices(ref ?? undefined);
-  });
+  registerImpl('uninstallRuntime', () => uninstallRuntime());
   registerImpl('listBackends', async () => manager.listBackends());
-  registerImpl('getBackendDownloadSize', async (_event: unknown, input: unknown) => {
-    const ref = sanitizeLlamaCppBackendRef(input);
-    if (!ref) return { success: false, error: 'Invalid llama.cpp backend selection.' };
-    return await manager.getBackendDownloadSize(ref);
-  });
-  registerImpl('getBackendSelection', async () => manager.getBackendSelection());
-  registerImpl('setBackendSelection', async (_event: unknown, input: unknown) => {
-    const ref = sanitizeLlamaCppBackendRef(input);
-    if (!ref) {
-      return {
-        success: false,
-        plan: { kind: 'needs-manual', message: 'Invalid llama.cpp backend selection.' },
-        error: 'Invalid llama.cpp backend selection.',
-      };
-    }
-    return await runRuntimeInstall(signal => manager.setBackendSelection(ref, { signal }));
-  });
   registerImpl('installBackend', async (_event: unknown, input: unknown) => {
     const ref = sanitizeLlamaCppBackendRef(input);
-    if (!ref) return await runRuntimeInstall(signal => manager.installRuntime({ signal }));
-    return await runRuntimeInstall(signal => manager.setBackendSelection(ref, { signal }));
+    return await installRuntime(ref ?? undefined);
   });
-  registerImpl('uninstallBackend', async (_event: unknown, input: unknown) => {
-    await daemon.stopService();
-    const ref = sanitizeLlamaCppBackendRef(input);
-    if (!ref) return await manager.uninstallRuntime();
-    return await manager.uninstallBackend(ref);
-  });
-  registerImpl('getRuntimeCapabilities', async () => manager.getRuntimeCapabilities());
+  registerImpl('uninstallBackend', (_event: unknown, input: unknown) =>
+    uninstallRuntime(sanitizeLlamaCppBackendRef(input) ?? undefined),
+  );
   registerImpl('importRuntime', async () => {
     const win = BrowserWindow.getFocusedWindow();
     if (!win) {
@@ -417,56 +466,70 @@ export function registerLlamaCppIpcHandlers(
       return { success: false, error: '已取消' };
     }
 
-    return await manager.importRuntime(result.filePaths[0]);
-  });
-  registerImpl('start', async () => {
-    const status = await getDedicatedServiceStatus();
-    if (status.status === LlamaCppServiceStatus.Running) {
-      const bindingRefresh = await refreshRunningModelBindings({
-        preserveExistingWhenEmpty: true,
+    return await runServiceTransition(async () => {
+      if (activeRuntimeInstall) throw new Error(LlamaCppBackendError.SwitchRequiresStoppedService);
+      return manager.importRuntime(result.filePaths[0], async () => {
+        const current = await daemon.reconnect({ requireResponsive: true });
+        if (current?.runningModels.length || current?.modelProcesses.length || hasModelWork()) {
+          throw new Error(LlamaCppBackendError.SwitchRequiresStoppedService);
+        }
+        if (current) await stopRuntime(true);
       });
-      if (!bindingRefresh.hasRunningModels) {
-        scheduleStartupModelBindingSync();
+    });
+  });
+  registerImpl('start', () =>
+    runServiceTransition(async () => {
+      const status = await daemon.start();
+      if (status.status === LlamaCppServiceStatus.Running) {
+        const bindingRefresh = await refreshRunningModelBindings({
+          preserveExistingWhenEmpty: true,
+        });
+        if (!bindingRefresh.hasRunningModels) scheduleStartupModelBindingSync();
       }
-    }
-    return status;
-  });
-  registerImpl('stop', async () => {
-    // Cancel delayed startup polling before the explicit stop clears the model bindings.
-    startupBindingSyncGeneration += 1;
-    await daemon.stopService();
-    const status: LlamaCppStatusSnapshot = {
-      status: LlamaCppServiceStatus.Stopped,
-      managedByApp: true,
-      checkedAt: new Date().toISOString(),
-    };
-    if (status.status === LlamaCppServiceStatus.Stopped) {
-      await updateRunningModelBindings([]);
-    }
-    return status;
-  });
+      return status;
+    }),
+  );
+  registerImpl('stop', () =>
+    runServiceTransition(async () => {
+      await stopRuntime();
+      return {
+        status: LlamaCppServiceStatus.Stopped,
+        managedByApp: true,
+        checkedAt: new Date().toISOString(),
+      };
+    }),
+  );
   registerImpl(
     'restart',
     async () =>
       await runServiceTransition(async () => {
-        const config = getLlamaCppServiceConfig(options.getStore());
-        const status = await daemon.restart(config);
+        const status = await suspendBindingReads(() => {
+          residency.reset();
+          return daemon.restart(resolveServiceConfig());
+        });
         await refreshRunningModelBindings();
         return status;
       }),
   );
   registerImpl('getServiceConfig', async () => getLlamaCppServiceConfig(options.getStore()));
-  registerImpl('setServiceConfig', async (_event: unknown, config: LlamaCppServiceConfig) => {
-    const previousConfig = getLlamaCppServiceConfig(options.getStore());
-    const sanitized = sanitizeLlamaCppServiceConfig(config);
-    options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
-    await daemon.applyConfigIfRunning(sanitized);
-    if (isLlamaCppLanAccessEnabled(previousConfig) !== isLlamaCppLanAccessEnabled(sanitized)) {
-      // The model gateway reads MAGPIE_ADDR only at process start.
-      await options.onLanAccessChanged?.();
-    }
-    return sanitized;
-  });
+  registerImpl('setServiceConfig', (_event: unknown, config: LlamaCppServiceConfig) =>
+    runServiceTransition(async () => {
+      const store = options.getStore();
+      const previous = store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY);
+      const sanitized = sanitizeLlamaCppServiceConfig(config);
+      if ((previous?.modelsDir?.trim() || '') !== (sanitized.modelsDir || '')) {
+        await changeModelsDir(store, previous, sanitized);
+      } else {
+        store.set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
+        await daemon.applyConfigIfRunning(sanitized);
+      }
+      if (isLlamaCppLanAccessEnabled(previous ?? {}) !== isLlamaCppLanAccessEnabled(sanitized)) {
+        // The model gateway reads MAGPIE_ADDR only at process start.
+        await options.onLanAccessChanged?.();
+      }
+      return sanitized;
+    }),
+  );
   registerImpl('getGatewayLanToken', async () => ({
     token: daemon.getLanToken(),
   }));
@@ -489,39 +552,17 @@ export function registerLlamaCppIpcHandlers(
     async (_event: unknown, modelsDir: unknown) =>
       await runServiceTransition(async () => {
         const store = options.getStore();
-        const currentConfig = store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ?? {};
+        const currentConfig = store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY);
         const trimmedModelsDir = typeof modelsDir === 'string' ? modelsDir.trim() : '';
         const nextConfig = sanitizeLlamaCppServiceConfig({
           ...currentConfig,
           modelsDir: trimmedModelsDir || undefined,
         });
         const modelsDirChanged =
-          (currentConfig.modelsDir?.trim() || '') !== (nextConfig.modelsDir?.trim() || '');
+          (currentConfig?.modelsDir?.trim() || '') !== (nextConfig.modelsDir || '');
         if (!modelsDirChanged) return manager.getModelsDir();
 
-        const wasRunning = manager.getStatus().status === 'running';
-        const nextStatus = await applyLlamaCppServiceTransition({
-          wasRunning,
-          stop: () => manager.stop(),
-          start: () => manager.start(),
-          applyConfig: () => {
-            if (trimmedModelsDir) {
-              fs.mkdirSync(trimmedModelsDir, { recursive: true });
-            }
-            store.set(LLAMACPP_SERVICE_CONFIG_KEY, nextConfig);
-          },
-          clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
-          refreshBindings: async () => {
-            await refreshRunningModelBindings();
-          },
-          setBindingRefreshSuppressed: suppressed => {
-            bindingRefreshSuppressed = suppressed;
-            if (suppressed) bindingRefreshGeneration += 1;
-          },
-        });
-        if (wasRunning && nextStatus?.status !== 'running') {
-          throw new Error(t('llamacppServiceStartupUnknown'));
-        }
+        await changeModelsDir(store, currentConfig, nextConfig);
         return manager.getModelsDir();
       }),
   );
@@ -529,51 +570,30 @@ export function registerLlamaCppIpcHandlers(
   registerImpl('listLocalModels', async () => {
     return await manager.listLocalModels();
   });
-  registerImpl('listRunningModels', async () => {
-    try {
-      // Keep model listing read-only. Binding persistence and Gateway sync are
-      // performed by explicit model lifecycle transitions below.
-      return await daemon.listRunningModels();
-    } catch (error) {
-      if (manager.getStatus().status !== 'running') return [];
-      throw error;
-    }
-  });
-  registerImpl('refreshRunningModelBindings', async () => {
-    await refreshRunningModelBindings();
-  });
-  registerImpl('deleteModel', async (_event: unknown, name: string) => {
-    await daemon.stopModel(name);
-    const result = await manager.deleteModel(name);
-    if (!result.success || !result.deleted || !result.removedModelName) {
-      return result;
-    }
+  registerImpl('listRunningModels', readRunningModels);
+  registerImpl('deleteModel', (_event: unknown, name: string) =>
+    runServiceTransition(async () => {
+      const result = await manager.deleteModel(name, (modelName, modelPath) =>
+        residency.withModelUnavailable(modelName, async () => {
+          await daemon.deleteModelFile(modelName, modelPath);
+          residency.markUnloaded(modelName);
+        }),
+      );
+      if (!result.success || !result.deleted || !result.removedModelName) {
+        return result;
+      }
 
-    const store = options.getStore();
-    const modelPreferences = getLlamaCppModelPreferences(store);
-    if (modelPreferences[result.removedModelName]) {
-      const { [result.removedModelName]: _removedPreference, ...nextPreferences } =
-        modelPreferences;
-      store.set(LLAMACPP_MODEL_PREFERENCES_KEY, nextPreferences);
-    }
-    await refreshRunningModelBindings();
-    return result;
-  });
-  registerImpl('showModel', async (_event: unknown, name: string) => {
-    const modelName = name.trim();
-    const localModel = (await manager.listLocalModels()).find(
-      model => model.name === modelName || model.id === modelName || model.model === modelName,
-    );
-    if (!localModel) throw new Error('Local model was not found.');
-    const runningModel = (await daemon.listRunningModels()).find(
-      model => model.name === modelName || model.id === modelName || model.model === modelName,
-    );
-    return {
-      ...localModel,
-      ...(runningModel ?? {}),
-      status: runningModel ? 'loaded' : 'unloaded',
-    };
-  });
+      const store = options.getStore();
+      const modelPreferences = getLlamaCppModelPreferences(store);
+      if (modelPreferences[result.removedModelName]) {
+        const { [result.removedModelName]: _removedPreference, ...nextPreferences } =
+          modelPreferences;
+        store.set(LLAMACPP_MODEL_PREFERENCES_KEY, nextPreferences);
+      }
+      await refreshRunningModelBindings();
+      return result;
+    }),
+  );
   registerImpl('getModelPreferences', async () => {
     return getLlamaCppModelPreferences(options.getStore());
   });
@@ -686,7 +706,7 @@ export function registerLlamaCppIpcHandlers(
             );
           }
 
-          const localModels = await manager.listLocalModels();
+          const localModels = await manager.listLocalModels(controller.signal);
           throwIfLlamaCppModelLoadCancelled(controller.signal);
           const targetModel = localModels.find(
             model =>
@@ -734,17 +754,7 @@ export function registerLlamaCppIpcHandlers(
                 });
                 return { success: true, runningModels: daemonStatus.runningModels };
               },
-              listModels: async () => {
-                const runningModels = await daemon.listRunningModels();
-                const runningNames = new Set(
-                  runningModels.map(model => model.name || model.model || model.id).filter(Boolean),
-                );
-                return (await manager.listLocalModels()).map(model =>
-                  runningNames.has(model.name) ? { ...model, status: 'loaded' } : model,
-                );
-              },
               listRunningModels: () => daemon.listRunningModels(),
-              detectService: () => daemon.status(),
               unloadModel: async unloadModelName => {
                 await daemon.stopModel(unloadModelName);
               },
@@ -785,23 +795,20 @@ export function registerLlamaCppIpcHandlers(
       },
     );
   };
-  void (async () => {
-    // In router mode this also clears a leftover daemon from the previous
-    // build before the router gateway binds config.port for the first time.
-    await stopLeftoverDaemonBeforeStart();
-    await daemon
-      .reconnect()
-      .then(() => refreshRunningModelBindings())
-      .catch(error => {
-        console.error('[LlamaCppDaemon] failed to reconnect to local inference daemon:', error);
-      });
-  })();
+  const initializeBindings = async () => {
+    await routerOrchestrator?.finishDaemonHandoff();
+    await refreshRunningModelBindings();
+  };
+  void runWhileOpen(initializeBindings).catch(error => {
+    console.error('[LlamaCpp] Failed to initialize local inference bindings:', error);
+  });
   registerImpl('loadModel', async (_event: unknown, input: LlamaCppModelLaunchInput) => {
+    if (serviceTransitionLock.isActive()) throw new Error(t('llamacppLoadModelServiceUnavailable'));
     let result: LlamaCppModelLaunchResult | undefined;
     await residency.ensureReady(input.model, async () => {
       result = await loadModelCore(input);
     });
-    return result ?? { success: true, runningModels: await daemon.listRunningModels() };
+    return result ?? { success: true, runningModels: await readRunningModels() };
   });
   registerImpl('cancelModelLoad', async (_event: unknown, input: unknown) => {
     const activeLoad = activeModelLoad;
@@ -824,7 +831,7 @@ export function registerLlamaCppIpcHandlers(
   registerImpl('unloadModel', async (_event: unknown, name: string) => {
     const modelName = name.trim();
     if (!modelName) throw new Error('Model name is required');
-    const beforeRunningModels = await daemon.listRunningModels();
+    const beforeRunningModels = await readRunningModels();
     const unloadingModel = beforeRunningModels.find(
       model => model.name === modelName || model.model === modelName || model.id === modelName,
     );
@@ -832,7 +839,7 @@ export function registerLlamaCppIpcHandlers(
     await daemon.stopModel(modelName);
     const confirmation = await waitForLlamaCppModelUnloadConfirmation({
       modelName,
-      listRunningModels: () => daemon.listRunningModels(),
+      listRunningModels: readRunningModels,
     });
     residency.markUnloaded(modelName);
     await updateRunningModelBindings(confirmation.runningModels);
@@ -876,24 +883,18 @@ export function registerLlamaCppIpcHandlers(
     const controller = new AbortController();
     activeInstalls.set(modelId, controller);
     try {
-      await manager.installModel(
-        input,
-        progress => {
-          broadcast(LlamaCppIpcChannel.InstallProgress, progress);
-        },
-        { signal: controller.signal },
-      );
+      await manager.installModel(input, sendProgress, { signal: controller.signal });
       return { success: true };
     } catch (error) {
       if (controller.signal.aborted || isAbortError(error)) {
-        broadcast(LlamaCppIpcChannel.InstallProgress, {
+        sendProgress({
           modelId,
           modelName: input.displayName ?? modelId,
           phase: 'cancelled',
         });
         return { success: false, cancelled: true };
       }
-      broadcast(LlamaCppIpcChannel.InstallProgress, {
+      sendProgress({
         modelId,
         modelName: input.displayName ?? modelId,
         phase: 'failed',
@@ -920,7 +921,39 @@ export function registerLlamaCppIpcHandlers(
     impls as Parameters<typeof handleIpcContract<typeof llamacppContract>>[1],
   );
 
-  return daemon;
+  return {
+    readModelBindings: (): Promise<LocalGpuSnapshot> =>
+      runWhileOpen(async () => {
+        const running = await readCurrentBindingState();
+        return {
+          baseUrl: running?.baseUrl ?? null,
+          models: running ? projectBindings(running.runningModels) : [],
+        };
+      }),
+    shutdownForQuit(readyToStop?: Promise<void>) {
+      closing = true;
+      bindingRefreshGeneration += 1;
+      startupBindingSyncGeneration += 1;
+      activeModelLoad?.controller.abort();
+      runtimeInstallController?.abort();
+      for (const controller of activeInstalls.values()) controller.abort();
+      residency.dispose();
+      const issued = Promise.withResolvers<void>();
+      const stopped = (async () => {
+        try {
+          await readyToStop;
+          return daemon.shutdownForQuit();
+        } finally {
+          // The orchestrator reads its shutdown settings before returning its promise.
+          issued.resolve();
+        }
+      })();
+      const drained = Promise.allSettled([issued.promise, ...pending]).then(() => {
+        residency.dispose();
+      });
+      return { drained, stopped };
+    },
+  };
 }
 
 export {

@@ -17,7 +17,6 @@ import { createCoworkStoreHarness, type CoworkStoreTestHarness } from './coworkS
 import type {
   CoworkConfig,
   CoworkConfigUpdate,
-  CoworkConversationReplacementEntry,
   CoworkConversationSearchRecord,
 } from '../coworkStore';
 import { CoworkExecutionMode } from '../coworkStore';
@@ -33,7 +32,6 @@ test('facade keeps the shared public surface importable from the original path',
 
   const config: CoworkConfig = harness.store.getConfig();
   const update: CoworkConfigUpdate = { permissionMode: config.permissionMode };
-  const replacement: CoworkConversationReplacementEntry = { role: 'user', text: 'hello' };
   const record: CoworkConversationSearchRecord = {
     sessionId: 'session',
     title: 'title',
@@ -44,7 +42,6 @@ test('facade keeps the shared public surface importable from the original path',
   };
 
   expect(update.permissionMode).toBe(CoworkPermissionMode.Ask);
-  expect(replacement.timestamp).toBeUndefined();
   expect(record.sessionId).toBe('session');
 });
 

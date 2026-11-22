@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { expect, test, vi } from 'vitest';
 
-import type { PiContinueOptions, PiStartOptions } from '../main/libs/agentEngine/piRuntimeTypes';
+import type { PiContinueOptions } from '../main/libs/agentEngine/piRuntimeTypes';
 import { CoworkSessionSource } from '../shared/cowork/constants';
 import { WorkbenchApprovalMode } from '../shared/workbenchTask';
 
@@ -72,7 +72,7 @@ function createCoworkStore() {
         systemPrompt: 'Default prompt',
         executionMode: 'local',
       }),
-      getWorkspace: () => ({ id: task.workspaceId, path: session.cwd }),
+      workspaces: { getWorkspace: () => ({ id: task.workspaceId, path: session.cwd }) },
       createSession: vi.fn(() => session),
       getSession: (id: string) =>
         id === session.id
@@ -94,14 +94,14 @@ function createCoworkStore() {
 }
 
 test('runs a canonical task in its workspace and returns its settled output', async () => {
-  const startSession = vi.fn(async (_id: string, _prompt: string, options: PiStartOptions) => {
-    options.onSettled?.({ ok: true, output: 'done' });
-  });
+  const continueSession = vi.fn(
+    async (_id: string, _prompt: string, options: PiContinueOptions) => {
+      options.onSettled?.({ ok: true, output: 'done' });
+    },
+  );
   const runtime = Object.assign(new EventEmitter(), {
-    isSessionActive: () => false,
     isSessionRunning: () => false,
-    startSession,
-    continueSession: async () => undefined,
+    continueSession,
     stopSession: () => undefined,
   });
   const { session, store } = createCoworkStore();
@@ -123,7 +123,7 @@ test('runs a canonical task in its workspace and returns its settled output', as
     [],
     CoworkSessionSource.Scheduled,
   );
-  expect(startSession).toHaveBeenCalledWith(
+  expect(continueSession).toHaveBeenCalledWith(
     session.id,
     'run',
     expect.objectContaining({
@@ -135,18 +135,18 @@ test('runs a canonical task in its workspace and returns its settled output', as
       scheduledTaskRun: true,
     }),
   );
-  expect(startSession.mock.calls[0]?.[2]).not.toHaveProperty('confirmationMode');
+  expect(continueSession.mock.calls[0]?.[2]).not.toHaveProperty('confirmationMode');
 });
 
 test('reuses the workspace session referenced by a managed session key', async () => {
-  const startSession = vi.fn(async (_id: string, _prompt: string, options: PiStartOptions) => {
-    options.onSettled?.({ ok: true, output: null });
-  });
+  const continueSession = vi.fn(
+    async (_id: string, _prompt: string, options: PiContinueOptions) => {
+      options.onSettled?.({ ok: true, output: null });
+    },
+  );
   const runtime = Object.assign(new EventEmitter(), {
-    isSessionActive: () => false,
     isSessionRunning: () => false,
-    startSession,
-    continueSession: async () => undefined,
+    continueSession,
     stopSession: () => undefined,
   });
   const { session, store } = createCoworkStore();
@@ -160,7 +160,7 @@ test('reuses the workspace session referenced by a managed session key', async (
     new PiScheduledTaskExecutor(runtime as never, store as never).execute(mainSessionTask, run),
   ).resolves.toEqual({ sessionId: session.id, output: null });
   expect(store.createSession).not.toHaveBeenCalled();
-  expect(startSession).toHaveBeenCalledWith(
+  expect(continueSession).toHaveBeenCalledWith(
     session.id,
     'run',
     expect.objectContaining({ workspaceRoot: session.cwd }),
@@ -168,15 +168,8 @@ test('reuses the workspace session referenced by a managed session key', async (
 });
 
 test('reuses one stable dedicated session for every run of a task-bound task', async () => {
-  const startSession = vi.fn(async (_id: string, _prompt: string, options: PiStartOptions) => {
-    runtimeActive = true;
-    options.onSettled?.({ ok: true, output: 'done' });
-  });
-  let runtimeActive = false;
   const runtime = Object.assign(new EventEmitter(), {
-    isSessionActive: () => runtimeActive,
     isSessionRunning: () => false,
-    startSession,
     continueSession: vi.fn(async (_id: string, _prompt: string, options: PiContinueOptions) => {
       options.onSettled?.({ ok: true, output: 'done' });
     }),
@@ -213,11 +206,16 @@ test('reuses one stable dedicated session for every run of a task-bound task', a
     [],
     CoworkSessionSource.Scheduled,
   );
-  expect(startSession).toHaveBeenCalledWith(`scheduled-task:${task.id}`, 'run', expect.anything());
+  expect(runtime.continueSession).toHaveBeenCalledWith(
+    `scheduled-task:${task.id}`,
+    'run',
+    expect.anything(),
+  );
 
   await new PiScheduledTaskExecutor(runtime as never, store as never).execute(taskBoundTask, run);
   expect(store.createSession).toHaveBeenCalledTimes(1);
-  expect(runtime.continueSession).toHaveBeenCalledWith(
+  expect(runtime.continueSession).toHaveBeenNthCalledWith(
+    2,
     `scheduled-task:${task.id}`,
     'run',
     expect.objectContaining({
@@ -228,23 +226,18 @@ test('reuses one stable dedicated session for every run of a task-bound task', a
 });
 
 test('serializes overlapping runs for a task-bound session', async () => {
-  let runtimeActive = false;
   let dedicatedExists = false;
-  let releaseFirst: (() => void) | null = null;
-  const startSession = vi.fn(async (_id: string, _prompt: string, options: PiStartOptions) => {
-    runtimeActive = true;
-    await new Promise<void>(resolve => {
-      releaseFirst = resolve;
-    });
-    options.onSettled?.({ ok: true, output: 'done' });
-  });
+  const firstTurn = Promise.withResolvers<void>();
   const runtime = Object.assign(new EventEmitter(), {
-    isSessionActive: () => runtimeActive,
     isSessionRunning: () => false,
-    startSession,
-    continueSession: vi.fn(async (_id: string, _prompt: string, options: PiContinueOptions) => {
-      options.onSettled?.({ ok: true, output: 'next result' });
-    }),
+    continueSession: vi
+      .fn(async (_id: string, _prompt: string, options: PiContinueOptions) => {
+        options.onSettled?.({ ok: true, output: 'next result' });
+      })
+      .mockImplementationOnce(async (_id, _prompt, options) => {
+        await firstTurn.promise;
+        options.onSettled?.({ ok: true, output: 'done' });
+      }),
     stopSession: () => undefined,
   });
   const { session, store } = createCoworkStore();
@@ -262,13 +255,13 @@ test('serializes overlapping runs for a task-bound session', async () => {
   const second = executor.execute(taskBoundTask, { ...run, id: 'run-2' });
   await new Promise(resolve => setTimeout(resolve, 0));
 
-  expect(startSession).toHaveBeenCalledTimes(1);
-  expect(runtime.continueSession).not.toHaveBeenCalled();
+  expect(runtime.continueSession).toHaveBeenCalledTimes(1);
 
-  releaseFirst?.();
+  firstTurn.resolve();
   await first;
   await second;
-  expect(runtime.continueSession).toHaveBeenCalledWith(
+  expect(runtime.continueSession).toHaveBeenNthCalledWith(
+    2,
     `scheduled-task:${task.id}`,
     'run',
     expect.anything(),
@@ -277,12 +270,10 @@ test('serializes overlapping runs for a task-bound session', async () => {
 
 test('rejects immediately and removes listeners when Pi stops before completion', async () => {
   const runtime = Object.assign(new EventEmitter(), {
-    isSessionActive: () => false,
     isSessionRunning: () => false,
-    startSession: async (_id: string, _prompt: string, options: PiStartOptions) => {
+    continueSession: async (_id: string, _prompt: string, options: PiContinueOptions) => {
       options.onSettled?.({ ok: false, error: 'Scheduled task was stopped' });
     },
-    continueSession: async () => undefined,
     stopSession: vi.fn(),
   });
   const { store } = createCoworkStore();
@@ -299,7 +290,6 @@ test('two different tasks bound to the same session get separate settled outputs
   const { session, store } = createCoworkStore();
   const inputs: PiContinueOptions[] = [];
   const runtime = Object.assign(new EventEmitter(), {
-    isSessionActive: () => true,
     isSessionRunning: () => false,
     continueSession: vi.fn(async (_id: string, _prompt: string, options: PiContinueOptions) => {
       inputs.push(options);
@@ -335,7 +325,6 @@ test('does not attach to or stop a session that is already running', async () =>
   const { session, store } = createCoworkStore();
   const runtime = Object.assign(new EventEmitter(), {
     isSessionRunning: () => true,
-    startSession: vi.fn(),
     continueSession: vi.fn(),
     stopSession: vi.fn(),
   });
@@ -343,7 +332,6 @@ test('does not attach to or stop a session that is already running', async () =>
   await expect(
     new PiScheduledTaskExecutor(runtime as never, store as never).execute(mainSessionTask, run),
   ).rejects.toThrow('its session is running');
-  expect(runtime.startSession).not.toHaveBeenCalled();
   expect(runtime.continueSession).not.toHaveBeenCalled();
   expect(runtime.stopSession).not.toHaveBeenCalled();
   expect(runtime.listenerCount('error')).toBe(0);
@@ -351,12 +339,10 @@ test('does not attach to or stop a session that is already running', async () =>
 
 test('removes completion listeners when starting Pi fails', async () => {
   const runtime = Object.assign(new EventEmitter(), {
-    isSessionActive: () => false,
     isSessionRunning: () => false,
-    startSession: async () => {
+    continueSession: async () => {
       throw new Error('model unavailable');
     },
-    continueSession: async () => undefined,
     stopSession: vi.fn(),
   });
   const { store } = createCoworkStore();

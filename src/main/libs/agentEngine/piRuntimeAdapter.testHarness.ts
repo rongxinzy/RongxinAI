@@ -14,9 +14,9 @@ import path from 'path';
 
 import { afterEach, beforeEach, vi } from 'vitest';
 import {
-  installTestMagpie,
+  createTestMagpie,
   type TestMagpieGateway,
-} from '../../../../tests/helpers/installTestMagpie';
+} from '../../../../tests/helpers/createTestMagpie';
 import { ModelCapabilityStatus } from '../../../shared/providers';
 import {
   runTextWorkerOperation,
@@ -25,6 +25,7 @@ import {
 
 vi.mock('../../workbenchTask/artifactWorkerPool', () => ({
   transformCoworkTextAsync: async (input: TextWorkerInput) => runTextWorkerOperation(input),
+  readCoworkImageAsync: vi.fn().mockResolvedValue(''),
 }));
 
 const hoisted = vi.hoisted(() => {
@@ -44,24 +45,6 @@ const hoisted = vi.hoisted(() => {
     getContextUsage: vi.fn(),
     compact: vi.fn().mockResolvedValue({ cancelled: false }),
     subscribe: vi.fn().mockReturnValue(() => {}),
-    getSessionStats: vi.fn().mockReturnValue({
-      sessionId: 'test-session',
-      userMessages: 2,
-      assistantMessages: 2,
-      toolCalls: 1,
-      toolResults: 1,
-      totalMessages: 6,
-      tokens: { input: 1200, output: 450, cacheRead: 300, cacheWrite: 100, total: 2050 },
-      cost: 0.015,
-      contextUsage: { percent: 12.5 },
-    }),
-    navigateTree: vi.fn().mockResolvedValue({
-      editorText: 'rewound text',
-      cancelled: false,
-    }),
-    sessionManager: {
-      appendContextEdit: vi.fn().mockReturnValue('edit-entry-uuid-1'),
-    },
   };
 
   const mockSettingsManagerCreate = vi.fn((cwd: string, agentDir?: string) => ({
@@ -129,6 +112,7 @@ const hoisted = vi.hoisted(() => {
     })),
     mockModelRuntime: {
       registerProvider: vi.fn(),
+      registerNativeProvider: vi.fn(),
       setRuntimeApiKey: vi.fn().mockResolvedValue(undefined),
       getModel: vi.fn(),
       completeSimple: mockCompleteSimple,
@@ -262,6 +246,10 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
 }));
 
 vi.mock('@earendil-works/pi-ai/compat', () => ({
+  anthropicMessagesApi: vi.fn(),
+  createProvider: vi.fn(provider => provider),
+  openAICompletionsApi: vi.fn(),
+  openAIResponsesApi: vi.fn(),
   getModel: hoisted.mockGetModel,
   completeSimple: hoisted.mockCompleteSimple,
 }));
@@ -274,7 +262,7 @@ vi.mock('../coworkUtil', async importOriginal => {
   };
 });
 
-import { PiRuntimeAdapter } from './piRuntimeAdapter';
+import { PiRuntimeAdapter, type PiRuntimeDependencies } from './piRuntimeAdapter';
 import { piSessionDirFor } from './piSessionStore';
 
 /**
@@ -293,7 +281,9 @@ export let adapter: PiRuntimeAdapter;
  */
 let testMagpie: TestMagpieGateway;
 
-let disposeMagpie: (() => void) | undefined;
+export function createTestPiRuntime(deps: PiRuntimeDependencies = {}): PiRuntimeAdapter {
+  return new PiRuntimeAdapter({ modelService: testMagpie.modelService, ...deps });
+}
 
 const temporaryWorkspaceRoots = new Set<string>();
 
@@ -306,7 +296,7 @@ export const createTemporaryWorkspace = (): string => {
 
 /**
  * Root for file-backed Pi session directories. Specs that enable persistence
- * pass this to `adapter.setPiSessionStoreRoot`; it is cleaned up with the
+ * pass this as `piSessionStoreRoot` to the adapter; it is cleaned up with the
  * workspaces.
  */
 export const createTemporaryPiSessionRoot = (): string => {
@@ -357,10 +347,8 @@ export const setupPiRuntimeAdapterSuite = (): void => {
     mockApplyApplicationRuntimeEnv.mockClear();
     vi.clearAllMocks();
     mockModelRuntimeCreate.mockResolvedValue(mockModelRuntime);
-    disposeMagpie?.();
-    testMagpie = installTestMagpie();
-    disposeMagpie = () => testMagpie.dispose();
-    adapter = new PiRuntimeAdapter();
+    testMagpie = createTestMagpie();
+    adapter = createTestPiRuntime();
   });
 
   afterEach(() => {
@@ -368,8 +356,6 @@ export const setupPiRuntimeAdapterSuite = (): void => {
       fs.rmSync(workspaceRoot, { recursive: true, force: true });
     }
     temporaryWorkspaceRoots.clear();
-    disposeMagpie?.();
-    disposeMagpie = undefined;
   });
 };
 

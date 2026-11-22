@@ -1,21 +1,21 @@
 /**
  * Integration preload surface, split from `../electron.d.ts`.
  *
- * Covers OS permissions, community auth, the managed model pool, enterprise
- * config/session, managed providers (incl. AISphere), provider install flows
- * (Feishu, DingTalk) and the activity feed.
+ * Covers OS permissions, community auth, enterprise
+ * config/session, managed providers (incl. AISphere), and the activity feed.
  *
  * Invoke method signatures derive from the zod IPC contract
- * (`src/shared/ipc/providersContract.ts`); push subscriptions and the
- * Feishu/DingTalk install flows (owned by the IM domain) stay hand-written.
+ * (`src/shared/ipc/providersContract.ts`).
  */
 import type { ActivityRun } from '../../../shared/activity/types';
 import type { IpcContractApi } from '../../../shared/ipc/contract';
 import type { activityContract } from '../../../shared/ipc/automationContract';
-import type { appSystemContract } from '../../../shared/ipc/appSystemContract';
+import type {
+  AppSystemInvokers,
+  permissionsChannels,
+} from '../../../shared/ipc/appSystemContract.channels';
 import type { providersContract } from '../../../shared/ipc/providersContract';
 
-type AppSystemContractApi = IpcContractApi<typeof appSystemContract>;
 type ProvidersContractApi = IpcContractApi<typeof providersContract>;
 
 /** Maps contract method names onto the preload-facing member names. */
@@ -23,10 +23,7 @@ type Renamed<M extends Record<string, keyof ProvidersContractApi>> = {
   [K in keyof M]: ProvidersContractApi[M[K]];
 };
 
-export interface PermissionsApi {
-  checkCalendar: AppSystemContractApi['permissionsCheckCalendar'];
-  requestCalendar: AppSystemContractApi['permissionsRequestCalendar'];
-}
+export type PermissionsApi = AppSystemInvokers<typeof permissionsChannels>;
 
 export interface AuthApi extends Renamed<{
   communityLogin: 'authCommunityLogin';
@@ -40,17 +37,6 @@ export interface AuthApi extends Renamed<{
       error?: string;
     }) => void,
   ) => () => void;
-}
-
-export interface ModelPoolApi extends Renamed<{
-  listModels: 'modelPoolListModels';
-  stream: 'modelPoolStream';
-  cancelStream: 'modelPoolCancelStream';
-}> {
-  onStreamData: (requestId: string, callback: (data: string) => void) => () => void;
-  onStreamDone: (requestId: string, callback: () => void) => () => void;
-  onStreamError: (requestId: string, callback: (error: string) => void) => () => void;
-  onStreamAbort: (requestId: string, callback: () => void) => () => void;
 }
 
 export interface EnterpriseApi {
@@ -76,42 +62,6 @@ export interface ManagedProvidersApi extends Renamed<{
   aisphereRefresh: 'aisphereRefresh';
 }> {
   onChanged: (callback: () => void) => () => void;
-}
-
-export interface FeishuApi {
-  install: {
-    verify: (
-      appId: string,
-      appSecret: string,
-    ) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-  };
-}
-
-export interface DingTalkApi {
-  install: {
-    qrcode: () => Promise<{
-      url: string;
-      deviceCode: string;
-      interval: number;
-      expireIn: number;
-    }>;
-    poll: (deviceCode: string) => Promise<{
-      done: boolean;
-      clientId?: string;
-      clientSecret?: string;
-      error?: string;
-    }>;
-    verify: (
-      clientId: string,
-      clientSecret: string,
-    ) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-  };
 }
 
 type ActivityContractApi = IpcContractApi<typeof activityContract>;

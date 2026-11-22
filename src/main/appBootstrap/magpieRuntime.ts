@@ -2,27 +2,23 @@
 import path from 'path';
 
 import { app } from 'electron';
+import { getBranding } from '../../shared/branding';
 
 import { lifecycleRuntime } from './lifecycleRuntimeState';
-import { inferenceRuntime } from './inferenceRuntimeState';
-import { getOllamaManager, getStore } from './runtimeServices';
+import { getStore, getStoreIfOpen } from './runtimeServices';
 import { resolveDefaultAgentModelRef } from './defaultAgentModel';
 import { MagpieManager } from '../magpie/manager';
-import { MagpieModelService, installMagpieModelService } from '../magpie/modelService';
+import { MAGPIE_DEFAULT_MODEL_ID_KEY, MagpieModelService } from '../magpie/modelService';
 import { isLlamaCppLanAccessEnabled } from '../magpie/lanAccess';
 import { ManagedMagpieProviderBindings } from '../magpie/managedProviderBindings';
 import { LlamaCppGatewayCredentialVault } from '../libs/llamacppGatewayCredentialVault';
-import { readOllamaProviderSnapshot } from '../magpie/ollamaProviderBinding';
-import { buildLlamaCppRunningModelBinding } from '../libs/llamacppAgentBinding';
+import type { LlamaCppRunningModelBinding, LocalGpuSnapshot } from '../libs/llamacppAgentBinding';
 import { getLlamaCppServiceConfig } from '../ipcHandlers/llamacpp';
 import { registerMagpieIpc } from '../magpie/registerIpc';
-import { registerAcpMagpieModelApply } from '../codingAgent/acpMagpieModel';
 import { zhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
-
-let magpieModelService: MagpieModelService | undefined;
-
-/** The Magpie model service installed by {@link setupMagpieRuntime}. */
-export const getMagpieModelService = (): MagpieModelService | undefined => magpieModelService;
+import { startEnterpriseModelGateway } from '../enterpriseExtension/modelGateway';
+import { aisphereService, startAISphereGateway } from '../extensions/aisphere';
+import type { SqliteStore } from '../sqliteStore';
 
 /** LAN gateway credential store; created lazily because the SQLite store starts later. */
 let lanCredentialVault: LlamaCppGatewayCredentialVault | undefined;
@@ -31,8 +27,10 @@ const getLanCredentialVault = (): LlamaCppGatewayCredentialVault => {
   return lanCredentialVault;
 };
 
-export const setupMagpieRuntime = (): void => {
-  inferenceRuntime.magpieManager = new MagpieManager({
+export const setupMagpieRuntime = (readLocalModels: () => Promise<LocalGpuSnapshot>) => {
+  let enterpriseGateway: Awaited<ReturnType<typeof startEnterpriseModelGateway>> | undefined;
+  const manager = new MagpieManager({
+    enterpriseForward: () => enterpriseGateway,
     resourcesRoot: app.isPackaged
       ? path.join(process.resourcesPath, 'magpie')
       : path.join(app.getAppPath(), 'resources/magpie'),
@@ -45,11 +43,11 @@ export const setupMagpieRuntime = (): void => {
       write: port => getStore().set('magpie_gateway_port', port),
     },
     serviceEnabled: {
-      read: () => getStore().get<boolean>('magpie_service_enabled') === true,
+      read: () => getStoreIfOpen()?.get<boolean>('magpie_service_enabled') === true,
       write: enabled => getStore().set('magpie_service_enabled', enabled),
     },
     subscriptionAccounts: {
-      read: () => getStore().get<boolean>('magpie_subscription_accounts_enabled') === true,
+      read: () => getStoreIfOpen()?.get<boolean>('magpie_subscription_accounts_enabled') === true,
       write: enabled => getStore().set('magpie_subscription_accounts_enabled', enabled),
     },
     lanAccess: {
@@ -65,57 +63,26 @@ export const setupMagpieRuntime = (): void => {
       },
     },
   });
-  inferenceRuntime.managedMagpieBindings = new ManagedMagpieProviderBindings(
-    zhiyuanManagedProviderBridge,
-    inferenceRuntime.magpieManager,
-  );
-  inferenceRuntime.managedMagpieBindings.setOllamaReader(() =>
-    readOllamaProviderSnapshot(getOllamaManager()),
-  );
-  inferenceRuntime.managedMagpieBindings.setGpuReader(async () => {
-    const orchestrator = inferenceRuntime.llamaCppModelOrchestrator;
-    if (!orchestrator) return { baseUrl: null, models: [] };
-    const models = await orchestrator.listRunningModels();
-    return {
-      baseUrl: orchestrator.gatewayBaseUrl(),
-      models: models
-        .map(buildLlamaCppRunningModelBinding)
-        .filter((model): model is NonNullable<typeof model> => Boolean(model)),
-    };
+  const organization = getBranding().features.enableAISphere ? aisphereService : undefined;
+  const bindings = new ManagedMagpieProviderBindings(zhiyuanManagedProviderBridge, manager, {
+    organization,
+    enterpriseOrigin: () => enterpriseGateway?.origin,
+    readLocalModels,
   });
   const modelService = new MagpieModelService(
-    inferenceRuntime.magpieManager,
+    manager,
     {
       readDefaultModelId: resolveDefaultAgentModelRef,
-      writeDefaultModelId: id => getStore().set('magpie_default_model_id', id),
-      beforeCatalog: () => inferenceRuntime.managedMagpieBindings!.beforeCatalog(),
-      allowedModel: model => inferenceRuntime.managedMagpieBindings!.allowedModel(model.id),
+      writeDefaultModelId: id => getStore().set(MAGPIE_DEFAULT_MODEL_ID_KEY, id),
+      beforeCatalog: owner => bindings.beforeCatalog(owner),
+      allowedModel: model => bindings.allowedModel(model.id, model.owned_by),
+      allowProviderFallback: !organization,
+      readLocalGpuEligibility: id => bindings.localGpuEligibility(id),
     },
-    inferenceRuntime.magpieManager.routingUsage,
+    manager.routingUsage,
   );
-  inferenceRuntime.disposeMagpieModels = installMagpieModelService(modelService);
-  magpieModelService = modelService;
-  registerAcpMagpieModelApply(async modelId => {
-    const snapshot = await inferenceRuntime.magpieManager?.agents();
-    for (const agent of snapshot?.agents ?? []) {
-      if (agent.cliMissing) continue;
-      for (const field of agent.models) {
-        if (field.value === modelId) continue;
-        if (!field.options.some(option => option.value === modelId)) continue;
-        try {
-          await inferenceRuntime.magpieManager?.setModel({
-            agentId: agent.id,
-            field: field.key,
-            value: modelId,
-          });
-        } catch (error) {
-          console.warn(`[CodingAgent] could not apply gateway model to ${agent.id}:`, error);
-        }
-      }
-    }
-  });
-  inferenceRuntime.disposeMagpie = registerMagpieIpc(
-    inferenceRuntime.magpieManager,
+  const closeIpc = registerMagpieIpc(
+    manager,
     event =>
       Boolean(
         lifecycleRuntime.mainWindow &&
@@ -124,14 +91,74 @@ export const setupMagpieRuntime = (): void => {
         event.senderFrame === lifecycleRuntime.mainWindow.webContents.mainFrame,
       ),
     modelService,
-    inferenceRuntime.magpieManager.routingUsage,
   );
+  const stopManagedGateway = async (): Promise<void> => {
+    const gateway = enterpriseGateway;
+    enterpriseGateway = undefined;
+    if (organization) await organization.shutdown();
+    else await gateway?.close();
+  };
+
+  return {
+    modelService,
+    isRunning: () => manager.status().state === 'running',
+    synchronizeCatalog: () => bindings.synchronize(),
+    onLocalModelBindingsChanged: async (
+      url: string | null,
+      models: readonly LlamaCppRunningModelBinding[],
+    ) => {
+      bindings.setGpuSnapshot(url, models);
+      if (manager.status().state === 'running') await bindings.synchronize();
+    },
+    onLanAccessChanged: async () => {
+      await manager.onLanAccessChanged();
+    },
+    onLanAccessTokenRegenerated: async () => {
+      await manager.onLanAccessTokenRegenerated();
+    },
+    start: async () => {
+      try {
+        if (getStore().get<boolean>('magpie_service_enabled') === true) {
+          await manager.ensureRunning();
+        } else {
+          // LAN access can start the bundled gateway independently.
+          await manager.onLanAccessChanged();
+        }
+      } catch (error) {
+        console.warn('[Magpie] Model gateway startup failed:', error);
+      }
+    },
+    startManagedGateway: async (store: SqliteStore, busy: () => boolean, enterprise: boolean) => {
+      try {
+        if (organization) {
+          organization.busy = busy;
+          await organization.initialize(store, startAISphereGateway);
+        } else if (enterprise) {
+          const gateway = await startEnterpriseModelGateway(zhiyuanManagedProviderBridge);
+          if (lifecycleRuntime.isQuitting) {
+            await gateway.close();
+            return;
+          }
+          enterpriseGateway = gateway;
+        }
+      } catch (error) {
+        console.error('[Magpie] Failed to initialize the managed model transport:', error);
+        await stopManagedGateway().catch(closeError => {
+          console.warn('[Magpie] Failed to close the managed model transport:', closeError);
+        });
+      }
+    },
+    stopManagedGateway,
+    onSuspend: () => manager.onSuspend(),
+    recoverIfNeeded: () => manager.recoverIfNeeded(),
+    closeAdmission: closeIpc,
+    disconnectExternalAgents: async (signal: AbortSignal) => {
+      await manager.disconnectAllAgents(signal);
+    },
+    shutdown: async () => {
+      await manager.shutdown();
+    },
+  };
 };
 
-/** Whether the bundled model gateway is currently running (work package I indirection). */
-export const isMagpieGatewayRunning = (): boolean =>
-  inferenceRuntime.magpieManager?.status().state === 'running';
-
-/** Runs one managed-catalog synchronization, if bindings exist (work package I indirection). */
-export const synchronizeManagedMagpieCatalog = (): Promise<void> | undefined =>
-  inferenceRuntime.managedMagpieBindings?.synchronize();
+export type MagpieRuntime = ReturnType<typeof setupMagpieRuntime>;

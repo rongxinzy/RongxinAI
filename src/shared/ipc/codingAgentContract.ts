@@ -182,15 +182,12 @@ const CreateCodingWorkspaceInputSchema = z.object({
   defaultProfileId: z.string(),
 });
 
-const CreateCodingSessionInputSchema = z.object({
+const StartCodingSessionInputSchema = z.object({
   workspaceId: z.string(),
   profileId: z.string(),
   sourceRoot: z.string(),
   title: z.string().optional(),
   modelOverride: z.string().optional(),
-});
-
-const StartCodingSessionInputSchema = CreateCodingSessionInputSchema.extend({
   prompt: z.string(),
   attachments: z.array(CodingPromptAttachmentSchema).optional(),
   configOptionOverrides: z.record(z.string(), z.string()).optional(),
@@ -336,11 +333,6 @@ export const codingAgentContract = defineIpcContract({
       error: z.string().optional(),
     }),
   },
-  createSession: {
-    channel: CodingAgentIpc.CreateSession,
-    args: z.tuple([CreateCodingSessionInputSchema]),
-    result: ActionResultSchema,
-  },
   startSession: {
     channel: CodingAgentIpc.StartSession,
     args: z.tuple([StartCodingSessionInputSchema]),
@@ -354,17 +346,6 @@ export const codingAgentContract = defineIpcContract({
   prepareLane: {
     channel: CodingAgentIpc.PrepareLane,
     args: z.tuple([LaneRefSchema]),
-    result: ActionResultSchema,
-  },
-  createMission: {
-    channel: CodingAgentIpc.CreateMission,
-    args: z.tuple([
-      z.object({
-        workspaceRoot: WorkspaceRootSchema,
-        profileId: z.string(),
-        title: z.string().optional(),
-      }),
-    ]),
     result: ActionResultSchema,
   },
   selectLane: {
@@ -437,21 +418,6 @@ export const codingAgentContract = defineIpcContract({
     args: z.tuple([LaneRefSchema]),
     result: ActionResultSchema,
   },
-  previewHandoff: {
-    channel: CodingAgentIpc.PreviewHandoff,
-    args: z.tuple([
-      z.object({
-        workspaceRoot: WorkspaceRootSchema,
-        sourceLaneId: z.string(),
-        targetLaneId: z.string(),
-      }),
-    ]),
-    result: z.object({
-      success: z.boolean(),
-      content: z.record(z.string(), z.unknown()).optional(),
-      error: z.string().optional(),
-    }),
-  },
   handoff: {
     channel: CodingAgentIpc.Handoff,
     args: z.tuple([
@@ -459,29 +425,6 @@ export const codingAgentContract = defineIpcContract({
         workspaceRoot: WorkspaceRootSchema,
         sourceLaneId: z.string(),
         targetLaneId: z.string(),
-      }),
-    ]),
-    result: ActionResultSchema,
-  },
-  addLane: {
-    channel: CodingAgentIpc.AddLane,
-    args: z.tuple([
-      z.object({
-        workspaceRoot: WorkspaceRootSchema,
-        missionId: z.string(),
-        profileId: z.string(),
-      }),
-    ]),
-    result: ActionResultSchema,
-  },
-  createCollaborationPreset: {
-    channel: CodingAgentIpc.CreateCollaborationPreset,
-    args: z.tuple([
-      z.object({
-        workspaceRoot: WorkspaceRootSchema,
-        missionId: z.string(),
-        reviewerProfileId: z.string(),
-        verifierProfileId: z.string(),
       }),
     ]),
     result: ActionResultSchema,
@@ -552,16 +495,6 @@ export const codingAgentContract = defineIpcContract({
       diff: z.string().optional(),
       error: z.string().optional(),
     }),
-  },
-  stageGitPaths: {
-    channel: CodingAgentIpc.StageGitPaths,
-    args: z.tuple([GitTargetSchema.extend({ paths: z.array(z.string()) })]),
-    result: GitStatusResultSchema,
-  },
-  unstageGitPaths: {
-    channel: CodingAgentIpc.UnstageGitPaths,
-    args: z.tuple([GitTargetSchema.extend({ paths: z.array(z.string()) })]),
-    result: GitStatusResultSchema,
   },
   commitGitChanges: {
     channel: CodingAgentIpc.CommitGitChanges,

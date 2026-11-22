@@ -8,6 +8,7 @@
  */
 
 import {
+  createTestPiRuntime,
   adapter,
   mockCreateAgentSession,
   mockDefaultResourceLoader,
@@ -54,7 +55,10 @@ describe('PiRuntimeAdapter', () => {
       adapter.enqueuePendingMessage('native-queue', 'Follow-up');
       expect((await adapter.steerInput('native-queue', 'First steer')).success).toBe(true);
       expect((await adapter.steerInput('native-queue', 'Second steer')).success).toBe(true);
-      expect(mockSession.steer.mock.calls).toEqual([['First steer'], ['Second steer']]);
+      expect(mockSession.steer.mock.calls).toEqual([
+        ['First steer', undefined, { onQueued: expect.any(Function) }],
+        ['Second steer', undefined, { onQueued: expect.any(Function) }],
+      ]);
       expect(mockSession.prompt.mock.calls).toEqual([['Start']]);
       expect(mockSession.followUp).toHaveBeenCalledWith('Follow-up', undefined, {
         onQueued: expect.any(Function),
@@ -113,7 +117,7 @@ describe('PiRuntimeAdapter', () => {
       // Pi emits user message_start for the initial prompt first.
       listener!({ type: 'message_start', message: { role: 'user', content: 'Start work' } });
 
-      const first = adapter.enqueuePendingMessage('queue-session', 'First follow-up');
+      const first = await adapter.enqueuePendingMessage('queue-session', 'First follow-up');
       adapter.enqueuePendingMessage('queue-session', 'Second follow-up');
 
       // Both follow-ups are dispatched immediately into Pi's native followUp queue.
@@ -141,17 +145,22 @@ describe('PiRuntimeAdapter', () => {
     it('merges a queued turn picks into the session skills without losing the session own', async () => {
       const nativeFollowUps = collectNativeFollowUps();
       const added: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
-      const updateSession = vi.fn();
-      adapter.setCoworkStore({
-        addMessage: (_sessionId: string, message: unknown) => {
-          added.push(message as { content: string; metadata?: Record<string, unknown> });
-          return message;
-        },
-        getSession: () => ({ messages: [], experts: [], activeSkillIds: ['alpha-skill'] }),
-        updateSession,
-        updateMessage: vi.fn(),
-        listSessionArtifacts: vi.fn(),
-      } as unknown as CoworkStore);
+      const appendSessionSkills = vi.fn();
+      const adapter = createTestPiRuntime({
+        coworkStore: {
+          messages: {
+            addMessage: (_sessionId: string, message: unknown) => {
+              added.push(message as { content: string; metadata?: Record<string, unknown> });
+              return message;
+            },
+            updateMessage: vi.fn(),
+          },
+          getSession: () => ({ messages: [], experts: [], activeSkillIds: ['alpha-skill'] }),
+          updateSession: vi.fn(),
+          appendSessionSkills,
+          listSessionArtifacts: vi.fn(),
+        } as unknown as CoworkStore,
+      });
 
       let listener: ((event: { type: string }) => void) | null = null;
       mockSession.subscribe.mockImplementation((callback: (event: { type: string }) => void) => {
@@ -163,7 +172,7 @@ describe('PiRuntimeAdapter', () => {
         sessionMode: 'work',
         skillIds: ['alpha-skill'],
       });
-      const queued = adapter.enqueuePendingMessage(
+      const queued = await adapter.enqueuePendingMessage(
         'queued-skills',
         'Second',
         undefined,
@@ -177,15 +186,10 @@ describe('PiRuntimeAdapter', () => {
         type: 'message_start',
         message: { role: 'user', content: 'Second' },
       } as { type: string });
-      const skillUpdate = [
-        'queued-skills',
-        { activeSkillIds: ['alpha-skill', 'beta-skill'] },
-        { touchUpdatedAt: false },
-      ];
-      expect(updateSession).not.toHaveBeenCalledWith(...skillUpdate);
+      expect(appendSessionSkills).not.toHaveBeenCalled();
       expect(adapter.listPendingMessages('queued-skills')).toHaveLength(1);
       listener!({ type: 'message_start', message: nativeFollowUps[0] } as { type: string });
-      expect(updateSession).toHaveBeenCalledWith(...skillUpdate);
+      expect(appendSessionSkills).toHaveBeenCalledExactlyOnceWith('queued-skills', ['beta-skill']);
       listener!({ type: 'agent_end' });
       listener!({ type: 'agent_settled' });
       await vi.waitFor(() => expect(mockSession.followUp).toHaveBeenCalledTimes(1));
@@ -209,7 +213,9 @@ describe('PiRuntimeAdapter', () => {
     it('rejects queue controls for Chat sessions', async () => {
       await adapter.startSession('chat-session', 'Hello', { sessionMode: 'chat' });
 
-      expect(adapter.enqueuePendingMessage('chat-session', 'Not allowed')).toMatchObject({
+      await expect(
+        adapter.enqueuePendingMessage('chat-session', 'Not allowed'),
+      ).resolves.toMatchObject({
         success: false,
       });
     });
@@ -281,7 +287,7 @@ describe('PiRuntimeAdapter', () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
+      const adapter = createTestPiRuntime({ workbenchTaskService: service });
       const completes: string[] = [];
       adapter.on('complete', sessionId => completes.push(sessionId));
       const errors: CoworkError[] = [];

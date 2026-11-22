@@ -19,9 +19,7 @@ test('buildLlamaCppRunningModelBinding uses runtime context length for Agent con
   ).toEqual({
     id: 'qwen-local',
     name: 'qwen-local',
-    supportsImage: false,
     contextWindow: 32768,
-    contextTokens: 32768,
     maxTokens: 4096,
     agentEligibility: {
       eligible: true,
@@ -41,6 +39,34 @@ test('buildLlamaCppRunningModelBinding caps Agent maxTokens below the runtime co
   expect(deriveLlamaCppAgentMaxTokens(32768)).toBe(4096);
 });
 
+test('publishes model preferences without advertising capacity beyond the loaded runtime', () => {
+  const running = { name: 'qwen-local', runtime_context_length: 32768 };
+  expect(
+    buildLlamaCppRunningModelBinding(running, {
+      'qwen-local': { ctxSize: 65536, maxTokens: 1024 },
+    }),
+  ).toMatchObject({
+    contextWindow: 32768,
+    maxTokens: 1024,
+    agentEligibility: { eligible: true, runtimeContextWindow: 32768 },
+  });
+  expect(
+    buildLlamaCppRunningModelBinding(running, {
+      'qwen-local': { ctxSize: 16384, maxTokens: 65536 },
+    }),
+  ).toMatchObject({
+    contextWindow: 16384,
+    maxTokens: 16384,
+    agentEligibility: {
+      eligible: false,
+      reason: LlamaCppAgentEligibilityReason.RuntimeContextTooSmall,
+      runtimeContextWindow: 16384,
+      requiredContextWindow: 32768,
+      canIncreaseContextWindow: true,
+    },
+  });
+});
+
 test('buildLlamaCppRunningModelBinding keeps running models with unknown runtime context but marks them ineligible for Agent', () => {
   expect(
     buildLlamaCppRunningModelBinding({
@@ -51,7 +77,6 @@ test('buildLlamaCppRunningModelBinding keeps running models with unknown runtime
   ).toEqual({
     id: 'qwen-local',
     name: 'qwen-local',
-    supportsImage: false,
     agentEligibility: {
       eligible: false,
       reason: LlamaCppAgentEligibilityReason.RuntimeContextUnknown,
@@ -72,9 +97,7 @@ test('buildLlamaCppRunningModelBinding keeps smaller runtime contexts but marks 
   ).toEqual({
     id: 'qwen-local',
     name: 'qwen-local',
-    supportsImage: false,
     contextWindow: 4096,
-    contextTokens: 4096,
     maxTokens: 1024,
     agentEligibility: {
       eligible: false,

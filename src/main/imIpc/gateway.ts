@@ -1,12 +1,13 @@
 /** IM gateway IPC: config get/sync (debounced sidecar reconcile), gateway start/stop, local IP. */
 import type { ChannelAccountManager } from '../im/channelAccountManager';
 import type { CcConnectAccountRuntimeStatus } from '../libs/ccConnectRuntimeStatusRegistry';
+import type { WeixinSetupResult } from '../libs/ccConnectWeixinSetup';
 
 export interface ImGatewayIpcDeps {
   getIMGatewayManager: () => ChannelAccountManager;
   reconcileCcConnectChannelSidecars: () => Promise<void>;
   refreshCcConnectPlatformStatuses: () => Promise<void>;
-  resolveCcConnectSidecarExecutable: () => string | null;
+  setupCcConnectWeixin: (action: 'start' | 'poll', qrcode?: string) => Promise<WeixinSetupResult>;
   resolveCcConnectAccountRuntimeStatus: (accountId: string) => CcConnectAccountRuntimeStatus;
 }
 
@@ -17,7 +18,6 @@ import { IMGatewayConfig } from '../im';
 import {
   formatWeixinSetupErrorForLog,
   isWeixinSetupTransportError,
-  runCcConnectWeixinSetup,
 } from '../libs/ccConnectWeixinSetup';
 import type { Platform } from '../../shared/platform';
 import { WeixinLoginErrorCode } from '../../shared/ipc/channels';
@@ -162,9 +162,7 @@ export const registerImGatewayIpc = (deps: ImGatewayIpcDeps): void => {
 
     weixinLoginStart: async () => {
       try {
-        const executable = deps.resolveCcConnectSidecarExecutable();
-        if (!executable) throw new Error('Channel runtime is not bundled');
-        const result = await runCcConnectWeixinSetup(executable, 'start');
+        const result = await deps.setupCcConnectWeixin('start');
         return {
           success: true,
           status: result.status,
@@ -196,9 +194,7 @@ export const registerImGatewayIpc = (deps: ImGatewayIpcDeps): void => {
     }> => {
       try {
         if (!qrcode?.trim()) throw new Error('Weixin QR code is required');
-        const executable = deps.resolveCcConnectSidecarExecutable();
-        if (!executable) throw new Error('Channel runtime is not bundled');
-        const result = await runCcConnectWeixinSetup(executable, 'poll', qrcode);
+        const result = await deps.setupCcConnectWeixin('poll', qrcode);
         if (result.status === 'confirmed') {
           if (!result.accountId || !result.botToken || !result.baseUrl) {
             throw new Error('Weixin login result is incomplete');
@@ -231,6 +227,22 @@ export const registerImGatewayIpc = (deps: ImGatewayIpcDeps): void => {
           status: 'wait',
           errorCode,
         };
+      }
+    },
+
+    dingtalkLoginStart: async () => {
+      try {
+        return await deps.getIMGatewayManager().startDingTalkInstallQrcode();
+      } catch (error) {
+        throw new Error(error instanceof Error ? error.message : '获取二维码失败');
+      }
+    },
+
+    dingtalkLoginPoll: async (_event, { deviceCode }) => {
+      try {
+        return await deps.getIMGatewayManager().pollDingTalkInstall(deviceCode);
+      } catch (error) {
+        return { done: false, error: error instanceof Error ? error.message : '轮询失败' };
       }
     },
 

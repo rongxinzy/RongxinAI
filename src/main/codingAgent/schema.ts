@@ -39,6 +39,7 @@ const CURRENT_SCHEMA_DDL = `
     pending_recovery_prompt TEXT, pending_recovery_context TEXT,
     created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
   );
+  CREATE INDEX IF NOT EXISTS idx_coding_lanes_local_session ON coding_agent_lanes(local_session_id, profile_id);
   CREATE TABLE IF NOT EXISTS coding_assignments (
     id TEXT PRIMARY KEY, mission_id TEXT NOT NULL, lane_id TEXT NOT NULL,
     title TEXT NOT NULL, instructions TEXT NOT NULL, workflow_stage TEXT, previous_assignment_id TEXT, status TEXT NOT NULL,

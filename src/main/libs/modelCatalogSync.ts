@@ -1,15 +1,14 @@
-import path from 'node:path';
-import { Worker } from 'node:worker_threads';
-
 import type { LocalModelCatalog } from './localModelCatalog';
-import type { CatalogFetchLike } from './modelCatalogClient';
-import type { CatalogUpdate } from './modelCatalogUpdateTypes';
+import { ModelCatalogUpdateLimit } from './modelCatalogUpdateTypes';
+import { verifyModelCatalogAsync } from '../workbenchTask/artifactWorkerPool';
 
+const DEFAULT_CATALOG_URL = 'https://models.rongxzyai.com';
 const MAX_MANIFEST_BYTES = 16 * 1024;
-const MAX_UPDATE_BYTES = 8 * 1024 * 1024;
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const RETRY_INTERVAL_MS = 60 * 60 * 1000;
 const NETWORK_TIMEOUT_MS = 20_000;
+
+type CatalogFetchLike = (input: string | Request, init?: RequestInit) => Promise<Response>;
 
 type Artifact = { bytes: number; sha256: string };
 type Manifest = {
@@ -24,7 +23,7 @@ function isArtifact(value: Artifact | undefined): value is Artifact {
     value &&
     Number.isSafeInteger(value.bytes) &&
     value.bytes > 0 &&
-    value.bytes <= MAX_UPDATE_BYTES &&
+    value.bytes <= ModelCatalogUpdateLimit.Bytes &&
     /^[a-f0-9]{64}$/.test(value.sha256),
   );
 }
@@ -63,44 +62,11 @@ async function fetchBytes(
   return bytes.buffer;
 }
 
-function verifyUpdate(
-  bytes: ArrayBuffer,
-  sha256: string,
-  baseRevision: number | null,
-  revision: number,
-): Promise<CatalogUpdate> {
-  const queuedAt = performance.now();
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(path.join(__dirname, 'modelCatalogUpdateWorker.js'), {
-      workerData: { bytes, sha256, baseRevision, revision },
-      transferList: [bytes],
-    });
-    const timer = setTimeout(
-      () => finish(new Error('Model catalog verification timed out')),
-      10_000,
-    );
-    function finish(error?: Error, update?: CatalogUpdate): void {
-      clearTimeout(timer);
-      void worker.terminate();
-      if (error || !update) reject(error ?? new Error('Model catalog worker returned no update'));
-      else resolve(update);
-    }
-    worker.once('error', error => finish(error));
-    worker.once('exit', () => finish(new Error('Model catalog verification worker exited')));
-    worker.once('message', (result: { error?: string; update?: CatalogUpdate; runMs?: number }) => {
-      console.debug(
-        `[Marketplace] Catalog verification ran ${Math.round(result.runMs ?? 0)} ms after ${Math.round(performance.now() - queuedAt)} ms elapsed`,
-      );
-      finish(result.error ? new Error(result.error) : undefined, result.update);
-    });
-  });
-}
-
 export async function syncModelCatalog(
   catalog: LocalModelCatalog,
   baseUrl: string,
   fetchImpl: CatalogFetchLike,
-  verify = verifyUpdate,
+  verify = verifyModelCatalogAsync,
 ): Promise<void> {
   const root = baseUrl.replace(/\/$/, '');
   const manifest = JSON.parse(
@@ -125,8 +91,24 @@ export async function syncModelCatalog(
   const artifact = delta ?? manifest.snapshot;
   const bytes = await fetchBytes(fetchImpl, `${root}/${file}`, artifact.bytes);
   if (bytes.byteLength !== artifact.bytes) throw new Error('Incomplete model catalog update');
-  const update = await verify(bytes, artifact.sha256, delta ? current : null, manifest.revision);
+  const update = await verify(
+    {
+      bytes,
+      sha256: artifact.sha256,
+      baseRevision: delta ? current : null,
+      revision: manifest.revision,
+    },
+    AbortSignal.timeout(10_000),
+  );
   await catalog.applyUpdate(update);
+}
+
+export function resolveModelCatalogFeedUrl(): string | undefined {
+  const feed = process.env.ZHIYUAN_MODEL_CATALOG_FEED_URL?.trim();
+  if (feed) return feed;
+  const configured = process.env.ZHIYUAN_MODEL_CATALOG_URL?.trim();
+  const root = configured || (process.env.NODE_ENV !== 'test' ? DEFAULT_CATALOG_URL : null);
+  return root ? `${root.replace(/\/$/, '')}/v1/catalog/feed` : undefined;
 }
 
 export function createModelCatalogUpdateCheck(

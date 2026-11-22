@@ -12,10 +12,6 @@ import { app, dialog, net, powerMonitor, protocol } from 'electron';
 
 import { ZHIYUAN_ENTERPRISE_RENDERER_SCHEME } from '../enterpriseExtension/rendererBridge';
 import { lifecycleRuntime } from './lifecycleRuntimeState';
-import { agentRuntime } from './agentRuntimeState';
-import { storageRuntime } from './storageRuntimeState';
-import { inferenceRuntime } from './inferenceRuntimeState';
-import { memoryRuntime } from './memoryRuntimeState';
 import {
   AppConfigSettings,
   applyProxyPreference,
@@ -24,53 +20,63 @@ import {
 } from './appConfigSettings';
 import { updateTitleBarOverlay } from './windowManagement';
 import { setLanguage } from '../i18n';
-import { ensureWindowsTaskbarBrand, repairWindowsTaskbarIdentity } from './windowBranding';
+import { prepareWindowsTaskbarIdentity } from './windowBranding';
 import { createMainWindow, focusOrCreateMainWindow } from './mainWindow';
 import { setContentSecurityPolicy } from './windowSecurity';
 import {
   getStore,
+  getArtifactLedger,
+  getActivityService,
+  getScheduledTaskStore,
   getMcpStore,
   initStore,
-  getLlamaCppManager,
-  getOllamaManager,
-  checkForAppUpdate,
+  startSqliteBackupLoop,
+  stopSqliteBackupLoop,
+  checkForAppUpdateOnResume,
   startAppUpdatePolling,
   setPreventSleepBlockerEnabled,
 } from './runtimeServices';
 import { getCoworkStore } from './runtimeServices';
-import { startCcConnectBridge, reconcileCcConnectChannelSidecars } from './ccConnectRuntime';
+import {
+  getCcConnectDeliveryTransport,
+  reconcileCcConnectChannelSidecars,
+} from './ccConnectRuntime';
 import { refreshEndpointsTestMode } from '../libs/endpoints';
 import {
-  getEngramManager,
+  getCanonicalScheduledTaskService,
+  startEngram,
+  startMemoryOutbox,
+  resumeMemoryOutbox,
   getProjectMemoryService,
-  getPiRuntimeAdapter,
+  initializeSessionRuntime,
+  hasRunningPiSessions,
   getWorkbenchTaskService,
 } from './sessionServices';
-import { getCodingRoomService } from './codingRoomRuntime';
-import { getCoworkImageRoot } from './coworkSessionImages';
+import type { CodingRoomRuntime } from './codingRoomRuntime';
+import { registerShellIpc } from '../shellIpc';
+import { CodingRoomRepository } from '../codingAgent/codingRoomRepository';
+import { initializeCompanionServices } from './companionTasks';
+import { getCoworkImageRoot } from './workspacePaths';
+import {
+  recoverPendingCoworkStartImages,
+  removeAbandonedCoworkImageWrites,
+} from '../coworkImageAttachments';
 import { bindPiWorkbenchRuntimeForwarder } from './piUiForwarder';
 import { ensureBuiltInMcpDefaultsDisabled } from './mcpBootstrap';
 import { resolveDefaultAgentModelRef } from './defaultAgentModel';
 import { ensureEmbeddedPiAgentDir } from '../libs/agentEngine/piAgentDir';
 import { handleDeepLink } from './communityAuth';
-import { getCronJobService } from '../ipcHandlers/scheduledTask';
-import { aisphereService, startAISphereGateway } from '../extensions/aisphere';
-import { getBranding } from '../../shared/branding';
+import type { MagpieRuntime } from './magpieRuntime';
+import type { LocalInferenceRuntime } from './localInferenceRuntime';
 import { DB_FILENAME } from '../appConstants';
 import { startSqliteDiagnostics } from '../sqliteDiagnostics';
-import { SqliteBackupManager } from '../libs/sqliteBackup/sqliteBackupManager';
+import type { SqliteStore } from '../sqliteStore';
 import { isAllowedLocalfilePath, resolveLocalfileRequestPath } from '../localfilePathValidation';
-import { ActivityService } from '../activity/activityService';
-import { ActivitySource, ActivityStatus } from '../../shared/activity/constants';
 import { registerWorkbenchTaskIpcHandlers } from '../workbenchTask/ipc';
 import { registerTodoIpcHandlers } from '../todo/ipc';
-import { TodoReminderScheduler } from '../todo/reminderScheduler';
 import { registerCodingAgentIpcHandlers } from '../ipcHandlers/codingAgent';
 import { registerMemoryIpcHandlers } from '../memory/ipc';
 import { resolveMemorySessionTitles } from '../memory/sessionTitleResolver';
-import { registerLlamaCppIpcHandlers } from '../ipcHandlers/llamacpp';
-import { registerOllamaIpcHandlers } from '../ipcHandlers/ollama';
-import { registerMarketplaceIpcHandlers } from '../ipcHandlers/marketplace';
 import { cleanupLegacyCopilotStoredToken } from '../legacyCredentialCleanup';
 import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from '../libs/enterpriseConfigSync';
 import { CoworkExecutionMode } from '../../shared/cowork/constants';
@@ -80,18 +86,28 @@ import { allowEnterpriseRendererOpaqueOrigin } from '../enterpriseExtension/rend
 import { initializeZhiyuanEnterpriseExtension } from '../enterpriseExtension/host';
 import { zhiyuanEnterpriseSessionBridge } from '../enterpriseExtension/sessionBridge';
 import { zhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
-import { SqliteScheduledTaskStore } from '../../scheduledTask/sqliteScheduledTaskStore';
 import { getSkillManager } from './runtimeServices';
 import { getSkillsRoot } from '../libs/coworkUtil';
 import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from '../libs/pythonRuntime';
-import { getSkillServiceManager } from '../skillServices';
 import { StartupProfiler } from '../startupProfiler';
 import { setAutoLaunchEnabled } from '../autoLaunchManager';
 import { updateTrayMenu } from '../trayManager';
-import { APP_UPDATE_POLL_INTERVAL_MS } from '../../shared/appUpdate/constants';
-import { channelRuntime } from './channelRuntimeState';
+import { recoverInterruptedWork } from './recoverInterruptedWork';
+import {
+  migrateLegacyScheduledTasksToCanonical,
+  migrateLegacyScheduledTaskRunsToCanonical,
+} from '../../scheduledTask/migrate';
+import {
+  PI_SESSION_GENERATIONS_DIR,
+  PI_SESSIONS_ROOT_DIR,
+} from '../libs/agentEngine/piSessionStore';
+import { recoverSessionDirectoryRemovals } from '../removeSessionDirectory';
 
-export const initApp = async (): Promise<void> => {
+export const initApp = async (
+  magpie: MagpieRuntime,
+  localInference: Pick<LocalInferenceRuntime, 'start'>,
+  codingRoomRuntime: Pick<CodingRoomRuntime, 'start'>,
+): Promise<void> => {
   // Original bootstrap body, kept as one unit; invoked below so exported
   // initApp() actually runs the startup sequence.
   const runInitApp = async (): Promise<void> => {
@@ -100,15 +116,29 @@ export const initApp = async (): Promise<void> => {
     profiler.mark('app.whenReady');
     console.log('[Main] initApp: waiting for app.whenReady()');
     await app.whenReady();
+    if (lifecycleRuntime.isQuitting) return;
     profiler.measure('app.whenReady');
     console.log('[Main] initApp: app is ready');
+    const piSessionRoot = path.join(app.getPath('userData'), PI_SESSIONS_ROOT_DIR);
+    void Promise.all(
+      [
+        getCoworkImageRoot(),
+        piSessionRoot,
+        path.join(piSessionRoot, PI_SESSION_GENERATIONS_DIR),
+      ].map(recoverSessionDirectoryRemovals),
+    ).catch(error => {
+      console.warn('[Cowork] failed to recover deleted session directories:', error);
+    });
+    await removeAbandonedCoworkImageWrites(getCoworkImageRoot()).catch((error: unknown) => {
+      console.warn('[CoworkImages] failed to clean abandoned staged images:', error);
+    });
     await ensureEmbeddedPiAgentDir(app.getPath('userData')).catch(error => {
       console.error('[PiRuntime] Failed to prepare embedded Pi agent directory:', error);
     });
     // 清理同一 AUMID 的旧开发态快捷方式，再写入开发态快捷方式；任务栏按
     // 开始菜单解析名称与图标，顺序反了会继续落到 Electron 原子图标。
-    repairWindowsTaskbarIdentity();
-    ensureWindowsTaskbarBrand();
+    await prepareWindowsTaskbarIdentity();
+    if (lifecycleRuntime.isQuitting) return;
 
     protocol.handle(ZHIYUAN_ENTERPRISE_RENDERER_SCHEME, async request => {
       const assetPath = zhiyuanEnterpriseRendererBridge.resolveAsset(request.url);
@@ -136,15 +166,14 @@ export const initApp = async (): Promise<void> => {
       createSettingsCapability: extensionDirectory =>
         zhiyuanEnterpriseRendererBridge.createScopedSettingsCapability(extensionDirectory),
     });
+    if (lifecycleRuntime.isQuitting) return;
     if (enterpriseExtension.extensionId) {
       console.log(
         `[EnterpriseExtension] Initialized ${enterpriseExtension.extensionId} with API version 1.`,
       );
     }
 
-    void getEngramManager()
-      .start()
-      .catch(error => console.warn('[MemoryRuntime] Failed to start local memory service:', error));
+    const engramReady = startEngram();
 
     // Note: Calendar permission is checked on-demand when calendar operations are requested
     // We don't trigger permission dialogs at startup to avoid annoying users
@@ -184,180 +213,99 @@ export const initApp = async (): Promise<void> => {
 
     profiler.mark('initStore');
     console.log('[Main] initApp: starting initStore()');
+    let store: SqliteStore;
+    let codingRepository: CodingRoomRepository;
     try {
-      storageRuntime.store = await initStore();
+      store = await initStore();
+      if (lifecycleRuntime.isQuitting) return;
+      const db = store.getDatabase();
+      codingRepository = new CodingRoomRepository(db, getArtifactLedger());
+      const scheduledTaskStore = getScheduledTaskStore();
+      const migration = {
+        db,
+        getKv: (key: string) => store.get(key),
+        setKv: (key: string, value: string) => store.set(key, value),
+        store: scheduledTaskStore,
+      };
+      await migrateLegacyScheduledTasksToCanonical(migration).catch(error => {
+        console.warn('[Scheduler] Failed to import scheduled tasks:', error);
+      });
+      if (lifecycleRuntime.isQuitting) return;
+      await migrateLegacyScheduledTaskRunsToCanonical(migration).catch(error => {
+        console.warn('[Scheduler] Failed to import scheduled task runs:', error);
+      });
+      if (lifecycleRuntime.isQuitting) return;
+      const { runs, companionReplies, scheduledRuns, activityRuns, prunedActivity, codingLanes } =
+        recoverInterruptedWork(
+          db,
+          getWorkbenchTaskService(),
+          scheduledTaskStore,
+          getActivityService(),
+          codingRepository,
+          getCoworkStore().messages,
+        );
+      if (runs || companionReplies || scheduledRuns || activityRuns) {
+        console.log(
+          `[Main] Recovered ${runs} workbench runs, ${companionReplies} companion replies, ${scheduledRuns} scheduled runs and ${activityRuns} remaining activity entries.`,
+        );
+      }
+      if (prunedActivity) {
+        console.log(`[Activity] Removed ${prunedActivity} expired activity runs.`);
+      }
+      if (codingLanes > 0) {
+        console.warn(`[CodingAgent] Recovered ${codingLanes} interrupted lane(s) after restart.`);
+      }
     } catch (error) {
+      if (lifecycleRuntime.isQuitting) return;
       // Schema migrations are transactional and rethrow instead of silently
       // skipping; without a store the app cannot run, so say so and exit
       // instead of leaving a process with no window.
-      console.error('[Main] initApp: store initialization failed:', error);
       const detail = error instanceof Error ? error.message : String(error);
       dialog.showErrorBox(
         '知远无法启动 / 知远 failed to start',
         `本地数据库初始化失败。\nLocal database initialization failed.\n\n${detail}`,
       );
-      app.exit(1);
-      return;
+      throw error;
     }
+    if (lifecycleRuntime.isQuitting) return;
+    await recoverPendingCoworkStartImages(getCoworkImageRoot(), getCoworkStore()).catch(
+      (error: unknown) => {
+        console.warn('[CoworkImages] failed to recover pending session starts:', error);
+      },
+    );
+    if (lifecycleRuntime.isQuitting) return;
     startSqliteDiagnostics({
-      db: storageRuntime.store.getDatabase(),
+      db: store.getDatabase(),
       dbPath: path.join(app.getPath('userData'), DB_FILENAME),
     });
-    if (getBranding().features.enableAISphere) {
-      try {
-        const aisphereGateway = await startAISphereGateway();
-        await aisphereService.initialize(storageRuntime.store, aisphereGateway.baseUrl);
-        aisphereService.busy = () => Boolean(agentRuntime.piRuntimeAdapter?.hasRunningSessions());
-        app.once('before-quit', () => {
-          void aisphereGateway.close();
-        });
-        console.log('[Main] initApp: AISphere gateway initialized at', aisphereGateway.baseUrl);
-      } catch (error) {
-        console.error('[Main] initApp: Failed to initialize AISphere gateway:', error);
-      }
-    }
+    await magpie.startManagedGateway(
+      store,
+      hasRunningPiSessions,
+      Boolean(enterpriseExtension.extensionId),
+    );
+    if (lifecycleRuntime.isQuitting) return;
     profiler.measure('initStore');
     console.log('[Main] initApp: store initialized');
-    const projectMemoryService = getProjectMemoryService();
-    projectMemoryService.startOutboxScheduler();
-    void getEngramManager()
-      .start()
-      .then(connection => {
-        if (connection) projectMemoryService.resumeOutboxDrain();
-      })
-      .catch(error => console.warn('[ProjectMemory] Failed to drain pending operations:', error));
-    refreshEndpointsTestMode(storageRuntime.store);
-    storageRuntime.sqliteBackupManager = new SqliteBackupManager(app.getPath('userData'));
-    await startCcConnectBridge().catch(error =>
-      console.error('[cc-connect] Failed to start local bridge:', error),
-    );
-    await reconcileCcConnectChannelSidecars().catch(error => {
-      console.error('[ChannelRuntime] Failed to start unified runtime:', error);
-    });
-    const startSqliteBackupLoop = async (): Promise<void> => {
-      if (!storageRuntime.sqliteBackupManager) return;
-      await storageRuntime.sqliteBackupManager.startPeriodicBackupLoop(() =>
-        getStore().getDatabase(),
-      );
-    };
-
-    const stopSqliteBackupLoop = (): void => {
-      storageRuntime.sqliteBackupManager?.stopPeriodicBackupLoop();
-    };
-
+    startMemoryOutbox(engramReady);
+    refreshEndpointsTestMode(store);
     if (getSqliteAutoBackupEnabledFromConfig(getStore().get<AppConfigSettings>('app_config'))) {
-      await startSqliteBackupLoop().catch(error => {
+      void startSqliteBackupLoop().catch(error => {
         console.error('[SqliteBackup] Failed to start periodic backup loop:', error);
       });
     }
+    if (lifecycleRuntime.isQuitting) return;
 
-    // Defensive recovery: app may be force-closed during execution and leave
-    // stale running flags in DB. Normalize them on startup.
-    const resetCount = getCoworkStore().resetRunningSessions();
-    console.log('[Main] initApp: resetRunningSessions done, count:', resetCount);
-    if (resetCount > 0) {
-      console.log(`[Main] Reset ${resetCount} stuck cowork session(s) from running -> idle`);
-    }
-    channelRuntime.activityService ??= new ActivityService(getStore().getDatabase());
-    const recoveredActivityRuns = channelRuntime.activityService.recoverInterruptedRuns();
-    if (recoveredActivityRuns > 0) {
-      console.warn(
-        `[Activity] marked ${recoveredActivityRuns} interrupted activity run(s) as failed`,
-      );
-    }
-    const prunedActivityRuns = channelRuntime.activityService.pruneExpired();
-    if (prunedActivityRuns > 0) {
-      console.log(`[Activity] removed ${prunedActivityRuns} expired activity run(s)`);
-    }
-    const recoveredScheduledRuns = new SqliteScheduledTaskStore(
-      getStore().getDatabase(),
-    ).recoverInterruptedRuns(run => {
-      channelRuntime.activityService?.upsertBestEffort({
-        id: run.id,
-        source: ActivitySource.ScheduledTask,
-        status: ActivityStatus.Failed,
-        startedAt: Date.parse(run.startedAt),
-        updatedAt: Date.parse(run.finishedAt ?? run.startedAt),
-        errorMessage: run.error ?? undefined,
-      });
-    });
-    if (recoveredScheduledRuns > 0) {
-      console.warn(`[Scheduler] marked ${recoveredScheduledRuns} interrupted Run(s) as failed`);
-    }
     registerWorkbenchTaskIpcHandlers({
       getService: getWorkbenchTaskService,
+      getMainWindow: () => lifecycleRuntime.mainWindow,
     });
-    memoryRuntime.todoReminderScheduler = new TodoReminderScheduler(getStore().getDatabase());
-    memoryRuntime.todoReminderScheduler.start();
-    registerTodoIpcHandlers(() => getStore().getDatabase(), {
-      onMutation: () => memoryRuntime.todoReminderScheduler?.refresh(),
-    });
-    registerCodingAgentIpcHandlers(getCodingRoomService);
-    const recoveredCodingLanes = getCodingRoomService().recoverInterruptedState();
-    if (recoveredCodingLanes > 0) {
-      console.warn(
-        `[CodingAgent] recovered ${recoveredCodingLanes} interrupted lane(s) after restart`,
-      );
-    }
-    void getCodingRoomService()
-      .registry.discoverExternalAgents()
-      .catch(error => {
-        console.warn('[CodingAgent] External ACP discovery failed:', error);
-      });
+    registerTodoIpcHandlers(store.getDatabase());
     registerMemoryIpcHandlers({
       getService: getProjectMemoryService,
       resolveSessionTitles: sessionIds =>
         resolveMemorySessionTitles(getStore().getDatabase(), sessionIds),
     });
-    getStore().onDidChange<AppConfigSettings>('app_config', (next, previous) => {
-      // Provider/model edits are the user's explicit statement about what the
-      // models can do: drop runtime image-capability observations so a corrected
-      // endpoint or a re-enabled switch takes effect without a restart.
-      const modelConfigSection = (value: AppConfigSettings | undefined): string => {
-        const record = value as Record<string, unknown> | undefined;
-        return JSON.stringify([
-          record?.providers ?? null,
-          record?.api ?? null,
-          record?.model ?? null,
-        ]);
-      };
-      if (modelConfigSection(next) !== modelConfigSection(previous)) {
-        void getPiRuntimeAdapter().resetImageInputCapabilities();
-      }
-    });
-    const localInferenceManager = getLlamaCppManager();
-    localInferenceManager.initializeModelsDir();
-    inferenceRuntime.llamaCppModelOrchestrator = registerLlamaCppIpcHandlers(
-      localInferenceManager,
-      {
-        getStore,
-        onModelBindingsChanged: async (url, models) => {
-          inferenceRuntime.managedMagpieBindings?.setGpuSnapshot(url, models);
-          if (inferenceRuntime.magpieManager?.status().state === 'running')
-            await inferenceRuntime.managedMagpieBindings?.synchronize();
-        },
-        onLanAccessChanged: async () => {
-          await inferenceRuntime.magpieManager?.onLanAccessChanged();
-        },
-        onLanAccessTokenRegenerated: async () => {
-          await inferenceRuntime.magpieManager?.onLanAccessTokenRegenerated();
-        },
-      },
-    );
-    // Warm the short-lived backend cache before the runtime settings dialog is opened.
-    void localInferenceManager.listBackends();
-    registerOllamaIpcHandlers(getOllamaManager(), {
-      getStore,
-      onModelBindingsChanged: async snapshot => {
-        inferenceRuntime.managedMagpieBindings?.setOllamaSnapshot(snapshot);
-        if (inferenceRuntime.magpieManager?.status().state === 'running')
-          await inferenceRuntime.managedMagpieBindings?.synchronize();
-      },
-    });
-    registerMarketplaceIpcHandlers({
-      getModelsDir: () => getLlamaCppManager().getModelsDir(),
-      userDataPath: app.getPath('userData'),
-    });
+    localInference.start(magpie);
     // Remove the stored GitHub OAuth token from the retired in-app Copilot
     // device-flow sign-in; subscription sign-in now goes through the model gateway.
     cleanupLegacyCopilotStoredToken(getStore());
@@ -365,13 +313,14 @@ export const initApp = async (): Promise<void> => {
     // Enterprise config sync must run before agent services initialize.
     profiler.mark('enterpriseConfigSync');
     // so enterprise data is in SQLite when the config is generated.
-    const enterpriseConfigPath = resolveEnterpriseConfigPath();
+    const enterpriseConfigPath = await resolveEnterpriseConfigPath();
+    if (lifecycleRuntime.isQuitting) return;
     if (enterpriseConfigPath) {
       try {
         const mcpStoreInstance = getMcpStore();
-        syncEnterpriseConfig(
+        await syncEnterpriseConfig(
           enterpriseConfigPath,
-          storageRuntime.store,
+          store,
           server => {
             const existing = mcpStoreInstance.listServers().find(s => s.name === server.name);
             if (existing) {
@@ -411,9 +360,9 @@ export const initApp = async (): Promise<void> => {
     } else {
       // No enterprise config package found — clear any previously stored config
       // so the app exits enterprise mode after the package is removed.
-      const hadEnterprise = storageRuntime.store.get('enterprise_config');
+      const hadEnterprise = store.get('enterprise_config');
       if (hadEnterprise) {
-        storageRuntime.store.delete('enterprise_config');
+        store.delete('enterprise_config');
         // Restore the default execution mode after removing enterprise configuration.
         const cs = getCoworkStore();
         cs.setConfig({ executionMode: CoworkExecutionMode.Local });
@@ -423,6 +372,7 @@ export const initApp = async (): Promise<void> => {
       }
     }
     profiler.measure('enterpriseConfigSync');
+    if (lifecycleRuntime.isQuitting) return;
 
     try {
       ensureBuiltInMcpDefaultsDisabled();
@@ -430,8 +380,30 @@ export const initApp = async (): Promise<void> => {
       console.error('[McpInit] Failed to apply MCP defaults:', error);
     }
 
-    bindPiWorkbenchRuntimeForwarder();
-
+    const channelDelivery = getCcConnectDeliveryTransport();
+    const piRuntime = initializeSessionRuntime(magpie.modelService, channelDelivery);
+    const codingRoom = codingRoomRuntime.start(magpie.modelService, piRuntime, codingRepository);
+    initializeCompanionServices(magpie.modelService, piRuntime);
+    registerCodingAgentIpcHandlers(
+      () => codingRoom,
+      () => lifecycleRuntime.mainWindow,
+    );
+    registerShellIpc({
+      getCoworkStore,
+      getCodingWorkspaceRoots: () =>
+        codingRoom
+          .listWorkspaces()
+          .flatMap(workspace => [
+            workspace.primaryRoot,
+            ...workspace.sources.map(source => source.path),
+          ]),
+    });
+    bindPiWorkbenchRuntimeForwarder(piRuntime, () => lifecycleRuntime.mainWindow);
+    void codingRoom.registry.discoverExternalAgents().catch(error => {
+      if (!lifecycleRuntime.isQuitting) {
+        console.warn('[CodingAgent] External ACP discovery failed:', error);
+      }
+    });
     const defaultAgentModelRef = resolveDefaultAgentModelRef();
     const backfilledAgentModels = getCoworkStore().backfillEmptyAgentModels(defaultAgentModelRef);
     if (backfilledAgentModels > 0) {
@@ -441,37 +413,10 @@ export const initApp = async (): Promise<void> => {
     profiler.mark('applyProxyPreference');
     const appConfig = getStore().get<AppConfigSettings>('app_config');
     await applyProxyPreference(getUseSystemProxyFromConfig(appConfig));
+    if (lifecycleRuntime.isQuitting) return;
     profiler.measure('applyProxyPreference');
-    if (getStore().get<boolean>('magpie_service_enabled') === true) {
-      await inferenceRuntime.magpieManager?.ensureRunning().catch(error => {
-        console.warn('[Magpie] Previously enabled model service could not start:', error);
-      });
-    } else {
-      // LAN access is served by the bundled model gateway; the toggle alone may
-      // start it even when unified model management was never enabled.
-      await inferenceRuntime.magpieManager?.onLanAccessChanged().catch(error => {
-        console.warn('[Magpie] LAN access model service start failed:', error);
-      });
-    }
 
-    // Construct the canonical scheduler eagerly. getCanonicalScheduledTaskService
-    // is the only place that injects the service into the Pi adapter
-    // (setScheduledTaskService); without this call it would only be built
-    // lazily by the first scheduled-task IPC request or the cc-connect sidecar
-    // cron attach, and Work sessions started before either (sidecar missing,
-    // in crash backoff, or racing startup) would silently lack the
-    // scheduled_task tool. The old startPolling() call covered this by
-    // accident; the polling itself was a no-op and stays removed.
-    try {
-      getCronJobService();
-    } catch (error) {
-      console.warn('[Main] Canonical scheduler not available after startup:', error);
-    }
-
-    // ── Step 1: Show window ASAP ──────────────────────────────────────
-    // CSP + createWindow moved before skill initialisation so the user
-    // sees the loading UI within ~1-2 s instead of waiting for the full
-    // skill bootstrap (~6-8 s previously).
+    // Create the window before waiting for the gateway and bundled skills.
     setContentSecurityPolicy();
 
     profiler.mark('createWindow');
@@ -495,28 +440,38 @@ export const initApp = async (): Promise<void> => {
     process.env.ZHIYUAN_SKILLS_ROOT = skillsRoot;
     console.log('[Main] initApp: SKILLS_ROOT =', skillsRoot);
 
-    // Parallelise independent skill sub-tasks (Step 4).
+    // Channel owns its shutdown. Only outbound delivery waits for its connection.
+    void channelDelivery.trackStartup(
+      reconcileCcConnectChannelSidecars().catch(error => {
+        console.error('[ChannelRuntime] Failed to start unified runtime:', error);
+      }),
+    );
     await Promise.all([
-      // Group A: file-system skill operations (sync, must run in order)
+      (async () => {
+        await magpie.start();
+        if (lifecycleRuntime.isQuitting) return;
+
+        try {
+          await getCanonicalScheduledTaskService().armSavedSchedules();
+        } catch (error) {
+          console.warn('[Scheduler] Failed to arm saved schedules:', error);
+        }
+      })(),
+
+      // Group A: recover interrupted replacements before syncing the packaged skills.
       (async () => {
         profiler.mark('syncBundledSkills');
         try {
-          manager.syncBundledSkillsToUserData();
-          console.log('[Main] initApp: syncBundledSkillsToUserData done');
+          await manager.prepareBundledSkills();
         } catch (error) {
-          console.error('[Main] initApp: syncBundledSkillsToUserData failed:', error);
+          console.error('[Main] initApp: bundled skill preparation failed:', error);
         }
         profiler.measure('syncBundledSkills');
-
-        try {
-          manager.recoverInterruptedUpgrades();
-          console.log('[Main] initApp: recoverInterruptedUpgrades done');
-        } catch (error) {
-          console.error('[Main] initApp: recoverInterruptedUpgrades failed:', error);
-        }
+        if (lifecycleRuntime.isQuitting) return;
 
         try {
           manager.startWatching();
+          manager.notifySkillsChanged();
           console.log('[Main] initApp: startWatching done');
         } catch (error) {
           console.error('[Main] initApp: startWatching failed:', error);
@@ -540,33 +495,8 @@ export const initApp = async (): Promise<void> => {
         profiler.measure('pythonRuntime');
       })(),
     ]);
+    if (lifecycleRuntime.isQuitting) return;
 
-    // Skill services (web-search bridge) — fire-and-forget (Step 2).
-    // No IPC handler or downstream init depends on this completing. The
-    // memory-leak scenario intentionally omits optional services so a fresh
-    // isolated profile cannot block the Electron first-window check while
-    // synchronously repairing web-search dependencies.
-    if (process.env.ZHIYUAN_MEMORY_LEAK_TEST === '1') {
-      console.log('[Main] initApp: skipping optional skill services for memory leak test');
-    } else {
-      try {
-        const skillServices = getSkillServiceManager();
-        console.log('[Main] initApp: getSkillServiceManager done');
-        const t0 = performance.now();
-        void skillServices
-          .startAll()
-          .then(() => {
-            console.log(
-              `[Main] initApp: skill services started (background, ${(performance.now() - t0).toFixed(0)}ms)`,
-            );
-          })
-          .catch(error => {
-            console.error('[Main] initApp: skill services failed:', error);
-          });
-      } catch (error) {
-        console.error('[Main] initApp: skill services init failed:', error);
-      }
-    }
     profiler.measure('skillManager');
 
     console.log(profiler.summary());
@@ -584,33 +514,28 @@ export const initApp = async (): Promise<void> => {
         clearTimeout(magpieResumeTimer);
         magpieResumeTimer = undefined;
       }
-      inferenceRuntime.magpieManager?.onSuspend();
+      magpie.onSuspend();
     });
 
     powerMonitor.on('resume', () => {
-      projectMemoryService.resumeOutboxDrain();
-      if (inferenceRuntime.magpieManager) {
-        const recoverMagpie = () => {
-          void inferenceRuntime.magpieManager?.recoverIfNeeded().catch(error => {
-            console.warn('[Magpie] Model service recovery after system resume failed:', error);
-          });
-        };
-        if (process.platform === 'win32') {
-          if (magpieResumeTimer) clearTimeout(magpieResumeTimer);
-          magpieResumeTimer = setTimeout(() => {
-            magpieResumeTimer = undefined;
-            recoverMagpie();
-          }, 500);
-        } else {
+      if (lifecycleRuntime.isQuitting) return;
+      resumeMemoryOutbox();
+      const recoverMagpie = () => {
+        if (lifecycleRuntime.isQuitting) return;
+        void magpie.recoverIfNeeded().catch(error => {
+          console.warn('[Magpie] Model service recovery after system resume failed:', error);
+        });
+      };
+      if (process.platform === 'win32') {
+        if (magpieResumeTimer) clearTimeout(magpieResumeTimer);
+        magpieResumeTimer = setTimeout(() => {
+          magpieResumeTimer = undefined;
           recoverMagpie();
-        }
+        }, 500);
+      } else {
+        recoverMagpie();
       }
-      if (
-        Date.now() - lifecycleRuntime.lastSuccessfulAppUpdateCheckAt >=
-        APP_UPDATE_POLL_INTERVAL_MS
-      ) {
-        checkForAppUpdate();
-      }
+      checkForAppUpdateOnResume();
     });
 
     // 首次启动时默认开启开机自启动（先写标记再设置，避免崩溃后重复设置）
@@ -638,6 +563,7 @@ export const initApp = async (): Promise<void> => {
       getStore().get<AppConfigSettings>('app_config'),
     );
     getStore().onDidChange<AppConfigSettings>('app_config', (newConfig, oldConfig) => {
+      if (lifecycleRuntime.isQuitting) return;
       updateTitleBarOverlay();
       // 仅在语言变更时刷新托盘菜单文本
       const currentLanguage = newConfig?.language;

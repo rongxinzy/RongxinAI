@@ -58,28 +58,76 @@ test('main.ts invokes every appBootstrap helper it imports', () => {
   }
 });
 
-test('initApp constructs the canonical scheduler before the first window', () => {
+test('initApp imports schedules and recovers interrupted runs before opening the window, Channel and Cron', () => {
   const source = readSource('./initApp.ts');
-
-  // The scheduled-task service must be constructed eagerly at startup:
-  // getCanonicalScheduledTaskService is the only place that injects it into
-  // the Pi adapter, and Work sessions started before the cc-connect sidecar
-  // attaches would otherwise silently lack the scheduled_task tool.
-  const eagerCall = source.indexOf('getCronJobService();');
+  const recoverWork = source.search(/=\s*recoverInterruptedWork\(/);
+  const startChannel = source.indexOf('reconcileCcConnectChannelSidecars().catch');
+  const armSchedules = source.indexOf(
+    'await getCanonicalScheduledTaskService().armSavedSchedules();',
+  );
   const createWindow = source.indexOf('createMainWindow();');
-  expect(eagerCall).toBeGreaterThan(-1);
-  expect(createWindow).toBeGreaterThan(eagerCall);
+  const openStore = source.indexOf('store = await initStore()');
+  expect(openStore).toBeGreaterThan(-1);
+  const importTasks = source.indexOf('await migrateLegacyScheduledTasksToCanonical(migration)');
+  const importRuns = source.indexOf('await migrateLegacyScheduledTaskRunsToCanonical(migration)');
+  expect(importTasks).toBeGreaterThan(openStore);
+  expect(importRuns).toBeGreaterThan(importTasks);
+  expect(recoverWork).toBeGreaterThan(importRuns);
+  expect(source.indexOf('void startSqliteBackupLoop().catch')).toBeGreaterThan(recoverWork);
+  expect(createWindow).toBeGreaterThan(recoverWork);
+  expect(startChannel).toBeGreaterThan(createWindow);
+  expect(armSchedules).toBeGreaterThan(startChannel);
 });
 
-test('constructing the canonical scheduler injects it into the Pi adapter', () => {
-  const source = readSource('./ccConnectRuntime.ts');
-
-  // The lazy constructor must keep wiring setScheduledTaskService; dropping
-  // it removes the scheduled_task tool from every Work session.
-  const constructor = source.indexOf('export const getCanonicalScheduledTaskService');
-  const injection = source.indexOf(
-    'agentRuntime.piRuntimeAdapter?.setScheduledTaskService(channelRuntime.scheduledTaskService)',
+test('initApp prepares the shared Pi runtime before opening Channel or arming Cron', () => {
+  const source = readSource('./initApp.ts');
+  const config = source.indexOf("profiler.measure('enterpriseConfigSync')");
+  const mcp = source.indexOf('ensureBuiltInMcpDefaultsDisabled();');
+  const codingRoom = source.indexOf(
+    'codingRoomRuntime.start(magpie.modelService, piRuntime, codingRepository)',
   );
-  expect(constructor).toBeGreaterThan(-1);
-  expect(injection).toBeGreaterThan(constructor);
+  const binding = source.indexOf('bindPiWorkbenchRuntimeForwarder(piRuntime,');
+  const channel = source.indexOf('void channelDelivery.trackStartup(');
+  const model = source.indexOf('await magpie.start();');
+  const cron = source.indexOf('await getCanonicalScheduledTaskService().armSavedSchedules();');
+  const quitCheck = 'if (lifecycleRuntime.isQuitting) return;';
+
+  expect(config).toBeGreaterThan(-1);
+  expect(mcp).toBeGreaterThan(config);
+  expect(codingRoom).toBeGreaterThan(mcp);
+  expect(binding).toBeGreaterThan(codingRoom);
+  expect(source).toContain('const channelDelivery = getCcConnectDeliveryTransport();');
+  expect(source).toContain('initializeSessionRuntime(magpie.modelService, channelDelivery)');
+  expect(source.indexOf('localInference.start(magpie);')).toBeGreaterThan(-1);
+  expect(channel).toBeGreaterThan(source.indexOf('localInference.start(magpie);'));
+  expect(channel).toBeGreaterThan(binding);
+  expect(model).toBeGreaterThan(channel);
+  expect(cron).toBeGreaterThan(model);
+  expect(source.slice(model, cron)).toContain(quitCheck);
+  expect(source).not.toContain('channelStartup');
+});
+
+test('initApp checks for quit after applying proxy settings and shows the window before waiting for Magpie', () => {
+  const source = readSource('./initApp.ts');
+  const proxy = source.indexOf('await applyProxyPreference(');
+  const quit = source.indexOf('if (lifecycleRuntime.isQuitting) return;', proxy);
+  const window = source.indexOf('createMainWindow();', quit);
+  const magpie = source.indexOf('await magpie.start();', proxy);
+  expect(proxy).toBeGreaterThan(-1);
+  expect(quit).toBeGreaterThan(proxy);
+  expect(window).toBeGreaterThan(quit);
+  expect(magpie).toBeGreaterThan(window);
+});
+
+test('initApp waits for Windows taskbar identity before creating its window', () => {
+  const source = readSource('./initApp.ts');
+  const prepare = source.indexOf('await prepareWindowsTaskbarIdentity();');
+  const handleProtocol = source.indexOf('protocol.handle(ZHIYUAN_ENTERPRISE_RENDERER_SCHEME');
+  const createWindow = source.indexOf('createMainWindow();');
+  expect(prepare).toBeGreaterThan(-1);
+  expect(handleProtocol).toBeGreaterThan(prepare);
+  expect(createWindow).toBeGreaterThan(handleProtocol);
+  expect(source.slice(prepare, handleProtocol)).toContain(
+    'if (lifecycleRuntime.isQuitting) return;',
+  );
 });

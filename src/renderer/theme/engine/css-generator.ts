@@ -14,10 +14,8 @@ function themeTokenBlock(theme: ThemeDefinition): string {
 
 /**
  * Generate a single theme's standalone CSS: its token block plus the shared
- * component rules scoped to that theme. Used by the live theme manager for
- * hot-switch injection (one active theme at a time); component rules are
- * appearance-independent, so only the scope-hashed motion names vary per
- * theme.
+ * component rules scoped to that theme. Used by tests to exercise a modified
+ * recipe through the same generator as the bundled stylesheet.
  */
 export function generateThemeCSS(theme: ThemeDefinition): string {
   validateTheme(theme);
@@ -44,13 +42,18 @@ export function generateAllThemesCSS(themes: ThemeDefinition[]): string {
   if (themes.length === 0) return '';
 
   const [defaultTheme, ...restThemes] = themes;
-  const rootBlock = `:root, [data-theme="${defaultTheme.meta.id}"] {\n${themeTokenBlock(defaultTheme)}\n}`;
+  const tokenSelector = ({ meta }: ThemeDefinition) =>
+    `[data-theme="${meta.id}"], [data-theme-preview="${meta.id}"]`;
+  const rootBlock = `:root, ${tokenSelector(defaultTheme)} {\n${themeTokenBlock(defaultTheme)}\n}`;
   const restBlocks = restThemes
-    .map(theme => `[data-theme="${theme.meta.id}"] {\n${themeTokenBlock(theme)}\n}`)
+    .map(theme => `${tokenSelector(theme)} {\n${themeTokenBlock(theme)}\n}`)
     .join('\n\n');
   const componentCSS = generateComponentCSS(defaultTheme.components, UNIVERSAL_COMPONENT_SCOPE);
   for (const theme of restThemes) {
-    if (generateComponentCSS(theme.components, UNIVERSAL_COMPONENT_SCOPE) !== componentCSS) {
+    if (
+      theme.components !== defaultTheme.components &&
+      generateComponentCSS(theme.components, UNIVERSAL_COMPONENT_SCOPE) !== componentCSS
+    ) {
       throw new Error(
         `Theme "${theme.meta.id}" has component recipes that differ from the default theme; ` +
           'component recipes must be appearance-independent (express differences as state tokens)',

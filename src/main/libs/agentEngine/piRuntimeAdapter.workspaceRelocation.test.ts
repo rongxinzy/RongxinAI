@@ -1,5 +1,5 @@
 import {
-  adapter,
+  createTestPiRuntime,
   createTemporaryPiSessionRoot,
   createTemporaryWorkspace,
   mockCreateAgentSession,
@@ -14,9 +14,11 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import type { CoworkStore } from '../../coworkStore';
 import type { ProjectMemoryService } from '../../memory/projectMemoryService';
+import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { piSessionDirFor } from './piSessionStore';
 
 setupPiRuntimeAdapterSuite();
+let adapter: PiRuntimeAdapter;
 afterEach(() => adapter.stopAllSessions());
 
 test.each(Object.values(CoworkSessionMode))(
@@ -26,7 +28,7 @@ test.each(Object.values(CoworkSessionMode))(
     const workspaceB = createTemporaryWorkspace();
     const root = createTemporaryPiSessionRoot();
     const sessionId = 'relocated-session';
-    adapter.setPiSessionStoreRoot(root);
+    adapter = createTestPiRuntime({ piSessionStoreRoot: root });
     await adapter.startSession(sessionId, 'First prompt', {
       workspaceRoot: workspaceA,
       sessionMode,
@@ -70,6 +72,7 @@ test.each([false, true])(
   'keeps the live session when cwd is unchanged or omitted (%s)',
   async omit => {
     const workspaceRoot = createTemporaryWorkspace();
+    adapter = createTestPiRuntime();
     await adapter.startSession('unchanged', 'First prompt', { workspaceRoot });
     const previous = adapter.activeSessions.get('unchanged');
 
@@ -84,11 +87,13 @@ test.each([false, true])(
 
 test.each([false, true])('preserves skip-user-message semantics on relocation (%s)', async skip => {
   const addMessage = vi.fn((_id: string, message: Record<string, unknown>) => message);
-  adapter.setCoworkStore({
-    addMessage,
-    updateSession: vi.fn(),
-    getSession: () => ({ experts: [], messages: [] }),
-  } as unknown as CoworkStore);
+  adapter = createTestPiRuntime({
+    coworkStore: {
+      messages: { addMessage },
+      updateSession: vi.fn(),
+      getSession: () => ({ experts: [], messages: [] }),
+    } as unknown as CoworkStore,
+  });
   await adapter.startSession('skip-user', 'First prompt', {
     workspaceRoot: createTemporaryWorkspace(),
   });
@@ -111,10 +116,12 @@ test('rebinds project memory to the new workspace', async () => {
   const workspaceB = createTemporaryWorkspace();
   const registerSession = vi.fn().mockResolvedValue(undefined);
   const buildProjectContext = vi.fn().mockResolvedValue(null);
-  adapter.setProjectMemoryService({
-    registerSession,
-    buildProjectContext,
-  } as unknown as ProjectMemoryService);
+  adapter = createTestPiRuntime({
+    projectMemoryService: {
+      registerSession,
+      buildProjectContext,
+    } as unknown as ProjectMemoryService,
+  });
   await adapter.startSession('memory-relocation', 'First prompt', { workspaceRoot: workspaceA });
 
   await adapter.continueSession('memory-relocation', 'Next prompt', { workspaceRoot: workspaceB });

@@ -17,25 +17,11 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })));
 });
 
-test('creates an isolated detached worktree at the requested baseline', async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'coding-worktree-'));
-  roots.push(root);
-  await git(root, ['init']);
-  await git(root, ['config', 'user.email', 'test@example.com']);
-  await git(root, ['config', 'user.name', 'Test']);
-  await writeFile(path.join(root, 'state.txt'), 'baseline');
-  await git(root, ['add', '.']);
-  await git(root, ['commit', '-m', 'baseline']);
-  const service = new GitWorktreeService(path.join(root, '.coding-worktrees'));
-  const worktree = await service.create({
-    repositoryRoot: root,
-    baseline: 'HEAD',
-    laneId: 'lane-a',
-  });
-  await writeFile(path.join(worktree, 'state.txt'), 'lane');
-  expect(await readFile(path.join(root, 'state.txt'), 'utf8')).toBe('baseline');
-  await service.remove(root, worktree);
-});
+async function prepareWorktree(root: string): Promise<string> {
+  const worktree = path.join(root, '.coding-worktree');
+  await git(root, ['worktree', 'add', '--detach', worktree, 'HEAD']);
+  return worktree;
+}
 
 test('previews and applies a collaborator worktree diff only when it cleanly applies', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'coding-worktree-'));
@@ -43,22 +29,17 @@ test('previews and applies a collaborator worktree diff only when it cleanly app
   await git(root, ['init']);
   await git(root, ['config', 'user.email', 'test@example.com']);
   await git(root, ['config', 'user.name', 'Test']);
-  await writeFile(path.join(root, 'state.txt'), 'baseline');
+  await writeFile(path.join(root, 'state.txt'), 'baseline\n');
   await git(root, ['add', '.']);
   await git(root, ['commit', '-m', 'baseline']);
-  const service = new GitWorktreeService(path.join(root, '.coding-worktrees'));
-  const worktree = await service.create({
-    repositoryRoot: root,
-    baseline: 'HEAD',
-    laneId: 'lane-a',
-  });
-  await writeFile(path.join(worktree, 'state.txt'), 'implemented');
+  const service = new GitWorktreeService();
+  const worktree = await prepareWorktree(root);
+  await writeFile(path.join(worktree, 'state.txt'), 'implemented\n');
 
   await expect(service.getWorktreeDiff(worktree)).resolves.toContain('-baseline');
   await service.applyWorktreeDiff({ repositoryRoot: root, worktreeRoot: worktree });
 
-  expect(await readFile(path.join(root, 'state.txt'), 'utf8')).toBe('implemented');
-  await service.remove(root, worktree);
+  expect(await readFile(path.join(root, 'state.txt'), 'utf8')).toBe('implemented\n');
 });
 
 test('previews and applies an untracked collaborator file without staging it', async () => {
@@ -70,19 +51,14 @@ test('previews and applies an untracked collaborator file without staging it', a
   await writeFile(path.join(root, 'state.txt'), 'baseline');
   await git(root, ['add', '.']);
   await git(root, ['commit', '-m', 'baseline']);
-  const service = new GitWorktreeService(path.join(root, '.coding-worktrees'));
-  const worktree = await service.create({
-    repositoryRoot: root,
-    baseline: 'HEAD',
-    laneId: 'lane-new',
-  });
+  const service = new GitWorktreeService();
+  const worktree = await prepareWorktree(root);
   await writeFile(path.join(worktree, 'new-module.ts'), 'export const created = true;\n');
 
   await expect(service.getWorktreeDiff(worktree)).resolves.toContain('new-module.ts');
   await service.applyWorktreeDiff({ repositoryRoot: root, worktreeRoot: worktree });
 
   await expect(readFile(path.join(root, 'new-module.ts'), 'utf8')).resolves.toContain('created');
-  await service.remove(root, worktree);
 });
 
 test('applies a mixed tracked and untracked collaborator patch', async () => {
@@ -94,12 +70,8 @@ test('applies a mixed tracked and untracked collaborator patch', async () => {
   await writeFile(path.join(root, 'state.txt'), 'baseline');
   await git(root, ['add', '.']);
   await git(root, ['commit', '-m', 'baseline']);
-  const service = new GitWorktreeService(path.join(root, '.coding-worktrees'));
-  const worktree = await service.create({
-    repositoryRoot: root,
-    baseline: 'HEAD',
-    laneId: 'lane-mixed',
-  });
+  const service = new GitWorktreeService();
+  const worktree = await prepareWorktree(root);
   await writeFile(path.join(worktree, 'state.txt'), 'updated');
   await writeFile(path.join(worktree, 'new-file.ts'), 'export {};\n');
 
@@ -107,7 +79,6 @@ test('applies a mixed tracked and untracked collaborator patch', async () => {
 
   await expect(readFile(path.join(root, 'state.txt'), 'utf8')).resolves.toBe('updated');
   await expect(readFile(path.join(root, 'new-file.ts'), 'utf8')).resolves.toContain('export');
-  await service.remove(root, worktree);
 });
 
 test('reports a conflict and preserves the primary workspace when a patch no longer applies', async () => {
@@ -119,12 +90,8 @@ test('reports a conflict and preserves the primary workspace when a patch no lon
   await writeFile(path.join(root, 'state.txt'), 'baseline');
   await git(root, ['add', '.']);
   await git(root, ['commit', '-m', 'baseline']);
-  const service = new GitWorktreeService(path.join(root, '.coding-worktrees'));
-  const worktree = await service.create({
-    repositoryRoot: root,
-    baseline: 'HEAD',
-    laneId: 'lane-conflict',
-  });
+  const service = new GitWorktreeService();
+  const worktree = await prepareWorktree(root);
   await writeFile(path.join(worktree, 'state.txt'), 'collaborator change');
   await writeFile(path.join(root, 'state.txt'), 'primary change');
 
@@ -132,7 +99,6 @@ test('reports a conflict and preserves the primary workspace when a patch no lon
     service.applyWorktreeDiff({ repositoryRoot: root, worktreeRoot: worktree }),
   ).rejects.toBeInstanceOf(GitWorktreeConflictError);
   expect(await readFile(path.join(root, 'state.txt'), 'utf8')).toBe('primary change');
-  await service.remove(root, worktree);
 });
 
 test('limits diff previews without truncating the diff used for patch application', async () => {
@@ -144,17 +110,12 @@ test('limits diff previews without truncating the diff used for patch applicatio
   await writeFile(path.join(root, 'large.txt'), 'baseline');
   await git(root, ['add', '.']);
   await git(root, ['commit', '-m', 'baseline']);
-  const service = new GitWorktreeService(path.join(root, '.coding-worktrees'));
-  const worktree = await service.create({
-    repositoryRoot: root,
-    baseline: 'HEAD',
-    laneId: 'lane-large-diff',
-  });
+  const service = new GitWorktreeService();
+  const worktree = await prepareWorktree(root);
   await writeFile(path.join(worktree, 'large.txt'), 'x'.repeat(300 * 1024));
 
   await expect(service.getWorktreeDiffPreview(worktree)).resolves.toContain(
     '[Diff preview truncated]',
   );
   await expect(service.getWorktreeDiff(worktree)).resolves.toContain('x'.repeat(300));
-  await service.remove(root, worktree);
 });

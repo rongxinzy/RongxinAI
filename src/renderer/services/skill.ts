@@ -6,7 +6,7 @@ import {
   Skill,
 } from '../types/skill';
 import { i18nService } from './i18n';
-import type { SkillSecurityReport } from '../../main/libs/skillSecurity/skillSecurityTypes';
+import type { SkillSecurityReport } from '../../shared/skills/securityTypes';
 
 export function resolveLocalizedText(text: string | LocalizedText): string {
   if (!text) return '';
@@ -199,19 +199,6 @@ class SkillService {
     }
   }
 
-  async getSkillsRoot(): Promise<string | null> {
-    try {
-      const result = await window.electron.skills.getRoot();
-      if (result.success && result.path) {
-        return result.path;
-      }
-      return null;
-    } catch (error) {
-      console.error('Failed to get skills root:', error);
-      return null;
-    }
-  }
-
   onSkillsChanged(callback: () => void): () => void {
     return window.electron.skills.onChanged(callback);
   }
@@ -267,15 +254,6 @@ class SkillService {
     }
   }
 
-  async getAutoRoutingPrompt(): Promise<string | null> {
-    try {
-      const result = await window.electron.skills.autoRoutingPrompt();
-      return result.success ? result.prompt || null : null;
-    } catch (error) {
-      console.error('Failed to get auto-routing prompt:', error);
-      return null;
-    }
-  }
   hasLocalizedSkillDescriptions(): boolean {
     return this.localSkillDescriptions.size > 0 || this.marketplaceSkillDescriptions.size > 0;
   }

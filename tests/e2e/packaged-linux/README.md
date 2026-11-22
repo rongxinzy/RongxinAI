@@ -15,7 +15,6 @@ Headless smoke for the **packaged** Electron app (not dev `electron .`), using P
 
 ```bash
 bun install
-bun run apply:patches
 node node_modules/electron/install.js
 bun run dist:linux
 xvfb-run -a bun run test:e2e:packaged-linux

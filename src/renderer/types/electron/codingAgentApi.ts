@@ -39,11 +39,9 @@ interface CodingAgentActionResult {
 
 /** Contract methods whose only imprecision is the opaque room snapshot. */
 type SnapshotMethodKeys =
-  | 'createSession'
   | 'startSession'
   | 'bootstrap'
   | 'prepareLane'
-  | 'createMission'
   | 'selectLane'
   | 'prompt'
   | 'steerPendingMessage'
@@ -51,8 +49,6 @@ type SnapshotMethodKeys =
   | 'confirmSessionRecovery'
   | 'cancel'
   | 'handoff'
-  | 'addLane'
-  | 'createCollaborationPreset'
   | 'saveLaneView'
   | 'setLaneConfigOption'
   | 'setLaneModelOverride'

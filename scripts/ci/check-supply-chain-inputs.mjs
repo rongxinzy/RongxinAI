@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -8,6 +8,7 @@ const npmLockfiles = [
   'SKILLs/web-search/package-lock.json',
   'scripts/release/package-lock.json',
 ];
+const emailLockfile = 'SKILLs/imap-smtp-email/bun.lock';
 
 const pythonRequirements = [
   'SKILLs/code-safety-audit/requirements.txt',
@@ -30,31 +31,33 @@ const approvedNpmRegistries = new Set([
 
 const violations = [];
 
+function checkPackage(lockfile, packageName, resolved, integrity) {
+  if (resolved) {
+    try {
+      const { origin } = new URL(resolved);
+      if (!approvedNpmRegistries.has(origin)) {
+        violations.push(`${lockfile}: ${packageName} resolves from unapproved registry ${origin}`);
+      }
+    } catch {
+      violations.push(`${lockfile}: ${packageName} has a non-HTTPS package source`);
+    }
+  }
+  if (!integrity) violations.push(`${lockfile}: ${packageName} is missing an integrity hash`);
+}
+
 for (const lockfile of npmLockfiles) {
   const raw = await readFile(resolve(lockfile), 'utf8');
   const lock = JSON.parse(raw);
 
   for (const [packagePath, entry] of Object.entries(lock.packages ?? {})) {
     if (!entry?.resolved) continue;
-
-    let origin;
-    try {
-      origin = new URL(entry.resolved).origin;
-    } catch {
-      violations.push(`${lockfile}: ${packagePath || '<root>'} has a non-HTTPS package source`);
-      continue;
-    }
-
-    if (!approvedNpmRegistries.has(origin)) {
-      violations.push(
-        `${lockfile}: ${packagePath || '<root>'} resolves from unapproved registry ${origin}`,
-      );
-    }
-
-    if (!entry.integrity) {
-      violations.push(`${lockfile}: ${packagePath || '<root>'} is missing an integrity hash`);
-    }
+    checkPackage(lockfile, packagePath, entry.resolved, entry.integrity);
   }
+}
+
+const emailLock = Bun.JSONC.parse(await readFile(resolve(emailLockfile), 'utf8'));
+for (const [name, [, resolved, , integrity]] of Object.entries(emailLock.packages)) {
+  checkPackage(emailLockfile, name, resolved, integrity);
 }
 
 for (const requirementsFile of pythonRequirements) {
@@ -84,5 +87,5 @@ if (violations.length > 0) {
 }
 
 console.log(
-  `Supply-chain input policy passed: ${npmLockfiles.length} npm lockfiles and ${pythonRequirements.length} Python requirement files checked.`,
+  `Supply-chain input policy passed: ${npmLockfiles.length + 1} JavaScript lockfiles and ${pythonRequirements.length} Python requirement files checked.`,
 );

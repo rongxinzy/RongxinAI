@@ -1,10 +1,22 @@
 # Bundled Magpie CLI runtime
 
-Magpie is built directly from the unchanged upstream Go source at
+Magpie is built from the pinned upstream Go source at
 `f074996d93b87b17ea682c4b5951d52794bb28cb` in
 <https://github.com/yetone/magpie>. Its MIT license is retained verbatim in
-`LICENSE` and in every generated platform directory. The application integrates
-the resulting sidecar; it does not port or modify upstream Go source.
+`LICENSE` and in every generated platform directory. The build applies the
+reviewed [`work-caller.patch`](work-caller.patch) to the verified archive.
+
+The patch confines marked Work requests to a host-authenticated, request-local
+list of explicit provider model IDs. The application passes only the SHA-256
+fingerprint of its ephemeral credential to the gateway process. The gateway
+checks the credential and bounded model list before its existing group and
+candidate filters run.
+
+Enterprise Chat uses the same scoped desktop admission as Work. A reserved
+enterprise provider can forward only to the current host transport origin on
+`127.0.0.1`. The patch relays the desktop conversation, workload and Pi session
+affinity headers along with an ephemeral transport proof. The caller credential
+and model allowlist stay inside Magpie.
 
 ## Build
 
@@ -22,16 +34,15 @@ bun run magpie:verify --target all
 The build fetches only the pinned commit. To use an existing clean upstream Git
 checkout without fetching, add `--source /path/to/magpie`. The checkout is read
 only. The builder verifies its commit tree, deterministic Git archive checksum,
-go.mod, go.sum, and MIT license; it builds an extracted snapshot and verifies that
-no snapshot file changed. No patch, `go mod tidy`, install script, account
-configuration, daemon, or upstream binary is run.
+go.mod, go.sum, and MIT license. It checks the declared patch digest before applying
+it to an extracted snapshot and checks the patched tree digest before and after
+compilation. No install script, account configuration, daemon, or upstream binary
+is run during the build.
 
 The six targets are `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64`,
 `win32-x64`, and `win32-arm64`; `--target` selects one or `all`. No argument selects
 the current host. Node `x64` maps to Go `amd64`, and Node `win32` maps to Go
-`windows`. Both macOS helpers are needed for macOS packaging, including a
-single-architecture build, so universal packages retain the same unchanged
-per-architecture payloads instead of lipo-merging them.
+`windows`. Each macOS package includes the helper built for its target architecture.
 
 Build outputs go to `resources/magpie/<platform>-<arch>/`. They are ignored by
 Git; release builds must create them before running electron-builder. Missing,
@@ -41,16 +52,17 @@ explicit error. Packaging and application startup never download a replacement.
 ## Reproducibility and provenance
 
 The builder mirrors upstream's CLI Makefile flags: `CGO_ENABLED=0`, `-tags nogui`,
-`-trimpath`, and `-ldflags '-s -w -X main.version=zhiyuan-f074996d93b8'`. The
-version is a downstream provenance label, not an upstream release tag.
+`-trimpath`, and `-ldflags '-s -w -X main.version=…'`. The version in
+`upstream.json` identifies the pinned commit and downstream patch revision.
 `-mod=readonly`, `-buildvcs=false`, `GOWORK=off`, fixed CPU baselines, and a clean
 Go environment additionally remove checkout paths, ambient workspaces and local
 build flags. Dependencies stay at the pinned go.mod/go.sum versions and use the
 official Go module proxy and checksum database.
 
-Each manifest records the source commit/tree/archive and content hashes,
-go.mod/go.sum hashes, exact compiler version and build flags, binary SHA-256,
-size, and MIT license hash. It has no timestamps or build-machine paths, so
+Each manifest records the upstream commit, tree, and archive hash, the patch
+and patched tree hashes, go.mod and go.sum hashes, the compiler version and
+build flags, the binary SHA-256 and size, and the MIT license hash. It has no
+timestamps or build-machine paths, so
 rebuilding the same target can be compared byte-for-byte. `buildSha256` always
 identifies the compiler output; `sha256` identifies the shipped executable.
 These hashes protect integrity against accidental replacement. A manifest beside
@@ -60,8 +72,7 @@ Mac codesigning changes executable bytes. The custom signing hook preserves the
 electron-builder identity, keychain, and entitlement options, signs each helper
 with Developer ID and the hardened runtime, refreshes shipped hashes just before
 the final outer `.app` signature, and retains `buildSha256`. Notarization submits
-that sealed `.app`, so the helpers are included in the ticket. Universal packaging
-explicitly excludes these already per-architecture helpers from lipo. Windows
+that sealed `.app`, so the helper is included in the ticket. Windows
 packaging signs `magpie.exe` with the same Certum signtool pass as the application
 (`scripts/runtime-signing/sign-runtime.ps1`), then refreshes the shipped hash and
 retains `buildSha256`. The enclosing installer is signed as before. Validate signed

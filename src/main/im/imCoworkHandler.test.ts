@@ -30,23 +30,9 @@ beforeEach(() => {
 });
 
 class FakeRuntime extends EventEmitter {
-  startCalls: Array<{ sessionId: string; prompt: string; options: Record<string, unknown> }> = [];
   continueCalls: Array<{ sessionId: string; prompt: string; options: Record<string, unknown> }> =
     [];
   stopCalls: string[] = [];
-  deliveryResolvers: Array<(sessionId: string) => unknown> = [];
-
-  setScheduledTaskDeliveryResolver(resolver: (sessionId: string) => unknown): () => void {
-    this.deliveryResolvers.push(resolver);
-    return () => {
-      const index = this.deliveryResolvers.indexOf(resolver);
-      if (index >= 0) this.deliveryResolvers.splice(index, 1);
-    };
-  }
-
-  async startSession(sessionId: string, prompt: string, options = {}) {
-    this.startCalls.push({ sessionId, prompt, options });
-  }
 
   async continueSession(sessionId: string, prompt: string, options = {}) {
     this.continueCalls.push({ sessionId, prompt, options });
@@ -56,6 +42,13 @@ class FakeRuntime extends EventEmitter {
     this.stopCalls.push(sessionId);
   }
   stopAllSessions() {}
+  getLiveStreamTexts(): Array<{
+    messageId: string;
+    content: string;
+    metadata: Record<string, unknown>;
+  }> {
+    return [];
+  }
   respondToPermission() {}
   isSessionActive() {
     return false;
@@ -70,13 +63,13 @@ test('does not recreate a channel session after an API rejection', async () => {
   const coworkStore = new FakeCoworkStore();
   const imStore = new FakeIMStore();
   const failure = new Error('API error 400: maximum context length');
-  vi.spyOn(runtime, 'startSession').mockRejectedValue(failure);
+  vi.spyOn(runtime, 'continueSession').mockRejectedValue(failure);
   const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
   try {
     await expect(handler.processMessage(createMessage(), undefined, 'workspace-1')).rejects.toThrow(
       failure,
     );
-    expect(runtime.startSession).toHaveBeenCalledTimes(1);
+    expect(runtime.continueSession).toHaveBeenCalledTimes(1);
     expect(coworkStore.sessions.size).toBe(1);
     expect(imStore.mappings).toHaveLength(1);
   } finally {
@@ -94,10 +87,16 @@ class FakeCoworkStore {
   sessions = new Map<string, Record<string, unknown>>();
   sessionCounter = 0;
   messageCounter = 0;
-  workspaces = new Map([
+  private readonly workspaceRows = new Map([
     ['workspace-1', { id: 'workspace-1', name: 'Workspace 1', path: 'C:\\workspace-1' }],
     ['workspace-2', { id: 'workspace-2', name: 'Workspace 2', path: 'C:\\workspace-2' }],
   ]);
+  readonly workspaces = { getWorkspace: (id: string) => this.workspaceRows.get(id) || null };
+  readonly messages = {
+    countSessionMessages: (id: string) => this.getSession(id)?.messages.length ?? 0,
+    getPagedSessionMessages: (id: string, limit: number, offset: number) =>
+      this.getSession(id)?.messages.slice(offset, limit < 0 ? undefined : offset + limit) ?? [],
+  };
 
   getConfig() {
     return this.config;
@@ -105,10 +104,6 @@ class FakeCoworkStore {
 
   getAgent() {
     return null;
-  }
-
-  getWorkspace(id: string) {
-    return this.workspaces.get(id) || null;
   }
 
   createSession(
@@ -234,7 +229,7 @@ function createMessage(overrides: Record<string, unknown> = {}) {
   };
 }
 
-test('reminder requests run through the agent and register scheduled-task delivery', async () => {
+test('reminder requests run through the agent and reply with the task confirmation', async () => {
   const runtime = new FakeRuntime();
   const coworkStore = new FakeCoworkStore();
   const imStore = new FakeIMStore();
@@ -254,37 +249,29 @@ test('reminder requests run through the agent and register scheduled-task delive
 
   // The pre-Pi detector is gone: reminder wording starts a normal agent turn
   // and the task is created through the scheduled_task tool inside it.
-  expect(runtime.startCalls.length).toBe(1);
-  expect(runtime.startCalls[0].prompt).toContain('2分钟后提醒我喝水');
-  expect(runtime.deliveryResolvers.length).toBe(1);
+  expect(runtime.continueCalls.length).toBe(1);
+  expect(runtime.continueCalls[0].prompt).toContain('2分钟后提醒我喝水');
 
   const [session] = [...coworkStore.sessions.values()];
   expect(session).toBeTruthy();
-  const delivery = runtime.deliveryResolvers[0](session.id as string) as Record<string, unknown>;
-  expect(delivery).toMatchObject({
-    mode: 'announce',
-    channel: 'dingtalk',
-    to: 'conv-1',
-  });
-  expect(delivery.accountId).toBeUndefined();
 
   // The model confirms through the Pi scheduled_task tool; the reply guard must
   // recognize that tool as a real task creation.
-  runtime.emit('message', session.id as string, {
+  coworkStore.addMessage(session.id as string, {
     id: 'tool-use-1',
     type: 'tool_use',
     content: 'Using tool: scheduled_task',
     timestamp: Date.now(),
     metadata: { toolName: 'scheduled_task', toolUseId: 'tool-use-1', toolInput: {} },
   });
-  runtime.emit('message', session.id as string, {
+  coworkStore.addMessage(session.id as string, {
     id: 'tool-result-1',
     type: 'tool_result',
     content: 'Scheduled task created: 喝水提醒',
     timestamp: Date.now(),
     metadata: { toolUseId: 'tool-use-1', toolResult: 'Scheduled task created', isError: false },
   });
-  runtime.emit('message', session.id as string, {
+  coworkStore.addMessage(session.id as string, {
     id: 'assistant-1',
     type: 'assistant',
     content: '好的，已经通过定时任务安排了提醒。',
@@ -296,10 +283,9 @@ test('reminder requests run through the agent and register scheduled-task delive
   expect(reply).toBe('好的，已经通过定时任务安排了提醒。');
 
   handler.destroy();
-  expect(runtime.deliveryResolvers.length).toBe(0);
 });
 
-test('scoped cc-connect conversations resolve delivery with account and native id', async () => {
+test('persists the scoped channel mapping before dispatching the agent', async () => {
   const runtime = new FakeRuntime();
   const coworkStore = new FakeCoworkStore();
   const imStore = new FakeIMStore();
@@ -318,123 +304,39 @@ test('scoped cc-connect conversations resolve delivery with account and native i
   );
   await new Promise(resolve => setImmediate(resolve));
 
-  // The session→conversation mapping must already be registered when the
-  // scheduled_task tool snapshots its default delivery at session launch.
   const [session] = [...coworkStore.sessions.values()];
-  expect(session).toBeTruthy();
-  const delivery = runtime.deliveryResolvers[0](session.id as string) as Record<string, unknown>;
-  expect(delivery).toMatchObject({
-    mode: 'announce',
-    channel: 'dingtalk',
-    to: 'native-conv-9',
-    accountId: 'acct-7',
+  expect(runtime.continueCalls[0]?.sessionId).toBe(session.id);
+  expect(imStore.getSessionMappingByCoworkSessionId(session.id as string)).toMatchObject({
+    platform: 'dingtalk',
+    imConversationId: scopedId,
   });
 
   runtime.emit('complete', session.id as string);
   await pending;
   handler.destroy();
-});
-
-test.skip('async reminder turns on IM-created sessions relay back to the original IM conversation', async () => {
-  const runtime = new FakeRuntime();
-  const coworkStore = new FakeCoworkStore();
-  const imStore = new FakeIMStore();
-  const relayedReplies: Array<{ platform: string; conversationId: string; text: string }> = [];
-
-  const handler = new IMCoworkHandler({
-    coworkRuntime: runtime,
-    coworkStore,
-    imStore,
-    sendAsyncReply: async (platform: string, conversationId: string, text: string) => {
-      relayedReplies.push({ platform, conversationId, text });
-      return true;
-    },
-  });
-
-  await handler.processMessage(createMessage(), undefined, 'workspace-1');
-  const [session] = [...coworkStore.sessions.values()];
-
-  runtime.emit('message', session.id, {
-    id: 'system-1',
-    type: 'system',
-    content: '⏰ 提醒：喝水',
-    timestamp: Date.now(),
-    metadata: {},
-  });
-  runtime.emit('message', session.id, {
-    id: 'assistant-1',
-    type: 'assistant',
-    content: '⏰ 该喝水啦！起身喝一杯水吧。',
-    timestamp: Date.now(),
-    metadata: {},
-  });
-  runtime.emit('complete', session.id);
-
-  await new Promise(resolve => setImmediate(resolve));
-
-  expect(relayedReplies).toEqual([
-    {
-      platform: 'dingtalk',
-      conversationId: 'conv-1',
-      text: '⏰ 该喝水啦！起身喝一杯水吧。',
-    },
-  ]);
-
   handler.destroy();
 });
 
-test('async reminder turns on channel-synced sessions are tracked lazily and relay back', async () => {
+test('ignores executor-owned turns even when they use a mapped channel session', () => {
   const runtime = new FakeRuntime();
   const coworkStore = new FakeCoworkStore();
   const imStore = new FakeIMStore();
-  const relayedReplies: Array<{ platform: string; conversationId: string; text: string }> = [];
-
-  const session = coworkStore.createSession('IM-dingtalk', process.cwd(), '', 'auto');
+  const session = coworkStore.createSession('Channel chat', process.cwd(), '', 'auto');
   imStore.createSessionMapping('default:user-42', 'dingtalk', session.id as string);
-
-  const handler = new IMCoworkHandler({
-    coworkRuntime: runtime,
-    coworkStore,
-    imStore,
-    sendAsyncReply: async (platform: string, conversationId: string, text: string) => {
-      relayedReplies.push({ platform, conversationId, text });
-      return true;
-    },
-  });
-
-  coworkStore.addMessage(session.id as string, {
-    id: 'assistant-history',
-    type: 'assistant',
-    content: 'Previous conversation reply.',
-    metadata: {},
-  });
-  runtime.emit('message', session.id, {
-    id: 'system-1',
-    type: 'system',
-    content: '⏰ 提醒：开会',
-    timestamp: Date.now(),
-    metadata: {},
-  });
-  runtime.emit('message', session.id, {
-    id: 'assistant-1',
-    type: 'assistant',
-    content: '时间到了，记得开会。',
-    timestamp: Date.now(),
-    metadata: {},
-  });
-  runtime.emit('complete', session.id);
-
-  await new Promise(resolve => setImmediate(resolve));
-
-  expect(relayedReplies).toEqual([
-    {
-      platform: 'dingtalk',
-      conversationId: 'default:user-42',
-      text: '时间到了，记得开会。',
-    },
-  ]);
-
-  handler.destroy();
+  const readMessages = vi.spyOn(coworkStore.messages, 'getPagedSessionMessages');
+  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
+  try {
+    coworkStore.addMessage(session.id, {
+      id: 'assistant-1',
+      type: 'assistant',
+      content: 'Scheduled reminder',
+      timestamp: Date.now(),
+    });
+    runtime.emit('complete', session.id);
+    expect(readMessages).not.toHaveBeenCalled();
+  } finally {
+    handler.destroy();
+  }
 });
 
 test('replaces every mapped IM session title with the platform default when loading conversations', () => {
@@ -526,15 +428,13 @@ test('runs a normal agent turn for non-reminder requests', async () => {
   );
   await new Promise(resolve => setImmediate(resolve));
 
-  expect(runtime.startCalls.length).toBe(1);
-  expect(runtime.startCalls[0].prompt).toBe('帮我总结一下今天的会议纪要');
+  expect(runtime.continueCalls.length).toBe(1);
+  expect(runtime.continueCalls[0].prompt).toBe('帮我总结一下今天的会议纪要');
 
-  runtime.emit('message', 'session-1', {
-    id: 'assistant-1',
+  coworkStore.addMessage('session-1', {
     type: 'assistant',
     content: '这是会议纪要摘要。',
-    timestamp: Date.now(),
-    metadata: {},
+    metadata: { isStreaming: false },
   });
   runtime.emit('complete', 'session-1');
 
@@ -558,11 +458,11 @@ test('uses only the IM platform for WeChat session titles', async () => {
     undefined,
     'workspace-1',
   );
-  await vi.waitFor(() => expect(runtime.startCalls).toHaveLength(1));
+  await vi.waitFor(() => expect(runtime.continueCalls).toHaveLength(1));
 
   expect(coworkStore.getSession('session-1')?.title).toBe('微信会话');
 
-  runtime.emit('message', 'session-1', {
+  coworkStore.addMessage('session-1', {
     id: 'assistant-1',
     type: 'assistant',
     content: '你好',
@@ -589,9 +489,9 @@ test('uses only the IM platform for group and direct session titles', async () =
     undefined,
     'workspace-1',
   );
-  await vi.waitFor(() => expect(runtime.startCalls).toHaveLength(1));
+  await vi.waitFor(() => expect(runtime.continueCalls).toHaveLength(1));
   expect(coworkStore.getSession('session-1')?.title).toBe('钉钉会话');
-  runtime.emit('message', 'session-1', {
+  coworkStore.addMessage('session-1', {
     id: 'assistant-group',
     type: 'assistant',
     content: '群聊回复',
@@ -606,9 +506,9 @@ test('uses only the IM platform for group and direct session titles', async () =
     undefined,
     'workspace-1',
   );
-  await vi.waitFor(() => expect(runtime.startCalls).toHaveLength(2));
+  await vi.waitFor(() => expect(runtime.continueCalls).toHaveLength(2));
   expect(coworkStore.getSession('session-2')?.title).toBe('钉钉会话');
-  runtime.emit('message', 'session-2', {
+  coworkStore.addMessage('session-2', {
     id: 'assistant-fallback',
     type: 'assistant',
     content: '兜底回复',
@@ -633,13 +533,13 @@ test('cancels the Pi turn when the channel bridge request disconnects', async ()
     controller.signal,
     'workspace-1',
   );
-  await vi.waitFor(() => expect(runtime.startCalls).toHaveLength(1));
+  await vi.waitFor(() => expect(runtime.continueCalls).toHaveLength(1));
   controller.abort();
 
   await expect(response).rejects.toThrow('Channel request was cancelled');
   expect(runtime.stopCalls).toEqual(['session-1']);
 
-  runtime.emit('message', 'session-1', {
+  coworkStore.addMessage('session-1', {
     id: 'late-assistant',
     type: 'assistant',
     content: 'This late result must not resolve the cancelled bridge request.',
@@ -648,6 +548,80 @@ test('cancels the Pi turn when the channel bridge request disconnects', async ()
   });
   runtime.emit('complete', 'session-1');
   handler.destroy();
+});
+
+test.each(['stop', 'timeout'])('reads the current Pi reply on channel %s', async exit => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const handler = new IMCoworkHandler({
+    coworkRuntime: runtime,
+    coworkStore,
+    imStore: new FakeIMStore(),
+  });
+  const readLive = vi.spyOn(runtime, 'getLiveStreamTexts').mockReturnValue([
+    { messageId: 'assistant-1', content: 'Current partial reply.', metadata: {} },
+    { messageId: 'unrelated', content: 'Unrelated reply.', metadata: {} },
+  ]);
+  try {
+    const pending = handler.processMessage(createMessage(), undefined, 'workspace-1');
+    await new Promise(resolve => setImmediate(resolve));
+    coworkStore.addMessage('session-1', {
+      id: 'assistant-1',
+      type: 'assistant',
+      content: 'Initial reply.',
+      timestamp: Date.now(),
+      metadata: { isStreaming: true },
+    });
+    runtime.emit('message', 'session-1', {
+      id: 'discarded-answer',
+      type: 'assistant',
+      content: 'Discarded by Pi recovery.',
+      timestamp: Date.now(),
+    });
+    runtime.emit('messageRemoved', 'session-1', 'discarded-answer');
+    runtime.emit('messageUpdate', 'session-1', 'assistant-1', 'Per-token snapshot.', {
+      isStreaming: true,
+    });
+    expect(readLive).not.toHaveBeenCalled();
+    if (exit === 'stop') {
+      runtime.emit('sessionStopped', 'session-1');
+      await expect(pending).resolves.toBe('Current partial reply.');
+    } else {
+      await vi.advanceTimersByTimeAsync(4 * 60 * 1000 + 30 * 1000);
+      await expect(pending).resolves.toBe('Current partial reply.\n\n[处理超时，以上为部分结果]');
+      expect(runtime.stopCalls).toEqual(['session-1']);
+    }
+    expect(readLive).toHaveBeenCalledExactlyOnceWith('session-1');
+  } finally {
+    handler.destroy();
+    vi.useRealTimers();
+  }
+});
+
+test('stops and rejects a timed-out Channel turn when the reply cannot be read', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  vi.spyOn(coworkStore.messages, 'getPagedSessionMessages').mockImplementation(() => {
+    throw new Error('transcript unavailable');
+  });
+  const handler = new IMCoworkHandler({
+    coworkRuntime: runtime,
+    coworkStore,
+    imStore: new FakeIMStore(),
+  });
+  try {
+    const pending = handler.processMessage(createMessage(), undefined, 'workspace-1');
+    const rejection = expect(pending).rejects.toThrow('transcript unavailable');
+    await new Promise(resolve => setImmediate(resolve));
+    await vi.advanceTimersByTimeAsync(4 * 60 * 1000 + 30 * 1000);
+    await rejection;
+    expect(runtime.stopCalls).toEqual(['session-1']);
+  } finally {
+    handler.destroy();
+    vi.useRealTimers();
+  }
 });
 
 test('IM turns use workspace session configuration without disabling Pi tools', async () => {
@@ -672,24 +646,17 @@ test('IM turns use workspace session configuration without disabling Pi tools', 
     mode: 'work',
     source: CoworkSessionSource.Im,
   });
-  expect(runtime.startCalls[0].options).toMatchObject({
+  expect(runtime.continueCalls[0].options).toMatchObject({
     skillIds: [],
     workspaceRoot: session.cwd,
     sessionMode: 'work',
   });
-  expect(runtime.startCalls[0].options.systemPrompt).toContain(
+  expect(runtime.continueCalls[0].options.systemPrompt).toContain(
     'Use the workspace conversation context.',
   );
-  expect(runtime.startCalls[0].options).not.toHaveProperty('confirmationMode');
-  expect(runtime.startCalls[0].options).not.toHaveProperty('approvalMode');
+  expect(runtime.continueCalls[0].options).not.toHaveProperty('confirmationMode');
+  expect(runtime.continueCalls[0].options).not.toHaveProperty('approvalMode');
 
-  runtime.emit('message', 'session-1', {
-    id: 'assistant-1',
-    type: 'assistant',
-    content: 'First response.',
-    timestamp: Date.now(),
-    metadata: {},
-  });
   coworkStore.addMessage('session-1', {
     type: 'assistant',
     content: 'First response.',
@@ -698,26 +665,18 @@ test('IM turns use workspace session configuration without disabling Pi tools', 
   runtime.emit('complete', 'session-1');
   await expect(firstResponse).resolves.toBe('First response.');
 
-  vi.spyOn(runtime, 'isSessionActive').mockReturnValue(true);
   const secondResponse = handler.processMessage(
     createMessage({ messageId: 'im-msg-2', content: 'Continue.' }),
     undefined,
     'workspace-2',
   );
   await new Promise(resolve => setImmediate(resolve));
-  expect(runtime.continueCalls[0].options).toMatchObject({
+  expect(runtime.continueCalls[1].options).toMatchObject({
     skillIds: [],
     workspaceRoot: session.cwd,
     sessionMode: 'work',
   });
 
-  runtime.emit('message', 'session-1', {
-    id: 'assistant-2',
-    type: 'assistant',
-    content: 'Second response.',
-    timestamp: Date.now(),
-    metadata: {},
-  });
   coworkStore.addMessage('session-1', {
     type: 'assistant',
     content: 'Second response.',
@@ -726,7 +685,6 @@ test('IM turns use workspace session configuration without disabling Pi tools', 
   runtime.emit('complete', 'session-1');
   await expect(secondResponse).resolves.toBe('Second response.');
 
-  vi.spyOn(runtime, 'isSessionActive').mockReturnValue(false);
   const thirdResponse = handler.processMessage(
     createMessage({
       messageId: 'im-msg-3',
@@ -742,7 +700,7 @@ test('IM turns use workspace session configuration without disabling Pi tools', 
     cwd: 'C:\\workspace-2',
   });
 
-  runtime.emit('message', 'session-2', {
+  coworkStore.addMessage('session-2', {
     id: 'assistant-3',
     type: 'assistant',
     content: 'Third response.',
@@ -806,8 +764,11 @@ test('emits a matching terminal run event when a session fails while waiting for
     coworkStore,
     imStore,
     activityService: {
-      upsertBestEffort: (run: Record<string, unknown>) => activityUpdates.push(run),
-    } as any,
+      recordChannelRun: run => {
+        activityUpdates.push(run);
+        return null;
+      },
+    },
   });
 
   const response = handler.processMessage(
@@ -840,6 +801,51 @@ test('emits a matching terminal run event when a session fails while waiting for
   handler.destroy();
 });
 
+test.each([true, false])(
+  'approval resumes only while its Channel mapping exists (%s)',
+  async mapped => {
+    const runtime = new FakeRuntime();
+    const coworkStore = new FakeCoworkStore();
+    const imStore = new FakeIMStore();
+    vi.spyOn(runtime, 'isSessionActive').mockReturnValue(true);
+    const respond = vi.spyOn(runtime, 'respondToPermission');
+    const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
+    try {
+      const request = createMessage();
+      const first = handler.processMessage(request, undefined, 'workspace-1');
+      await vi.waitFor(() => expect(runtime.continueCalls).toHaveLength(1));
+      runtime.emit('permissionRequest', 'session-1', {
+        requestId: 'permission-1',
+        toolName: 'read',
+        toolInput: { path: 'fixture.txt' },
+      });
+      await expect(first).resolves.toMatch(/请在 60 秒内回复/u);
+
+      if (!mapped) imStore.deleteSessionMapping(request.conversationId, request.platform);
+      const confirmation = handler.processMessage(createMessage({ content: '允许' }));
+      if (mapped) {
+        expect(respond).toHaveBeenCalledWith(
+          'permission-1',
+          expect.objectContaining({ behavior: 'allow' }),
+        );
+        coworkStore.addMessage('session-1', {
+          id: 'answer',
+          type: 'assistant',
+          content: 'Done',
+          timestamp: Date.now(),
+        });
+        runtime.emit('complete', 'session-1');
+        await expect(confirmation).resolves.toBe('Done');
+      } else {
+        await expect(confirmation).resolves.toMatch(/已过期/u);
+        expect(respond).not.toHaveBeenCalled();
+      }
+    } finally {
+      handler.destroy();
+    }
+  },
+);
+
 test('closes a started run when existing-session setup fails before runtime execution', async () => {
   const runtime = new FakeRuntime();
   const coworkStore = new FakeCoworkStore();
@@ -855,8 +861,11 @@ test('closes a started run when existing-session setup fails before runtime exec
       return null;
     },
     activityService: {
-      upsertBestEffort: (run: Record<string, unknown>) => activityUpdates.push(run),
-    } as any,
+      recordChannelRun: run => {
+        activityUpdates.push(run);
+        return null;
+      },
+    },
   });
 
   const firstResponse = handler.processMessage(
@@ -865,7 +874,7 @@ test('closes a started run when existing-session setup fails before runtime exec
     'workspace-1',
   );
   await new Promise(resolve => setImmediate(resolve));
-  runtime.emit('message', 'session-1', {
+  coworkStore.addMessage('session-1', {
     id: 'assistant-1',
     type: 'assistant',
     content: '第一条回复',

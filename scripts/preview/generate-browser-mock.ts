@@ -34,6 +34,7 @@ const OUT_DIR = path.join(ROOT, 'src/renderer/browserMock/generated');
 const PRELOAD_PATH = path.join(ROOT, 'src/main/preload.ts');
 const PRELOAD_FRAGMENT_EXPORTS: ReadonlyArray<{ file: string; exportName: string }> = [
   { file: 'src/main/preload/appSystem.ts', exportName: 'appSystemApi' },
+  { file: 'src/main/preload/companion.ts', exportName: 'companionNavigationApi' },
   { file: 'src/main/preload/skillsAndMcp.ts', exportName: 'skillsAndMcpApi' },
   { file: 'src/main/preload/localInference.ts', exportName: 'localInferenceApi' },
   { file: 'src/main/preload/providers.ts', exportName: 'providersApi' },

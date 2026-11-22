@@ -7,7 +7,13 @@
 /** Synthetic entry the router derives from the preset's global `[*]` section. */
 export const LLAMACPP_ROUTER_SYNTHETIC_MODEL_IDS = ['default'] as const;
 
-export type LlamaCppRouterModelState = 'unloaded' | 'loading' | 'loaded' | 'sleeping' | 'failed';
+export type LlamaCppRouterModelState =
+  | 'unloaded'
+  | 'loading'
+  | 'loaded'
+  | 'sleeping'
+  | 'failed'
+  | 'unknown';
 
 export type LlamaCppRouterModelSnapshot = {
   id: string;
@@ -15,7 +21,7 @@ export type LlamaCppRouterModelSnapshot = {
   /** Model file from the `--model` arg; absent on synthetic entries. */
   modelPath?: string;
   exitCode?: number;
-  /** Child port from the `--port` arg; only set when running (port 0 = not running). */
+  /** The port in the last child launch args, when present. */
   port?: number;
 };
 
@@ -51,11 +57,10 @@ const MODEL_STATE_VALUES = new Set<string>(['unloaded', 'loading', 'loaded', 'sl
 /**
  * Parses a GET /models payload (b9244: data[] entries with id and
  * status: {value, args?, failed?, exit_code?}). Tolerant to missing fields and
- * unknown status values (mapped to 'unloaded'); `failed: true` always wins over
+ * unknown status values; `failed: true` always wins over
  * the reported status value. The synthetic `default` entry (whose args carry no
  * `--model`) is dropped; entries without `--model` in status.args are dropped
- * the same way. `port` is only reported when positive — unloaded entries carry
- * `--port 0`.
+ * the same way. A positive port can remain in the launch args after unload.
  */
 export function parseLlamaCppRouterModelsPayload(payload: unknown): LlamaCppRouterModelSnapshot[] {
   const entries = (payload as RouterModelsPayload | null | undefined)?.data;
@@ -79,7 +84,7 @@ export function parseLlamaCppRouterModelsPayload(payload: unknown): LlamaCppRout
       ? 'failed'
       : MODEL_STATE_VALUES.has(value)
         ? (value as LlamaCppRouterModelState)
-        : 'unloaded';
+        : 'unknown';
 
     const port = findFlagNumberValue(status.args, '--port');
     snapshots.push({

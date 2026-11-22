@@ -1,17 +1,5 @@
 import { PlatformRegistry } from '../../../shared/platform';
 
-export interface ScheduledTaskHelperDeps {
-  getIMGatewayManager: () => {
-    getConfig: () => Record<string, unknown> | null;
-  } | null;
-}
-
-let deps: ScheduledTaskHelperDeps | null = null;
-
-export function initScheduledTaskHelpers(d: ScheduledTaskHelperDeps): void {
-  deps = d;
-}
-
 const MULTI_INSTANCE_CONFIG_KEYS = new Set([
   'dingtalk',
   'feishu',
@@ -35,19 +23,15 @@ function isConfigKeyEnabled(key: string, value: unknown): boolean {
   return (value as { enabled?: boolean }).enabled === true;
 }
 
-export function listScheduledTaskChannels(): Array<{
+export function listScheduledTaskChannels(config?: object | null): Array<{
   value: string;
   label: string;
   accountId?: string;
   filterAccountId?: string;
 }> {
-  const manager = deps?.getIMGatewayManager();
-  const config = manager?.getConfig();
   if (!config) {
     return [...PlatformRegistry.channelOptions()];
   }
-
-  const configRecord = config as unknown as Record<string, unknown>;
 
   const enabledPlatforms = new Set<string>();
   const singletonAccountIds = new Map<string, string>();
@@ -57,7 +41,7 @@ export function listScheduledTaskChannels(): Array<{
     Array<{ accountId: string; instanceName: string; filterAccountId?: string }>
   >();
 
-  for (const [key, value] of Object.entries(configRecord)) {
+  for (const [key, value] of Object.entries(config)) {
     if (!isConfigKeyEnabled(key, value)) continue;
     enabledPlatforms.add(key);
 

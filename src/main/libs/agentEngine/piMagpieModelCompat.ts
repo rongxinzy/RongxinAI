@@ -173,7 +173,7 @@ export function resolveMagpieModelCompat(
     };
   }
 
-  // Default for generic / Qwen / DashScope / MiniMax / Ollama / llama.cpp / LAN servers.
+  // Default for generic endpoints.
   return {
     sendSessionAffinityHeaders: true,
     supportsStore: false,

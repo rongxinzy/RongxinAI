@@ -2,15 +2,14 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 
-// Shared streaming SHA-256 worker (moved from magpie/hashWorker so the
-// sqlite backup manager can reuse it instead of growing a third hasher).
 const started = performance.now();
-const hash = createHash('sha256');
 let size = 0;
-const { file, maxBytes = 512 * 1024 * 1024 } = workerData as {
+const { file, algorithm, maxBytes } = workerData as {
   file: string;
-  maxBytes?: number;
+  algorithm: 'sha256' | 'sha512';
+  maxBytes: number;
 };
+const hash = createHash(algorithm);
 const stream = createReadStream(file);
 stream.on('data', chunk => {
   size += chunk.length;
@@ -25,5 +24,8 @@ stream.on('error', error => {
   parentPort?.postMessage({ error: message });
 });
 stream.on('end', () =>
-  parentPort?.postMessage({ digest: hash.digest('hex'), runMs: performance.now() - started }),
+  parentPort?.postMessage({
+    digest: hash.digest(algorithm === 'sha512' ? 'base64' : 'hex'),
+    runMs: performance.now() - started,
+  }),
 );

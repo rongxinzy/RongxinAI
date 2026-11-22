@@ -24,7 +24,6 @@ export {
 export {
   fetchLlamaCppBackendManifest,
   listLlamaCppBackends,
-  resolveLlamaCppBackendDownloadSize,
   getLlamaCppBackendCompatibilityError,
   recommendLlamaCppBackend,
   recommendLlamaCppCpuBackend,

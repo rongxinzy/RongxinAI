@@ -3,13 +3,6 @@ import path from 'path';
 
 import type { LlamaCppModelLaunchInput, LlamaCppServiceConfig } from '../../../shared/llamacpp';
 
-export function normalizePositiveInteger(value: string | undefined): number | undefined {
-  const trimmed = value?.trim();
-  if (!trimmed) return undefined;
-  const parsed = Number.parseInt(trimmed, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
-
 /**
  * GPU placement for the router preset's global `[*]` section. Keys mirror
  * modelLaunchOptionsToPreset so a per-model section overrides them one by one.
@@ -43,7 +36,7 @@ export function resolveImportedModelTargetPath(importDir: string, sourcePath: st
   while (true) {
     const suffix = attempt === 0 ? '' : `-${attempt + 1}`;
     const candidate = path.join(importDir, `${baseName}${suffix}${extension}`);
-    if (!fs.existsSync(candidate)) {
+    if (!fs.lstatSync(candidate, { throwIfNoEntry: false })) {
       return candidate;
     }
     attempt += 1;
@@ -128,22 +121,19 @@ export function replaceIniSectionKeys(
   return upsertIniSection(source, section, { ...preserved, ...values });
 }
 
-export function removeEmptyParentDirs(startDir: string, stopDir: string): void {
+export async function removeEmptyParentDirs(startDir: string, stopDir: string): Promise<void> {
   let currentDir = path.resolve(startDir);
   const resolvedStopDir = path.resolve(stopDir);
 
   while (currentDir.startsWith(resolvedStopDir + path.sep)) {
-    if (!safeIsDirectoryEmpty(currentDir)) return;
-    fs.rmdirSync(currentDir);
+    try {
+      await fs.promises.rmdir(currentDir);
+    } catch (error) {
+      const { code } = error as NodeJS.ErrnoException;
+      if (code === 'ENOENT' || code === 'ENOTEMPTY' || code === 'EEXIST') return;
+      throw error;
+    }
     currentDir = path.dirname(currentDir);
-  }
-}
-
-function safeIsDirectoryEmpty(target: string): boolean {
-  try {
-    return fs.readdirSync(target).length === 0;
-  } catch {
-    return false;
   }
 }
 

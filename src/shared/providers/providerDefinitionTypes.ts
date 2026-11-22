@@ -53,7 +53,7 @@ export interface ProviderDefInput {
   readonly label: string;
   /** Provider console / product website URL */
   readonly website?: string;
-  /** API key creation page URL. Omit for providers that don't use API keys (e.g. Ollama). */
+  /** API key creation page URL, when available. */
   readonly apiKeyUrl?: string;
   /** Default base URL */
   readonly defaultBaseUrl: string;

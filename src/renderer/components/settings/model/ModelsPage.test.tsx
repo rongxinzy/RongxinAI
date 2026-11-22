@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { AISphereStatus } from '../../../../shared/aisphere';
+import { AISphere, AISphereStatus } from '../../../../shared/aisphere';
 import type {
   MagpieModelCatalog,
   MagpieProviderSummary,
@@ -40,6 +40,8 @@ vi.mock('../../../services/toastNotification', () => ({
 
 const mockProviders = vi.fn();
 const mockAisphereStatus = vi.fn();
+const mockAisphereConnect = vi.fn();
+const mockAisphereRefresh = vi.fn();
 const mockAisphereDisconnect = vi.fn();
 const mockStatus = vi.fn();
 const mockStart = vi.fn();
@@ -55,6 +57,12 @@ async function openFirstProviderWizard() {
     target: { value: 'sk-test' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'providerWizardNext' }));
+}
+
+function connectToOrganization(address: string) {
+  fireEvent.click(screen.getByRole('button', { name: 'modelsZeroOrgAction' }));
+  fireEvent.change(screen.getByLabelText('aisphereAddress'), { target: { value: address } });
+  fireEvent.click(screen.getByRole('button', { name: 'aisphereConnect' }));
 }
 
 function saveWizard() {
@@ -95,6 +103,14 @@ describe('ModelsPage', () => {
     });
     mockProviders.mockResolvedValue([]);
     mockAisphereStatus.mockResolvedValue({ status: AISphereStatus.Unconfigured, address: '' });
+    mockAisphereConnect.mockResolvedValue({
+      status: AISphereStatus.Ready,
+      address: 'https://org.test',
+    });
+    mockAisphereRefresh.mockResolvedValue({
+      status: AISphereStatus.Ready,
+      address: 'https://org.test',
+    });
     mockAisphereDisconnect.mockResolvedValue({ status: AISphereStatus.Unconfigured, address: '' });
 
     Object.defineProperty(window, 'electron', {
@@ -133,14 +149,8 @@ describe('ModelsPage', () => {
         },
         managedProviders: {
           aisphereSnapshot: () => mockAisphereStatus(),
-          aisphereConnect: async () => ({
-            status: AISphereStatus.Ready,
-            address: 'https://org.test',
-          }),
-          aisphereRefresh: async () => ({
-            status: AISphereStatus.Ready,
-            address: 'https://org.test',
-          }),
+          aisphereConnect: (address: string) => mockAisphereConnect(address),
+          aisphereRefresh: () => mockAisphereRefresh(),
           aisphereDisconnect: () => mockAisphereDisconnect(),
           policy: async () => ({ managedModelsOnly: false }),
           onChanged: () => () => {},
@@ -205,6 +215,93 @@ describe('ModelsPage', () => {
     await waitFor(() => expect(screen.getByText('modelsZeroTitle')).toBeInTheDocument());
     expect(startSpy).not.toHaveBeenCalled();
     expect(screen.queryByText('magpieGatewayStartFailedHint')).not.toBeInTheDocument();
+  });
+
+  test.each(['connect', 'refresh'])('loads organization models after explicit %s', async action => {
+    const model = { id: `${AISphere.HostProviderPrefix}test/org-gpt`, name: 'Org GPT' };
+    const connected = {
+      status: AISphereStatus.Ready,
+      address: 'https://org.test',
+      models: [model],
+    };
+    mockStatus.mockResolvedValue({ state: 'stopped', enabled: false, version: '1.0.0' });
+    mockAisphereConnect.mockImplementation(async () => {
+      mockAisphereStatus.mockResolvedValue(connected);
+      return connected;
+    });
+    mockAisphereRefresh.mockResolvedValue(connected);
+    if (action === 'refresh') mockAisphereStatus.mockResolvedValue(connected);
+
+    let finishStart!: (status: MagpieModelCatalog['status']) => void;
+    mockStart.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          finishStart = resolve;
+        }),
+    );
+    refreshMagpieModels.mockImplementation(async () => {
+      if (savedCatalog.status.enabled) {
+        mockAvailableModels = [model];
+        mockDefaultSelectedModel = model;
+      }
+      return savedCatalog;
+    });
+
+    render(<ModelsPage />);
+    await waitFor(() => expect(refreshMagpieModels).toHaveBeenCalled());
+    expect(mockStart).not.toHaveBeenCalled();
+    if (action === 'connect') {
+      connectToOrganization(connected.address);
+      await waitFor(() => expect(mockAisphereConnect).toHaveBeenCalledWith(connected.address));
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: 'modelsOrgBannerRefresh' }));
+      await waitFor(() => expect(mockAisphereRefresh).toHaveBeenCalledOnce());
+    }
+    await waitFor(() => expect(mockStart).toHaveBeenCalledOnce());
+    expect(screen.queryByText(model.name)).not.toBeInTheDocument();
+    if (action === 'connect') {
+      const refresh = screen.getByRole('button', { name: 'modelsOrgBannerRefresh' });
+      await act(async () => fireEvent.click(refresh));
+      expect(mockAisphereRefresh).toHaveBeenCalledOnce();
+      expect(mockStart).toHaveBeenCalledOnce();
+    }
+    savedCatalog.status = { state: 'running', enabled: true, version: '1.0.0' };
+    await act(async () => finishStart(savedCatalog.status));
+    expect(await screen.findByText(model.name)).toBeInTheDocument();
+  });
+
+  test('refreshes the organization without restarting an enabled, running service', async () => {
+    const connected = { status: AISphereStatus.Ready, address: 'https://org.test', models: [] };
+    mockAisphereStatus.mockResolvedValue(connected);
+    mockAisphereRefresh.mockResolvedValue(connected);
+    mockStatus.mockResolvedValue({ state: 'running', enabled: true, version: '1.0.0' });
+
+    render(<ModelsPage />);
+    const refresh = await screen.findByRole('button', { name: 'modelsOrgBannerRefresh' });
+    await act(async () => fireEvent.click(refresh));
+    expect(mockAisphereRefresh).toHaveBeenCalledOnce();
+    expect(mockStart).not.toHaveBeenCalled();
+  });
+
+  test('shows the existing start retry when an organization binds but local startup fails', async () => {
+    mockStatus.mockResolvedValue({ state: 'stopped', enabled: false, version: '1.0.0' });
+    mockAisphereStatus
+      .mockResolvedValueOnce({ status: AISphereStatus.Unconfigured, address: '' })
+      .mockResolvedValue({ status: AISphereStatus.Ready, address: 'https://org.test', models: [] });
+    mockStart.mockRejectedValueOnce(new Error('startup failed'));
+
+    render(<ModelsPage />);
+    await waitFor(() => expect(refreshMagpieModels).toHaveBeenCalledOnce());
+    connectToOrganization('https://org.test');
+    expect(await screen.findByText('magpieGatewayStartFailedHint')).toBeInTheDocument();
+    expect(screen.getByText('modelsOrgBannerTitle')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'providerErrRetry' }));
+    await waitFor(() =>
+      expect(screen.queryByText('magpieGatewayStartFailedHint')).not.toBeInTheDocument(),
+    );
+    expect(mockStart).toHaveBeenCalledTimes(2);
   });
 
   test('starts a never-enabled service before saving the first provider', async () => {

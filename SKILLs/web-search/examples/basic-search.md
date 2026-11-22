@@ -13,8 +13,7 @@ node SKILLs/web-search/scripts/start-server.mjs
 Expected output:
 
 ```
-✓ Bridge Server started successfully (PID: 12345)
-  Health check: http://127.0.0.1:8923/api/health
+✓ Bridge Server is healthy at http://127.0.0.1:8923/api/health
   Logs: SKILLs/web-search/.server.log
 ```
 
@@ -138,7 +137,7 @@ Response:
   "success": true,
   "data": {
     "pid": 12345,
-    "cdpPort": 9222,
+    "cdpPort": 53142,
     "startTime": 1707363600000
   }
 }
@@ -159,10 +158,12 @@ Response:
   "success": true,
   "data": {
     "connectionId": "e2421754-0091-450d-a54c-7bc58498bfec",
-    "cdpPort": 9222
+    "cdpPort": 53142
   }
 }
 ```
+
+Chrome chooses the CDP port for a managed launch. To connect to an external Chrome instance, pass its known `cdpPort` in the request body.
 
 #### Perform Search
 
@@ -345,7 +346,6 @@ node SKILLs/web-search/scripts/stop-server.mjs
 
 # Clear cache
 rm SKILLs/web-search/.connection
-rm SKILLs/web-search/.server.pid
 
 # Restart
 node SKILLs/web-search/scripts/start-server.mjs

@@ -131,7 +131,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
   };
 
   const handleRowClick = (run: ScheduledTaskRunWithName) => {
-    if (run.sessionId || run.sessionKey) {
+    if (run.sessionId) {
       setViewingRun(run);
     } else if (run.status === 'error' && run.error) {
       setViewingError(run);
@@ -233,8 +233,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
             </TableHeader>
             <TableBody>
               {runs.map(run => {
-                const hasSession = run.sessionId || run.sessionKey;
-                const isClickable = hasSession || (run.status === 'error' && run.error);
+                const isClickable = run.sessionId || (run.status === 'error' && run.error);
                 return (
                   <TableRow
                     key={run.id}
@@ -289,10 +288,9 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
           </Button>
         )}
 
-        {viewingRun && (
+        {viewingRun?.sessionId && (
           <RunSessionModal
             sessionId={viewingRun.sessionId}
-            sessionKey={viewingRun.sessionKey}
             title={viewingRun.taskName}
             onClose={() => setViewingRun(null)}
           />

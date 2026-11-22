@@ -33,7 +33,7 @@ test('routes a builtin lane through its driver and projects runtime completion',
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: 'builtin-zhiyuan-coding',
     title: 'Fix refresh flow',
@@ -75,7 +75,7 @@ test('advertises the builtin commands for a lane whose row predates them', async
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: CodingAgentProfileId.Builtin,
     title: 'Legacy lane',
@@ -107,7 +107,7 @@ test('refreshes stale builtin commands and config options when the lane is prepa
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: CodingAgentProfileId.Builtin,
     title: 'Stale lane',
@@ -169,7 +169,7 @@ test('re-projects builtin commands for an already bound lane on the next prompt'
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: CodingAgentProfileId.Builtin,
     title: 'Bound lane',
@@ -205,7 +205,7 @@ test('forwards the goal command to the builtin runtime as goal mode', async () =
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: CodingAgentProfileId.Builtin,
     title: 'Ship the migration',
@@ -238,7 +238,7 @@ test('forwards the plan command to the builtin runtime as a planning turn', asyn
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: CodingAgentProfileId.Builtin,
     title: 'Plan the migration',
@@ -273,7 +273,7 @@ test('applies draft config option overrides when starting a builtin session', as
     completeExternalWorkbenchRun: () => undefined,
   });
 
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Product',
     sourceFolders: [root],
     defaultProfileId: CodingAgentProfileId.Builtin,
@@ -313,7 +313,7 @@ test('ignores invalid draft config option overrides instead of failing the sessi
     completeExternalWorkbenchRun: () => undefined,
   });
 
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Product',
     sourceFolders: [root],
     defaultProfileId: CodingAgentProfileId.Builtin,
@@ -349,12 +349,12 @@ test('prepareLane populates config options for legacy builtin lanes', async () =
     completeExternalWorkbenchRun: () => undefined,
   });
 
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Product',
     sourceFolders: [root],
     defaultProfileId: CodingAgentProfileId.Builtin,
   });
-  const created = await service.createSession({
+  const created = await service.seedSession({
     workspaceId: workspace.id,
     sourceRoot: root,
     profileId: CodingAgentProfileId.Builtin,
@@ -388,7 +388,7 @@ test('getProfileConfigOptions returns defaults for the builtin profile only', ()
   expect(service.getProfileConfigOptions('unknown-profile')).toEqual([]);
 });
 
-test('getProfileAvailableCommands returns the builtin command list without a session', () => {
+test('getProfileAvailableCommands returns the builtin command list without a session', async () => {
   const db = openCodingRoomDatabase();
   const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
@@ -398,10 +398,10 @@ test('getProfileAvailableCommands returns the builtin command list without a ses
     completeExternalWorkbenchRun: () => undefined,
   });
 
-  const names = service
-    .getProfileAvailableCommands(CodingAgentProfileId.Builtin)
-    .map(command => command.name);
+  const names = (await service.getProfileAvailableCommands(CodingAgentProfileId.Builtin)).map(
+    command => command.name,
+  );
   expect(names).toContain('plan');
   expect(names).toContain('mcp');
-  expect(service.getProfileAvailableCommands('unknown-profile')).toEqual([]);
+  expect(await service.getProfileAvailableCommands('unknown-profile')).toEqual([]);
 });

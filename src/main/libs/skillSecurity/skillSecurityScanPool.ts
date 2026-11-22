@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 
-import type { SkillSecurityReport } from './skillSecurityTypes';
+import type { SkillSecurityReport } from '../../../shared/skills/securityTypes';
 
 /** Bounded scan pool limits (AGENTS.md worker requirements: pool ≤ 2). */
 export const SkillSecurityScanLimit = {

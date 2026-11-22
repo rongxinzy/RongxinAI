@@ -21,10 +21,15 @@ export interface SkillsIpcDeps {
 }
 
 export const registerSkillsIpc = (deps: SkillsIpcDeps): void => {
+  const readyManager = async (): Promise<SkillManager> => {
+    const manager = deps.getSkillManager();
+    await manager.prepareBundledSkills();
+    return manager;
+  };
   handleIpcContract(skillsContract, {
-    list: () => {
+    list: async () => {
       try {
-        const skills = deps.getSkillManager().listSkills();
+        const skills = await deps.getSkillManager().listSkills();
         return { success: true, skills };
       } catch (error) {
         return {
@@ -34,9 +39,9 @@ export const registerSkillsIpc = (deps: SkillsIpcDeps): void => {
       }
     },
 
-    setEnabled: (_event, options) => {
+    setEnabled: async (_event, options) => {
       try {
-        const skills = deps.getSkillManager().setSkillEnabled(options.id, options.enabled);
+        const skills = await (await readyManager()).setSkillEnabled(options.id, options.enabled);
         return { success: true, skills };
       } catch (error) {
         return {
@@ -46,9 +51,9 @@ export const registerSkillsIpc = (deps: SkillsIpcDeps): void => {
       }
     },
 
-    setEnabledBatch: (_event, options) => {
+    setEnabledBatch: async (_event, options) => {
       try {
-        const skills = deps.getSkillManager().setSkillsEnabled(options.ids, options.enabled);
+        const skills = await (await readyManager()).setSkillsEnabled(options.ids, options.enabled);
         return { success: true, skills };
       } catch (error) {
         return {
@@ -58,9 +63,9 @@ export const registerSkillsIpc = (deps: SkillsIpcDeps): void => {
       }
     },
 
-    setPinned: (_event, options) => {
+    setPinned: async (_event, options) => {
       try {
-        const skills = deps.getSkillManager().setSkillPinned(options.id, options.pinned);
+        const skills = await (await readyManager()).setSkillPinned(options.id, options.pinned);
         return { success: true, skills };
       } catch (error) {
         return {
@@ -70,11 +75,11 @@ export const registerSkillsIpc = (deps: SkillsIpcDeps): void => {
       }
     },
 
-    createCustom: (_event, params) => deps.getSkillManager().createCustomSkill(params),
+    createCustom: async (_event, params) => (await readyManager()).createCustomSkill(params),
 
     delete: async (_event, id) => {
       try {
-        const skills = await deps.getSkillManager().deleteSkill(id);
+        const skills = await (await readyManager()).deleteSkill(id);
         return { success: true, skills };
       } catch (error) {
         console.error('[skills] Failed to delete skill:', id, error);
@@ -85,43 +90,21 @@ export const registerSkillsIpc = (deps: SkillsIpcDeps): void => {
       }
     },
 
-    download: (_event, source, options) => deps.getSkillManager().downloadSkill(source, options),
+    download: async (_event, source, options) =>
+      (await readyManager()).downloadSkill(source, options),
 
-    confirmInstall: (_event, pendingId, action) =>
-      deps.getSkillManager().confirmPendingInstall(pendingId, action),
-
-    getRoot: () => {
-      try {
-        const root = deps.getSkillManager().getSkillsRoot();
-        return { success: true, path: root };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to resolve skills root',
-        };
-      }
-    },
+    confirmInstall: async (_event, pendingId, action) =>
+      (await readyManager()).confirmPendingInstall(pendingId, action),
 
     getContent: (_event, skillId) => deps.getSkillManager().getSkillContent(skillId),
 
-    autoRoutingPrompt: () => {
-      try {
-        const prompt = deps.getSkillManager().buildAutoRoutingPrompt();
-        return { success: true, prompt };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to build auto-routing prompt',
-        };
-      }
-    },
-
     getConfig: (_event, skillId) => deps.getSkillManager().getSkillConfig(skillId),
 
-    setConfig: (_event, skillId, config) => deps.getSkillManager().setSkillConfig(skillId, config),
+    setConfig: async (_event, skillId, config) =>
+      (await readyManager()).setSkillConfig(skillId, config),
 
-    testEmailConnectivity: (_event, skillId, config) =>
-      deps.getSkillManager().testEmailConnectivity(skillId, config),
+    testEmailConnectivity: async (_event, skillId, config) =>
+      (await readyManager()).testEmailConnectivity(skillId, config),
 
     fetchMarketplace: async (_event, options) => {
       try {

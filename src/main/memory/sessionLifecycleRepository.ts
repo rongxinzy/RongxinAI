@@ -82,9 +82,11 @@ function saveRuntimeSessionIdentity(
   db.transaction(() => {
     const makeCurrent = input.makeCurrent !== false;
     if (makeCurrent) {
-      db.prepare(
-        'UPDATE memory_runtime_sessions SET is_current = 0 WHERE local_session_id = ?',
-      ).run(input.localSessionId);
+      db.prepare(`UPDATE memory_runtime_sessions SET is_current = 0
+        WHERE local_session_id = ? AND is_current = 1 AND runtime_session_id <> ?`).run(
+        input.localSessionId,
+        input.runtimeSessionId,
+      );
     }
     db.prepare(
       `INSERT INTO memory_runtime_sessions (
@@ -94,7 +96,10 @@ function saveRuntimeSessionIdentity(
         project_id = excluded.project_id,
         project_root = excluded.project_root,
         is_current = MAX(memory_runtime_sessions.is_current, excluded.is_current),
-        updated_at = excluded.updated_at`,
+        updated_at = excluded.updated_at
+      WHERE memory_runtime_sessions.project_id <> excluded.project_id
+        OR memory_runtime_sessions.project_root <> excluded.project_root
+        OR memory_runtime_sessions.is_current < excluded.is_current`,
     ).run(
       input.localSessionId,
       input.runtimeSessionId,
@@ -128,16 +133,26 @@ function getLocalSessionIdByRuntimeId(
 
 function queueSessionFinalizations(
   db: Database.Database,
-  inputs: SessionFinalizationInput[],
-  deleteSessions: () => void,
-): void {
-  db.transaction(() => {
+  deleteSessions: () => SessionFinalizationInput[] | null,
+): string[] | null {
+  return db.transaction(() => {
+    const inputs = deleteSessions();
+    if (!inputs) return null;
+    const readPrevious = db.prepare<[string], { localSessionId: string; status: string }>(`
+      SELECT local_session_id AS localSessionId, status FROM memory_session_finalizations
+      WHERE runtime_session_id = ?`);
     const now = new Date().toISOString();
     for (const input of inputs) {
       const runtimeSessionId = getRuntimeSessionId(db, input.sessionId) ?? input.sessionId;
-      const previous = getSessionFinalization(db, runtimeSessionId);
-      const hasPendingWork = hasPendingSessionWrites(db, input.sessionId);
-      if (previous?.status === MemoryOutboxStatus.Completed && !hasPendingWork) continue;
+      const previous = readPrevious.get(runtimeSessionId);
+      if (previous && previous.localSessionId !== input.sessionId) {
+        throw new Error('Session close intent belongs to a different local session.');
+      }
+      if (
+        previous?.status === MemoryOutboxStatus.Completed &&
+        !pendingSessionWriteAvailableAt(db, input.sessionId)
+      )
+        continue;
       const intentKey =
         previous?.status === MemoryOutboxStatus.Completed
           ? `pending:${randomUUID()}`
@@ -146,21 +161,27 @@ function queueSessionFinalizations(
         previous?.status === MemoryOutboxStatus.Completed
           ? `finalize:${intentKey}`
           : `finalize:${runtimeSessionId}`;
-      db.prepare(
-        `INSERT INTO memory_session_finalizations (
+      const inserted = db
+        .prepare(
+          `INSERT INTO memory_session_finalizations (
           runtime_session_id, local_session_id, project_id, summary, status, created_at
         ) VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(runtime_session_id) DO NOTHING`,
-      ).run(
-        intentKey,
-        input.sessionId,
-        input.projectId,
-        input.summary,
-        MemoryOutboxStatus.Pending,
-        now,
-      );
-      const intent = getSessionFinalization(db, intentKey);
-      if (!intent) throw new Error('Session close intent was not persisted.');
+        )
+        .run(
+          intentKey,
+          input.sessionId,
+          input.projectId,
+          input.summary,
+          MemoryOutboxStatus.Pending,
+          now,
+        );
+      if (
+        (!previous || previous.status === MemoryOutboxStatus.Completed) &&
+        inserted.changes !== 1
+      ) {
+        throw new Error('Session close intent was not persisted.');
+      }
       const existing =
         previous?.status === MemoryOutboxStatus.Completed
           ? undefined
@@ -170,8 +191,6 @@ function queueSessionFinalizations(
       const payload = JSON.stringify({
         sessionId: input.sessionId,
         runtimeSessionId,
-        projectId: intent.projectId,
-        summary: intent.summary,
       });
       if (existing) {
         db.prepare(
@@ -197,7 +216,7 @@ function queueSessionFinalizations(
         'UPDATE memory_session_finalizations SET status = ?, error = NULL WHERE runtime_session_id = ?',
       ).run(MemoryOutboxStatus.Pending, intentKey);
     }
-    deleteSessions();
+    return inputs.map(input => input.sessionId);
   })();
 }
 
@@ -221,25 +240,22 @@ function pendingSessionWriteAvailableAt(
   return row.available_at;
 }
 
-function hasPendingSessionWrites(db: Database.Database, localSessionId: string): boolean {
-  return pendingSessionWriteAvailableAt(db, localSessionId) !== null;
-}
-
 function resolveSessionFinalization(
   db: Database.Database,
   outboxId: string,
-  localSessionId: string,
-): FinalizeSessionPayload {
-  const row = db
-    .prepare('SELECT link_id, payload_json FROM memory_outbox WHERE id = ?')
-    .get(outboxId) as { link_id: string | null; payload_json: string };
-  const payload = JSON.parse(row.payload_json) as FinalizeSessionPayload;
-  const intentKey = row.link_id?.startsWith('finalize:')
-    ? row.link_id.slice('finalize:'.length)
+  linkId: string | null,
+  payload: FinalizeSessionPayload,
+): { runtimeSessionId: string; projectId: string; summary: string } | null {
+  const localSessionId = payload.sessionId;
+  const intentKey = linkId?.startsWith('finalize:')
+    ? linkId.slice('finalize:'.length)
     : payload.runtimeSessionId;
+  const intent = getSessionFinalization(db, intentKey);
+  if (!intent || intent.localSessionId !== localSessionId || !intent.projectId || !intent.summary)
+    return null;
   const runtimeSessionId = getRuntimeSessionId(db, localSessionId) ?? payload.runtimeSessionId;
-  if (runtimeSessionId === payload.runtimeSessionId) return payload;
-  const next = { ...payload, runtimeSessionId };
+  const delivery = { runtimeSessionId, projectId: intent.projectId, summary: intent.summary };
+  if (runtimeSessionId === payload.runtimeSessionId) return delivery;
   db.transaction(() => {
     const target = db
       .prepare(
@@ -264,8 +280,8 @@ function resolveSessionFinalization(
       ).run(
         runtimeSessionId,
         localSessionId,
-        payload.projectId,
-        payload.summary,
+        intent.projectId,
+        intent.summary,
         MemoryOutboxStatus.Pending,
         new Date().toISOString(),
       );
@@ -276,11 +292,11 @@ function resolveSessionFinalization(
     }
     db.prepare('UPDATE memory_outbox SET link_id = ?, payload_json = ? WHERE id = ?').run(
       `finalize:${runtimeSessionId}`,
-      JSON.stringify(next),
+      JSON.stringify({ ...payload, runtimeSessionId }),
       outboxId,
     );
   })();
-  return next;
+  return delivery;
 }
 
 function deferSessionFinalization(
@@ -310,17 +326,35 @@ function deferSessionFinalization(
 function getSessionFinalization(
   db: Database.Database,
   runtimeSessionId: string,
-): { summary: string; projectId: string; status: string; error: string | null } | null {
+): {
+  localSessionId: string;
+  summary: string;
+  projectId: string;
+  status: string;
+  error: string | null;
+} | null {
   const row = db
     .prepare(
-      `SELECT summary, project_id, status, error FROM memory_session_finalizations
+      `SELECT local_session_id, summary, project_id, status, error FROM memory_session_finalizations
        WHERE runtime_session_id = ?`,
     )
     .get(runtimeSessionId) as
-    | { summary: string; project_id: string; status: string; error: string | null }
+    | {
+        local_session_id: string;
+        summary: string;
+        project_id: string;
+        status: string;
+        error: string | null;
+      }
     | undefined;
   return row
-    ? { summary: row.summary, projectId: row.project_id, status: row.status, error: row.error }
+    ? {
+        localSessionId: row.local_session_id,
+        summary: row.summary,
+        projectId: row.project_id,
+        status: row.status,
+        error: row.error,
+      }
     : null;
 }
 
@@ -370,12 +404,18 @@ export class SessionLifecycleStore {
     saveRuntimeSessionIdentity(this.db, input);
   }
 
-  queueSessionFinalizations(inputs: SessionFinalizationInput[], deleteSessions: () => void): void {
-    queueSessionFinalizations(this.db, inputs, deleteSessions);
+  queueSessionFinalizations(
+    deleteSessions: () => SessionFinalizationInput[] | null,
+  ): string[] | null {
+    return queueSessionFinalizations(this.db, deleteSessions);
   }
 
-  resolveSessionFinalization(outboxId: string, localSessionId: string): FinalizeSessionPayload {
-    return resolveSessionFinalization(this.db, outboxId, localSessionId);
+  resolveSessionFinalization(
+    outboxId: string,
+    linkId: string | null,
+    payload: FinalizeSessionPayload,
+  ) {
+    return resolveSessionFinalization(this.db, outboxId, linkId, payload);
   }
 
   deferSessionFinalization(outboxId: string, localSessionId: string): boolean {

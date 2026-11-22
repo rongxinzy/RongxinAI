@@ -19,7 +19,7 @@ export async function testEmailConnectivityImpl(
   config: Record<string, string>,
 ): Promise<{ success: boolean; result?: EmailConnectivityTestResult; error?: string }> {
   try {
-    const skillDir = ctx.resolveSkillDir(skillId);
+    const skillDir = await ctx.resolveSkillDir(skillId);
 
     // Ensure dependencies are installed before running scripts
     const depsResult = await ctx.ensureSkillDependencies(skillDir);

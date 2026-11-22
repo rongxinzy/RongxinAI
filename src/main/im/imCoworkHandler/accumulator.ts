@@ -1,31 +1,30 @@
 /**
- * Message accumulation for IM cowork turns: collects streamed messages per
- * session, exposes the response promise, and projects Channel run events.
+ * Tracks pending Channel replies and projects them from the current turn.
  */
 
-import { ActivitySource, ActivityStatus } from '../../../shared/activity/constants';
+import { ActivityStatus } from '../../../shared/activity/constants';
 import type { Platform } from '../../../shared/platform';
 import type { ActivityService } from '../../activity/activityService';
 import type { CoworkMessage, CoworkStore } from '../../coworkStore';
-import { generateCorrelationId } from '../../libs/logCorrelation';
+import type { PiRuntime } from '../../libs/agentEngine/types';
 import { DEFAULT_IM_EMPTY_REPLY, formatIMReply } from './replies';
-import type { IMCoworkBackgroundDelivery, MessageAccumulator } from './types';
+import type { MessageAccumulator } from './types';
 
 const ACCUMULATOR_TIMEOUT_MS = 4 * 60 * 1000 + 30 * 1000;
 
 interface IMCoworkAccumulatorDeps {
   coworkStore: CoworkStore;
-  activityService?: ActivityService;
+  activityService?: Pick<ActivityService, 'recordChannelRun'>;
   getConversation: (
     sessionId: string,
   ) => { conversationId: string; platform: Platform } | undefined;
+  getLiveStreamTexts: PiRuntime['getLiveStreamTexts'];
   stopSession: (sessionId: string) => void;
 }
 
 export class IMCoworkAccumulatorRegistry {
   private readonly deps: IMCoworkAccumulatorDeps;
 
-  // Track active sessions' message accumulation
   private readonly accumulators = new Map<string, MessageAccumulator>();
 
   constructor(deps: IMCoworkAccumulatorDeps) {
@@ -36,15 +35,7 @@ export class IMCoworkAccumulatorRegistry {
     return this.accumulators.get(sessionId);
   }
 
-  has(sessionId: string): boolean {
-    return this.accumulators.has(sessionId);
-  }
-
-  createResponsePromise(
-    sessionId: string,
-    runId: string,
-    backgroundDelivery?: IMCoworkBackgroundDelivery,
-  ): Promise<string> {
+  createResponsePromise(sessionId: string, runId: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const existingAccumulator = this.accumulators.get(sessionId);
       if (existingAccumulator) {
@@ -52,20 +43,21 @@ export class IMCoworkAccumulatorRegistry {
           clearTimeout(existingAccumulator.timeoutId);
         }
         this.accumulators.delete(sessionId);
-        this.emitRunEvent(sessionId, existingAccumulator, ActivityStatus.Failed);
+        this.emitRunEvent(sessionId, existingAccumulator.runId, ActivityStatus.Failed);
         existingAccumulator.reject?.(new Error('Replaced by a newer IM request'));
       }
 
       const timeoutId = setTimeout(() => {
         const accumulator = this.accumulators.get(sessionId);
         if (accumulator && accumulator.timeoutId === timeoutId) {
-          const partialReply = formatIMReply(accumulator.messages);
+          const partialReply = this.formatReply(sessionId, accumulator, true);
           this.cleanup(sessionId);
           this.deps.stopSession(sessionId);
+          if (partialReply === null) return;
           if (partialReply && partialReply !== DEFAULT_IM_EMPTY_REPLY) {
             this.emitRunEvent(
               sessionId,
-              accumulator,
+              accumulator.runId,
               ActivityStatus.Failed,
               undefined,
               '处理超时，已返回部分结果',
@@ -74,7 +66,7 @@ export class IMCoworkAccumulatorRegistry {
           } else {
             this.emitRunEvent(
               sessionId,
-              accumulator,
+              accumulator.runId,
               ActivityStatus.Failed,
               undefined,
               '处理超时，请稍后重试',
@@ -84,86 +76,65 @@ export class IMCoworkAccumulatorRegistry {
         }
       }, ACCUMULATOR_TIMEOUT_MS);
 
-      // Set up message accumulator
       this.accumulators.set(sessionId, {
         runId,
-        messages: [],
-        storeMessageCountAtStart: this.deps.coworkStore.getSession(sessionId)?.messages.length ?? 0,
+        storeMessageCountAtStart: this.deps.coworkStore.messages.countSessionMessages(sessionId),
         resolve,
         reject,
         timeoutId,
-        backgroundDelivery,
       });
     });
   }
 
-  ensureBackgroundAccumulator(
+  formatReply(
     sessionId: string,
-    firstMessage: CoworkMessage,
-  ): MessageAccumulator | null {
-    const conversation = this.deps.getConversation(sessionId);
-    if (!conversation) {
+    accumulator: MessageAccumulator,
+    includeLiveText = false,
+  ): string | null {
+    const offset = accumulator.storeMessageCountAtStart;
+    if (offset === undefined) return DEFAULT_IM_EMPTY_REPLY;
+    let messages: CoworkMessage[];
+    try {
+      messages = this.deps.coworkStore.messages.getPagedSessionMessages(sessionId, -1, offset);
+    } catch (error) {
+      this.reject(sessionId, error instanceof Error ? error : new Error(String(error)));
       return null;
     }
+    if (!includeLiveText) return formatIMReply(messages);
 
-    const existing = this.accumulators.get(sessionId);
-    if (existing) {
-      return existing;
-    }
-
-    const timeoutId = setTimeout(() => {
-      const accumulator = this.accumulators.get(sessionId);
-      if (!accumulator?.backgroundDelivery || accumulator.timeoutId !== timeoutId) {
-        return;
-      }
-      this.cleanup(sessionId);
-      this.emitRunEvent(
-        sessionId,
-        accumulator,
-        ActivityStatus.Failed,
-        undefined,
-        '处理超时，请稍后重试',
-      );
-    }, ACCUMULATOR_TIMEOUT_MS);
-
-    const storeMessages = this.deps.coworkStore.getSession(sessionId)?.messages ?? [];
-    const firstMessageIndex = storeMessages.findIndex(message => message.id === firstMessage.id);
-    const nextAccumulator: MessageAccumulator = {
-      runId: generateCorrelationId(),
-      messages: [],
-      storeMessageCountAtStart: firstMessageIndex >= 0 ? firstMessageIndex : storeMessages.length,
-      timeoutId,
-      backgroundDelivery: {
-        conversationId: conversation.conversationId,
-        platform: conversation.platform,
-      },
-    };
-    this.accumulators.set(sessionId, nextAccumulator);
-    return nextAccumulator;
+    const texts = this.deps.getLiveStreamTexts(sessionId);
+    return formatIMReply(
+      messages.map(message => {
+        const live = texts.find(text => text.messageId === message.id);
+        return live ? { ...message, content: live.content } : message;
+      }),
+    );
   }
 
   reject(sessionId: string, error: Error): void {
     const accumulator = this.accumulators.get(sessionId);
     if (!accumulator) return;
     this.cleanup(sessionId);
-    this.emitRunEvent(sessionId, accumulator, ActivityStatus.Failed, undefined, error.message);
+    this.emitRunEvent(
+      sessionId,
+      accumulator.runId,
+      ActivityStatus.Failed,
+      undefined,
+      error.message,
+    );
     accumulator.reject?.(error);
   }
 
   emitRunEvent(
     sessionId: string,
-    accumulator: MessageAccumulator,
+    runId: string,
     status: ActivityStatus,
     reply?: string,
     error?: string,
   ): void {
-    // Background delivery is an outbound scheduled-task result. The canonical scheduler owns the
-    // Cron activity lifecycle; do not project this accumulator as a second run.
-    if (accumulator.backgroundDelivery) return;
-    const conversation = accumulator.backgroundDelivery ?? this.deps.getConversation(sessionId);
-    this.deps.activityService?.upsertBestEffort({
-      id: accumulator.runId,
-      source: ActivitySource.Channel,
+    const conversation = this.deps.getConversation(sessionId);
+    this.deps.activityService?.recordChannelRun({
+      id: runId,
       status,
       sessionId,
       platform: conversation?.platform,

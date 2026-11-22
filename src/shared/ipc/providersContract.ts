@@ -14,18 +14,16 @@
 import { z } from 'zod';
 
 import { defineIpcContract } from './contract';
-import { ModelPoolStreamSchema } from './schemas';
-import { CommunityAuthIpc, EnterpriseIpc, ManagedProviderIpc, ModelPoolIpc } from './channels';
+import { CommunityAuthIpc, EnterpriseIpc, ManagedProviderIpc } from './channels';
 import { AgentIpcChannel } from '../agent/constants';
 import { AISphereIpc } from '../aisphere';
 import { EnterpriseSessionIpc } from '../enterpriseSession';
 import { EnterpriseRendererIpc } from '../enterpriseRenderer';
-import { MagpieIpc } from '../magpie/types';
+import { MagpieIpc } from './providersContract.channels';
 import type {
   MagpieAgents,
   MagpieAgentConnectPreview,
   MagpieDiagnosticSummary,
-  MagpieModel,
   MagpieModelCatalog,
   MagpieProviderSummary,
   MagpieStatus,
@@ -81,12 +79,11 @@ const AgentRecordSchema = z.object({
   updatedAt: z.number(),
 });
 
-/** `{ success, agents? , agent?, deleted?, error? }` envelope from agentIpc. */
+/** Agent reads and updates share this result. */
 const AgentsEnvelopeSchema = z.object({
   success: z.boolean(),
   agents: z.array(AgentRecordSchema).optional(),
   agent: AgentRecordSchema.optional(),
-  deleted: z.boolean().optional(),
   error: z.string().optional(),
 });
 
@@ -162,7 +159,6 @@ const PresetExpertsResultSchema = z.object({
  * treats them as the shared interfaces, so validation only checks the envelope.
  */
 const MagpieStatusSchema = z.custom<MagpieStatus>(value => typeof value === 'object');
-const MagpieModelsSchema = z.custom<MagpieModel[]>(value => Array.isArray(value));
 const MagpieModelCatalogSchema = z.custom<MagpieModelCatalog>(value => typeof value === 'object');
 const MagpieAgentsSchema = z.custom<MagpieAgents>(value => typeof value === 'object');
 const MagpieAgentConnectPreviewSchema = z.custom<MagpieAgentConnectPreview>(
@@ -282,7 +278,12 @@ export const providersContract = defineIpcContract({
   agentsDelete: {
     channel: AgentIpcChannel.Delete,
     args: z.tuple([z.string()]),
-    result: AgentsEnvelopeSchema,
+    result: z.object({
+      success: z.boolean(),
+      deleted: z.boolean().optional(),
+      deletedSessionIds: z.array(z.string()).optional(),
+      error: z.string().optional(),
+    }),
   },
   agentsImportExpertPackage: {
     channel: AgentIpcChannel.ImportExpertPackage,
@@ -299,159 +300,6 @@ export const providersContract = defineIpcContract({
     channel: AgentIpcChannel.GetPresetExperts,
     args: z.tuple([]),
     result: PresetExpertsResultSchema,
-  },
-
-  // magpie (ModelSettingsPanel, CodingAgentManager, MagpieSubscriptionControl,
-  // useMagpiePreferences, availableModels)
-  magpieStatus: {
-    channel: MagpieIpc.status,
-    args: z.tuple([]),
-    result: MagpieStatusSchema,
-  },
-  magpieSetSubscriptionAccounts: {
-    channel: MagpieIpc.setSubscriptionAccounts,
-    args: z.tuple([z.boolean()]),
-    result: MagpieStatusSchema,
-  },
-  magpieStart: {
-    channel: MagpieIpc.start,
-    args: z.tuple([]),
-    result: MagpieStatusSchema,
-  },
-  magpieStop: {
-    channel: MagpieIpc.stop,
-    args: z.tuple([]),
-    result: MagpieStatusSchema,
-  },
-  magpieAgents: {
-    channel: MagpieIpc.agents,
-    args: z.tuple([]),
-    result: MagpieAgentsSchema,
-  },
-  magpieSetModel: {
-    channel: MagpieIpc.setModel,
-    args: z.tuple([z.object({ agentId: z.string(), field: z.string(), value: z.string() })]),
-    result: MagpieAgentsSchema,
-  },
-  magpiePreviewAgent: {
-    channel: MagpieIpc.previewAgent,
-    args: z.tuple([z.string()]),
-    result: MagpieAgentConnectPreviewSchema,
-  },
-  magpieConnectAgent: {
-    channel: MagpieIpc.connectAgent,
-    args: z.tuple([z.string()]),
-    result: MagpieAgentsSchema,
-  },
-  magpieDisconnectAgent: {
-    channel: MagpieIpc.disconnectAgent,
-    args: z.tuple([z.string()]),
-    result: MagpieAgentsSchema,
-  },
-  magpieDisconnectAllAgents: {
-    channel: MagpieIpc.disconnectAllAgents,
-    args: z.tuple([]),
-    result: MagpieAgentsSchema,
-  },
-  magpieModels: {
-    channel: MagpieIpc.models,
-    args: z.tuple([]),
-    result: MagpieModelsSchema,
-  },
-  magpieCatalog: {
-    channel: MagpieIpc.catalog,
-    args: z.tuple([]),
-    result: MagpieModelCatalogSchema,
-  },
-  magpieSelectDefault: {
-    channel: MagpieIpc.selectDefault,
-    args: z.tuple([z.string()]),
-    result: MagpieModelCatalogSchema,
-  },
-  magpieProviders: {
-    channel: MagpieIpc.providers,
-    args: z.tuple([]),
-    result: MagpieProviderSummariesSchema,
-  },
-  magpieSaveProvider: {
-    channel: MagpieIpc.saveProvider,
-    args: z.tuple([MagpieSaveProviderInputSchema]),
-    result: MagpieProviderSummariesSchema,
-  },
-  magpieSetProviderEnabled: {
-    channel: MagpieIpc.setProviderEnabled,
-    args: z.tuple([z.string(), z.boolean()]),
-    result: MagpieProviderSummariesSchema,
-  },
-  magpieDeleteProvider: {
-    channel: MagpieIpc.deleteProvider,
-    args: z.tuple([z.string()]),
-    result: MagpieProviderSummariesSchema,
-  },
-  magpieTestProvider: {
-    channel: MagpieIpc.testProvider,
-    args: z.tuple([MagpieSaveProviderInputSchema]),
-    result: MagpieTestProviderResultSchema2,
-  },
-  magpieDiagnostics: {
-    channel: MagpieIpc.diagnostics,
-    args: z.tuple([]),
-    result: MagpieDiagnosticSummarySchema,
-  },
-  magpieClearDiagnostics: {
-    channel: MagpieIpc.clearDiagnostics,
-    args: z.tuple([]),
-    result: MagpieDiagnosticSummarySchema,
-  },
-  magpiePreferences: {
-    channel: MagpieIpc.preferences,
-    args: z.tuple([]),
-    result: MagpiePreferencesSchema,
-  },
-  magpieUpdatePreferences: {
-    channel: MagpieIpc.updatePreferences,
-    args: z.tuple([MagpiePreferencesPatchSchema]),
-    result: MagpiePreferencesSchema,
-  },
-  magpieRoutingGroups: {
-    channel: MagpieIpc.routingGroups,
-    args: z.tuple([]),
-    result: MagpieRoutingStateSchema,
-  },
-  magpieSaveRoutingGroup: {
-    channel: MagpieIpc.saveRoutingGroup,
-    args: z.tuple([MagpieRoutingGroupSaveInputSchema]),
-    result: MagpieRoutingStateSchema,
-  },
-  magpieDeleteRoutingGroup: {
-    channel: MagpieIpc.deleteRoutingGroup,
-    args: z.tuple([z.string()]),
-    result: MagpieRoutingStateSchema,
-  },
-  magpieArrangeRoutingGroups: {
-    channel: MagpieIpc.arrangeRoutingGroups,
-    args: z.tuple([z.array(z.string())]),
-    result: MagpieRoutingStateSchema,
-  },
-  magpieUsageSummary: {
-    channel: MagpieIpc.usageSummary,
-    args: z.tuple([MagpieUsagePeriodSchema]),
-    result: MagpieUsageSummarySchema,
-  },
-  magpieUsageRequests: {
-    channel: MagpieIpc.usageRequests,
-    args: z.tuple([MagpieUsagePeriodSchema, z.number(), z.number()]),
-    result: MagpieUsageRequestPageSchema,
-  },
-  magpieUsageQuotas: {
-    channel: MagpieIpc.usageQuotas,
-    args: z.tuple([z.boolean().optional()]),
-    result: MagpieSubscriptionQuotaListSchema,
-  },
-  magpieUsageBudget: {
-    channel: MagpieIpc.usageBudget,
-    args: z.tuple([]),
-    result: MagpieUsageBudgetSchema,
   },
 
   // enterprise (useAppBootstrap, LoginButton, EnterpriseSettingsPage/SessionGate)
@@ -542,32 +390,154 @@ export const providersContract = defineIpcContract({
     args: z.tuple([]),
     result: z.object({ success: z.boolean() }),
   },
+});
 
-  // model pool (community free models; consumed by the enterprise renderer
-  // module via window.electron)
-  modelPoolListModels: {
-    channel: ModelPoolIpc.ListModels,
+export const magpieContract = defineIpcContract({
+  // magpie (ModelSettingsPanel, CodingAgentManager, MagpieSubscriptionControl,
+  // useMagpiePreferences, availableModels)
+  status: {
+    channel: MagpieIpc.status,
     args: z.tuple([]),
-    result: z.object({
-      ok: z.boolean(),
-      status: z.number(),
-      models: z.array(z.string()),
-      error: z.string().optional(),
-    }),
+    result: MagpieStatusSchema,
   },
-  modelPoolStream: {
-    channel: ModelPoolIpc.Stream,
-    args: z.tuple([ModelPoolStreamSchema.input]),
-    result: z.object({
-      ok: z.boolean(),
-      status: z.number(),
-      statusText: z.string(),
-      error: z.string().optional(),
-    }),
+  setSubscriptionAccounts: {
+    channel: MagpieIpc.setSubscriptionAccounts,
+    args: z.tuple([z.boolean()]),
+    result: MagpieStatusSchema,
   },
-  modelPoolCancelStream: {
-    channel: ModelPoolIpc.CancelStream,
+  start: {
+    channel: MagpieIpc.start,
+    args: z.tuple([]),
+    result: MagpieStatusSchema,
+  },
+  stop: {
+    channel: MagpieIpc.stop,
+    args: z.tuple([]),
+    result: MagpieStatusSchema,
+  },
+  agents: {
+    channel: MagpieIpc.agents,
+    args: z.tuple([]),
+    result: MagpieAgentsSchema,
+  },
+  setModel: {
+    channel: MagpieIpc.setModel,
+    args: z.tuple([z.object({ agentId: z.string(), field: z.string(), value: z.string() })]),
+    result: MagpieAgentsSchema,
+  },
+  previewAgent: {
+    channel: MagpieIpc.previewAgent,
     args: z.tuple([z.string()]),
-    result: z.boolean(),
+    result: MagpieAgentConnectPreviewSchema,
+  },
+  connectAgent: {
+    channel: MagpieIpc.connectAgent,
+    args: z.tuple([z.string()]),
+    result: MagpieAgentsSchema,
+  },
+  disconnectAgent: {
+    channel: MagpieIpc.disconnectAgent,
+    args: z.tuple([z.string()]),
+    result: MagpieAgentsSchema,
+  },
+  disconnectAllAgents: {
+    channel: MagpieIpc.disconnectAllAgents,
+    args: z.tuple([]),
+    result: MagpieAgentsSchema,
+  },
+  catalog: {
+    channel: MagpieIpc.catalog,
+    args: z.tuple([]),
+    result: MagpieModelCatalogSchema,
+  },
+  selectDefault: {
+    channel: MagpieIpc.selectDefault,
+    args: z.tuple([z.string()]),
+    result: MagpieModelCatalogSchema,
+  },
+  providers: {
+    channel: MagpieIpc.providers,
+    args: z.tuple([]),
+    result: MagpieProviderSummariesSchema,
+  },
+  saveProvider: {
+    channel: MagpieIpc.saveProvider,
+    args: z.tuple([MagpieSaveProviderInputSchema]),
+    result: MagpieProviderSummariesSchema,
+  },
+  setProviderEnabled: {
+    channel: MagpieIpc.setProviderEnabled,
+    args: z.tuple([z.string(), z.boolean()]),
+    result: MagpieProviderSummariesSchema,
+  },
+  deleteProvider: {
+    channel: MagpieIpc.deleteProvider,
+    args: z.tuple([z.string()]),
+    result: MagpieProviderSummariesSchema,
+  },
+  testProvider: {
+    channel: MagpieIpc.testProvider,
+    args: z.tuple([MagpieSaveProviderInputSchema]),
+    result: MagpieTestProviderResultSchema2,
+  },
+  diagnostics: {
+    channel: MagpieIpc.diagnostics,
+    args: z.tuple([]),
+    result: MagpieDiagnosticSummarySchema,
+  },
+  clearDiagnostics: {
+    channel: MagpieIpc.clearDiagnostics,
+    args: z.tuple([]),
+    result: MagpieDiagnosticSummarySchema,
+  },
+  preferences: {
+    channel: MagpieIpc.preferences,
+    args: z.tuple([]),
+    result: MagpiePreferencesSchema,
+  },
+  updatePreferences: {
+    channel: MagpieIpc.updatePreferences,
+    args: z.tuple([MagpiePreferencesPatchSchema]),
+    result: MagpiePreferencesSchema,
+  },
+  routingGroups: {
+    channel: MagpieIpc.routingGroups,
+    args: z.tuple([]),
+    result: MagpieRoutingStateSchema,
+  },
+  saveRoutingGroup: {
+    channel: MagpieIpc.saveRoutingGroup,
+    args: z.tuple([MagpieRoutingGroupSaveInputSchema]),
+    result: MagpieRoutingStateSchema,
+  },
+  deleteRoutingGroup: {
+    channel: MagpieIpc.deleteRoutingGroup,
+    args: z.tuple([z.string()]),
+    result: MagpieRoutingStateSchema,
+  },
+  arrangeRoutingGroups: {
+    channel: MagpieIpc.arrangeRoutingGroups,
+    args: z.tuple([z.array(z.string())]),
+    result: MagpieRoutingStateSchema,
+  },
+  usageSummary: {
+    channel: MagpieIpc.usageSummary,
+    args: z.tuple([MagpieUsagePeriodSchema]),
+    result: MagpieUsageSummarySchema,
+  },
+  usageRequests: {
+    channel: MagpieIpc.usageRequests,
+    args: z.tuple([MagpieUsagePeriodSchema, z.number(), z.number()]),
+    result: MagpieUsageRequestPageSchema,
+  },
+  usageQuotas: {
+    channel: MagpieIpc.usageQuotas,
+    args: z.tuple([z.boolean().optional()]),
+    result: MagpieSubscriptionQuotaListSchema,
+  },
+  usageBudget: {
+    channel: MagpieIpc.usageBudget,
+    args: z.tuple([]),
+    result: MagpieUsageBudgetSchema,
   },
 });

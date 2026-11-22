@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 
 import type { CoworkStore } from '../../coworkStore';
-import { installTestMagpie } from '../../../../tests/helpers/installTestMagpie';
+import { createTestMagpie } from '../../../../tests/helpers/createTestMagpie';
 
 const VISION_400 =
   '{"message":"this server was started without the vision encoder (run setup again and choose \'vision\'), so it cannot read images","type":"invalid_request_error","param":"","code":null}';
@@ -103,6 +103,8 @@ vi.mock('../../workbenchTask/artifactWorkerPool', async () => {
   return {
     transformCoworkTextAsync: async (input: Parameters<typeof runTextWorkerOperation>[0]) =>
       runTextWorkerOperation(input),
+    readCoworkImageAsync: async (filePath: string) =>
+      (await fs.promises.readFile(filePath)).toString('base64'),
   };
 });
 
@@ -117,39 +119,41 @@ vi.mock('../coworkUtil', async importOriginal => {
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 
 const fakeStore = {
-  addMessage: (sessionId: string, message: object) => ({ id: `m-${sessionId}`, ...message }),
-  updateMessage: () => undefined,
+  messages: {
+    addMessage: (sessionId: string, message: object) => ({ id: `m-${sessionId}`, ...message }),
+    updateMessage: () => undefined,
+    getMessage: () => undefined,
+  },
   updateSession: () => undefined,
-  getMessage: () => undefined,
   getSession: () => undefined,
   listSessionArtifacts: () => [],
 } as unknown as CoworkStore; // test double for a wide store interface
 
-let disposeMagpie: (() => void) | undefined;
+let gateway: ReturnType<typeof createTestMagpie>;
 
 beforeAll(async () => {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   port = typeof address === 'object' && address ? address.port : 0;
-  const gateway = installTestMagpie({
+  gateway = createTestMagpie({
     gatewayUrl: `http://127.0.0.1:${port}`,
     defaultModelId: 'GLM-5.3-Flash',
   });
   gateway.setImage('GLM-5.3-Flash', true);
-  disposeMagpie = gateway.dispose;
 });
 
 afterAll(() => {
-  disposeMagpie?.();
   server.close();
   fs.rmSync(imageDir, { recursive: true, force: true });
 });
 
 test('a real image rejection reports failure once without hidden text requests or capability downgrade', async () => {
   const errors: unknown[] = [];
-  const adapter = new PiRuntimeAdapter();
+  const adapter = new PiRuntimeAdapter({
+    modelService: gateway.modelService,
+    coworkStore: fakeStore,
+  });
   adapter.on('error', (_sessionId, error) => errors.push(error));
-  adapter.setCoworkStore(fakeStore);
   try {
     for (const sessionId of ['first-image', 'next-image']) {
       requests.length = 0;

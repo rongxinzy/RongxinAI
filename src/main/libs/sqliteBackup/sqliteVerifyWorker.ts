@@ -15,6 +15,7 @@ type VerifyResponse = {
   userVersion?: number;
   schemaVersion?: number;
   error?: string;
+  sqliteCode?: string;
   runMs: number;
 };
 
@@ -32,6 +33,7 @@ parentPort?.on('message', (request: VerifyRequest) => {
   } catch (error) {
     response.error =
       error instanceof Error ? error.message : 'Sqlite verification failed in worker';
+    if (error instanceof Database.SqliteError) response.sqliteCode = error.code;
   } finally {
     try {
       db?.close();

@@ -65,6 +65,27 @@ test('assigns a new run identity on continuation even within one millisecond', (
   expect(second.runId).not.toBe(first.runId);
   expect(second.startedAt).toBeGreaterThan(first.startedAt);
 });
+test('keeps the Workbench run identity and ordering through a Pi restart', () => {
+  vi.useFakeTimers();
+  const tracker = new PiRunStateTracker(() => {});
+  const start = { type: PiRunEvent.AgentStart };
+  tracker.observe('a', start, 'workbench-one');
+  const started = tracker.snapshot('a')!;
+  tracker.finish('a', CoworkRunPhase.Error);
+  const ended = tracker.snapshot('a')!;
+  tracker.observe('a', start, 'workbench-one');
+  const restarted = tracker.snapshot('a')!;
+  expect(restarted).toMatchObject({
+    runId: 'workbench-one',
+    running: true,
+    startedAt: started.startedAt,
+  });
+  expect(restarted.sequence).toBeGreaterThan(ended.sequence);
+  tracker.observe('a', start, 'workbench-two');
+  const next = tracker.snapshot('a')!;
+  expect(next.runId).toBe('workbench-two');
+  expect(next.startedAt).toBeGreaterThan(restarted.startedAt);
+});
 test('does not serialize arbitrary or cyclic tool objects', () => {
   const value: Record<string, unknown> = {};
   value.self = value;

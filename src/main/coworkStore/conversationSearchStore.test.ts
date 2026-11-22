@@ -29,10 +29,10 @@ function seedSession(title: string, cwd: string, updatedAt: number): string {
 test('conversationSearch matches message content and builds session records', () => {
   const { store } = harness;
   const first = store.createSession('deploy notes', '/tmp/search-a');
-  store.addMessage(first.id, { type: 'user', content: 'deploy failed on staging' }, 1000);
-  store.addMessage(first.id, { type: 'assistant', content: 'restarted the pods' }, 2000);
+  store.messages.addMessage(first.id, { type: 'user', content: 'deploy failed on staging' }, 1000);
+  store.messages.addMessage(first.id, { type: 'assistant', content: 'restarted the pods' }, 2000);
   const second = store.createSession('deploy other', '/tmp/search-b');
-  store.addMessage(second.id, { type: 'user', content: 'deploy succeeded on prod' }, 3000);
+  store.messages.addMessage(second.id, { type: 'user', content: 'deploy succeeded on prod' }, 3000);
 
   const records = store.conversationSearch({ query: 'deploy' });
 
@@ -55,7 +55,7 @@ test('conversationSearch matches message content and builds session records', ()
 test('conversationSearch ignores single-character and empty queries', () => {
   const { store } = harness;
   const session = store.createSession('session', '/tmp/search-empty');
-  store.addMessage(session.id, { type: 'user', content: 'a b' }, 1000);
+  store.messages.addMessage(session.id, { type: 'user', content: 'a b' }, 1000);
 
   expect(store.conversationSearch({ query: 'a' })).toEqual([]);
   expect(store.conversationSearch({ query: '   ' })).toEqual([]);
@@ -65,7 +65,7 @@ test('conversationSearch clamps maxResults between 1 and 10', () => {
   const { store } = harness;
   for (let index = 0; index < 3; index += 1) {
     const session = store.createSession(`matching-${index}`, `/tmp/search-clamp-${index}`);
-    store.addMessage(session.id, { type: 'user', content: 'deploy note' }, 1000 + index);
+    store.messages.addMessage(session.id, { type: 'user', content: 'deploy note' }, 1000 + index);
   }
 
   expect(store.conversationSearch({ query: 'deploy', maxResults: 0 })).toHaveLength(1);
@@ -75,11 +75,11 @@ test('conversationSearch clamps maxResults between 1 and 10', () => {
 test('conversationSearch honors before and after bounds', () => {
   const { store } = harness;
   const early = store.createSession('early session', '/tmp/search-bounds-a');
-  store.addMessage(early.id, { type: 'user', content: 'deploy early question' }, 1000);
-  store.addMessage(early.id, { type: 'assistant', content: 'deploy early answer' }, 1500);
+  store.messages.addMessage(early.id, { type: 'user', content: 'deploy early question' }, 1000);
+  store.messages.addMessage(early.id, { type: 'assistant', content: 'deploy early answer' }, 1500);
   const late = store.createSession('late session', '/tmp/search-bounds-b');
-  store.addMessage(late.id, { type: 'user', content: 'deploy late question' }, 3000);
-  store.addMessage(late.id, { type: 'assistant', content: 'deploy late answer' }, 3500);
+  store.messages.addMessage(late.id, { type: 'user', content: 'deploy late question' }, 3000);
+  store.messages.addMessage(late.id, { type: 'assistant', content: 'deploy late answer' }, 3500);
 
   const beforeRecords = store.conversationSearch({
     query: 'deploy',
@@ -107,12 +107,12 @@ test('recentChats returns sessions with latest user and assistant previews', () 
   const oldest = store.createSession('oldest chat', '/tmp/recent-1').id;
   const middle = store.createSession('middle chat', '/tmp/recent-2').id;
   const newest = store.createSession('newest chat', '/tmp/recent-3').id;
-  store.addMessage(oldest, { type: 'user', content: 'old question' }, 1000);
-  store.addMessage(oldest, { type: 'assistant', content: 'old answer' }, 2000);
-  store.addMessage(middle, { type: 'user', content: 'middle question' }, 1000);
-  store.addMessage(newest, { type: 'user', content: 'new question' }, 1000);
-  store.addMessage(newest, { type: 'assistant', content: 'new answer' }, 4000);
-  store.addMessage(newest, { type: 'user', content: 'newer question' }, 5000);
+  store.messages.addMessage(oldest, { type: 'user', content: 'old question' }, 1000);
+  store.messages.addMessage(oldest, { type: 'assistant', content: 'old answer' }, 2000);
+  store.messages.addMessage(middle, { type: 'user', content: 'middle question' }, 1000);
+  store.messages.addMessage(newest, { type: 'user', content: 'new question' }, 1000);
+  store.messages.addMessage(newest, { type: 'assistant', content: 'new answer' }, 4000);
+  store.messages.addMessage(newest, { type: 'user', content: 'newer question' }, 5000);
   // addMessage stamps the session updated_at; pin it after seeding.
   db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(100, oldest);
   db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(200, middle);
@@ -153,7 +153,7 @@ test('message previews are whitespace-normalized and truncated to 280 characters
   const { store } = harness;
   const longText = `${'word '.repeat(100)}`;
   const session = seedSession('long preview', '/tmp/search-long', 100);
-  store.addMessage(session, { type: 'user', content: longText }, 1000);
+  store.messages.addMessage(session, { type: 'user', content: longText }, 1000);
 
   const records = store.recentChats({ n: 1 });
 

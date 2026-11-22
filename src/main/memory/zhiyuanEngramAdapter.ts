@@ -37,10 +37,15 @@ export class EngramRequestError extends Error {
   }
 }
 
-export class ZhiYuanEngramAdapter {
-  private readonly registeredSessions = new Map<string, string>();
+interface SessionRegistration {
+  ready: Promise<string>;
+  effectiveId?: string;
+}
 
-  constructor(private readonly manager: EngramManager) {}
+export class ZhiYuanEngramAdapter {
+  private readonly registeredSessions = new Map<string, SessionRegistration>();
+
+  constructor(private readonly manager: Pick<EngramManager, 'start'>) {}
 
   async recall(input: {
     query: string;
@@ -50,7 +55,7 @@ export class ZhiYuanEngramAdapter {
     matchMode?: EngramSearchMatchModeValue;
     signal?: AbortSignal;
   }): Promise<EngramObservation[]> {
-    const connection = await this.getConnection();
+    const connection = await this.manager.start();
     input.signal?.throwIfAborted();
     if (!connection) return [];
     const params = new URLSearchParams({
@@ -74,7 +79,7 @@ export class ZhiYuanEngramAdapter {
     limit?: number;
     signal?: AbortSignal;
   }): Promise<EngramObservation[]> {
-    const connection = await this.getConnection();
+    const connection = await this.manager.start();
     input.signal?.throwIfAborted();
     if (!connection) return [];
     const params = new URLSearchParams({
@@ -105,7 +110,7 @@ export class ZhiYuanEngramAdapter {
     workingDirectory: string,
     onRuntimeSession?: (runtimeSessionId: string, recovered?: boolean) => void,
   ): Promise<number | null> {
-    const connection = await this.getConnection();
+    const connection = await this.manager.start();
     if (!connection) return null;
     const operationId = candidate.operationId ?? candidate.id;
     if (candidate.recoverExistingResult) {
@@ -154,7 +159,7 @@ export class ZhiYuanEngramAdapter {
     summaryId: number;
     alreadyFinalized: boolean;
   } | null> {
-    const connection = await this.getConnection();
+    const connection = await this.manager.start();
     if (!connection) return null;
     let result;
     try {
@@ -167,14 +172,10 @@ export class ZhiYuanEngramAdapter {
         method: 'POST',
         body: JSON.stringify({ project: input.project, summary: input.summary }),
       });
-    } catch (error) {
-      for (const [localId, runtimeId] of this.registeredSessions) {
-        if (runtimeId === input.sessionId) this.registeredSessions.delete(localId);
+    } finally {
+      for (const [localId, registration] of this.registeredSessions) {
+        if (registration.effectiveId === input.sessionId) this.registeredSessions.delete(localId);
       }
-      throw error;
-    }
-    for (const [localId, runtimeId] of this.registeredSessions) {
-      if (runtimeId === input.sessionId) this.registeredSessions.delete(localId);
     }
     return {
       sessionId: result.session_id,
@@ -190,7 +191,7 @@ export class ZhiYuanEngramAdapter {
     project?: string;
     scope?: string;
   }): Promise<Record<string, unknown>> {
-    const connection = await this.getConnection();
+    const connection = await this.manager.start();
     if (!connection) throw new Error('Memory runtime is unavailable.');
     return await this.request(connection, '/conflicts/scan', {
       method: 'POST',
@@ -202,7 +203,7 @@ export class ZhiYuanEngramAdapter {
     relationIds: number[];
     decision: 'keep_new' | 'keep_old' | 'keep_both' | 'delete_old';
   }): Promise<Record<string, unknown>> {
-    const connection = await this.getConnection();
+    const connection = await this.manager.start();
     if (!connection) throw new Error('Memory runtime is unavailable.');
     return await this.request(connection, '/conflicts/judge-many', {
       method: 'POST',
@@ -234,7 +235,7 @@ export class ZhiYuanEngramAdapter {
     hardDelete: boolean,
     expectedProject?: string,
   ): Promise<boolean> {
-    const connection = await this.getConnection();
+    const connection = await this.manager.start();
     if (!connection) return false;
     const owner = expectedProject?.trim();
     const query = owner ? `&expected_project=${encodeURIComponent(owner)}` : '';
@@ -266,17 +267,13 @@ export class ZhiYuanEngramAdapter {
     }
   }
 
-  private async getConnection(): Promise<EngramConnection | null> {
-    return this.manager.getConnection() ?? (await this.manager.start());
-  }
-
   async resumeSession(
     sessionId: string,
     project: string,
     workingDirectory: string,
     runtimeSessionId?: string,
   ): Promise<string> {
-    const connection = await this.getConnection();
+    const connection = await this.manager.start();
     if (!connection) throw new Error('Memory runtime is unavailable.');
     return await this.ensureSession(
       connection,
@@ -295,18 +292,29 @@ export class ZhiYuanEngramAdapter {
     runtimeSessionId?: string,
   ): Promise<string> {
     const cached = this.registeredSessions.get(sessionId);
-    if (cached) return cached;
-    const registered = await this.request<{ id: string }>(connection, '/sessions', {
-      method: 'POST',
-      body: JSON.stringify({
-        id: runtimeSessionId ?? sessionId,
-        project,
-        directory: workingDirectory,
-        resume: true,
-      }),
-    });
-    this.registeredSessions.set(sessionId, registered.id);
-    return registered.id;
+    if (cached) return cached.ready;
+    const registration: SessionRegistration = {
+      ready: this.request<{ id: string }>(connection, '/sessions', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: runtimeSessionId ?? sessionId,
+          project,
+          directory: workingDirectory,
+          resume: true,
+        }),
+      }).then(
+        ({ id }) => {
+          registration.effectiveId = id;
+          return id;
+        },
+        error => {
+          this.registeredSessions.delete(sessionId);
+          throw error;
+        },
+      ),
+    };
+    this.registeredSessions.set(sessionId, registration);
+    return registration.ready;
   }
 
   private async request<T = unknown>(

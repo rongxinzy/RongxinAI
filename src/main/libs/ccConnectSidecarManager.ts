@@ -1,10 +1,13 @@
 import { type ChildProcessWithoutNullStreams, spawn } from 'child_process';
-import { EventEmitter } from 'events';
+import { EventEmitter, once } from 'events';
 import fs from 'fs';
 import path from 'path';
 
+import { stopOwnedProcess } from './ownedProcessStop';
+
 export class CcConnectSidecarManager extends EventEmitter {
   private child: ChildProcessWithoutNullStreams | null = null;
+  private stopping: Promise<void> | undefined;
   private startedAtMs: number | null = null;
   private lastErrorMessage: string | null = null;
   private controlUrl: string | null = null;
@@ -26,19 +29,14 @@ export class CcConnectSidecarManager extends EventEmitter {
   get running(): boolean {
     return this.child !== null && this.child.exitCode === null;
   }
-  async waitForControlUrl(timeoutMs = 10_000): Promise<string> {
+  async waitForControlUrl(timeoutMs = 10_000, signal?: AbortSignal): Promise<string> {
+    signal?.throwIfAborted();
     if (this.controlUrl) return this.controlUrl;
-    return new Promise<string>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.off('controlUrl', onControlUrl);
-        reject(new Error('cc-connect control URL was not announced before timeout'));
-      }, timeoutMs);
-      const onControlUrl = (url: string) => {
-        clearTimeout(timeout);
-        resolve(url);
-      };
-      this.once('controlUrl', onControlUrl);
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const [url] = await once(this, 'controlUrl', {
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
+    return url as string;
   }
   async start(config: string): Promise<void> {
     if (this.child) return;
@@ -78,17 +76,13 @@ export class CcConnectSidecarManager extends EventEmitter {
     });
   }
   async stop(): Promise<void> {
+    if (this.stopping) return this.stopping;
     const child = this.child;
-    if (!child) return;
-    await new Promise<void>(resolve => {
-      const done = () => resolve();
-      child.once('exit', done);
-      // A process may already have exited between the null check and kill.
-      if (!child.kill()) {
-        child.off('exit', done);
-        resolve();
-      }
+    if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
+    this.stopping = stopOwnedProcess(child).finally(() => {
+      this.stopping = undefined;
     });
+    return this.stopping;
   }
 
   private captureControlUrl(line: string): void {

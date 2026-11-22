@@ -8,6 +8,7 @@
  */
 
 import {
+  createTestPiRuntime,
   adapter,
   createTemporaryWorkspace,
   mockCreateAgentSession,
@@ -37,15 +38,17 @@ describe('PiRuntimeAdapter', () => {
         run: { id: `run-${beginRun.mock.calls.length}` },
       }));
       const recordToolCallObserved = vi.fn();
-      adapter.setWorkbenchTaskService({
-        beginRun,
-        recordToolCallObserved,
-        recordToolApprovalDecision: vi.fn(),
-        recordToolResult: vi.fn(),
-        updateRunContext: vi.fn(),
-        on: vi.fn(),
-        off: vi.fn(),
-      } as unknown as WorkbenchTaskService);
+      const adapter = createTestPiRuntime({
+        workbenchTaskService: {
+          beginRun,
+          recordToolCallObserved,
+          recordToolApprovalDecision: vi.fn(),
+          recordToolResult: vi.fn(),
+          updateRunContext: vi.fn(),
+          on: vi.fn(),
+          off: vi.fn(),
+        } as unknown as WorkbenchTaskService,
+      });
 
       await adapter.startSession('test', 'First', {
         approvalMode: WorkbenchApprovalMode.AllowAll,
@@ -341,7 +344,7 @@ describe('PiRuntimeAdapter', () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
+      const adapter = createTestPiRuntime({ workbenchTaskService: service });
       const workspaceRoot = createTemporaryWorkspace();
       const requests: string[] = [];
       adapter.on('permissionRequest', (_sessionId, request) => {

@@ -1,8 +1,8 @@
-import * as fs from 'node:fs';
+import fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import {
   copyTopLevelSkillIdsToUserData,
@@ -118,6 +118,39 @@ describe('parseExpertPackage', () => {
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
       fs.rmSync(userDataDir, { recursive: true, force: true });
+    }
+  });
+
+  test('reuses the validated manifest to decide whether packaged skills should be refreshed', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-expert-manifest-'));
+    const env = process.env.PI_CODING_AGENT_DIR;
+    process.env.PI_CODING_AGENT_DIR = path.join(tmpDir, 'pi');
+    const source = path.join(tmpDir, 'expert');
+    const manifest = path.join(source, 'plugin.json');
+    const userData = path.join(tmpDir, 'profile');
+    const shippedSkill = path.join(source, 'skills', 'hello-skill', 'SKILL.md');
+    const installedSkill = path.join(userData, 'SKILLs', 'hello-skill', 'SKILL.md');
+    const read = vi.spyOn(fs, 'readFileSync');
+    const shouldUpdate = vi.fn((presetId: string) => presetId === 'test-code-expert');
+    try {
+      createMinimalExpertPackage(source, { version: '2.0.0' });
+      fs.mkdirSync(path.dirname(installedSkill), { recursive: true });
+      fs.writeFileSync(installedSkill, 'old skill');
+      const { pluginJson } = parseExpertPackage(source, {
+        dbPath: path.join(userData, 'zhiyuan.sqlite'),
+        shouldUpdate,
+      });
+      expect(read.mock.calls.filter(([file]) => file === fs.realpathSync(manifest))).toHaveLength(
+        1,
+      );
+      expect(shouldUpdate).toHaveBeenCalledExactlyOnceWith(pluginJson.name);
+      expect(pluginJson.version).toBe('2.0.0');
+      expect(fs.readFileSync(installedSkill, 'utf-8')).toBe(fs.readFileSync(shippedSkill, 'utf-8'));
+    } finally {
+      read.mockRestore();
+      if (env === undefined) delete process.env.PI_CODING_AGENT_DIR;
+      else process.env.PI_CODING_AGENT_DIR = env;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 

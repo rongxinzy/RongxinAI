@@ -304,18 +304,6 @@ export class ScheduledTaskService {
     }
   }
 
-  async stopTask(id: string): Promise<void> {
-    const api = window.electron?.scheduledTasks;
-    if (!api) return;
-
-    try {
-      await api.stop(id);
-    } catch (err: unknown) {
-      store.dispatch(setError(err instanceof Error ? err.message : String(err)));
-      throw err;
-    }
-  }
-
   async loadRuns(taskId: string, limit = 20, offset?: number, filter?: RunFilter): Promise<void> {
     const api = window.electron?.scheduledTasks;
     if (!api) return;

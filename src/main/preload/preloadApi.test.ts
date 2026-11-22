@@ -5,12 +5,23 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { AgentIpcChannel } from '../../shared/agent/constants';
-import { CompanionIpc, CoworkSessionIpc, ModelPoolIpc, StoreIpc } from '../../shared/ipc/channels';
+import { ContextMenuAction } from '../../shared/contextMenu';
+import {
+  CompanionIpc,
+  ContextMenuIpc,
+  CoworkSessionIpc,
+  DingTalkInstallIpc,
+  LogIpc,
+  NetworkIpc,
+  StoreIpc,
+  WindowIpc,
+} from '../../shared/ipc/channels';
 import { LlamaCppIpcChannel } from '../../shared/llamacpp/constants';
 import { appSystemApi } from './appSystem';
 import { artifactsApi } from './artifacts';
 import { automationApi } from './automation';
 import { codingAgentApi } from './codingAgent';
+import { companionApi, companionNavigationApi } from './companion';
 import { coworkApi } from './cowork';
 import { imApi } from './im';
 import { localInferenceApi } from './localInference';
@@ -55,9 +66,34 @@ describe('pushChannel helpers', () => {
 });
 
 describe('split api fragments', () => {
+  test('app renderer events retain fire-and-forget preload methods and channels', () => {
+    const send = vi.spyOn(ipcRenderer, 'send');
+    const invoke = vi.spyOn(ipcRenderer, 'invoke');
+    const position = { x: 15, y: 20 };
+
+    expect(appSystemApi.window.minimize()).toBeUndefined();
+    expect(appSystemApi.window.toggleMaximize()).toBeUndefined();
+    expect(appSystemApi.window.close()).toBeUndefined();
+    expect(appSystemApi.window.showSystemMenu(position)).toBeUndefined();
+    expect(appSystemApi.contextMenu.execute(ContextMenuAction.Copy)).toBeUndefined();
+    expect(appSystemApi.networkStatus.send('offline')).toBeUndefined();
+    expect(appSystemApi.log.fromRenderer('warn', 'App', 'notice')).toBeUndefined();
+
+    expect(send.mock.calls).toEqual([
+      [WindowIpc.Minimize],
+      [WindowIpc.ToggleMaximize],
+      [WindowIpc.Close],
+      [WindowIpc.ShowSystemMenu, position],
+      [ContextMenuIpc.Execute, ContextMenuAction.Copy],
+      [NetworkIpc.StatusChange, 'offline'],
+      [LogIpc.FromRenderer, 'warn', 'App', 'notice'],
+    ]);
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
   test('companion focus is a payload-free subscription with full cleanup', () => {
     const listener = vi.fn();
-    const off = appSystemApi.companion.onFocus(listener);
+    const off = companionApi.companion.onFocus(listener);
     ipcRenderer.emit(CompanionIpc.Focus, { sender: {} });
     expect(listener).toHaveBeenCalledExactlyOnceWith();
     off();
@@ -67,8 +103,18 @@ describe('split api fragments', () => {
   });
   test('companion visibility reads only the dedicated window state channel', async () => {
     const invoke = vi.spyOn(ipcRenderer, 'invoke').mockResolvedValueOnce(false);
-    await expect(appSystemApi.companion.visibility()).resolves.toBe(false);
+    await expect(companionApi.companion.visibility()).resolves.toBe(false);
     expect(invoke).toHaveBeenCalledExactlyOnceWith(CompanionIpc.GetVisibility);
+  });
+  test('the main window companion bridge exposes only the workbench notification', () => {
+    expect(Object.keys(companionNavigationApi.companion)).toEqual(['onWorkbench']);
+    const listener = vi.fn();
+    const off = companionNavigationApi.companion.onWorkbench(listener);
+    ipcRenderer.emit(CompanionIpc.Changed, { sender: {} });
+    ipcRenderer.emit(CompanionIpc.Workbench, { sender: {} });
+    off();
+    ipcRenderer.emit(CompanionIpc.Workbench, { sender: {} });
+    expect(listener).toHaveBeenCalledExactlyOnceWith();
   });
   test('appSystem store forwards to StoreIpc channels', async () => {
     const invoke = vi.spyOn(ipcRenderer, 'invoke');
@@ -83,35 +129,13 @@ describe('split api fragments', () => {
     expect(invoke).toHaveBeenCalledWith(CoworkSessionIpc.Start, options);
   });
 
-  test('llamacpp onPullProgress maps install progress payloads', () => {
-    const events: Array<{ name: string; chunk: Record<string, unknown> }> = [];
-    const off = localInferenceApi.llamacpp.onPullProgress(event => events.push(event));
-    const emitProgress = (payload: unknown) =>
-      ipcRenderer.emit(LlamaCppIpcChannel.InstallProgress, { sender: {} }, payload);
+  test('llamacpp forwards typed install progress and removes the subscription', () => {
+    const callback = vi.fn();
+    const off = localInferenceApi.llamacpp.onInstallProgress(callback);
+    const progress = { modelId: 'qwen3', phase: 'downloading', percent: 41 };
 
-    emitProgress({
-      modelId: 'qwen3',
-      phase: 'downloading',
-      percent: 41,
-    });
-    expect(events).toEqual([
-      {
-        name: 'qwen3',
-        chunk: { modelId: 'qwen3', phase: 'downloading', percent: 41, status: 'downloading' },
-      },
-    ]);
-
-    emitProgress({
-      modelName: 'llama3',
-      phase: 'verifying',
-    });
-    expect(events[1]).toEqual({
-      name: 'llama3',
-      chunk: { modelName: 'llama3', phase: 'verifying', status: 'verifying' },
-    });
-
-    emitProgress({});
-    expect(events[2]).toEqual({ name: '', chunk: { status: undefined } });
+    ipcRenderer.emit(LlamaCppIpcChannel.InstallProgress, { sender: {} }, progress);
+    expect(callback).toHaveBeenCalledExactlyOnceWith(progress);
 
     off();
     expect(ipcRenderer.listenerCount(LlamaCppIpcChannel.InstallProgress)).toBe(0);
@@ -131,21 +155,35 @@ describe('split api fragments', () => {
 
     expect(invoke).toHaveBeenNthCalledWith(1, AgentIpcChannel.List);
     expect(invoke).toHaveBeenNthCalledWith(3, AgentIpcChannel.Get, 'missing');
-  });
 
-  test('modelPool listeners use per-request derived channels', () => {
-    const on = vi.spyOn(ipcRenderer, 'on');
-    providersApi.modelPool.onStreamData('req-9', () => {});
-    expect(on).toHaveBeenCalledWith(ModelPoolIpc.streamData('req-9'), expect.any(Function));
+    invoke.mockResolvedValueOnce({
+      success: true,
+      deleted: true,
+      deletedSessionIds: ['session-1'],
+    });
+    await expect(providersApi.agents.delete('a1')).resolves.toEqual({
+      success: true,
+      deleted: true,
+      deletedSessionIds: ['session-1'],
+    });
+    expect(invoke).toHaveBeenNthCalledWith(4, AgentIpcChannel.Delete, 'a1');
   });
 
   test('fragment surfaces keep their top-level sections', () => {
     expect(Object.keys(skillsAndMcpApi).sort()).toEqual(['marketplace', 'mcp', 'skills']);
     expect(Object.keys(codingAgentApi)).toEqual(['codingAgent']);
-    expect(Object.keys(imApi).sort()).toEqual(['dingtalk', 'feishu', 'im']);
+    expect(Object.keys(imApi)).toEqual(['im']);
     expect(Object.keys(memoryApi)).toEqual(['memory']);
     expect(Object.keys(artifactsApi)).toEqual(['artifacts']);
     expect(Object.keys(automationApi).sort()).toEqual(['activity', 'scheduledTasks']);
+  });
+
+  test('DingTalk setup forwards the shared IM contract arguments', async () => {
+    const invoke = vi.spyOn(ipcRenderer, 'invoke');
+    await imApi.im.dingtalkLoginStart();
+    await imApi.im.dingtalkLoginPoll({ deviceCode: 'device' });
+    expect(invoke).toHaveBeenNthCalledWith(1, DingTalkInstallIpc.Qrcode);
+    expect(invoke).toHaveBeenNthCalledWith(2, DingTalkInstallIpc.Poll, { deviceCode: 'device' });
   });
 });
 
@@ -174,9 +212,7 @@ describe('preload entry', () => {
       'cowork',
       'desktopPet',
       'dialog',
-      'dingtalk',
       'enterprise',
-      'feishu',
       'generateSessionTitle',
       'getRecentCwds',
       'hardware',
@@ -188,9 +224,7 @@ describe('preload entry', () => {
       'marketplace',
       'mcp',
       'memory',
-      'modelPool',
       'networkStatus',
-      'ollama',
       'permissions',
       'platform',
       'preventSleep',

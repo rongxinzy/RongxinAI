@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -97,14 +97,19 @@ function run(root) {
   const lineCounts = {};
   for (const relative of tracked) {
     if (!isCheckedSource(relative)) continue;
+    const file = path.join(root, relative);
+    let bytes;
     try {
-      const output = execFileSync('wc', ['-l', path.join(root, relative)], {
-        encoding: 'utf8',
-      }).trim();
-      lineCounts[relative] = Number(output.split(/\s+/)[0]);
-    } catch {
-      // deleted in the working tree
+      bytes = readFileSync(file);
+    } catch (error) {
+      if (error.code === 'ENOENT' && !lstatSync(file, { throwIfNoEntry: false })) continue;
+      throw error;
     }
+    let lines = 0;
+    for (const byte of bytes) {
+      if (byte === 0x0a) lines += 1;
+    }
+    lineCounts[relative] = lines;
   }
   const base = readBaseBaseline(root);
   if (!base) console.warn('Source line limit: base baseline unavailable; ratchet check skipped.');

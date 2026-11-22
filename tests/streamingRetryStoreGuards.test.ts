@@ -3,19 +3,15 @@
  */
 import '../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
 import {
-  adapter,
+  createTestPiRuntime,
   mockSession,
   setupPiRuntimeAdapterSuite,
 } from '../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
 import { createHarnessCoworkStore, ensureHarnessCoworkSession } from './helpers/harnessCoworkStore';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 describe('streaming retry store guards', () => {
   setupPiRuntimeAdapterSuite();
-
-  beforeEach(() => {
-    adapter.on('error', () => {});
-  });
 
   it('A9: non-retryable error then queued follow-up keeps prior assistant content in SQLite', async () => {
     let listener: ((event: unknown) => void) | null = null;
@@ -24,8 +20,9 @@ describe('streaming retry store guards', () => {
       return () => {};
     });
     const { store, cleanup } = createHarnessCoworkStore();
+    const adapter = createTestPiRuntime({ coworkStore: store });
+    adapter.on('error', () => {});
     try {
-      adapter.setCoworkStore(store);
       ensureHarnessCoworkSession(store, 'a9-session', 'work');
       await adapter.startSession('a9-session', 'First prompt', { sessionMode: 'work' });
 
@@ -85,6 +82,7 @@ describe('streaming retry store guards', () => {
         expect(message.metadata?.isStreaming).not.toBe(true);
       }
     } finally {
+      adapter.stopAllSessions();
       cleanup();
     }
   });
@@ -96,12 +94,13 @@ describe('streaming retry store guards', () => {
       return () => {};
     });
     const { store, cleanup } = createHarnessCoworkStore();
+    const adapter = createTestPiRuntime({ coworkStore: store });
+    adapter.on('error', () => {});
     const updates: Array<{ messageId: string; content: string }> = [];
     adapter.on('messageUpdate', (_sid, messageId, content) => {
       updates.push({ messageId, content });
     });
     try {
-      adapter.setCoworkStore(store);
       ensureHarnessCoworkSession(store, 'reuse-arm', 'chat');
       await adapter.startSession('reuse-arm', 'Hi');
 
@@ -129,6 +128,7 @@ describe('streaming retry store guards', () => {
         ?.messages.find(message => message.type === 'assistant');
       expect(assistant?.content).toBe('Keep me');
     } finally {
+      adapter.stopAllSessions();
       cleanup();
     }
   });

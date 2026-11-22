@@ -119,51 +119,22 @@ runs:
           libxss1 libxtst6 libuuid1 xdg-utils xvfb libfuse2t64
     - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
       shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
-    - run: bun run apply:patches
-      shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
-    - name: Read pinned Magpie Go toolchain
-      shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
-      id: magpie-toolchain
-      run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
-    - uses: actions/setup-go@v6
+    - uses: ./.github/actions/prepare-magpie-runtime
       with:
-        go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
-        cache: false
-    - name: Cache Magpie module and build scratch
-      uses: actions/cache@v5
-      with:
-        path: |
-          .cache/magpie
-          resources/magpie
-        key: magpie-${{ runner.os }}-${{ inputs.runtime-target }}-go${{ steps.magpie-toolchain.outputs.go-version }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs', 'scripts/magpie-runtime.cjs') }}
-    - name: Build and verify pinned Magpie gateway
-      shell: bash
-      env:
-        MAGPIE_TARGET: ${{ inputs.platform == 'linux' && 'linux-x64' || inputs.platform == 'windows' && 'win32-x64' || (inputs.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64') }}
-      run: |
-        set -euo pipefail
-        go version | grep -Fq "go${{ steps.magpie-toolchain.outputs.go-version }}"
-        bun run magpie:build -- --target "${MAGPIE_TARGET}"
-        bun run magpie:verify -- --target "${MAGPIE_TARGET}"
+        target: ${{ inputs.platform == 'linux' && 'linux-x64' || inputs.platform == 'windows' && 'win32-x64' || (inputs.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64') }}
     - name: Set up installer shell SDK
       if: ${{ inputs.platform == 'windows' }}
       uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '8.0.x'
-    - name: Set up Windows runtimes
-      shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
-      if: ${{ inputs.platform == 'windows' }}
-      run: |
-        bun run setup:uv-runtime
-        bun run setup:python-runtime
-        bun run engram:runtime:${{ inputs.runtime-target }}
+    - if: ${{ inputs.platform == 'windows' }}
+      uses: ./.github/actions/prepare-windows-packaging-runtime
     - name: Set up POSIX runtimes
       shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
       if: ${{ inputs.platform != 'windows' }}
       run: |
         bash scripts/ci/with-download-retries.sh bun run setup:posix-uv-runtime
         bash scripts/ci/with-download-retries.sh bun run setup:posix-python-runtime
-        bun run engram:runtime:${{ inputs.runtime-target }}
     - name: Sync vendor llama.cpp CPU edition
       shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
       if: ${{ inputs.inference-edition != 'lite' }}
@@ -196,12 +167,6 @@ runs:
       with:
         path: vendor/llamacpp/cuda
         key: ${{ steps.linux-cuda-runtime.outputs.cache-primary-key }}
-    - name: Stage bundled llama.cpp runtime
-      shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
-      if: ${{ inputs.inference-edition != 'lite' }}
-      run: bun run prepare:inference-edition-runtime
-      env:
-        ZHIYUAN_UPDATE_VARIANT: ${{ inputs.inference-edition }}
     - name: Connect Certum SimplySign
       if: ${{ inputs.mode == 'release' && inputs.platform == 'windows' }}
       id: certum-signing
@@ -264,63 +229,45 @@ runs:
         APPLE_ID: ${{ inputs.APPLE-ID }}
         APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.APPLE-APP-SPECIFIC-PASSWORD }}
         APPLE_TEAM_ID: ${{ inputs.APPLE-TEAM-ID }}
-    - name: Build macOS (verify)
-      shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
-      if: ${{ inputs.mode == 'verify' && inputs.platform == 'macos' }}
-      run: node scripts/ensure-build-version.js && bun run dist:mac:${{ inputs.arch }}
-      env:
-        NODE_OPTIONS: '--max-old-space-size=4096'
-        CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        MODELSCOPE_TOKENS: ${{ inputs.MODELSCOPE-TOKENS }}
-    - name: Build unsigned macOS release
-      shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
-      if: ${{ inputs.mode == 'release' && inputs.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED != 'true' }}
-      run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ inputs.arch }}
-      env:
-        NODE_OPTIONS: '--max-old-space-size=4096'
-        APP_BUILD_VERSION: ${{ inputs.app-build-version }}
-        UPDATE_MANIFEST_KEY_ID: ${{ inputs.UPDATE-MANIFEST-KEY-ID }}
-        UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ inputs.UPDATE-MANIFEST-PUBLIC-KEY-BASE64 }}
-        MODELSCOPE_TOKENS: ${{ inputs.MODELSCOPE-TOKENS }}
     # Intel macOS runners: stapler CloudKit ticket fetch over HTTP/3/UDP fails intermittently.
     # https://github.com/actions/runner-images/issues/14924
     - name: Block UDP/443 for stapler (macOS x64)
       if: ${{ inputs.mode == 'release' && inputs.platform == 'macos' && inputs.arch == 'x64' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
       shell: bash
       run: scripts/ci/block-stapler-http3-udp443.sh
-    - name: Build signed macOS release
-      shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
-      if: ${{ inputs.mode == 'release' && inputs.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
-      run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ inputs.arch }}
+    - name: Build macOS packages
+      shell: bash
+      if: ${{ inputs.platform == 'macos' && (inputs.mode == 'verify' || inputs.mode == 'release') }}
+      run: |
+        if [[ "$PACKAGING_MODE" != 'release' || "${ZHIYUAN_MAC_AUTO_UPDATE_ENABLED:-}" != 'true' ]]; then
+          unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          export CSC_IDENTITY_AUTO_DISCOVERY=false
+          export ZHIYUAN_MAC_AUTO_UPDATE_ENABLED=false
+        fi
+        node scripts/ensure-build-version.js
+        bun run "dist:mac:$MACOS_ARCH"
       env:
         NODE_OPTIONS: '--max-old-space-size=4096'
-        APP_BUILD_VERSION: ${{ inputs.app-build-version }}
-        UPDATE_MANIFEST_KEY_ID: ${{ inputs.UPDATE-MANIFEST-KEY-ID }}
-        UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ inputs.UPDATE-MANIFEST-PUBLIC-KEY-BASE64 }}
-        CSC_LINK: ${{ inputs.MACOS-CSC-LINK }}
-        CSC_KEY_PASSWORD: ${{ inputs.MACOS-CSC-KEY-PASSWORD }}
-        APPLE_ID: ${{ inputs.APPLE-ID }}
-        APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.APPLE-APP-SPECIFIC-PASSWORD }}
-        APPLE_TEAM_ID: ${{ inputs.APPLE-TEAM-ID }}
+        PACKAGING_MODE: ${{ inputs.mode }}
+        MACOS_ARCH: ${{ inputs.arch }}
+        ZHIYUAN_UPDATE_VARIANT: ${{ inputs.inference-edition }}
+        APP_BUILD_VERSION: ${{ inputs.mode == 'release' && inputs.app-build-version || '' }}
+        UPDATE_MANIFEST_KEY_ID: ${{ inputs.mode == 'release' && inputs.UPDATE-MANIFEST-KEY-ID || '' }}
+        UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ inputs.mode == 'release' && inputs.UPDATE-MANIFEST-PUBLIC-KEY-BASE64 || '' }}
+        CSC_LINK: ${{ inputs.mode == 'release' && inputs.MACOS-CSC-LINK || '' }}
+        CSC_KEY_PASSWORD: ${{ inputs.mode == 'release' && inputs.MACOS-CSC-KEY-PASSWORD || '' }}
+        APPLE_ID: ${{ inputs.mode == 'release' && inputs.APPLE-ID || '' }}
+        APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.mode == 'release' && inputs.APPLE-APP-SPECIFIC-PASSWORD || '' }}
+        APPLE_TEAM_ID: ${{ inputs.mode == 'release' && inputs.APPLE-TEAM-ID || '' }}
         MODELSCOPE_TOKENS: ${{ inputs.MODELSCOPE-TOKENS }}
-    - name: Build Linux (verify)
-      shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
-      if: ${{ inputs.mode == 'verify' && inputs.platform == 'linux' }}
-      # CUDA is already built and staged above; lite needs no inference runtime.
+    - name: Build Linux packages
+      shell: bash
+      if: ${{ inputs.platform == 'linux' && (inputs.mode == 'verify' || inputs.mode == 'release') }}
       run: bun run dist:linux
       env:
         ZHIYUAN_UPDATE_VARIANT: ${{ inputs.inference-edition }}
         NODE_OPTIONS: '--max-old-space-size=4096'
-        MODELSCOPE_TOKENS: ${{ inputs.MODELSCOPE-TOKENS }}
-    - name: Build Linux release
-      shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
-      if: ${{ inputs.mode == 'release' && inputs.platform == 'linux' }}
-      # CUDA is already built and staged above; lite needs no inference runtime.
-      run: bun run dist:linux
-      env:
-        ZHIYUAN_UPDATE_VARIANT: ${{ inputs.inference-edition }}
-        NODE_OPTIONS: '--max-old-space-size=4096'
-        APP_BUILD_VERSION: ${{ inputs.app-build-version }}
-        UPDATE_MANIFEST_KEY_ID: ${{ inputs.UPDATE-MANIFEST-KEY-ID }}
-        UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ inputs.UPDATE-MANIFEST-PUBLIC-KEY-BASE64 }}
+        APP_BUILD_VERSION: ${{ inputs.mode == 'release' && inputs.app-build-version || '' }}
+        UPDATE_MANIFEST_KEY_ID: ${{ inputs.mode == 'release' && inputs.UPDATE-MANIFEST-KEY-ID || '' }}
+        UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ inputs.mode == 'release' && inputs.UPDATE-MANIFEST-PUBLIC-KEY-BASE64 || '' }}
         MODELSCOPE_TOKENS: ${{ inputs.MODELSCOPE-TOKENS }}

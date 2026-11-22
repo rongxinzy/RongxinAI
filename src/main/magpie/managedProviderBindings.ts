@@ -1,30 +1,31 @@
-import type { OllamaProviderSnapshot } from './ollamaProviderBinding';
 import type { MagpieHostProvider } from './hostProviders';
 import type { ZhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
-import type { LlamaCppRunningModelBinding } from '../libs/llamacppAgentBinding';
+import type { AISphereService } from '../extensions/aisphere/service';
+import type { LlamaCppRunningModelBinding, LocalGpuSnapshot } from '../libs/llamacppAgentBinding';
 import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '../../shared/magpie/constants';
-const OLLAMA_MAGPIE_PROVIDER_ID = 'zhiyuan-host-ollama';
-export interface LocalGpuSnapshot {
-  baseUrl: string | null;
-  models: readonly LlamaCppRunningModelBinding[];
-}
+type LocalGpuProvider = Omit<MagpieHostProvider, 'models'> & {
+  models: Array<
+    MagpieHostProvider['models'][number] & Pick<LlamaCppRunningModelBinding, 'agentEligibility'>
+  >;
+};
 /** One full source set prevents one managed backend from disabling another's providers. */
 export class ManagedMagpieProviderBindings {
-  private gpu: MagpieHostProvider | null = null;
-  private ollama: MagpieHostProvider | null = null;
-  private refreshOllama?: () => Promise<OllamaProviderSnapshot>;
+  private gpu: LocalGpuProvider | null = null;
   private gpuRevision = 0;
-  private ollamaRevision = 0;
-  private refreshGpu?: () => Promise<LocalGpuSnapshot>;
   constructor(
     private readonly enterprise: ZhiyuanManagedProviderBridge,
     private readonly sink: {
-      syncHostProviders(providers: readonly MagpieHostProvider[]): Promise<void>;
+      syncHostProviders(
+        providers: readonly MagpieHostProvider[],
+        owner?: AbortSignal,
+      ): Promise<void>;
     },
+    private readonly sources: {
+      organization?: Pick<AISphereService, 'hostProvider' | 'allowedModel'>;
+      enterpriseOrigin?: () => string | undefined;
+      readLocalModels?: () => Promise<LocalGpuSnapshot>;
+    } = {},
   ) {}
-  setGpuReader(reader: () => Promise<LocalGpuSnapshot>): void {
-    this.refreshGpu = reader;
-  }
   setGpuSnapshot(baseUrl: string | null, models: readonly LlamaCppRunningModelBinding[]): void {
     this.gpuRevision++;
     this.gpu = null;
@@ -48,58 +49,47 @@ export class ManagedMagpieProviderBindings {
       models: models.map(model => ({
         id: model.id,
         name: model.name,
-        contextWindow: model.contextWindow ?? model.contextTokens,
+        contextWindow: model.contextWindow,
         maxTokens: model.maxTokens,
         input: ['text'],
+        agentEligibility: model.agentEligibility,
       })),
     };
   }
-  setOllamaReader(reader: () => Promise<OllamaProviderSnapshot>): void {
-    this.refreshOllama = reader;
+  localGpuEligibility(
+    modelId: string,
+  ): LlamaCppRunningModelBinding['agentEligibility'] | undefined {
+    const prefix = `${LOCAL_GPU_MAGPIE_PROVIDER_ID}/`;
+    const id = modelId.startsWith(prefix) ? modelId.slice(prefix.length) : modelId;
+    return this.gpu?.models.find(model => model.id === id)?.agentEligibility;
   }
-  setOllamaSnapshot(snapshot: OllamaProviderSnapshot): void {
-    this.ollamaRevision++;
-    this.ollama = null;
-    if (!snapshot.baseUrl || snapshot.models.length === 0) return;
-    if (snapshot.baseUrl !== 'http://127.0.0.1:11434/v1')
-      throw new Error('Ollama host endpoint must match the owned loopback client');
-    this.ollama = {
-      id: OLLAMA_MAGPIE_PROVIDER_ID,
-      name: 'Ollama',
-      api: 'openai-completions',
-      baseUrl: snapshot.baseUrl,
-      models: snapshot.models,
-    };
-  }
-  async beforeCatalog(): Promise<void> {
-    if (this.refreshGpu) {
+  async beforeCatalog(owner?: AbortSignal): Promise<void> {
+    const { organization, readLocalModels } = this.sources;
+    if (!organization && readLocalModels) {
       const revision = this.gpuRevision;
       try {
-        const snapshot = await this.refreshGpu();
+        const snapshot = await readLocalModels();
+        owner?.throwIfAborted();
         if (revision === this.gpuRevision) this.setGpuSnapshot(snapshot.baseUrl, snapshot.models);
       } catch {
+        owner?.throwIfAborted();
         if (revision === this.gpuRevision) this.gpu = null;
       }
     }
-    if (this.refreshOllama) {
-      const revision = this.ollamaRevision;
-      try {
-        const snapshot = await this.refreshOllama();
-        if (revision === this.ollamaRevision) this.setOllamaSnapshot(snapshot);
-      } catch {
-        if (revision === this.ollamaRevision) this.ollama = null;
-      }
-    }
-    await this.synchronize();
+    await this.synchronize(owner);
   }
-  async synchronize(): Promise<void> {
-    await this.sink.syncHostProviders([
-      ...this.enterprise.hostProviders(),
-      ...(this.gpu ? [this.gpu] : []),
-      ...(this.ollama ? [this.ollama] : []),
-    ]);
+  async synchronize(owner?: AbortSignal): Promise<void> {
+    owner?.throwIfAborted();
+    const { organization, enterpriseOrigin } = this.sources;
+    const providers = organization
+      ? [organization.hostProvider()].filter(provider => provider !== null)
+      : [...this.enterprise.hostProviders(enterpriseOrigin?.()), ...(this.gpu ? [this.gpu] : [])];
+    await this.sink.syncHostProviders(providers, owner);
   }
-  allowedModel(modelRef: string): boolean {
-    return this.enterprise.allowedModel(modelRef);
+  allowedModel(modelRef: string, owner?: string): boolean {
+    const { organization } = this.sources;
+    return organization
+      ? organization.allowedModel(modelRef, owner)
+      : this.enterprise.allowedModel(modelRef);
   }
 }

@@ -24,7 +24,7 @@ vi.mock('electron', () => ({
     ) => ({ x: rect.x * 2, y: rect.y * 2, width: rect.width * 2, height: rect.height * 2 }),
   },
 }));
-import { DesktopWindowObserver } from './observer';
+import { DesktopWindowObserver, drainDesktopPetSensors } from './observer';
 
 class FakeChild extends EventEmitter {
   pid = 700 + runtime.children.length;
@@ -178,4 +178,32 @@ test('a stale snapshot cannot support the pet and an unresponsive helper is term
   expect(child.postMessage).toHaveBeenLastCalledWith({ kind: WindowSensorMessage.Stop });
   vi.advanceTimersByTime(250);
   expect(child.kill).toHaveBeenCalledOnce();
+});
+
+test('quit waits for the exit of sensors owned by closed windows', async () => {
+  const closed = open();
+  observer.dispose();
+  observer = new DesktopWindowObserver(window, changed, 'win32');
+  const latest = open();
+  observer.dispose();
+
+  const completed = vi.fn();
+  const drain = drainDesktopPetSensors().then(completed);
+  latest.emit('exit', 0);
+  await vi.advanceTimersByTimeAsync(250);
+  expect(latest.kill).not.toHaveBeenCalled();
+  expect(closed.kill).toHaveBeenCalledOnce();
+  expect(completed).not.toHaveBeenCalled();
+
+  closed.emit('exit', 0);
+  await drain;
+  expect(completed).toHaveBeenCalledOnce();
+});
+
+test('quit reports a missing sensor exit without waiting indefinitely', async () => {
+  open();
+  observer.dispose();
+  const result = expect(drainDesktopPetSensors()).rejects.toThrow('did not exit');
+  await vi.advanceTimersByTimeAsync(1250);
+  await result;
 });

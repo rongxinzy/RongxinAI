@@ -1,4 +1,5 @@
 import { AISphereError, type AISphereModel } from '../../../shared/aisphere';
+import { MAX_CONTEXT_TOKENS } from '../../../shared/magpie/contexts';
 import { ModelCapabilityStatus } from '../../../shared/providers';
 
 export interface PlatformModel extends AISphereModel {
@@ -43,7 +44,12 @@ function text(input: unknown, limit: number): string {
 
 function limit(input: unknown): number | undefined {
   if (input === undefined || input === 0) return undefined;
-  if (typeof input !== 'number' || !Number.isSafeInteger(input) || input < 0) {
+  if (
+    typeof input !== 'number' ||
+    !Number.isSafeInteger(input) ||
+    input < 0 ||
+    input > MAX_CONTEXT_TOKENS
+  ) {
     throw new Error(AISphereError.InvalidModels);
   }
   return input;

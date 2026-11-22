@@ -12,6 +12,7 @@ import { randomUUID } from 'crypto';
 import { classifyCoworkError, CoworkErrorKind, makeCoworkError } from '../../../common/coworkError';
 import type { CoworkMessage } from '../../coworkStore';
 import { t } from '../../i18n';
+import { CoworkSessionStatus } from '../../../shared/cowork/constants';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
@@ -35,13 +36,25 @@ import {
 import { evaluateSummaryObligation } from './piSummaryObligation';
 import type { UIMessageChunk } from 'ai';
 import { ProviderName } from '../../../shared/providers';
-import { getMagpieModelService, hasMagpieModelService } from '../../magpie/modelService';
+import type { MagpieModelService } from '../../magpie/modelService';
 import type { ActivePiSession, PiEvent, PiStartupLatency } from './piRuntimeSessionState';
 import type { SessionMemoryCompletion } from '../../memory/sessionMemoryExtractor';
+import type { CoworkPersistedArtifact } from '../../../shared/cowork/artifacts';
+
+export type PiSummaryOmission = Pick<
+  ActivePiSession,
+  | 'workspaceRoot'
+  | 'workbenchRunId'
+  | 'lastCompletedAnswerMessageId'
+  | 'lastCompletedAnswerText'
+  | 'summaryCheckpointGoal'
+  | 'turnFailed'
+>;
 
 export interface PiRuntimeTurnHost {
-  getStore(): import('../../coworkStore').CoworkStore | null;
-  getWorkbench(): WorkbenchTaskService | null;
+  getModelService(): MagpieModelService | undefined;
+  getStore(sessionId: string): import('../../coworkStore').CoworkStore | null;
+  getWorkbench(sessionId: string): WorkbenchTaskService | null;
   readonly transcript: PiAssistantTranscript;
   sessionCount(): number;
   activeSessions(): ActivePiSession[];
@@ -55,7 +68,11 @@ export interface PiRuntimeTurnHost {
   ) => void;
   flushPendingError(sessionId: string, active: ActivePiSession): void;
   createSessionMemoryCompletion(active: ActivePiSession): SessionMemoryCompletion;
-  recordSummaryOmission(sessionId: string, active: ActivePiSession): Promise<void>;
+  recordSummaryOmission(
+    sessionId: string,
+    turn: PiSummaryOmission,
+    artifacts: readonly CoworkPersistedArtifact[],
+  ): Promise<void>;
 }
 
 export class PiRuntimeTurnEvents {
@@ -128,7 +145,6 @@ export class PiRuntimeTurnEvents {
       case 'agent_start':
         active.isRunning = true;
         active.lastUsedAt = Date.now();
-        this.host.getStore()?.updateSession(sessionId, { status: 'running' });
         if (active.agentStartedAt === null) {
           active.agentStartedAt = Date.now();
           console.log(
@@ -520,8 +536,10 @@ export class PiRuntimeTurnEvents {
         };
         // Emit the persisted message (store assigns its own id) to keep the
         // rendered id and DB id in sync — see message_end note.
-        const store = this.host.getStore();
-        const emittedToolUse = store ? store.addMessage(sessionId, toolUseMsg) : toolUseMsg;
+        const store = this.host.getStore(sessionId);
+        const emittedToolUse = store
+          ? store.messages.addMessage(sessionId, toolUseMsg)
+          : toolUseMsg;
         this.host.emit('message', sessionId, emittedToolUse);
         active.artifactRecorder?.onToolStart(event.toolCallId, event.toolName, event.args);
         break;
@@ -542,7 +560,7 @@ export class PiRuntimeTurnEvents {
         observeWorkbench(sessionId, () => {
           if (active.workbenchRunId) {
             this.host
-              .getWorkbench()
+              .getWorkbench(sessionId)
               ?.recordToolResult(
                 active.workbenchRunId,
                 event.toolCallId,
@@ -575,9 +593,9 @@ export class PiRuntimeTurnEvents {
           },
         };
         active.toolStartedAtByCallId.delete(event.toolCallId);
-        const store = this.host.getStore();
+        const store = this.host.getStore(sessionId);
         const emittedToolResult = store
-          ? store.addMessage(sessionId, toolResultMsg)
+          ? store.messages.addMessage(sessionId, toolResultMsg)
           : toolResultMsg;
         active.toolResultMessageIdByCallId.set(event.toolCallId, emittedToolResult.id);
         this.host.emit('message', sessionId, emittedToolResult);
@@ -647,11 +665,11 @@ export class PiRuntimeTurnEvents {
         // kick recovery now so Pi's retry backoff can connect to the restarted gateway.
         if (
           active.pendingError?.classified.kind === CoworkErrorKind.NetworkError &&
-          active.harnessModelProfile?.provider === ProviderName.Magpie &&
-          hasMagpieModelService()
+          active.harnessModelProfile?.provider === ProviderName.Magpie
         ) {
-          void getMagpieModelService()
-            .recoverIfNeeded()
+          void this.host
+            .getModelService()
+            ?.recoverIfNeeded()
             .catch(error => {
               console.warn(
                 `[PiRuntime] Magpie recovery during retry failed for ${sessionId}:`,
@@ -719,7 +737,9 @@ export class PiRuntimeTurnEvents {
     active.onSettled = undefined;
     // Flush artifact capture before completion: the final diff anchors to the
     // last completed answer message.
-    active.artifactRecorder?.onRunSettled(active.lastCompletedAnswerMessageId);
+    const finalWorkVersion = active.artifactRecorder?.onRunSettled(
+      active.lastCompletedAnswerMessageId,
+    );
     // Pi has exhausted its own continuations. A truncated/aborted/tool-only
     // final attempt is an interruption, never a successful task completion.
     if (
@@ -746,7 +766,7 @@ export class PiRuntimeTurnEvents {
       return;
     }
     active.retryPriorAnswer = '';
-    this.host.transcript.markFinalAnswer(sessionId, active);
+    const sessionSettledWithAnswer = this.host.transcript.markFinalAnswer(sessionId, active);
     this.host.transcript.flushContextUsageSync(sessionId);
     this.host.transcript.clearThrottleStateBySession(sessionId, false);
     active.lastUsedAt = Date.now();
@@ -755,32 +775,48 @@ export class PiRuntimeTurnEvents {
       this.host.sessionCount(),
       this.host.activeSessions().filter(session => session.isRunning).length,
     );
+    const checkpoint = {
+      checkpointWritten: active.summaryCheckpointWritten === true,
+      checkpointSkipped: active.summaryCheckpointSkipped !== undefined,
+      coveredWorkVersion: active.summaryCheckpointWorkVersion,
+    };
+    const summaryTurn: PiSummaryOmission = {
+      workspaceRoot: active.workspaceRoot,
+      workbenchRunId: active.workbenchRunId,
+      lastCompletedAnswerMessageId: active.lastCompletedAnswerMessageId,
+      lastCompletedAnswerText: active.lastCompletedAnswerText,
+      summaryCheckpointGoal: active.summaryCheckpointGoal,
+      turnFailed: active.turnFailed,
+    };
     observeWorkbench(sessionId, () => {
       if (active.workbenchRunId) {
-        this.host.getWorkbench()?.settleObservedRun({
+        this.host.getWorkbench(sessionId)?.settleObservedRun({
           sessionId,
           runId: active.workbenchRunId,
+          artifactsReady: finalWorkVersion?.then(() => {}),
+          onArtifactsReady: finalWorkVersion
+            ? async artifacts => {
+                const workVersion = await finalWorkVersion;
+                const obligation = evaluateSummaryObligation({
+                  ...checkpoint,
+                  hasRecordedFiles: workVersion > 0,
+                  workVersion,
+                });
+                if (obligation === 'fallback') {
+                  await this.host.recordSummaryOmission(sessionId, summaryTurn, artifacts);
+                }
+              }
+            : undefined,
+          memoryCompletion: active.resourceState.chatMode
+            ? undefined
+            : this.host.createSessionMemoryCompletion(active),
           workspaceRoot: active.workspaceRoot,
           finalAnswer: active.lastCompletedAnswerText,
         });
       }
     });
-    const store = this.host.getStore();
-    if (store) {
-      store.updateSession(sessionId, { status: 'idle' });
-    }
-    if (!active.resourceState.chatMode) {
-      const obligation = evaluateSummaryObligation({
-        hasRecordedFiles: active.artifactRecorder?.hasRecordedFiles() === true,
-        checkpointWritten: active.summaryCheckpointWritten === true,
-        checkpointSkipped: active.summaryCheckpointSkipped !== undefined,
-        workVersion: active.artifactRecorder?.recordedWorkVersion() ?? 0,
-        coveredWorkVersion: active.summaryCheckpointWorkVersion,
-      });
-      if (obligation === 'fallback') {
-        // Omissions never start another model turn.
-        void this.host.recordSummaryOmission(sessionId, active);
-      }
+    if (!sessionSettledWithAnswer) {
+      this.host.getStore(sessionId)?.updateSession(sessionId, { status: CoworkSessionStatus.Idle });
     }
     onSettled?.({ ok: true, output: active.lastCompletedAnswerText.trim() || null });
     this.host.emit('complete', sessionId);

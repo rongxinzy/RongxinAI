@@ -11,14 +11,6 @@ export function createDialog(runtime: BrowserMockRuntime): Window['electron']['d
         path: '/home/user/preview',
       };
     },
-    selectFile: async _p0 => {
-      void _p0;
-      runtime.warnOnce('dialog.selectFile');
-      return {
-        success: true,
-        path: '/home/user/preview',
-      };
-    },
     selectFiles: async _p0 => {
       void _p0;
       runtime.warnOnce('dialog.selectFiles');
@@ -47,20 +39,6 @@ export function createDialog(runtime: BrowserMockRuntime): Window['electron']['d
       runtime.warnOnce('dialog.checkArtifactFile');
       return {
         success: true,
-      };
-    },
-    generateThumbnail: async _p0 => {
-      void _p0;
-      runtime.warnOnce('dialog.generateThumbnail');
-      return {
-        success: true,
-      };
-    },
-    showMessageBox: async _p0 => {
-      void _p0;
-      runtime.warnOnce('dialog.showMessageBox');
-      return {
-        response: 0,
       };
     },
   };

@@ -5,6 +5,7 @@ import { MemoryOutboxOperation, MemoryOutboxStatus } from './constants';
 import { processMemoryOutboxItem } from './memoryOutboxProcessor';
 import { MemoryRepository } from './repository';
 import { getSessionFinalization } from './sessionLifecycleRepository';
+import { EngramRequestError } from './zhiyuanEngramAdapter';
 
 function databaseWithSessions(): Database.Database {
   const database = new Database(':memory:');
@@ -32,12 +33,15 @@ test('close intents and single or batch session deletion commit atomically', () 
     projectRoot: '/work',
   });
 
-  repository.lifecycle.queueSessionFinalizations(inputs(), () => {
+  const deleted = repository.lifecycle.queueSessionFinalizations(() => {
+    expect(database.inTransaction).toBe(true);
     database
       .prepare('DELETE FROM cowork_sessions WHERE id IN (?, ?)')
       .run('session-1', 'session-2');
+    return inputs();
   });
 
+  expect(deleted).toEqual(['session-1', 'session-2']);
   expect(database.prepare('SELECT COUNT(*) AS count FROM cowork_sessions').get()).toEqual({
     count: 0,
   });
@@ -46,7 +50,10 @@ test('close intents and single or batch session deletion commit atomically', () 
     MemoryOutboxOperation.FinalizeSession,
     MemoryOutboxOperation.FinalizeSession,
   ]);
-  expect(repository.listPending()[0].payload.runtimeSessionId).toBe('session-1:resume:2');
+  expect(repository.listPending()[0].payload).toEqual({
+    sessionId: 'session-1',
+    runtimeSessionId: 'session-1:resume:2',
+  });
   expect(repository.lifecycle.getLocalSessionIdByRuntimeId('session-1:resume:2')).toBe('session-1');
   expect(getSessionFinalization(database, 'session-1:resume:2')?.status).toBe(
     MemoryOutboxStatus.Pending,
@@ -61,11 +68,14 @@ test('an outbox failure rolls back both close intent and session deletion', () =
     BEGIN SELECT RAISE(ABORT, 'close rejected'); END;
   `);
 
-  expect(() =>
-    repository.lifecycle.queueSessionFinalizations(inputs().slice(0, 1), () => {
-      database.prepare('DELETE FROM cowork_sessions WHERE id = ?').run('session-1');
-    }),
-  ).toThrow('close rejected');
+  const deleteSessions = vi.fn(() => {
+    database.prepare('DELETE FROM cowork_sessions WHERE id = ?').run('session-1');
+    return inputs().slice(0, 1);
+  });
+  expect(() => repository.lifecycle.queueSessionFinalizations(deleteSessions)).toThrow(
+    'close rejected',
+  );
+  expect(deleteSessions).toHaveBeenCalledOnce();
   expect(database.prepare('SELECT COUNT(*) AS count FROM cowork_sessions').get()).toEqual({
     count: 2,
   });
@@ -75,12 +85,21 @@ test('an outbox failure rolls back both close intent and session deletion', () =
 test('finalize completion and uncertain failure update durable intent distinctly', async () => {
   const database = databaseWithSessions();
   const repository = new MemoryRepository(database);
-  repository.lifecycle.queueSessionFinalizations(inputs(), () => {
+  repository.lifecycle.queueSessionFinalizations(() => {
     database
       .prepare('DELETE FROM cowork_sessions WHERE id IN (?, ?)')
       .run('session-1', 'session-2');
+    return inputs();
   });
   const pending = repository.listPending();
+  database.prepare('UPDATE memory_outbox SET payload_json = ? WHERE id = ?').run(
+    JSON.stringify({
+      ...pending[0].payload,
+      summary: 'duplicated legacy text',
+      projectId: 'legacy-project',
+    }),
+    pending[0].id,
+  );
   const adapter = {
     finalizeSession: vi.fn(async () => ({
       sessionId: 'session-1',
@@ -90,6 +109,11 @@ test('finalize completion and uncertain failure update durable intent distinctly
     })),
   };
   await processMemoryOutboxItem(repository, adapter as never, pending[0]);
+  expect(adapter.finalizeSession).toHaveBeenCalledWith({
+    sessionId: 'session-1',
+    project: 'project-a',
+    summary: 'summary-1',
+  });
   expect(getSessionFinalization(database, 'session-1')?.status).toBe(MemoryOutboxStatus.Completed);
 
   const unavailable = { finalizeSession: vi.fn(async () => null) };
@@ -107,6 +131,40 @@ test('finalize completion and uncertain failure update durable intent distinctly
   expect(repository.listPending()).toHaveLength(0);
 });
 
+test('definitive absence closes an unregistered session while preserving failure for known identities', async () => {
+  const database = databaseWithSessions();
+  try {
+    const repository = new MemoryRepository(database);
+    repository.lifecycle.saveRuntimeSessionId({
+      localSessionId: 'session-2',
+      runtimeSessionId: 'native-2',
+      projectId: 'project-a',
+      projectRoot: '/work',
+    });
+    repository.lifecycle.queueSessionFinalizations(inputs);
+    const adapter = {
+      finalizeSession: vi.fn(async ({ sessionId }: { sessionId: string }) => {
+        throw new EngramRequestError(
+          404,
+          'POST',
+          `/sessions/${sessionId}/finalize`,
+          'unknown_session',
+          'missing',
+        );
+      }),
+    };
+    for (const item of repository.listPending()) {
+      await processMemoryOutboxItem(repository, adapter as never, item);
+    }
+    expect(getSessionFinalization(database, 'session-1')?.status).toBe(
+      MemoryOutboxStatus.Completed,
+    );
+    expect(getSessionFinalization(database, 'native-2')?.status).toBe(MemoryOutboxStatus.Failed);
+  } finally {
+    database.close();
+  }
+});
+
 test('finalize waits for an earlier checkpoint even while it is in backoff', async () => {
   const database = new Database(':memory:');
   const repository = new MemoryRepository(database);
@@ -120,10 +178,9 @@ test('finalize waits for an earlier checkpoint even while it is in backoff', asy
   });
   const checkpoint = repository.listPending()[0];
   repository.markRetry(checkpoint.id, 1, 'temporary failure');
-  repository.lifecycle.queueSessionFinalizations(
-    [{ sessionId: 'session-1', projectId: 'project-a', summary: 'final summary' }],
-    () => {},
-  );
+  repository.lifecycle.queueSessionFinalizations(() => [
+    { sessionId: 'session-1', projectId: 'project-a', summary: 'final summary' },
+  ]);
   const close =
     repository
       .listPending()
@@ -153,7 +210,8 @@ test('finalize waits for an earlier checkpoint even while it is in backoff', asy
 });
 
 test('all runtime identities retain their local owner while only the current pointer advances', () => {
-  const repository = new MemoryRepository(new Database(':memory:'));
+  const db = new Database(':memory:');
+  const repository = new MemoryRepository(db);
   for (const runtimeSessionId of ['session-1:resume:1', 'session-1:resume:2']) {
     repository.lifecycle.saveRuntimeSessionId({
       localSessionId: 'session-1',
@@ -162,6 +220,8 @@ test('all runtime identities retain their local owner while only the current poi
       projectRoot: '/work',
     });
   }
+  const totalWrites = db.prepare<[], { count: number }>('SELECT total_changes() AS count');
+  const beforeDuplicate = totalWrites.get()!.count;
   repository.lifecycle.saveRuntimeSessionId({
     localSessionId: 'session-1',
     runtimeSessionId: 'session-1:resume:2',
@@ -175,6 +235,7 @@ test('all runtime identities retain their local owner while only the current poi
     projectRoot: '/work',
     makeCurrent: false,
   });
+  expect(totalWrites.get()!.count).toBe(beforeDuplicate);
 
   expect(repository.lifecycle.getRuntimeSessionId('session-1')).toBe('session-1:resume:2');
   expect(repository.lifecycle.getLocalSessionIdByRuntimeId('session-1:resume:1')).toBe('session-1');
@@ -222,10 +283,9 @@ test('finalize follows the continuation resolved by the covered checkpoint', asy
     projectId: 'project-a',
     projectRoot: '/work',
   });
-  repository.lifecycle.queueSessionFinalizations(
-    [{ sessionId: 'session-1', projectId: 'project-a', summary: 'summary' }],
-    () => {},
-  );
+  repository.lifecycle.queueSessionFinalizations(() => [
+    { sessionId: 'session-1', projectId: 'project-a', summary: 'summary' },
+  ]);
   repository.lifecycle.saveRuntimeSessionId({
     localSessionId: 'session-1',
     runtimeSessionId: 'session-1:resume:2',
@@ -254,10 +314,9 @@ test('finalize follows the continuation resolved by the covered checkpoint', asy
   expect(getSessionFinalization(database, 'session-1')).toBeNull();
   expect(repository.listPending()).toHaveLength(0);
 
-  repository.lifecycle.queueSessionFinalizations(
-    [{ sessionId: 'session-1', projectId: 'project-a', summary: 'summary' }],
-    () => {},
-  );
+  repository.lifecycle.queueSessionFinalizations(() => [
+    { sessionId: 'session-1', projectId: 'project-a', summary: 'summary' },
+  ]);
   expect(repository.listPending()).toHaveLength(0);
 });
 
@@ -279,10 +338,9 @@ test('a completed close does not suppress finalization after resumed work', asyn
     })),
   };
   const close = (summary: string) => {
-    repository.lifecycle.queueSessionFinalizations(
-      [{ sessionId: 'session-1', projectId: 'project-a', summary }],
-      () => {},
-    );
+    repository.lifecycle.queueSessionFinalizations(() => [
+      { sessionId: 'session-1', projectId: 'project-a', summary },
+    ]);
   };
   close('first close');
   await processMemoryOutboxItem(repository, adapter as never, repository.listPending()[0]);
@@ -358,10 +416,9 @@ test('a new lifecycle gets a distinct outbox and never rewrites the old complete
     }),
   };
   const close = (summary: string) => {
-    repository.lifecycle.queueSessionFinalizations(
-      [{ sessionId: 'session-1', projectId: 'project-a', summary }],
-      () => {},
-    );
+    repository.lifecycle.queueSessionFinalizations(() => [
+      { sessionId: 'session-1', projectId: 'project-a', summary },
+    ]);
   };
   close('close root');
   await processMemoryOutboxItem(repository, adapter as never, repository.listPending()[0]);

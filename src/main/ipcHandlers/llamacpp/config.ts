@@ -25,7 +25,6 @@ import { ModelCapabilityStatus, type ModelCapabilities } from '../../../shared/p
 import { resolveLlamaCppDeviceSelection } from '../../libs/llamacppManager';
 
 export const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
-const OLLAMA_SERVICE_CONFIG_KEY = 'ollama_service_config';
 export const LLAMACPP_MODEL_PREFERENCES_KEY = 'llamacpp_model_preferences';
 const LLAMACPP_MODEL_PREFERENCE_CAPABILITY_KEYS = [
   'toolCalling',
@@ -67,30 +66,10 @@ export function getLlamaCppModelPreferences(store: SqliteStore): LlamaCppModelPr
   );
 }
 
-export function migrateLegacyLlamaCppConfig(store: SqliteStore): void {
-  migrateLegacyServiceConfig(store);
-  enforceLlamaCppParallelTwo(store);
-}
-
 export function enforceLlamaCppParallelTwo(store: SqliteStore): void {
   const existing = store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY);
   if (!existing || existing.parallel === '2') return;
   store.set(LLAMACPP_SERVICE_CONFIG_KEY, { ...existing, parallel: '2' });
-}
-
-function migrateLegacyServiceConfig(store: SqliteStore): void {
-  const existing = store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY);
-  if (existing) return;
-  const legacy = store.get<{ cudaVisibleDevices?: string; numParallel?: string }>(
-    OLLAMA_SERVICE_CONFIG_KEY,
-  );
-  if (!legacy) return;
-  store.set(
-    LLAMACPP_SERVICE_CONFIG_KEY,
-    sanitizeLlamaCppServiceConfig({
-      device: legacy.cudaVisibleDevices,
-    }),
-  );
 }
 
 export function applyStoredModelPreferencesToLaunchInput(

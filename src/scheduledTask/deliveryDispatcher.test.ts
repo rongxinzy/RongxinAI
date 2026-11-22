@@ -10,10 +10,13 @@ import {
   WakeMode,
 } from './constants';
 import { ScheduledTaskDeliveryDispatcher } from './deliveryDispatcher';
+import { initializeScheduledTaskSchema } from './schema';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 
 function setup(mode: DeliveryMode) {
-  const store = new SqliteScheduledTaskStore(new Database(':memory:'));
+  const db = new Database(':memory:');
+  initializeScheduledTaskSchema(db);
+  const store = new SqliteScheduledTaskStore(db);
   const task = store.create({
     name: 'task',
     description: '',
@@ -34,20 +37,33 @@ function setup(mode: DeliveryMode) {
     scheduledAt: '2026-08-11T06:00:00.000Z',
   })!;
   const transport = { send: vi.fn(async () => ({ receiptId: 'receipt-1' })) };
-  return { store, task, run, transport };
+  return { db, store, task, run, transport };
 }
 
-test('persists a skipped Delivery for mode none without calling the channel transport', async () => {
-  const { store, task, run, transport } = setup(DeliveryMode.None);
-  const delivery = await new ScheduledTaskDeliveryDispatcher(store, transport).dispatch(
-    task,
-    run,
-    'done',
-  );
-  expect(delivery).toMatchObject({ status: DeliveryStatus.Skipped, deliveredAt: null });
-  expect(transport.send).not.toHaveBeenCalled();
-  expect(store.listDeliveries(run.id)).toEqual([delivery]);
-});
+test.each([
+  [DeliveryMode.None, 'done', DeliveryStatus.Skipped, null],
+  [DeliveryMode.Announce, '  ', DeliveryStatus.Error, 'Pi completed without user-visible output'],
+] as const)(
+  'writes a single terminal delivery for %s mode with output %j',
+  async (mode, output, status, error) => {
+    const { db, store, task, run, transport } = setup(mode);
+    try {
+      db.exec(`CREATE TRIGGER reject_second_delivery_write
+        BEFORE UPDATE ON zhiyuan_scheduled_task_deliveries
+        BEGIN SELECT RAISE(ABORT, 'No transport attempt to update'); END;`);
+      const delivery = await new ScheduledTaskDeliveryDispatcher(store, transport).dispatch(
+        task,
+        run,
+        output,
+      );
+      expect(delivery).toMatchObject({ status, error, deliveredAt: null });
+      expect(transport.send).not.toHaveBeenCalled();
+      expect(store.listDeliveries(run.id)).toEqual([delivery]);
+    } finally {
+      db.close();
+    }
+  },
+);
 
 test('records the sidecar receipt or error against the same pending Delivery', async () => {
   const { store, task, run, transport } = setup(DeliveryMode.Announce);
@@ -62,4 +78,22 @@ test('records the sidecar receipt or error against the same pending Delivery', a
     error: 'channel unavailable',
   });
   expect(store.listDeliveries(run.id)).toHaveLength(2);
+});
+
+test('does not turn a failed receipt write into a transport failure', async () => {
+  const { db, store, task, run, transport } = setup(DeliveryMode.Announce);
+  try {
+    db.exec(`CREATE TRIGGER reject_receipt_write
+      BEFORE UPDATE ON zhiyuan_scheduled_task_deliveries WHEN NEW.status = '${DeliveryStatus.Success}'
+      BEGIN SELECT RAISE(ABORT, 'Receipt write failed'); END;`);
+    await expect(
+      new ScheduledTaskDeliveryDispatcher(store, transport).dispatch(task, run, 'done'),
+    ).rejects.toThrow('Receipt write failed');
+    expect(transport.send).toHaveBeenCalledOnce();
+    expect(store.listDeliveries(run.id)).toMatchObject([
+      { status: DeliveryStatus.Pending, error: null, receiptId: null },
+    ]);
+  } finally {
+    db.close();
+  }
 });

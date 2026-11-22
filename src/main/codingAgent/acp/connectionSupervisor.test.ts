@@ -3,9 +3,19 @@ import { expect, test, vi } from 'vitest';
 import { execPath } from 'process';
 import { tmpdir } from 'os';
 import path from 'path';
+import { EventEmitter } from 'node:events';
 
-import { AcpConnectionSupervisor, terminateProcessTree } from './connectionSupervisor';
+import { AcpConnectionSupervisor } from './connectionSupervisor';
+import { terminateProcessTree } from '../../libs/ownedProcessStop';
 import { AcpErrorCode, AcpMethod, AcpRequestError } from './protocol';
+
+function forceKillFixtureProcess(pid: number): void {
+  try {
+    process.kill(pid, 'SIGKILL');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+  }
+}
 
 test('reports handler failures with the ACP error code the handler chose', async () => {
   const supervisor = new AcpConnectionSupervisor();
@@ -304,31 +314,63 @@ test('responds to agent requests that use a string JSON-RPC ID', async () => {
 });
 
 test('falls back to terminating the child when Windows tree termination fails', async () => {
-  const kill = vi.fn(() => true);
-  await terminateProcessTree(
-    { pid: 42, kill },
-    {
-      platform: 'win32',
-      terminateWindowsTree: async pid => {
-        expect(pid).toBe(42);
-        throw new Error('taskkill failed');
-      },
+  const child = Object.assign(new EventEmitter(), {
+    pid: 42,
+    exitCode: null,
+    signalCode: null,
+    kill: vi.fn(function (this: EventEmitter, signal: NodeJS.Signals) {
+      this.emit('exit', null, signal);
+      return true;
+    }),
+  });
+  await terminateProcessTree(child, {
+    platform: 'win32',
+    terminateWindowsTree: async pid => {
+      expect(pid).toBe(42);
+      throw new Error('taskkill failed');
     },
-  );
-  expect(kill).toHaveBeenCalledWith('SIGTERM');
+  });
+  expect(child.kill).toHaveBeenCalledWith('SIGTERM');
 });
+
+test.skipIf(process.platform === 'win32')(
+  'concurrent disposal waits for an ACP process group that ignores SIGTERM',
+  async () => {
+    const supervisor = new AcpConnectionSupervisor();
+    const script = [
+      "process.on('SIGTERM', () => {});",
+      "process.stdin.once('data', chunk => { const request = JSON.parse(String(chunk)); process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: 'ready' }) + '\\n'); });",
+    ].join('');
+    await supervisor.start({
+      executable: execPath,
+      args: ['-e', script],
+      cwd: process.cwd(),
+      environment: process.env,
+    });
+    const pid = supervisor.processId!;
+    try {
+      await expect(supervisor.request(AcpMethod.Initialize, {})).resolves.toBe('ready');
+      const stopping = supervisor.dispose();
+      await supervisor.dispose();
+      expect(() => process.kill(pid, 0)).toThrow(/ESRCH/);
+      await stopping;
+    } finally {
+      forceKillFixtureProcess(-pid);
+      await supervisor.dispose();
+    }
+  },
+);
 
 test('terminates descendants with the ACP process tree', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'acp-process-tree-'));
   const pidFile = path.join(root, 'child.pid');
   const script = [
     "const { spawn } = require('child_process');",
-    "const fs = require('fs');",
-    "const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
-    'fs.writeFileSync(process.argv[1], String(child.pid));',
+    "spawn(process.execPath, ['-e', \"process.on('SIGTERM', () => {}); require('fs').writeFileSync(process.argv[1], String(process.pid)); setInterval(() => {}, 1000);\", process.argv[1]], { stdio: 'ignore' });",
     'setInterval(() => {}, 1000);',
   ].join('');
   const supervisor = new AcpConnectionSupervisor();
+  let pid: number | undefined;
   try {
     await supervisor.start({
       executable: execPath,
@@ -348,7 +390,7 @@ test('terminates descendants with the ACP process tree', async () => {
         { timeout: 1_000 },
       )
       .not.toBe('');
-    const pid = Number((await readFile(pidFile, 'utf8')).trim());
+    pid = Number((await readFile(pidFile, 'utf8')).trim());
     expect(pid).toBeGreaterThan(0);
 
     await supervisor.dispose();
@@ -356,7 +398,7 @@ test('terminates descendants with the ACP process tree', async () => {
       .poll(
         () => {
           try {
-            process.kill(pid, 0);
+            process.kill(pid!, 0);
             return true;
           } catch {
             return false;
@@ -367,6 +409,7 @@ test('terminates descendants with the ACP process tree', async () => {
       .toBe(false);
   } finally {
     await supervisor.dispose();
+    if (pid) forceKillFixtureProcess(pid);
     await rm(root, { recursive: true, force: true });
   }
 });

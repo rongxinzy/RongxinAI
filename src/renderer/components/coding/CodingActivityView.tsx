@@ -1,5 +1,5 @@
 import { CodeBlock } from '@shared/components/ai-elements/code-block';
-import { Tool, ToolContent, ToolHeader } from '@shared/components/ai-elements/tool';
+import { Tool, ToolContent, ToolHeader } from '../ai-elements/tool';
 import { Badge } from '@shared/components/ui/badge';
 import {
   Brain,

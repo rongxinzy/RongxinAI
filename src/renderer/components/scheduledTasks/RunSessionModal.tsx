@@ -12,8 +12,7 @@ import { TurnView } from '../conversation/thread/TurnView';
 import { PersistentToggleNamespaceProvider } from '../cowork/hooks/usePersistentToggle';
 
 interface RunSessionModalProps {
-  sessionId?: string | null;
-  sessionKey?: string | null;
+  sessionId: string;
   title?: string;
   onClose: () => void;
 }
@@ -21,12 +20,7 @@ interface RunSessionModalProps {
 const MAX_RETRIES = 5;
 const RETRY_INTERVAL_MS = 3000;
 
-const RunSessionModal: React.FC<RunSessionModalProps> = ({
-  sessionId,
-  sessionKey,
-  title,
-  onClose,
-}) => {
+const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, title, onClose }) => {
   const [session, setSession] = useState<CoworkSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,48 +36,24 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({
       }
 
       try {
-        let loadedSession: CoworkSession | null = null;
-
-        if (sessionId) {
-          const result = await window.electron?.cowork?.getSession(sessionId, {
-            messageLimit: null,
-          });
-          if (result?.success && result.session) {
-            const s = result.session;
-            loadedSession = {
-              ...s,
-              messagesOffset: s.messagesOffset ?? 0,
-              totalMessages: s.totalMessages ?? s.messages?.length ?? 0,
-            };
-          }
-        }
-
-        if (!loadedSession && sessionKey) {
-          const result = await window.electron?.scheduledTasks?.resolveSession(sessionKey);
-          if (result?.success && result.session) {
-            const s = result.session;
-            loadedSession = {
-              ...s,
-              messagesOffset: s.messagesOffset ?? 0,
-              totalMessages: s.totalMessages ?? s.messages?.length ?? 0,
-            };
-          }
-        }
-
-        if (cancelledRef.current) return false;
-
-        if (loadedSession) {
-          setSession(loadedSession);
-          setLoading(false);
-          setError(null);
-          return true;
-        }
-        return false;
+        const result = await window.electron?.cowork?.getSession(sessionId, {
+          messageLimit: null,
+        });
+        if (cancelledRef.current || !result?.success || !result.session) return false;
+        const loaded = result.session;
+        setSession({
+          ...loaded,
+          messagesOffset: loaded.messagesOffset ?? 0,
+          totalMessages: loaded.totalMessages ?? loaded.messages?.length ?? 0,
+        });
+        setLoading(false);
+        setError(null);
+        return true;
       } catch {
         return false;
       }
     },
-    [sessionId, sessionKey],
+    [sessionId],
   );
 
   useEffect(() => {

@@ -13,6 +13,7 @@ export interface ClockTask {
 export interface SchedulerClock {
   upsert(task: ClockTask): void;
   remove(taskId: string): void;
+  stop(): void;
 }
 
 type Timer = Cron | ReturnType<typeof setTimeout>;
@@ -44,10 +45,13 @@ const stopTimer = (timer: Timer): void => {
  */
 export class LocalCronClock implements SchedulerClock {
   private readonly timers = new Map<string, Timer>();
+  private readonly staggeredTimers = new Set<ReturnType<typeof setTimeout>>();
+  private stopped = false;
 
   constructor(private readonly fire: (task: ClockTask, scheduledAtMs: number) => void) {}
 
   upsert(task: ClockTask): void {
+    if (this.stopped) return;
     this.remove(task.taskId);
     const timer = this.schedule(task);
     if (timer) this.timers.set(task.taskId, timer);
@@ -58,6 +62,14 @@ export class LocalCronClock implements SchedulerClock {
     if (!timer) return;
     stopTimer(timer);
     this.timers.delete(taskId);
+  }
+
+  stop(): void {
+    this.stopped = true;
+    for (const timer of this.timers.values()) stopTimer(timer);
+    this.timers.clear();
+    for (const timer of this.staggeredTimers) clearTimeout(timer);
+    this.staggeredTimers.clear();
   }
 
   private schedule(task: ClockTask): Timer | null {
@@ -114,6 +126,10 @@ export class LocalCronClock implements SchedulerClock {
       this.fire(task, Date.now());
       return;
     }
-    setTimeout(() => this.fire(task, Date.now()), staggerMs);
+    const timer = setTimeout(() => {
+      this.staggeredTimers.delete(timer);
+      this.fire(task, Date.now());
+    }, staggerMs);
+    this.staggeredTimers.add(timer);
   }
 }

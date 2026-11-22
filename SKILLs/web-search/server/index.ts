@@ -5,11 +5,13 @@
 
 import express, { NextFunction, Request, Response } from 'express';
 import { Server } from 'http';
+import path from 'node:path';
 import { PlaywrightManager } from './playwright/manager';
 import {
   launchBrowser,
   closeBrowser,
   isBrowserRunning,
+  isOwnedCdpReachable,
   BrowserInstance,
 } from './playwright/browser';
 import { BingSearch } from './search/bing';
@@ -17,6 +19,7 @@ import { GoogleSearch } from './search/google';
 import { navigate, screenshot, getContent, getTextContent } from './playwright/operations';
 import { Config, mergeConfig } from './config';
 import { SearchResponse } from './search/types';
+import { openStandaloneControl } from './standaloneControl.cjs';
 
 type SearchEngine = 'google' | 'bing';
 type SearchEnginePreference = SearchEngine | 'auto';
@@ -81,6 +84,9 @@ export class BridgeServer {
   private googleSearch: GoogleSearch;
   private browserInstance: BrowserInstance | null = null;
   private httpServer: Server | null = null;
+  private ready = false;
+  private readonly shutdown = new AbortController();
+  private browserTransition = Promise.resolve();
   private config: Config;
 
   constructor(config?: Partial<Config>) {
@@ -190,80 +196,60 @@ export class BridgeServer {
     this.app.get('/api/connections', this.handleListConnections.bind(this));
   }
 
-  private isBrowserProcessAlive(instance: BrowserInstance | null): boolean {
-    if (!instance) {
-      return false;
-    }
-
-    if (!isBrowserRunning(instance)) {
-      return false;
-    }
-
-    try {
-      process.kill(instance.pid, 0);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  private async isCdpReachable(port: number): Promise<boolean> {
-    try {
-      const response = await fetch(`http://127.0.0.1:${port}/json/version`, {
-        signal: AbortSignal.timeout(1500),
-      });
-      return response.ok;
-    } catch {
-      return false;
-    }
-  }
-
   private async resetBrowserState(): Promise<void> {
     await this.playwrightManager.disconnectAll();
 
     if (this.browserInstance) {
-      try {
-        await closeBrowser(this.browserInstance);
-      } catch (error) {
-        console.warn(
-          `[Bridge Server] Failed to close stale browser instance: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+      await closeBrowser(this.browserInstance);
       this.browserInstance = null;
     }
   }
 
-  private async relaunchHeadfulBrowser(): Promise<string> {
-    await this.resetBrowserState();
-    const headfulConfig: Config['browser'] = {
-      ...this.config.browser,
-      headless: false,
-    };
-    this.browserInstance = await launchBrowser(headfulConfig);
-    return this.playwrightManager.connectToCDP(this.browserInstance.cdpPort);
+  private runBrowserTransition<T>(transition: () => Promise<T>): Promise<T> {
+    const next = this.browserTransition.then(() => {
+      this.shutdown.signal.throwIfAborted();
+      return transition();
+    });
+    this.browserTransition = next.then(
+      () => {},
+      () => {},
+    );
+    return next;
   }
 
-  private async ensureBrowserReady(): Promise<{ instance: BrowserInstance; reused: boolean }> {
-    if (this.browserInstance) {
-      const processAlive = this.isBrowserProcessAlive(this.browserInstance);
-      const cdpReachable = processAlive
-        ? await this.isCdpReachable(this.browserInstance.cdpPort)
-        : false;
+  private async relaunchHeadfulBrowser(): Promise<string> {
+    const instance = await this.runBrowserTransition(async () => {
+      await this.resetBrowserState();
+      this.browserInstance = await launchBrowser(
+        { ...this.config.browser, headless: false },
+        this.shutdown.signal,
+      );
+      return this.browserInstance;
+    });
+    return this.playwrightManager.connectToCDP(instance.cdpPort, instance.cdpWebSocketUrl);
+  }
 
-      if (processAlive && cdpReachable) {
-        return { instance: this.browserInstance, reused: true };
+  private ensureBrowserReady(): Promise<{ instance: BrowserInstance; reused: boolean }> {
+    return this.runBrowserTransition(async () => {
+      if (this.browserInstance) {
+        if (await isOwnedCdpReachable(this.browserInstance, this.shutdown.signal))
+          return { instance: this.browserInstance, reused: true };
+
+        console.warn('[Bridge Server] Detected stale browser instance, relaunching...');
+        await this.resetBrowserState();
       }
 
-      console.warn('[Bridge Server] Detected stale browser instance, relaunching...');
-      await this.resetBrowserState();
-    }
-
-    this.browserInstance = await launchBrowser(this.config.browser);
-    return { instance: this.browserInstance, reused: false };
+      this.browserInstance = await launchBrowser(this.config.browser, this.shutdown.signal);
+      return { instance: this.browserInstance, reused: false };
+    });
   }
 
   // Health check endpoint
   private handleHealth(req: Request, res: Response): void {
+    if (!this.ready) {
+      res.status(503).json({ success: false });
+      return;
+    }
     res.json({
       success: true,
       data: {
@@ -311,15 +297,12 @@ export class BridgeServer {
   private async handleBrowserConnect(req: Request, res: Response): Promise<void> {
     try {
       const { cdpPort } = req.body;
-      let port = cdpPort as number | undefined;
-
-      // If client does not specify a port, ensure managed browser is healthy first.
-      if (!port) {
-        const { instance } = await this.ensureBrowserReady();
-        port = instance.cdpPort;
-      }
-
-      const connectionId = await this.playwrightManager.connectToCDP(port);
+      const instance = cdpPort ? undefined : (await this.ensureBrowserReady()).instance;
+      const port = instance?.cdpPort ?? (cdpPort as number);
+      const connectionId = await this.playwrightManager.connectToCDP(
+        port,
+        instance?.cdpWebSocketUrl,
+      );
 
       res.json({
         success: true,
@@ -366,7 +349,7 @@ export class BridgeServer {
   // Close browser and disconnect all connections
   private async handleBrowserClose(req: Request, res: Response): Promise<void> {
     try {
-      await this.resetBrowserState();
+      await this.runBrowserTransition(() => this.resetBrowserState());
 
       res.json({
         success: true,
@@ -382,11 +365,9 @@ export class BridgeServer {
 
   // Get browser status
   private async handleBrowserStatus(req: Request, res: Response): Promise<void> {
-    const processAlive = this.isBrowserProcessAlive(this.browserInstance);
-    const cdpReachable =
-      processAlive && this.browserInstance
-        ? await this.isCdpReachable(this.browserInstance.cdpPort)
-        : false;
+    const instance = this.browserInstance;
+    const cdpReachable = instance ? await isOwnedCdpReachable(instance, this.shutdown.signal) : false;
+    const processAlive = isBrowserRunning(instance);
 
     res.json({
       success: true,
@@ -395,8 +376,8 @@ export class BridgeServer {
         processAlive,
         cdpReachable,
         connections: this.playwrightManager.getConnectionCount(),
-        pid: this.browserInstance?.pid,
-        cdpPort: this.browserInstance?.cdpPort,
+        pid: instance?.pid,
+        cdpPort: instance?.cdpPort,
       },
     });
   }
@@ -661,7 +642,7 @@ export class BridgeServer {
   /**
    * Start the server
    */
-  async start(): Promise<void> {
+  async start(afterListen?: () => Promise<void>): Promise<void> {
     return new Promise((resolve, reject) => {
       const server = this.app.listen(this.config.server.port, this.config.server.host);
       this.httpServer = server;
@@ -671,7 +652,16 @@ export class BridgeServer {
         reject(error);
       });
 
-      server.once('listening', () => {
+      server.once('listening', async () => {
+        try {
+          await afterListen?.();
+        } catch (error) {
+          server.close();
+          server.closeAllConnections();
+          reject(error);
+          return;
+        }
+        this.ready = true;
         console.log(
           `\n[Bridge Server] Started on http://${this.config.server.host}:${this.config.server.port}`,
         );
@@ -688,50 +678,53 @@ export class BridgeServer {
    */
   async stop(): Promise<void> {
     console.log('\n[Bridge Server] Shutting down...');
-
-    // Disconnect all Playwright connections
-    await this.playwrightManager.disconnectAll();
-
-    // Close browser if running
-    if (this.browserInstance) {
-      await closeBrowser(this.browserInstance);
-      this.browserInstance = null;
-    }
-
-    if (this.httpServer) {
-      await new Promise<void>((resolve, reject) => {
-        this.httpServer?.close((error?: Error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve();
-        });
+    this.ready = false;
+    this.shutdown.abort();
+    const httpServer = this.httpServer;
+    this.httpServer = null;
+    const closed =
+      httpServer &&
+      new Promise<void>((resolve, reject) => {
+        httpServer.close(error => (error ? reject(error) : resolve()));
+        httpServer.closeAllConnections();
       });
-      this.httpServer = null;
-    }
-
+    await Promise.all([closed, this.browserTransition.then(() => this.resetBrowserState())]);
     console.log('[Bridge Server] Shutdown complete\n');
   }
 }
 
-// Main entry point
+export async function runBridgeProcess(server: BridgeServer, skillRoot: string): Promise<void> {
+  const managed = typeof process.send === 'function';
+  let closeControl: (() => void) | undefined;
+  let stopping: Promise<void> | undefined;
+  const stop = () =>
+    (stopping ??= startup.then(() => {
+      closeControl?.();
+      return server.stop();
+    }));
+  const quit = () => {
+    void stop().then(
+      () => process.exit(0),
+      error => {
+        console.error('[Bridge Server] Failed to stop:', error);
+        process.exit(1);
+      },
+    );
+  };
+  const startup = server.start(async () => {
+    if (!managed && !stopping) closeControl = await openStandaloneControl(skillRoot, stop);
+  });
+  process.once('SIGINT', quit);
+  process.once('SIGTERM', quit);
+  if (managed) {
+    process.once('disconnect', quit);
+    if (!process.connected) quit();
+  }
+  await startup;
+}
+
 if (require.main === module) {
-  const server = new BridgeServer();
-
-  // Handle graceful shutdown
-  process.on('SIGINT', async () => {
-    await server.stop();
-    process.exit(0);
-  });
-
-  process.on('SIGTERM', async () => {
-    await server.stop();
-    process.exit(0);
-  });
-
-  // Start server
-  server.start().catch(error => {
+  runBridgeProcess(new BridgeServer(), path.resolve(__dirname, '../..')).catch(error => {
     console.error('Failed to start server:', error);
     process.exit(1);
   });

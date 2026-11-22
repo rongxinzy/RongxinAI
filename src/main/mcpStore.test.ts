@@ -49,6 +49,30 @@ test('createServer keeps new MCP servers disabled until explicitly enabled', () 
   db.close();
 });
 
+test('creates one registry-linked server and leaves portable custom rows separate', () => {
+  const db = createTestDb();
+  const store = new McpStore(db);
+  const config = {
+    name: 'Official',
+    description: '',
+    transportType: 'http' as const,
+    url: 'https://example.test/mcp',
+  };
+  try {
+    const first = store.createServer({ ...config, registryId: 'fixture', isBuiltIn: true });
+    const custom = store.createServer({ ...config, name: 'Imported' });
+    expect(() =>
+      store.createServer({ ...config, name: 'Second', registryId: 'fixture' }),
+    ).toThrow();
+    expect(() => store.updateServer(custom.id, { registryId: 'fixture' })).toThrow();
+    expect(store.getRegistryOwner('fixture')?.id).toBe(first.id);
+    expect(store.getServer(custom.id)?.registryId).toBeUndefined();
+    expect(store.listServers()).toHaveLength(2);
+  } finally {
+    db.close();
+  }
+});
+
 test('stores MCP credentials outside config_json when a credential vault is configured', () => {
   const db = createTestDb();
   const store = new McpStore(db, createCredentialStore());

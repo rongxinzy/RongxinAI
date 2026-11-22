@@ -5,8 +5,7 @@ import { Check } from 'lucide-react';
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { i18nService } from '../../../services/i18n';
 import { backgroundStyle, normalizeBackground } from '../../../theme/background/background';
-import { resolveThemePlugin, themePlugins } from '../../../theme/themes/plugins';
-import { TOKEN_CONTRACT, TOKEN_NAMES } from '../../../theme/tokens/contract';
+import { resolveThemePresentation, themePresentations } from '../../../theme/themes/presentation';
 
 type Appearance = 'light' | 'dark' | 'system';
 const APPEARANCES = ['light', 'dark', 'system'] as const;
@@ -21,15 +20,11 @@ const getSystemDark = () => window.matchMedia(SYSTEM_DARK_QUERY).matches;
 const getServerDark = () => false;
 
 function ThemePreview({ styleId, appearance }: { styleId: string; appearance: 'light' | 'dark' }) {
-  const theme = resolveThemePlugin(styleId).appearances[appearance];
-  const variables = {
-    ...Object.fromEntries(TOKEN_NAMES.map(key => [TOKEN_CONTRACT[key], theme.tokens[key]])),
-    ...backgroundStyle(normalizeBackground(theme.background)),
-  } as CSSProperties;
+  const theme = resolveThemePresentation(styleId).appearances[appearance];
   return (
     <span
-      style={variables}
-      data-theme-preview={theme.meta.id}
+      style={backgroundStyle(normalizeBackground(theme.background)) as CSSProperties}
+      data-theme-preview={theme.id}
       aria-hidden="true"
       className="theme-appearance-preview-frame flex aspect-[3/2] w-full overflow-hidden"
     >
@@ -101,7 +96,7 @@ export function AppearanceSettingsPanel({
       <section className="space-y-3" aria-label={i18nService.t('themeStyle')}>
         <h4 className="text-base font-semibold">{i18nService.t('themeStyle')}</h4>
         <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))] gap-3">
-          {themePlugins.map(plugin => {
+          {themePresentations.map(plugin => {
             const isPending = pendingStyleId === plugin.id;
             const isActive = styleId === plugin.id || isPending;
             return (

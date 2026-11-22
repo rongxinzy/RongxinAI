@@ -1,177 +1,163 @@
 /**
- * Unified cc-connect channel runtime: bridge server, sidecar process lifecycle,
- * canonical scheduled task service and the IM gateway manager. All mutable
- * runtime state lives in ./runtimeState.
+ * cc-connect channel runtime: bridge server, sidecar lifecycle and IM gateway.
  */
 import crypto from 'crypto';
-import fs from 'fs';
+import { access, readFile } from 'node:fs/promises';
 import path from 'path';
+import { setTimeout as delay } from 'node:timers/promises';
 
-import { app, BrowserWindow } from 'electron';
+import { app } from 'electron';
 
-import { agentRuntime } from './agentRuntimeState';
-import { getCoworkStore, getSkillManager, getStore } from './runtimeServices';
+import {
+  getActivityService,
+  getCoworkStore,
+  getIMStore,
+  getSkillManager,
+  getStore,
+} from './runtimeServices';
 import { getPiRuntimeAdapter } from './sessionServices';
 import { CcConnectControlClient } from '../libs/ccConnectControlClient';
-import { CanonicalScheduledTaskService } from '../../scheduledTask/canonicalScheduledTaskService';
 import { CcConnectDeliveryClient } from '../../scheduledTask/ccConnectDeliveryClient';
 import { CcConnectDeliveryTransport } from '../../scheduledTask/ccConnectDeliveryTransport';
-import { CcConnectSchedulerRuntime } from '../../scheduledTask/ccConnectSchedulerRuntime';
-import { LocalCronClock } from '../../scheduledTask/localCronClock';
-import { ScheduledTaskDeliveryDispatcher } from '../../scheduledTask/deliveryDispatcher';
-import { SqliteScheduledTaskStore } from '../../scheduledTask/sqliteScheduledTaskStore';
-import { PiScheduledTaskExecutor } from '../../scheduledTask/piScheduledTaskExecutor';
-import { IpcChannel as ScheduledTaskIpc } from '../../scheduledTask/constants';
-import { ActivityService } from '../activity/activityService';
 import { ChannelAccountManager } from '../im/channelAccountManager';
 import { CcConnectPiBridge } from '../im/ccConnectPiBridge';
 import { ChannelInboxStore } from '../im/channelInboxStore';
 import { ChannelTurnCoordinator } from '../im/channelTurnCoordinator';
-import { IMStore } from '../im/imStore';
 import { listCcConnectAccountConfigs } from '../libs/ccConnectAccountConfig';
 import { CcConnectBridgeServer } from '../libs/ccConnectBridgeServer';
 import { CcConnectSidecarManager } from '../libs/ccConnectSidecarManager';
 import { serializeCcConnectSidecarConfig } from '../libs/ccConnectSidecarConfig';
 import { resolveCcConnectAccountRuntimeStatus } from '../libs/ccConnectAccountRuntimeStatus';
-import { channelRuntime } from './channelRuntimeState';
+import { CcConnectRuntimeStatusRegistry } from '../libs/ccConnectRuntimeStatusRegistry';
+import { runCcConnectWeixinSetup, type WeixinSetupResult } from '../libs/ccConnectWeixinSetup';
 
-const attachCcConnectControl = async (
-  baseUrl: string,
-  expectedPid: number,
-): Promise<Awaited<ReturnType<CcConnectControlClient['healthCheck']>>> => {
-  if (!channelRuntime.bridgeToken) throw new Error('cc-connect bridge token is not initialized');
-  // The scheduler clock is in-process; attach only verifies the sidecar health
-  // contract. There is no cron projection to rebuild on attach anymore.
-  return await new CcConnectControlClient(baseUrl, channelRuntime.bridgeToken).healthCheck(
-    expectedPid,
-  );
-};
-/**
- * Pushes canonical scheduler Run/status changes to every renderer window.
- * Scheduled Runs are started by the sidecar clock, so without this push the
- * task list and run history would keep showing pre-Run state until the next
- * user action.
- */
-const broadcastScheduledTaskEvent = (
-  channel: (typeof ScheduledTaskIpc)[keyof typeof ScheduledTaskIpc],
-  data: Record<string, unknown>,
-): void => {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (win.isDestroyed()) continue;
-    try {
-      win.webContents.send(channel, data);
-    } catch (error) {
-      console.error('[Scheduler] failed to broadcast a scheduled task event:', error);
-    }
-  }
+/** State for cc-connect sidecars, bridge ingress and channel accounts. */
+interface ChannelRuntimeState {
+  gatewayManager: ChannelAccountManager | null;
+  bridge: {
+    server: CcConnectBridgeServer;
+    handler: CcConnectPiBridge;
+    token: string;
+    url: string | null;
+  } | null;
+  bridgeClosing: Promise<void> | null;
+  sidecarManager: CcConnectSidecarManager | null;
+  statuses: CcConnectRuntimeStatusRegistry;
+  restartTimer: NodeJS.Timeout | null;
+  stopping: boolean;
+  reconcileQueue: Promise<void>;
+  configSignature: string;
+  controlClient: CcConnectControlClient | null;
+  delivery: CcConnectDeliveryTransport | null;
+  restartAttempts: number;
+}
+
+const channelRuntime: ChannelRuntimeState = {
+  gatewayManager: null,
+  bridge: null,
+  bridgeClosing: null,
+  sidecarManager: null,
+  statuses: new CcConnectRuntimeStatusRegistry(),
+  restartTimer: null,
+  stopping: false,
+  reconcileQueue: Promise.resolve(),
+  configSignature: '',
+  controlClient: null,
+  delivery: null,
+  restartAttempts: 0,
 };
 
-export const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
-  if (!channelRuntime.scheduledTaskService) {
-    const taskStore = new SqliteScheduledTaskStore(getStore().getDatabase());
-    channelRuntime.deliveryTransport = new CcConnectDeliveryTransport(
-      new IMStore(getStore().getDatabase()),
-      getCoworkStore(),
-    );
-    const executor = new PiScheduledTaskExecutor(getPiRuntimeAdapter(), getCoworkStore());
-    channelRuntime.activityService ??= new ActivityService(getStore().getDatabase());
-    // Main-process clock: timers survive sidecar restarts and fire with no
-    // sidecar at all; triggers go straight into the runtime's claim path.
-    channelRuntime.schedulerClock = new LocalCronClock((task, scheduledAtMs) => {
-      void channelRuntime
-        .schedulerRuntime!.handleTrigger({
-          taskId: task.taskId,
-          scheduleVersion: task.scheduleVersion,
-          scheduledAt: new Date(scheduledAtMs).toISOString(),
-        })
-        .catch(error => console.error('[Scheduler] clock trigger failed:', error));
-    });
-    channelRuntime.schedulerRuntime = new CcConnectSchedulerRuntime(
-      taskStore,
-      channelRuntime.schedulerClock,
-      executor.execute.bind(executor),
-      new ScheduledTaskDeliveryDispatcher(taskStore, channelRuntime.deliveryTransport),
-      channelRuntime.activityService,
-      {
-        runUpdated: (run, taskName) =>
-          broadcastScheduledTaskEvent(ScheduledTaskIpc.RunUpdate, {
-            run: { ...run, taskName },
-          }),
-        taskStateChanged: (taskId, state) =>
-          broadcastScheduledTaskEvent(ScheduledTaskIpc.StatusUpdate, { taskId, state }),
-      },
-    );
-    channelRuntime.scheduledTaskService = new CanonicalScheduledTaskService(
-      taskStore,
-      channelRuntime.schedulerRuntime,
-    );
-    agentRuntime.piRuntimeAdapter?.setScheduledTaskService(channelRuntime.scheduledTaskService);
-    // Arm every enabled task's timer from SQLite at construction; the previous
-    // design armed them only when the sidecar control plane attached.
-    void (async () => {
-      try {
-        await channelRuntime.schedulerRuntime!.reconcile(
-          await channelRuntime.scheduledTaskService.listJobs(),
-        );
-      } catch (error) {
-        console.error('[Scheduler] startup scheduling failed:', error);
-      }
-    })();
-  }
-  return channelRuntime.scheduledTaskService;
-};
-export const startCcConnectBridge = async (): Promise<void> => {
-  if (channelRuntime.bridgeServer) return;
+const channelShutdown = new AbortController();
+const pendingWeixinSetups = new Set<Promise<WeixinSetupResult>>();
+
+export function getCcConnectDeliveryTransport(): CcConnectDeliveryTransport {
+  return (channelRuntime.delivery ??= new CcConnectDeliveryTransport(
+    getIMStore(),
+    getCoworkStore().messages,
+  ));
+}
+
+const startCcConnectBridge = async (): Promise<void> => {
+  if (channelRuntime.bridge || channelShutdown.signal.aborted) return;
   const token = crypto.randomBytes(32).toString('base64url');
-  channelRuntime.bridgeToken = token;
-  channelRuntime.piBridge = new CcConnectPiBridge({
+  const bridge = new CcConnectPiBridge({
     runtime: getPiRuntimeAdapter(),
     coworkStore: getCoworkStore(),
-    imStore: new IMStore(getStore().getDatabase()),
+    imStore: getIMStore(),
     turnCoordinator: new ChannelTurnCoordinator(new ChannelInboxStore(getStore().getDatabase())),
-    activityService:
-      channelRuntime.activityService ??
-      (channelRuntime.activityService = new ActivityService(getStore().getDatabase())),
+    activityService: getActivityService(),
     getSkillsPrompt: async () => getSkillManager().buildAutoRoutingPrompt(),
   });
-  channelRuntime.bridgeServer = new CcConnectBridgeServer(token, {
-    onTurn: (request, signal) => channelRuntime.piBridge!.runTurn(request, signal),
+  const server = new CcConnectBridgeServer(token, {
+    onTurn: (request, signal) => bridge.runTurn(request, signal),
   });
-  channelRuntime.bridgeUrl = await channelRuntime.bridgeServer.start();
+  const endpoint: NonNullable<ChannelRuntimeState['bridge']> = {
+    server,
+    handler: bridge,
+    token,
+    url: null,
+  };
+  channelRuntime.bridge = endpoint;
+  try {
+    endpoint.url = await server.start();
+  } catch (error) {
+    if (channelRuntime.bridge === endpoint) {
+      channelRuntime.bridge = null;
+      endpoint.handler.dispose();
+    }
+    if (!channelShutdown.signal.aborted) throw error;
+  }
 };
 
-export const resolveCcConnectSidecarExecutable = (): string | null => {
+const resolveCcConnectSidecarExecutable = async (): Promise<string | null> => {
   const binary = process.platform === 'win32' ? 'cc-connect-sidecar.exe' : 'cc-connect-sidecar';
-  const runtimeDirectories = [
-    path.join(process.resourcesPath, 'channel-runtime'),
-    path.join(app.getAppPath(), 'vendor', 'channel-runtime', 'current'),
-  ];
-  const candidates = runtimeDirectories.flatMap(directory => {
-    try {
-      const buildInfo = JSON.parse(
-        fs.readFileSync(path.join(directory, 'runtime-build-info.json'), 'utf8'),
-      ) as { binary?: unknown };
-      return typeof buildInfo.binary === 'string'
-        ? [path.join(directory, buildInfo.binary), path.join(directory, binary)]
-        : [path.join(directory, binary)];
-    } catch {
-      return [path.join(directory, binary)];
+  const packagedBinary = path.join(process.resourcesPath, 'channel-runtime', binary);
+  if (
+    await access(packagedBinary).then(
+      () => true,
+      () => false,
+    )
+  )
+    return packagedBinary;
+  if (app.isPackaged) return null;
+
+  const directory = path.join(app.getAppPath(), 'vendor', 'channel-runtime', 'current');
+  const candidates = [path.join(directory, binary)];
+  try {
+    // A Windows host build can publish a revisioned binary while the previous executable is locked.
+    const buildInfo = JSON.parse(
+      await readFile(path.join(directory, 'runtime-build-info.json'), 'utf8'),
+    ) as { binary?: unknown };
+    if (typeof buildInfo.binary === 'string') {
+      candidates.unshift(path.join(directory, buildInfo.binary));
     }
-  });
-  return candidates.find(candidate => fs.existsSync(candidate)) ?? null;
+  } catch {
+    // Downloaded development runtimes use the canonical binary name.
+  }
+  for (const candidate of candidates) {
+    try {
+      await access(candidate);
+      return candidate;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
 };
 
 const waitForCcConnectCronControl = async (
-  baseUrl: string,
+  client: CcConnectControlClient,
   expectedPid: number,
 ): Promise<Awaited<ReturnType<CcConnectControlClient['healthCheck']>>> => {
+  const { signal } = channelShutdown;
   let lastError: unknown;
   for (let attempt = 0; attempt < 40; attempt += 1) {
+    signal.throwIfAborted();
     try {
-      return await attachCcConnectControl(baseUrl, expectedPid);
+      return await client.healthCheck(expectedPid, signal);
     } catch (error) {
       lastError = error;
-      await new Promise(resolve => setTimeout(resolve, 250));
+      await delay(250, undefined, { signal });
     }
   }
   throw lastError instanceof Error
@@ -186,23 +172,35 @@ const applyCcConnectPlatformStatuses = (
 };
 
 export const refreshCcConnectPlatformStatuses = async (): Promise<void> => {
-  if (!channelRuntime.controlClient || !channelRuntime.sidecarManager?.running) return;
-  const health = await channelRuntime.controlClient.healthCheck(
-    channelRuntime.sidecarManager.pid ?? undefined,
+  const { controlClient, sidecarManager } = channelRuntime;
+  if (!controlClient || !sidecarManager?.running || channelShutdown.signal.aborted) return;
+  const health = await controlClient.healthCheck(
+    sidecarManager.pid ?? undefined,
+    channelShutdown.signal,
   );
-  applyCcConnectPlatformStatuses(health.platforms);
+  if (
+    channelRuntime.controlClient === controlClient &&
+    channelRuntime.sidecarManager === sidecarManager
+  )
+    applyCcConnectPlatformStatuses(health.platforms);
 };
 
 const startCcConnectRuntime = async (
   accounts: ReturnType<typeof listCcConnectAccountConfigs>,
   signature: string,
 ): Promise<void> => {
-  if (channelRuntime.sidecarManager) return;
-  if (!channelRuntime.bridgeToken || !channelRuntime.bridgeUrl)
-    throw new Error('cc-connect bridge is not initialized');
-  const executable = resolveCcConnectSidecarExecutable();
+  if (accounts.length === 0 || channelRuntime.sidecarManager || channelShutdown.signal.aborted)
+    return;
+  const executable = await resolveCcConnectSidecarExecutable();
+  if (channelShutdown.signal.aborted) return;
   if (!executable) throw new Error('cc-connect runtime is not bundled');
+  await startCcConnectBridge();
+  if (channelShutdown.signal.aborted) return;
+  const endpoint = channelRuntime.bridge;
+  if (!endpoint?.url) throw new Error('cc-connect bridge is not initialized');
+  const { token: bridgeToken, url: bridgeUrl } = endpoint;
   const sidecarRoot = path.join(app.getPath('userData'), 'cc-connect', 'runtime');
+  const delivery = getCcConnectDeliveryTransport();
   const manager = new CcConnectSidecarManager(executable, path.join(sidecarRoot, 'config.toml'));
   let stopRequested = false;
   manager.on('stdout', line => console.debug(`[ChannelRuntime] ${line}`));
@@ -212,11 +210,12 @@ const startCcConnectRuntime = async (
   });
   manager.on('error', error => console.error('[ChannelRuntime] Sidecar error:', error));
   manager.on('exit', ({ code, signal }) => {
-    if (channelRuntime.sidecarManager === manager) channelRuntime.sidecarManager = null;
+    if (channelRuntime.sidecarManager !== manager) return;
+    channelRuntime.sidecarManager = null;
+    channelRuntime.controlClient = null;
+    delivery.disconnect();
     for (const account of accounts) {
       channelRuntime.statuses.delete(account.accountId);
-      channelRuntime.deliveryTransport?.detach(account.accountId);
-      channelRuntime.deliveryAccounts.delete(account.accountId);
       channelRuntime.statuses.markUnavailable(
         account.accountId,
         manager.lastError ?? `Channel runtime exited with code ${code ?? 'unknown'}`,
@@ -226,7 +225,7 @@ const startCcConnectRuntime = async (
     if (
       channelRuntime.stopping ||
       stopRequested ||
-      !channelRuntime.bridgeServer ||
+      !channelRuntime.bridge ||
       channelRuntime.restartTimer
     )
       return;
@@ -237,33 +236,34 @@ const startCcConnectRuntime = async (
     await manager.start(
       serializeCcConnectSidecarConfig({
         dataDir: sidecarRoot,
-        bridgeUrl: channelRuntime.bridgeUrl,
-        bridgeToken: channelRuntime.bridgeToken,
+        bridgeUrl,
+        bridgeToken,
         cronControlListen: '127.0.0.1:0',
         projects: accounts,
       }),
     );
     const pid = manager.pid;
     if (!pid) throw new Error('cc-connect runtime has no child PID');
-    const baseUrl = await manager.waitForControlUrl();
-    const health = await waitForCcConnectCronControl(baseUrl, pid);
-    channelRuntime.controlClient = new CcConnectControlClient(baseUrl, channelRuntime.bridgeToken);
-    const client = new CcConnectDeliveryClient(baseUrl, channelRuntime.bridgeToken);
-    for (const account of accounts) {
-      channelRuntime.deliveryTransport?.attach(account.accountId, client);
-      channelRuntime.deliveryAccounts.add(account.accountId);
-    }
+    const baseUrl = await manager.waitForControlUrl(10_000, channelShutdown.signal);
+    const controlClient = new CcConnectControlClient(baseUrl, bridgeToken);
+    const health = await waitForCcConnectCronControl(controlClient, pid);
+    if (channelShutdown.signal.aborted || channelRuntime.sidecarManager !== manager) return;
+    channelRuntime.controlClient = controlClient;
+    const client = new CcConnectDeliveryClient(baseUrl, bridgeToken);
+    delivery.connect(
+      accounts.map(account => account.accountId),
+      client,
+    );
     applyCcConnectPlatformStatuses(health.platforms);
     channelRuntime.configSignature = signature;
     channelRuntime.restartAttempts = 0;
     console.log(`[ChannelRuntime] Started one runtime with ${accounts.length} channel account(s)`);
   } catch (error) {
-    if (channelRuntime.sidecarManager === manager) channelRuntime.sidecarManager = null;
+    if (channelShutdown.signal.aborted) return;
     channelRuntime.controlClient = null;
+    delivery.disconnect();
     for (const account of accounts) {
       channelRuntime.statuses.delete(account.accountId);
-      channelRuntime.deliveryTransport?.detach(account.accountId);
-      channelRuntime.deliveryAccounts.delete(account.accountId);
       channelRuntime.statuses.markUnavailable(
         account.accountId,
         error instanceof Error ? error.message : String(error),
@@ -271,43 +271,104 @@ const startCcConnectRuntime = async (
     }
     stopRequested = true;
     await manager.stop();
+    if (channelRuntime.sidecarManager === manager) channelRuntime.sidecarManager = null;
     throw error;
   }
 };
 
 const loadCcConnectChannelAccounts = () => {
-  const accounts = listCcConnectAccountConfigs(new IMStore(getStore().getDatabase()), workspaceId =>
-    Boolean(getCoworkStore().getWorkspace(workspaceId)),
+  const accounts = listCcConnectAccountConfigs(getIMStore(), workspaceId =>
+    Boolean(getCoworkStore().workspaces.getWorkspace(workspaceId)),
   );
   console.log(`[ChannelRuntime] Found ${accounts.length} enabled channel account(s)`);
   return accounts;
 };
 
-/** Reconcile one process containing the scheduler and every enabled channel project. */
+function cancelChannelRestart(): void {
+  if (channelRuntime.restartTimer) clearTimeout(channelRuntime.restartTimer);
+  channelRuntime.restartTimer = null;
+}
+
+async function stopCurrentCcConnectSidecar(): Promise<void> {
+  const manager = channelRuntime.sidecarManager;
+  channelRuntime.controlClient = null;
+  if (manager) channelRuntime.delivery?.disconnect();
+  await manager?.stop();
+  if (channelRuntime.sidecarManager === manager) channelRuntime.sidecarManager = null;
+  channelRuntime.statuses.clear();
+  channelRuntime.configSignature = '';
+}
+
+function closeCcConnectIngress(): Promise<void> | undefined {
+  if (channelRuntime.bridgeClosing) return channelRuntime.bridgeClosing;
+  const endpoint = channelRuntime.bridge;
+  if (!endpoint) return;
+  channelRuntime.bridge = null;
+  channelRuntime.bridgeClosing = endpoint.server.stop().finally(() => {
+    channelRuntime.bridgeClosing = null;
+    endpoint.handler.dispose();
+  });
+  return channelRuntime.bridgeClosing;
+}
+
+export function drainCcConnectIngress(): Promise<void> | undefined {
+  channelRuntime.stopping = true;
+  channelShutdown.abort();
+  cancelChannelRestart();
+  return closeCcConnectIngress();
+}
+
+export async function stopCcConnectProcesses(): Promise<void> {
+  await Promise.all([
+    channelRuntime.reconcileQueue.then(stopCurrentCcConnectSidecar),
+    Promise.allSettled(pendingWeixinSetups),
+  ]);
+}
+
+export async function setupCcConnectWeixin(
+  action: 'start' | 'poll',
+  qrcode?: string,
+): Promise<WeixinSetupResult> {
+  const { signal } = channelShutdown;
+  signal.throwIfAborted();
+  const operation = (async () => {
+    const executable = await resolveCcConnectSidecarExecutable();
+    if (!executable) throw new Error('Channel runtime is not bundled');
+    const result = await runCcConnectWeixinSetup(executable, action, qrcode, signal);
+    signal.throwIfAborted();
+    return result;
+  })();
+  pendingWeixinSetups.add(operation);
+  try {
+    return await operation;
+  } finally {
+    pendingWeixinSetups.delete(operation);
+  }
+}
+
+/** Reconcile one cc-connect process for all enabled channel accounts. */
 const reconcileCcConnectChannelSidecarsNow = async (): Promise<void> => {
+  if (channelShutdown.signal.aborted) return;
   const accounts = loadCcConnectChannelAccounts();
   const signature = JSON.stringify(accounts);
   if (signature === channelRuntime.configSignature && channelRuntime.sidecarManager?.running)
     return;
   channelRuntime.stopping = true;
-  if (channelRuntime.restartTimer) clearTimeout(channelRuntime.restartTimer);
-  channelRuntime.restartTimer = null;
+  cancelChannelRestart();
   try {
-    await channelRuntime.sidecarManager?.stop();
-    channelRuntime.sidecarManager = null;
-    channelRuntime.controlClient = null;
-    for (const accountId of channelRuntime.deliveryAccounts)
-      channelRuntime.deliveryTransport?.detach(accountId);
-    channelRuntime.deliveryAccounts.clear();
-    channelRuntime.statuses.clear();
-    channelRuntime.configSignature = '';
+    await stopCurrentCcConnectSidecar();
   } finally {
-    channelRuntime.stopping = false;
+    try {
+      if (accounts.length === 0) await closeCcConnectIngress();
+    } finally {
+      channelRuntime.stopping = channelShutdown.signal.aborted;
+    }
   }
   await startCcConnectRuntime(accounts, signature);
 };
 
 export const reconcileCcConnectChannelSidecars = (): Promise<void> => {
+  if (channelShutdown.signal.aborted) return Promise.resolve();
   const operation = channelRuntime.reconcileQueue.then(
     reconcileCcConnectChannelSidecarsNow,
     reconcileCcConnectChannelSidecarsNow,
@@ -317,7 +378,8 @@ export const reconcileCcConnectChannelSidecars = (): Promise<void> => {
 };
 
 const scheduleCcConnectRuntimeRestart = (): void => {
-  if (channelRuntime.restartTimer || !channelRuntime.bridgeServer) return;
+  if (channelShutdown.signal.aborted || channelRuntime.restartTimer || !channelRuntime.bridge)
+    return;
   const delayMs = Math.min(30_000, 1_000 * 2 ** channelRuntime.restartAttempts);
   channelRuntime.restartAttempts = Math.min(channelRuntime.restartAttempts + 1, 5);
   channelRuntime.restartTimer = setTimeout(() => {
@@ -329,19 +391,23 @@ const scheduleCcConnectRuntimeRestart = (): void => {
   }, delayMs);
 };
 
+export function hasIMGatewayManager(): boolean {
+  return channelRuntime.gatewayManager !== null;
+}
+
+export const getChannelAccountRuntimeStatus = (accountId: string) =>
+  resolveCcConnectAccountRuntimeStatus(
+    channelRuntime.statuses,
+    accountId,
+    channelRuntime.sidecarManager?.running === true,
+  );
+
 export const getIMGatewayManager = () => {
   if (!channelRuntime.gatewayManager) {
-    channelRuntime.gatewayManager = new ChannelAccountManager(
-      getStore().getDatabase(),
-      async accountId => {
-        await refreshCcConnectPlatformStatuses();
-        return resolveCcConnectAccountRuntimeStatus(
-          channelRuntime.statuses,
-          accountId,
-          channelRuntime.sidecarManager?.running === true,
-        );
-      },
-    );
+    channelRuntime.gatewayManager = new ChannelAccountManager(getIMStore(), async accountId => {
+      await refreshCcConnectPlatformStatuses();
+      return getChannelAccountRuntimeStatus(accountId);
+    });
   }
   return channelRuntime.gatewayManager;
 };

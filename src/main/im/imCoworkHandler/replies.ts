@@ -1,6 +1,6 @@
 /**
  * Reply formatting helpers for IM cowork turns: scheduled-task receipts,
- * raw reminder extraction, error replies, and media-formatted message content.
+ * error replies and media-formatted message content.
  */
 
 import { type CoworkError, CoworkErrorKind } from '../../../common/coworkError';
@@ -10,14 +10,6 @@ import { readIMScheduledTaskReceipts } from '../imScheduledTaskReceipts';
 import type { IMMediaAttachment, IMMessage } from '../types';
 
 export const DEFAULT_IM_EMPTY_REPLY = '处理完成，但没有生成回复。';
-
-/**
- * Extract assistant text for the channel. Scheduled delivery already has its
- * own execution outcome, so it does not include task-creation receipts.
- */
-export function formatIMReplyRaw(messages: CoworkMessage[]): string {
-  return readAssistantText(messages) || DEFAULT_IM_EMPTY_REPLY;
-}
 
 function readAssistantText(messages: CoworkMessage[]): string {
   const parts: string[] = [];

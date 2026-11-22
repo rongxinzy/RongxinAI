@@ -1,4 +1,5 @@
 import React, { type Dispatch, type SetStateAction } from 'react';
+import type { CodingWorkspaceSummary } from '../../shared/codingAgent';
 
 import type { CodingSidebarSelection } from '../components/coding/CodingWorkspaceSidebar';
 import type { ExpertTab } from '../components/expert/ExpertView';
@@ -30,6 +31,7 @@ export interface MainViewCanvasProps {
   /** Settings view */
   settingsOptions: SettingsOpenOptions;
   onLeaveSettings: () => void;
+  onAskAi: (prompt: string) => void;
   onRequestAppSettings: (options?: SettingsOpenOptions) => void;
   enterpriseConfig: SettingsEnterpriseConfig | null;
   managedModelsOnly: boolean;
@@ -51,6 +53,11 @@ export interface MainViewCanvasProps {
   /** Coding workbench */
   codingSelection: CodingSidebarSelection;
   onCodingSelectionChange: Dispatch<SetStateAction<CodingSidebarSelection>>;
+  codingSessionSetupWorkspace: CodingWorkspaceSummary | null;
+  onCloseCodingSessionSetup: () => void;
+  codingAgentManagerOpen: boolean;
+  onCodingAgentManagerOpenChange: (open: boolean) => void;
+  onOpenCreateCodingWorkspace: () => void;
   /** Local inference keep-alive view */
   hasMountedLocalInference: boolean;
   isLocalInferenceDormant: boolean;
@@ -75,6 +82,7 @@ export function MainViewCanvas({
   onNewChat,
   settingsOptions,
   onLeaveSettings,
+  onAskAi,
   onRequestAppSettings,
   enterpriseConfig,
   managedModelsOnly,
@@ -92,6 +100,11 @@ export function MainViewCanvas({
   onShowScheduledTasks,
   codingSelection,
   onCodingSelectionChange,
+  codingSessionSetupWorkspace,
+  onCloseCodingSessionSetup,
+  codingAgentManagerOpen,
+  onCodingAgentManagerOpenChange,
+  onOpenCreateCodingWorkspace,
   hasMountedLocalInference,
   isLocalInferenceDormant,
   localInferenceRefreshRequestId,
@@ -138,6 +151,7 @@ export function MainViewCanvas({
             {mainView === MainView.Settings ? (
               <SettingsPage
                 onClose={onLeaveSettings}
+                onAskAi={onAskAi}
                 initialTab={settingsOptions.initialTab}
                 initialProvider={settingsOptions.initialProvider}
                 notice={settingsOptions.notice}
@@ -202,7 +216,12 @@ export function MainViewCanvas({
                 workspaceRoot={codingSelection.workspaceRoot}
                 selectedLaneId={codingSelection.laneId}
                 draftSession={codingSelection.draft}
+                agentManagerOpen={codingAgentManagerOpen}
+                onAgentManagerOpenChange={onCodingAgentManagerOpenChange}
+                onOpenCreateWorkspace={onOpenCreateCodingWorkspace}
                 onSessionDraftCreated={onCodingSelectionChange}
+                sessionSetupWorkspace={codingSessionSetupWorkspace}
+                onCloseSessionSetup={onCloseCodingSessionSetup}
                 onSessionCreated={laneId =>
                   onCodingSelectionChange(current => ({ ...current, laneId, draft: null }))
                 }

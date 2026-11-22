@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { CodingEventKind, CodingLaneStatus } from '../../../src/shared/codingAgent/constants.ts';
 import { attachConsoleGuards, home, previewSearch } from '../shared/harness.mjs';
+import { applyThemeRecipes } from '../shared/themeFixture.mjs';
 
 const indicator = (page, variant) =>
   page.locator(`.theme-thinking-indicator[data-variant="${variant}"] canvas`).first();
@@ -114,23 +115,9 @@ async function expectRoundSilhouette(canvas, size) {
 }
 
 async function applyRecipe(page, { theme, variant, color, size }) {
-  await page.evaluate(
-    async ({ theme, variant, color, size }) => {
-      const [{ allThemes }, { themeService }] = await Promise.all([
-        import(new URL('/src/renderer/theme/index.ts', window.location.href).href),
-        import(new URL('/src/renderer/services/theme.ts', window.location.href).href),
-      ]);
-      const recipe = allThemes.find(item => item.meta.appearance === theme).components[
-        `thinking-indicator-${variant}`
-      ];
-      if (color) recipe.base.color = color;
-      if (size) recipe.base.width = recipe.base.height = `${size}px`;
-      // Reapply the current theme: stylesheet replacement must repaint a paused
-      // canvas even when the appearance and React component identity stay equal.
-      themeService.setTheme(theme);
-    },
-    { theme, variant, color, size },
-  );
+  await applyThemeRecipes(page, theme, [
+    [`thinking-indicator-${variant}`, 'base', { color, width: `${size}px`, height: `${size}px` }],
+  ]);
 }
 
 async function setTheme(page, theme) {

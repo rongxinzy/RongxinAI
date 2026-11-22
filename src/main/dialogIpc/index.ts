@@ -10,18 +10,14 @@ import {
   resolveInlineAttachmentDir,
   sanitizeAttachmentFileName,
 } from '../coworkIpc/fileExportHelpers';
-import { registerArtifactFileAvailabilityHandler } from '../artifactFileAvailability';
+import { checkArtifactFile } from '../artifactFileAvailability';
 import { appSystemContract } from '../../shared/ipc/appSystemContract';
 import type { CoworkStore } from '../coworkStore';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 
-export interface DialogIpcDeps {
-  getCoworkStore: () => CoworkStore;
-}
-
-export const registerDialogIpc = (deps: DialogIpcDeps): void => {
-  // Dialog handlers
+export const registerDialogIpc = (): void => {
   handleIpcContractSubset(appSystemContract, {
+    dialogCheckArtifactFile: (_event, filePath) => checkArtifactFile(filePath),
     dialogSelectDirectory: async (event, options) => {
       const ownerWindow = BrowserWindow.fromWebContents(event.sender);
       const defaultPath = options?.defaultPath?.trim();
@@ -38,46 +34,17 @@ export const registerDialogIpc = (deps: DialogIpcDeps): void => {
       return { success: true, path: result.filePaths[0] };
     },
 
-    dialogSelectFile: async (event, options) => {
-      const ownerWindow = BrowserWindow.fromWebContents(event.sender);
-      const dialogOptions = {
-        properties: ['openFile'] as 'openFile'[],
-        title: options?.title,
-        filters: options?.filters,
-      };
-      const result = ownerWindow
-        ? await dialog.showOpenDialog(ownerWindow, dialogOptions)
-        : await dialog.showOpenDialog(dialogOptions);
-      if (result.canceled || result.filePaths.length === 0) {
-        return { success: true, path: null };
-      }
-      return { success: true, path: result.filePaths[0] };
-    },
-
     dialogSelectFiles: async (event, options) => {
       const ownerWindow = BrowserWindow.fromWebContents(event.sender);
-      const dialogOptions = {
-        properties: ['openFile', 'multiSelections'] as ('openFile' | 'multiSelections')[],
+      const dialogOptions: Electron.OpenDialogOptions = {
+        properties: options?.multiple === false ? ['openFile'] : ['openFile', 'multiSelections'],
         title: options?.title,
         filters: options?.filters,
       };
       const result = ownerWindow
         ? await dialog.showOpenDialog(ownerWindow, dialogOptions)
         : await dialog.showOpenDialog(dialogOptions);
-      if (result.canceled || result.filePaths.length === 0) {
-        return { success: true, paths: [] };
-      }
-      return { success: true, paths: result.filePaths };
-    },
-
-    dialogShowMessageBox: async (event, options) => {
-      const ownerWindow = BrowserWindow.fromWebContents(event.sender);
-      return dialog.showMessageBox(ownerWindow!, {
-        type: options.type || 'warning',
-        title: options.title || '',
-        message: options.message,
-        buttons: ['OK'],
-      });
+      return { success: true, paths: result.canceled ? [] : result.filePaths };
     },
 
     dialogSaveInlineFile: async (_event, options) => {
@@ -156,55 +123,6 @@ export const registerDialogIpc = (deps: DialogIpcDeps): void => {
         };
       }
     },
-
-    dialogGenerateThumbnail: async (
-      _event,
-      filePath,
-    ): Promise<{
-      success: boolean;
-      dataUrl?: string;
-      error?: string;
-    }> => {
-      try {
-        if (typeof filePath !== 'string' || !filePath.trim()) {
-          return { success: false, error: 'Missing file path' };
-        }
-        const resolvedPath = path.resolve(filePath.trim());
-        const stat = await fs.promises.stat(resolvedPath);
-        if (!stat.isFile()) {
-          return { success: false, error: 'Not a file' };
-        }
-        if (process.platform !== 'darwin') {
-          return { success: false, error: 'Thumbnail generation only supported on macOS' };
-        }
-        const { execFile } = await import('child_process');
-        const { promisify } = await import('util');
-        const execFileAsync = promisify(execFile);
-        const tmpDir = path.join(app.getPath('temp'), 'zhiyuan-thumbnails');
-        await fs.promises.mkdir(tmpDir, { recursive: true });
-        const baseName = path.basename(resolvedPath);
-        const outputFile = path.join(tmpDir, `${baseName}.png`);
-        try {
-          await fs.promises.unlink(outputFile);
-        } catch {
-          /* ignore */
-        }
-        await execFileAsync('qlmanage', ['-t', '-s', '1200', '-o', tmpDir, resolvedPath]);
-        const thumbBuffer = await fs.promises.readFile(outputFile);
-        const base64 = thumbBuffer.toString('base64');
-        try {
-          await fs.promises.unlink(outputFile);
-        } catch {
-          /* ignore */
-        }
-        return { success: true, dataUrl: `data:image/png;base64,${base64}` };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to generate thumbnail',
-        };
-      }
-    },
   });
 
   // Read a local file as a data URL (data:<mime>;base64,...)
@@ -222,7 +140,6 @@ export const registerDialogIpc = (deps: DialogIpcDeps): void => {
     '.ico': 'image/x-icon',
     '.avif': 'image/avif',
   };
-  registerArtifactFileAvailabilityHandler();
 };
 
 export const getAllowedShellProbeRoots = (
@@ -245,8 +162,7 @@ export const getAllowedShellProbeRoots = (
     // Ignore
   }
   try {
-    const rootsCoworkStore = getCoworkStore();
-    const workspaces = rootsCoworkStore.listWorkspaces();
+    const workspaces = getCoworkStore().workspaces.listWorkspaces();
     for (const ws of workspaces) {
       if (ws.path) roots.push(ws.path);
     }

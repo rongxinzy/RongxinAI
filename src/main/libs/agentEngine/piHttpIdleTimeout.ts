@@ -1,7 +1,7 @@
 import { Agent, setGlobalDispatcher } from 'undici';
 
 /**
- * HTTP idle ceiling for the embedded Pi runtime. llama.cpp/Ollama emit
+ * HTTP idle ceiling for the embedded Pi runtime. Local inference servers emit
  * nothing during prompt evaluation, so undici's 300s default bodyTimeout and
  * the Pi SDK's 300s default request timeout would both cut healthy long turns
  * early.

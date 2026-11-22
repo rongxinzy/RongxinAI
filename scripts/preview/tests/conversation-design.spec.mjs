@@ -1,7 +1,7 @@
-import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { attachConsoleGuards, home, previewSearch } from '../shared/harness.mjs';
 import { historyMessages, installConversation } from '../shared/conversationFixture.mjs';
+import { applyThemeRecipes } from '../shared/themeFixture.mjs';
 
 const sizes = [
   [1280, 800],
@@ -13,7 +13,7 @@ const sizes = [
 
 for (const theme of ['light', 'dark']) {
   for (const [width, height] of sizes) {
-    test(`conversation design ${theme} ${width}x${height}`, async ({ page, baseURL }) => {
+    test(`conversation design ${theme} ${width}x${height}`, async ({ page, baseURL }, testInfo) => {
       const errors = [];
       attachConsoleGuards(page, errors, 'design');
       await page.setViewportSize({ width, height });
@@ -91,18 +91,10 @@ for (const theme of ['light', 'dark']) {
         );
         return { id: row.dataset.turnId, top: row.getBoundingClientRect().top };
       });
-      await page.evaluate(async () => {
-        const [{ allThemes }, { themeService }] = await Promise.all([
-          import(new URL('/src/renderer/theme/index.ts', window.location.href).href),
-          import(new URL('/src/renderer/services/theme.ts', window.location.href).href),
-        ]);
-        const current = themeService.getEffectiveTheme();
-        const next = current === 'light' ? 'dark' : 'light';
-        allThemes.find(item => item.meta.appearance === next).components[
-          'conversation-editor'
-        ].base['font-size'] = '18px';
-        themeService.setTheme(next);
-      });
+      const opposite = theme === 'light' ? 'dark' : 'light';
+      await applyThemeRecipes(page, opposite, [
+        ['conversation-editor', 'base', { 'font-size': '18px' }],
+      ]);
       await expect(editor).toHaveCSS('font-size', '18px');
       await expect(editor).toHaveText('保留这份草稿 / Keep this draft');
       await expect(editor).toBeFocused();
@@ -120,16 +112,8 @@ for (const theme of ['light', 'dark']) {
           (await page.locator(`[data-turn-id="${anchor.id}"]`).boundingBox()).y - anchor.top,
         ),
       ).toBeLessThan(2);
-      await page.evaluate(async theme => {
-        const [{ allThemes }, { themeService }] = await Promise.all([
-          import(new URL('/src/renderer/theme/index.ts', window.location.href).href),
-          import(new URL('/src/renderer/services/theme.ts', window.location.href).href),
-        ]);
-        for (const item of allThemes)
-          item.components['conversation-editor'].base['font-size'] =
-            'var(--zy-component-text-base)';
-        themeService.setTheme(theme);
-      }, theme);
+      await applyThemeRecipes(page, opposite, []);
+      await applyThemeRecipes(page, theme, []);
       await expect(editor).toHaveCSS('font-size', '16px');
       const bounds = await editor.boundingBox();
       expect(bounds.x).toBeGreaterThanOrEqual(0);
@@ -158,9 +142,7 @@ for (const theme of ['light', 'dark']) {
         });
         await page.waitForTimeout(150);
         await page.screenshot({
-          path: path.resolve(
-            `docs/theme-previews/pr-1463/conversation-${theme}-${width}x${height}.png`,
-          ),
+          path: testInfo.outputPath(`conversation-${theme}-${width}x${height}.png`),
         });
       }
       expect(errors).toEqual([]);

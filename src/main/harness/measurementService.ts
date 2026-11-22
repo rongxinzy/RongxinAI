@@ -36,7 +36,10 @@ export class HarnessMeasurementService {
 
   recordModelProfile(runId: string, input: HarnessModelProfileInput): HarnessModelProfile {
     const profile = createHarnessModelProfile(input);
-    this.repository.appendRunEvent(runId, WorkbenchRunEventType.HarnessProfiled, { profile });
+    const { id, workflowKind, harnessVersion } = profile;
+    this.repository.appendRunEvent(runId, WorkbenchRunEventType.HarnessProfiled, {
+      profile: { id, workflowKind, harnessVersion },
+    });
     return profile;
   }
 

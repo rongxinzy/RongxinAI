@@ -1,4 +1,8 @@
-import { describe, expect, test } from 'vitest';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 import { checkSourceLineLimit } from './check-source-line-limit.mjs';
 
@@ -57,4 +61,87 @@ describe('checkSourceLineLimit', () => {
   test('fails orphaned baseline entries', () => {
     expect(checkSourceLineLimit(base, {}, base)[0]).toContain('not found');
   });
+});
+
+describe('source line limit command', () => {
+  const scriptPath = 'scripts/ci/check-source-line-limit.mjs';
+  const baselinePath = 'scripts/ci/source-line-baseline.json';
+  let root: string;
+
+  function git(...args: string[]) {
+    execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  }
+
+  function runCheck() {
+    return spawnSync(process.execPath, [scriptPath], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, PR_BASE_SHA: 'HEAD' },
+    });
+  }
+
+  beforeEach(() => {
+    root = mkdtempSync(path.join(tmpdir(), 'source-line-limit-'));
+    mkdirSync(path.join(root, 'scripts/ci'), { recursive: true });
+    copyFileSync(
+      new URL('./check-source-line-limit.mjs', import.meta.url),
+      path.join(root, scriptPath),
+    );
+    writeFileSync(path.join(root, baselinePath), JSON.stringify({ limit: 1, caps: {} }));
+    git('init', '-q');
+    git('add', baselinePath);
+    git(
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '-qm',
+      'baseline',
+    );
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test('counts only newline bytes and skips sources removed from the working tree', () => {
+    const file = path.join(root, 'lines.ts');
+    writeFileSync(file, 'first\r\nlast');
+    writeFileSync(path.join(root, 'empty.ts'), '');
+    writeFileSync(path.join(root, 'removed.ts'), 'first\nsecond\n');
+    git('add', 'lines.ts', 'empty.ts', 'removed.ts');
+    rmSync(path.join(root, 'removed.ts'));
+
+    const withinLimit = runCheck();
+    expect(withinLimit.status).toBe(0);
+    expect(withinLimit.stdout).toContain('ratchet vs HEAD');
+    expect(withinLimit.stderr).toBe('');
+
+    writeFileSync(file, 'first\r\nlast\n');
+    const overLimit = runCheck();
+    expect(overLimit.status).toBe(1);
+    expect(overLimit.stderr).toContain('lines.ts: 2 lines exceeds 1');
+  });
+
+  test.skipIf(process.platform === 'win32')(
+    'follows source symlinks and reports failed reads',
+    () => {
+      const target = path.join(root, 'target');
+      writeFileSync(target, 'first\nsecond\n');
+      symlinkSync('target', path.join(root, 'linked.ts'));
+      git('add', 'linked.ts');
+
+      const readable = runCheck();
+      expect(readable.status).toBe(1);
+      expect(readable.stderr).toContain('linked.ts: 2 lines exceeds 1');
+
+      rmSync(target);
+      const dangling = runCheck();
+      expect(dangling.status).toBe(1);
+      expect(dangling.stderr).toMatch(/ENOENT.*linked\.ts/);
+    },
+  );
 });

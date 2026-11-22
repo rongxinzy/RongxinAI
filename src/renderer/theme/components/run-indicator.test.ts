@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { generateThemeCSS } from '../engine/css-generator';
-import { zenithLight } from '../themes/zenith-light';
+import { zenithLight } from '../themes';
 
 test('the compact indicator icon overrides the shared spinner size without changing other spinners', () => {
   const css = generateThemeCSS(zenithLight);

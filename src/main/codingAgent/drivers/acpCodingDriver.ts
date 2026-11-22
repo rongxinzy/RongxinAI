@@ -4,6 +4,7 @@ import {
   CodingErrorMessage,
   CodingEventKind,
   CodingPermissionOutcome,
+  type CodingAgentAuthMethod,
   type CodingAgentAvailableCommand,
   type CodingAgentCapabilities,
   type CodingAgentConfigOption,
@@ -11,6 +12,7 @@ import {
   type CodingPromptAttachment,
 } from '../../../shared/codingAgent';
 import { AcpConnectionSupervisor } from '../acp/connectionSupervisor';
+import { parseAcpAuthMethods } from '../acp/authMethods';
 import { AcpEventQueue } from '../acp/acpEventQueue';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import {
@@ -40,7 +42,6 @@ import {
   OPEN_TOOL_CALL_STATUSES,
   asRecord,
   mergeAdjacentDriverEvents,
-  type AcpAuthMethod,
   type AcpInitializeResult,
   type AcpSessionResult,
   type AcpTurnTimeouts,
@@ -76,7 +77,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
   private readonly firstOutputTimers = new Map<string, NodeJS.Timeout>();
   private readonly updateNormalizer = new AcpSessionUpdateNormalizer();
   private capabilities = DEFAULT_CAPABILITIES;
-  private readonly authMethods = new Map<string, AcpAuthMethod>();
+  private readonly authMethods = new Map<string, CodingAgentAuthMethod>();
   private initialized = false;
   private initializedGeneration = 0;
   private supportsSessionClose = false;
@@ -99,6 +100,10 @@ export class AcpCodingDriver implements CodingAgentDriver {
 
   async getCapabilities(): Promise<CodingAgentCapabilities> {
     return this.capabilities;
+  }
+
+  getProfileMetadata() {
+    return { capabilities: this.capabilities, authMethods: [...this.authMethods.values()] };
   }
 
   isConnectionRunning(): boolean {
@@ -345,8 +350,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
     this.availableCommandsBySession.clear();
     this.availableCommandListeners.clear();
     this.sessionTitleListeners.clear();
-    this.agentRequests.dispose();
-    await this.supervisor.dispose();
+    const cleanup = await Promise.allSettled([
+      this.agentRequests.dispose(),
+      this.supervisor.dispose(),
+    ]);
+    const failures = cleanup.flatMap(result =>
+      result.status === 'rejected' ? [result.reason] : [],
+    );
+    if (failures.length) throw new AggregateError(failures, 'Failed to stop the ACP driver.');
   }
 
   /**
@@ -410,7 +421,9 @@ export class AcpCodingDriver implements CodingAgentDriver {
     this.capabilities = normalizeCapabilities(response);
     const agentCapabilities = asRecord(response.agentCapabilities ?? response.capabilities);
     this.supportsSessionClose = Boolean(asRecord(agentCapabilities.sessionCapabilities).close);
-    for (const method of response.authMethods ?? []) this.authMethods.set(method.id, method);
+    for (const method of parseAcpAuthMethods(response.authMethods)) {
+      this.authMethods.set(method.id, method);
+    }
     this.initialized = true;
     this.initializedGeneration = this.supervisor.generation;
   }

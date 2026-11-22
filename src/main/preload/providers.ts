@@ -1,6 +1,6 @@
-import { CommunityAuthIpc, ManagedProviderIpc, ModelPoolIpc } from '../../shared/ipc/channels';
-import { providersContractChannels } from '../../shared/ipc/providersContract.channels';
-import type { providersContract } from '../../shared/ipc/providersContract';
+import { CommunityAuthIpc, ManagedProviderIpc } from '../../shared/ipc/channels';
+import { MagpieIpc, providersContractChannels } from '../../shared/ipc/providersContract.channels';
+import type { magpieContract, providersContract } from '../../shared/ipc/providersContract';
 import type { IpcContractApi } from '../../shared/ipc/contract';
 import { onPush, onPushVoid } from './pushChannel';
 import { createIpcInvokers } from './createIpcInvokers';
@@ -72,46 +72,14 @@ export const providersApi = {
       const result = await asApi('agentsUpdate')(id, updates);
       return result?.success ? result.agent : null;
     },
-    delete: async (id: string) => {
-      const result = await asApi('agentsDelete')(id);
-      return result?.success ? result.deleted : false;
-    },
+    delete: asApi('agentsDelete'),
     importExpertPackage: asApi('agentsImportExpertPackage'),
     getPresetExperts: asApi('agentsGetPresetExperts'),
   },
 
   magpie: {
-    status: asApi('magpieStatus'),
-    setSubscriptionAccounts: asApi('magpieSetSubscriptionAccounts'),
-    start: asApi('magpieStart'),
-    stop: asApi('magpieStop'),
-    agents: asApi('magpieAgents'),
-    setModel: asApi('magpieSetModel'),
-    previewAgent: asApi('magpiePreviewAgent'),
-    connectAgent: asApi('magpieConnectAgent'),
-    disconnectAgent: asApi('magpieDisconnectAgent'),
-    disconnectAllAgents: asApi('magpieDisconnectAllAgents'),
-    models: asApi('magpieModels'),
-    catalog: asApi('magpieCatalog'),
-    selectDefault: asApi('magpieSelectDefault'),
-    providers: asApi('magpieProviders'),
-    saveProvider: asApi('magpieSaveProvider'),
-    setProviderEnabled: asApi('magpieSetProviderEnabled'),
-    deleteProvider: asApi('magpieDeleteProvider'),
-    testProvider: asApi('magpieTestProvider'),
-    diagnostics: asApi('magpieDiagnostics'),
-    clearDiagnostics: asApi('magpieClearDiagnostics'),
-    preferences: asApi('magpiePreferences'),
-    updatePreferences: asApi('magpieUpdatePreferences'),
-    routingGroups: asApi('magpieRoutingGroups'),
-    saveRoutingGroup: asApi('magpieSaveRoutingGroup'),
-    deleteRoutingGroup: asApi('magpieDeleteRoutingGroup'),
-    arrangeRoutingGroups: asApi('magpieArrangeRoutingGroups'),
-    usageSummary: asApi('magpieUsageSummary'),
-    usageRequests: asApi('magpieUsageRequests'),
-    usageQuotas: asApi('magpieUsageQuotas'),
-    usageBudget: asApi('magpieUsageBudget'),
-  },
+    ...createIpcInvokers(MagpieIpc),
+  } as IpcContractApi<typeof magpieContract>,
 
   auth: {
     communityLogin: asApi('authCommunityLogin'),
@@ -125,21 +93,8 @@ export const providersApi = {
       }) => void,
     ) => onPush(CommunityAuthIpc.Callback, callback),
   },
-
-  modelPool: {
-    listModels: asApi('modelPoolListModels'),
-    stream: asApi('modelPoolStream'),
-    cancelStream: asApi('modelPoolCancelStream'),
-    onStreamData: (requestId: string, callback: (data: string) => void) =>
-      onPush(ModelPoolIpc.streamData(requestId), callback),
-    onStreamDone: (requestId: string, callback: () => void) =>
-      onPushVoid(ModelPoolIpc.streamDone(requestId), callback),
-    onStreamError: (requestId: string, callback: (error: string) => void) =>
-      onPush(ModelPoolIpc.streamError(requestId), callback),
-    onStreamAbort: (requestId: string, callback: () => void) =>
-      onPushVoid(ModelPoolIpc.streamAbort(requestId), callback),
-  },
 } satisfies {
+  magpie: IpcContractApi<typeof magpieContract>;
   agents: {
     list: () => Promise<
       NonNullable<Awaited<ReturnType<ProvidersContractApi['agentsList']>>['agents']>
@@ -163,7 +118,7 @@ export const providersApi = {
           updates: U,
         ) => Promise<Res extends { agent?: infer A } ? (A extends null ? never : A | null) : never>
       : never;
-    delete: (id: string) => Promise<boolean>;
+    delete: ProvidersContractApi['agentsDelete'];
     importExpertPackage: ProvidersContractApi['agentsImportExpertPackage'];
     getPresetExperts: ProvidersContractApi['agentsGetPresetExperts'];
   };
@@ -191,38 +146,6 @@ export const providersApi = {
       aisphereRefresh: 'aisphereRefresh';
     }
   >;
-  magpie: Renamed<{
-    status: 'magpieStatus';
-    setSubscriptionAccounts: 'magpieSetSubscriptionAccounts';
-    start: 'magpieStart';
-    stop: 'magpieStop';
-    agents: 'magpieAgents';
-    setModel: 'magpieSetModel';
-    previewAgent: 'magpiePreviewAgent';
-    connectAgent: 'magpieConnectAgent';
-    disconnectAgent: 'magpieDisconnectAgent';
-    disconnectAllAgents: 'magpieDisconnectAllAgents';
-    models: 'magpieModels';
-    catalog: 'magpieCatalog';
-    selectDefault: 'magpieSelectDefault';
-    providers: 'magpieProviders';
-    saveProvider: 'magpieSaveProvider';
-    setProviderEnabled: 'magpieSetProviderEnabled';
-    deleteProvider: 'magpieDeleteProvider';
-    testProvider: 'magpieTestProvider';
-    diagnostics: 'magpieDiagnostics';
-    clearDiagnostics: 'magpieClearDiagnostics';
-    preferences: 'magpiePreferences';
-    updatePreferences: 'magpieUpdatePreferences';
-    routingGroups: 'magpieRoutingGroups';
-    saveRoutingGroup: 'magpieSaveRoutingGroup';
-    deleteRoutingGroup: 'magpieDeleteRoutingGroup';
-    arrangeRoutingGroups: 'magpieArrangeRoutingGroups';
-    usageSummary: 'magpieUsageSummary';
-    usageRequests: 'magpieUsageRequests';
-    usageQuotas: 'magpieUsageQuotas';
-    usageBudget: 'magpieUsageBudget';
-  }>;
   auth: WithExtra<
     {
       onCommunityCallback: (
@@ -237,19 +160,6 @@ export const providersApi = {
       communityLogin: 'authCommunityLogin';
       getCommunityUser: 'authGetCommunityUser';
       communityLogout: 'authCommunityLogout';
-    }
-  >;
-  modelPool: WithExtra<
-    {
-      onStreamData: (requestId: string, callback: (data: string) => void) => () => void;
-      onStreamDone: (requestId: string, callback: () => void) => () => void;
-      onStreamError: (requestId: string, callback: (error: string) => void) => () => void;
-      onStreamAbort: (requestId: string, callback: () => void) => () => void;
-    },
-    {
-      listModels: 'modelPoolListModels';
-      stream: 'modelPoolStream';
-      cancelStream: 'modelPoolCancelStream';
     }
   >;
 };

@@ -8,6 +8,11 @@
  */
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../../../shared/contextMenu';
 import type { IpcContractApi } from '../../../shared/ipc/contract';
+import type {
+  AppSystemInvokers,
+  storeChannels,
+  windowChannels,
+} from '../../../shared/ipc/appSystemContract.channels';
 import type { memoryContract } from '../../../shared/ipc/memoryContract';
 
 interface WindowState {
@@ -16,10 +21,8 @@ interface WindowState {
   isFocused: boolean;
 }
 
-export interface StoreApi {
-  get: (key: string) => Promise<unknown>;
+export interface StoreApi extends Omit<AppSystemInvokers<typeof storeChannels>, 'set'> {
   set: (key: string, value: unknown) => Promise<void>;
-  remove: (key: string) => Promise<void>;
 }
 
 export interface AppEventsApi {
@@ -32,14 +35,11 @@ export interface ContextMenuApi {
   onOpen: (callback: (event: ContextMenuOpenEvent) => void) => () => void;
 }
 
-export interface WindowApi {
+export interface WindowApi extends AppSystemInvokers<typeof windowChannels> {
   minimize: () => void;
   toggleMaximize: () => void;
   close: () => void;
-  isMaximized: () => Promise<boolean>;
   showSystemMenu: (position: { x: number; y: number }) => void;
-  toggleDevTools: () => Promise<boolean>;
-  openDevTools: () => Promise<boolean>;
   onStateChanged: (callback: (state: WindowState) => void) => () => void;
 }
 

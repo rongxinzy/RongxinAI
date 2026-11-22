@@ -8,13 +8,15 @@ import {
   CodingAgentProfileId,
   CodingAgentProfileStatus,
   CodingAgentCheckPhase,
+  CodingAgentCheckFailure,
   CodingErrorMessage,
   type CodingAgentCapabilities,
   type CodingAgentProfile,
 } from '../../shared/codingAgent';
 import { AcpDiscoveryService, type AcpDiscoveryOptions } from './acp/discoveryService';
 import { BUNDLED_ACP_ADAPTERS, bundledAdapterDefinition } from './acp/bundledAdapters';
-import { AcpProbeFailureError, AcpProbeService } from './acp/probeService';
+import { AcpProbeFailureError, AcpProbeService, type AcpProbeResult } from './acp/probeService';
+import { isAcpAuthenticationRequired } from './acp/authMethods';
 import { AcpProtocolIncompatibleError } from './acp/protocol';
 import type { CodingAgentProfileRepository } from './codingAgentProfileRepository';
 import { classifyProbeFailure } from './acp/probeFailure';
@@ -34,7 +36,8 @@ const BUILTIN_CAPABILITIES: CodingAgentCapabilities = {
 
 export class CodingAgentRegistry extends EventEmitter {
   private readonly profiles = new Map<string, CodingAgentProfile>();
-  private readonly probing = new Set<string>();
+  private readonly probing = new Map<string, Promise<CodingAgentProfile>>();
+  private readonly closing = new AbortController();
 
   constructor(
     private readonly repository?: CodingAgentProfileRepository,
@@ -161,12 +164,58 @@ export class CodingAgentRegistry extends EventEmitter {
     return updated;
   }
 
+  recordFirstSessionCheck(
+    profile: CodingAgentProfile,
+    metadata: AcpProbeResult,
+    result: { success: true } | { success: false; error: unknown },
+  ): void {
+    if (profile.status !== CodingAgentProfileStatus.Detected) return;
+    const current = this.profiles.get(profile.id);
+    if (
+      !current ||
+      this.probing.has(profile.id) ||
+      !this.launchConfigurationMatches(current, profile) ||
+      (!result.success && current.status !== CodingAgentProfileStatus.Detected) ||
+      current.status === CodingAgentProfileStatus.Ready ||
+      current.status === CodingAgentProfileStatus.Untrusted
+    )
+      return;
+
+    let status: CodingAgentProfileStatus = CodingAgentProfileStatus.Ready;
+    let failure: CodingAgentCheckFailure | undefined;
+    if (result.success === false) {
+      const error = result.error;
+      if (isAcpAuthenticationRequired(error)) {
+        status = CodingAgentProfileStatus.NeedsAuth;
+        failure = CodingAgentCheckFailure.Authentication;
+      } else {
+        status =
+          error instanceof AcpProtocolIncompatibleError
+            ? CodingAgentProfileStatus.Incompatible
+            : CodingAgentProfileStatus.Unavailable;
+        failure = classifyProbeFailure(error);
+      }
+    }
+    this.replaceExternal({
+      ...current,
+      ...metadata,
+      status,
+      connectionCheck: {
+        phase: failure ? CodingAgentCheckPhase.Failed : CodingAgentCheckPhase.Complete,
+        ...(failure ? { failure } : {}),
+        checkedAt: Date.now(),
+      },
+    });
+  }
+
   async probe(profileId: string, cwd: string): Promise<CodingAgentProfile> {
+    this.closing.signal.throwIfAborted();
     const profile = this.profiles.get(profileId);
+    const executable = profile?.command;
     if (
       !profile ||
       profile.isBuiltin ||
-      !profile.command ||
+      !executable ||
       this.probing.has(profileId) ||
       // NeedsAuth is probeable too: a successful probe means the agent is
       // reachable again, and if it still needs login the next session
@@ -179,18 +228,38 @@ export class CodingAgentRegistry extends EventEmitter {
     ) {
       throw new Error(CodingErrorMessage.ProfileNotProbeable);
     }
-    this.probing.add(profileId);
+    const check = Promise.resolve()
+      .then(() => this.checkProfile(profile, executable, cwd))
+      .finally(() => this.probing.delete(profileId));
+    this.probing.set(profileId, check);
+    return await check;
+  }
+
+  async shutdown(): Promise<void> {
+    this.closing.abort(new Error(CodingErrorMessage.RoomShuttingDown));
+    await Promise.allSettled(this.probing.values());
+  }
+
+  private async checkProfile(
+    profile: CodingAgentProfile,
+    executable: string,
+    cwd: string,
+  ): Promise<CodingAgentProfile> {
+    const signal = this.closing.signal;
     try {
       const result = await new AcpProbeService().probe({
-        executable: profile.command,
+        executable,
         args: profile.args,
         cwd,
+        signal,
         environment: { ...getCodingAgentEnvironment(), ...profile.environment },
         onPhase: phase => {
-          this.profiles.set(profileId, { ...profile, connectionCheck: { phase } });
+          signal.throwIfAborted();
+          this.profiles.set(profile.id, { ...profile, connectionCheck: { phase } });
           this.emit('changed');
         },
       });
+      signal.throwIfAborted();
       const updated = {
         ...profile,
         capabilities: result.capabilities,
@@ -203,6 +272,10 @@ export class CodingAgentRegistry extends EventEmitter {
       this.emit('changed');
       return updated;
     } catch (error) {
+      if (signal.aborted) {
+        this.profiles.set(profile.id, profile);
+        signal.throwIfAborted();
+      }
       // Only an explicit authentication failure means sign-in is required.
       // Advertising login methods does not prove why a model returned no answer.
       const needsAuth = error instanceof AcpProbeFailureError && error.needsAuth;
@@ -225,16 +298,18 @@ export class CodingAgentRegistry extends EventEmitter {
       this.repository?.save(updated);
       this.emit('changed');
       throw error;
-    } finally {
-      this.probing.delete(profileId);
     }
   }
 
   async discoverExternalAgents(): Promise<void> {
+    const signal = this.closing.signal;
+    signal.throwIfAborted();
     const discovered = await new AcpDiscoveryService(this.acpRegistryPath, {
       ...this.acpDiscoveryOptions,
       adapterRoot: this.acpAdapterRoot,
     }).discover();
+    // Filesystem discovery may outlive quit. Only the synchronous commit uses SQLite.
+    signal.throwIfAborted();
     const availableManagedAdapters = new Set<string>();
     for (const profile of discovered) {
       const managedAdapterId = profile.environment[CodingAgentEnvironmentKey.ManagedAdapterId];

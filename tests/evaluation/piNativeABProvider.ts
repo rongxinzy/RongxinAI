@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { zhiyuanIntranetApiKey } from '../../src/main/libs/zhiyuanIntranet';
 import {
   ZhiyuanModelPool,
   ZhiyuanModelPoolHeader,
@@ -55,9 +54,11 @@ export async function provider(): Promise<Provider> {
     throw new Error('Set valid PI_AB_CONTEXT_WINDOW and PI_AB_MAX_OUTPUT values.');
   }
   if (process.env.PI_AB_USE_ZHIYUAN_INTRANET === '1') {
+    const apiKey = process.env.PI_AB_API_KEY?.trim();
+    if (!apiKey) throw new Error('Set PI_AB_API_KEY for the ZhiYuan intranet gateway.');
     return {
       baseUrl: `${ZhiyuanModelPool.IntranetBaseUrl}/v1`,
-      apiKey: zhiyuanIntranetApiKey(),
+      apiKey,
       model: ZhiyuanModelPool.IntranetModelId,
       contextWindow,
       maxTokens,

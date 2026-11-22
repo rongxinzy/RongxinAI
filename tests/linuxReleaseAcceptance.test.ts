@@ -7,6 +7,7 @@ import {
   expectedDebVersion,
   fingerprintArtifacts,
   installedExecutable,
+  releaseArtifact,
   releaseArtifacts,
   releaseIdentity,
   verifyEvidence,
@@ -86,12 +87,16 @@ test('Linux final artifact selection fails closed for missing, duplicate or syml
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'linux-selection-test-'));
   try {
     await assert.rejects(releaseArtifacts(directory));
-    await fs.writeFile(path.join(directory, 'release.deb'), 'deb');
+    const deb = path.join(directory, 'release.deb');
+    await fs.writeFile(deb, 'deb');
+    expect(await releaseArtifact(directory, 'deb')).toBe(deb);
+    await assert.rejects(releaseArtifacts(directory), /exactly one final appimage/);
     await fs.symlink('release.deb', path.join(directory, 'release.AppImage'));
     await assert.rejects(releaseArtifacts(directory));
     await fs.unlink(path.join(directory, 'release.AppImage'));
     await fs.writeFile(path.join(directory, 'release.AppImage'), 'appimage');
     await fs.writeFile(path.join(directory, 'duplicate.deb'), 'deb');
+    await assert.rejects(releaseArtifact(directory, 'deb'), /exactly one final deb/);
     await assert.rejects(releaseArtifacts(directory));
   } finally {
     await fs.rm(directory, { recursive: true, force: true });

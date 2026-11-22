@@ -3,9 +3,9 @@ import { Tabs } from '@shared/components/ui/tabs';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
-  LlamaCppModel as OllamaModel,
-  LlamaCppRunningModel as OllamaRunningModel,
-  LlamaCppStatusSnapshot as OllamaStatusSnapshot,
+  LlamaCppModel,
+  LlamaCppRunningModel,
+  LlamaCppStatusSnapshot,
 } from '../../../shared/llamacpp';
 import { withMarketplaceScore } from '../../../shared/marketplace/scoring';
 import { i18nService } from '../../services/i18n';
@@ -51,11 +51,7 @@ import {
 } from './utils/marketplace';
 import { getRemainingBusyMs, shouldBlockModelAction } from './utils/modelActions';
 import { getLocalInferenceUserFacingErrorMessage } from './utils/errors';
-import {
-  isSuccessfulMarketplaceInstallProgress,
-  normalizeInstallProgress,
-  isInstallTerminalPhase,
-} from './utils/progress';
+import { isSuccessfulMarketplaceInstallProgress, isInstallTerminalPhase } from './utils/progress';
 import {
   readLocalInferenceSessionState,
   writeLocalInferenceSessionState,
@@ -74,7 +70,7 @@ interface LocalInferenceViewProps {
 
 const LOCAL_INFERENCE_TAB_ORDER: LocalInferenceTab[] = ['models', 'marketplace'];
 
-let cachedStatus: OllamaStatusSnapshot | null = null;
+let cachedStatus: LlamaCppStatusSnapshot | null = null;
 
 const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   refreshRequestId,
@@ -95,13 +91,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   );
   const [runtimeSettingsOpen, setRuntimeSettingsOpen] = useState(false);
   const [tabDirection, setTabDirection] = useState(1);
-  const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
-  const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
-  const [runningModels, setRunningModels] = useState<OllamaRunningModel[]>([]);
+  const [status, setStatus] = useState<LlamaCppStatusSnapshot | null>(cachedStatus);
+  const [localModels, setLocalModels] = useState<LlamaCppModel[]>([]);
+  const [runningModels, setRunningModels] = useState<LlamaCppRunningModel[]>([]);
   const [modelsDir, setModelsDir] = useState('');
   const [librarySettingsOpen, setLibrarySettingsOpen] = useState(false);
   const [draftModelsDir, setDraftModelsDir] = useState('');
-  const [inspectorModel, setInspectorModel] = useState<OllamaModel | null>(null);
+  const [inspectorModel, setInspectorModel] = useState<LlamaCppModel | null>(null);
   const [inspectorInitialTab, setInspectorInitialTab] = useState<ModelInspectorTab>(
     ModelInspectorTab.Overview,
   );
@@ -119,7 +115,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     () =>
       new Map(
         localModels
-          .filter((model): model is OllamaModel & { path: string } => Boolean(model.path))
+          .filter((model): model is LlamaCppModel & { path: string } => Boolean(model.path))
           .map(model => [model.path, model.name]),
       ),
     [localModels],
@@ -241,6 +237,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     runAction,
     showToast,
     setRunningModels,
+    refreshStatus,
     refreshRunningModels,
     refreshLocalModels,
     refreshModelPreferences,
@@ -269,7 +266,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     return filtered;
   }, [marketplaceHardware, marketplaceModels, marketplaceSearchParams]);
 
-  const handleRestartStatus = useCallback((nextStatus: OllamaStatusSnapshot) => {
+  const handleRestartStatus = useCallback((nextStatus: LlamaCppStatusSnapshot) => {
     cachedStatus = nextStatus;
     setStatus(nextStatus);
   }, []);
@@ -384,8 +381,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           setRunningModels([]);
         }
       }),
-      window.electron.llamacpp.onPullProgress(({ name, chunk }) => {
-        const progress = normalizeInstallProgress(name, chunk);
+      window.electron.llamacpp.onInstallProgress(progress => {
+        const name = progress.modelId || progress.modelName;
+        if (!name) return;
         if (!isInstallTerminalPhase(progress.phase)) {
           clearInstallProgressDismissTimer(name);
         }
@@ -449,13 +447,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         setModelsDir(nextModelsDir);
         setDraftModelsDir(nextModelsDir);
         await refreshLocalModels();
-        setRunningModels([]);
+        await refreshRunningModels();
         const params = buildMarketplaceSearchParams({ query: marketplaceQueryRef.current });
         if (marketplaceHasSearchedRef.current && params) {
           await searchMarketplace(params);
         }
         showToast(
-          isRunning
+          isRunning && nextModelsDir !== modelsDir
             ? i18nService.t('localInferenceLibrarySavedRestarted')
             : i18nService.t('localInferenceLibrarySaved'),
           LocalInferenceToastKind.Success,
@@ -468,7 +466,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       isRunning,
       marketplaceHasSearchedRef,
       marketplaceQueryRef,
+      modelsDir,
       refreshLocalModels,
+      refreshRunningModels,
       runAction,
       searchMarketplace,
       showToast,

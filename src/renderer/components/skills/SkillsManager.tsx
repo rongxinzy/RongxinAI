@@ -328,12 +328,14 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
 
   const handleUploadSkillZip = async () => {
     if (isDownloadingSkill) return;
-    const result = await window.electron.dialog.selectFile({
+    const result = await window.electron.dialog.selectFiles({
+      multiple: false,
       title: i18nService.t('uploadSkillZip'),
       filters: [{ name: 'Zip', extensions: ['zip'] }],
     });
-    if (result.success && result.path) {
-      await handleAddSkillFromSource(result.path, 'zip');
+    const [selectedPath] = result.paths;
+    if (result.success && selectedPath) {
+      await handleAddSkillFromSource(selectedPath, 'zip');
     }
   };
 

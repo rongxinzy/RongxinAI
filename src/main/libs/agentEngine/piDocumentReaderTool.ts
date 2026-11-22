@@ -186,8 +186,8 @@ async function hasPdfHeader(filePath: string): Promise<boolean> {
 }
 
 async function validateDocumentFile(workspaceRoot: string, requestedPath: string) {
-  const filePath = resolveWorkspaceFile(workspaceRoot, requestedPath);
-  if (!filePath) {
+  const file = await resolveWorkspaceFile(workspaceRoot, requestedPath);
+  if (!file) {
     return {
       failure: buildDocumentFailure(
         'DOCUMENT_PATH_DENIED',
@@ -196,35 +196,16 @@ async function validateDocumentFile(workspaceRoot: string, requestedPath: string
       ),
     };
   }
-  const stat = await fs.promises.lstat(filePath).catch((): null => null);
-  if (!stat) {
-    return {
-      failure: buildDocumentFailure(
-        'DOCUMENT_NOT_FOUND',
-        `Document not found: ${requestedPath}`,
-        requestedPath,
-      ),
-    };
-  }
-  if (!stat.isFile()) {
-    return {
-      failure: buildDocumentFailure(
-        'DOCUMENT_NOT_A_FILE',
-        `Document read denied: ${requestedPath} is not a file.`,
-        requestedPath,
-      ),
-    };
-  }
-  if (stat.size > DOCUMENT_MAX_BYTES) {
+  if (file.bytes > DOCUMENT_MAX_BYTES) {
     const failure = buildDocumentFailure(
       'DOCUMENT_TOO_LARGE',
       `Document read denied: ${requestedPath} is larger than the 50 MiB local conversion limit.`,
       requestedPath,
     );
-    failure.details.bytes = stat.size;
+    failure.details.bytes = file.bytes;
     return { failure };
   }
-  return { filePath, bytes: stat.size };
+  return file;
 }
 
 export function buildPiDocumentReaderTool(options: {
@@ -265,7 +246,7 @@ export function buildPiDocumentReaderTool(options: {
           activeSignal.throwIfAborted();
           const validated = await validateDocumentFile(options.workspaceRoot, requestedPath);
           activeSignal.throwIfAborted();
-          if (validated.failure) return validated.failure;
+          if ('failure' in validated) return validated.failure;
 
           const { filePath, bytes } = validated;
           const ext = path.extname(filePath).toLowerCase();

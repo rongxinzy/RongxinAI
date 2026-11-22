@@ -31,11 +31,9 @@ import { PersistentToggleNamespaceProvider } from '../cowork/hooks/usePersistent
 import { useSessionHistoryPagination } from '../cowork/hooks/useSessionHistoryPagination';
 import type { CoworkPromptInputRef } from '../cowork/promptInput/types';
 import { SessionArtifactPanelRegion } from '../cowork/sessionDetail/SessionArtifactPanelRegion';
-import { SessionExportDialog } from '../cowork/sessionDetail/SessionExportDialog';
 import { useArtifactLinkInterception } from '../cowork/sessionDetail/useArtifactLinkInterception';
 import { useArtifactPanelPresentation } from '../cowork/sessionDetail/useArtifactPanelPresentation';
 import { useInlineArtifacts } from '../cowork/sessionDetail/useInlineArtifacts';
-import { useSessionExport } from '../cowork/sessionDetail/useSessionExport';
 import { createSessionTurnsSelector } from './model/projectTurns';
 import { ConversationThread } from './thread/ConversationThread';
 
@@ -71,14 +69,6 @@ export const SessionTranscriptStage: React.FC<SessionTranscriptStageProps> = ({
   const sessionArtifacts = useSelector((state: RootState) =>
     sessionId ? selectSessionArtifacts(state, sessionId) : EMPTY_ARTIFACTS,
   );
-
-  const {
-    isExportingImage,
-    showExportOptions,
-    setShowExportOptions,
-    handleExportText,
-    handleShareClick,
-  } = useSessionExport({ currentSession, scrollContainerRef });
 
   useInlineArtifacts({ sessionId, messages: currentSession?.messages, isStreaming });
   useArtifactLinkInterception({
@@ -143,19 +133,11 @@ export const SessionTranscriptStage: React.FC<SessionTranscriptStageProps> = ({
   return (
     <PersistentToggleNamespaceProvider namespace={currentSession.id}>
       <DiffWorkerPoolProvider>
-        <SessionExportDialog
-          open={showExportOptions}
-          onOpenChange={setShowExportOptions}
-          onExportImage={handleShareClick}
-          onExportText={handleExportText}
-          disabled={isExportingImage}
-        />
         <ConversationThread
           sessionId={currentSession.id}
           turns={turns}
           skills={skills}
           cwd={currentSession.cwd}
-          isExporting={isExportingImage}
           scrollContainerRef={scrollContainerRef}
           unmatchedPermission={unmatchedPermission}
           onRespondToPermission={onRespondToInlinePermission}

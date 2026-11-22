@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron';
+import type { BrowserWindow } from 'electron';
 
 import {
   CodingAgentIpc,
@@ -9,7 +9,6 @@ import {
   type CodingGitBranchInput,
   type CodingGitPullRequestInput,
   type CodingGitDiffInput,
-  type CodingGitPathActionInput,
   type CodingGitTargetInput,
   type CodingWorkspaceFileInput,
   type CodingWorkspaceFileWriteInput,
@@ -17,13 +16,9 @@ import {
   type CodingLaneConfigOptionInput,
   type CodingPermissionResponse,
   type CodingElicitationResponse,
-  type CreateCodingCollaborationPresetInput,
   type CodingPromptInput,
-  type CodingRoomEventDelta,
-  type CreateCodingSessionInput,
   type StartCodingSessionInput,
   type CreateCodingWorkspaceInput,
-  type CreateCodingMissionInput,
   type UpdateCodingWorkspaceInput,
 } from '../../shared/codingAgent';
 import type { CodingRoomService } from '../codingAgent/codingRoomService';
@@ -57,35 +52,24 @@ async function runCodingHandler<T>(
   }
 }
 
-export function registerCodingAgentIpcHandlers(getService: () => CodingRoomService): void {
+export function registerCodingAgentIpcHandlers(
+  getService: () => CodingRoomService,
+  getMainWindow: () => BrowserWindow | null,
+): void {
   const service = getService();
+  const send = (channel: CodingAgentIpc, payload: unknown) => {
+    const window = getMainWindow();
+    if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
+    window.webContents.send(channel, payload);
+  };
   service.on('changed', snapshot => {
     agentResourceDiagnostics.recordRoomSnapshot(snapshot.events.length, snapshot.lanes.length);
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(CodingAgentIpc.Changed, snapshot);
-    }
+    send(CodingAgentIpc.Changed, snapshot);
   });
-  service.on('pendingMessagesChanged', event => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed())
-        window.webContents.send(CodingAgentIpc.PendingMessagesChanged, event);
-    }
-  });
-  service.on('authTerminalData', event => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(CodingAgentIpc.AuthTerminalData, event);
-    }
-  });
-  service.on('authTerminalExit', event => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(CodingAgentIpc.AuthTerminalExit, event);
-    }
-  });
-  service.on('eventDelta', (delta: CodingRoomEventDelta) => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(CodingAgentIpc.EventDelta, delta);
-    }
-  });
+  service.on('pendingMessagesChanged', event => send(CodingAgentIpc.PendingMessagesChanged, event));
+  service.on('authTerminalData', event => send(CodingAgentIpc.AuthTerminalData, event));
+  service.on('authTerminalExit', event => send(CodingAgentIpc.AuthTerminalExit, event));
+  service.on('eventDelta', delta => send(CodingAgentIpc.EventDelta, delta));
   handleIpcContract(codingAgentContract, {
     listProfiles: () =>
       runCodingHandler(CodingAgentIpc.ListProfiles, () => {
@@ -96,12 +80,12 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
         return { success: true, workspaces: service.listWorkspaces() };
       }),
     createWorkspace: (_event, input: CreateCodingWorkspaceInput) =>
-      runCodingHandler(CodingAgentIpc.CreateWorkspace, () => {
-        return { success: true, workspaces: service.createWorkspace(input) };
+      runCodingHandler(CodingAgentIpc.CreateWorkspace, async () => {
+        return { success: true, workspaces: await service.createWorkspace(input) };
       }),
     updateWorkspace: (_event, input: UpdateCodingWorkspaceInput) =>
-      runCodingHandler(CodingAgentIpc.UpdateWorkspace, () => {
-        return { success: true, workspaces: service.updateWorkspace(input) };
+      runCodingHandler(CodingAgentIpc.UpdateWorkspace, async () => {
+        return { success: true, workspaces: await service.updateWorkspace(input) };
       }),
     deleteWorkspace: (_event, workspaceId: string) =>
       runCodingHandler(CodingAgentIpc.DeleteWorkspace, () => {
@@ -119,12 +103,8 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
         return { success: true, configOptions: service.getProfileConfigOptions(profileId) };
       }),
     getProfileAvailableCommands: (_event, profileId: string) =>
-      runCodingHandler(CodingAgentIpc.GetProfileAvailableCommands, () => {
-        return { success: true, commands: service.getProfileAvailableCommands(profileId) };
-      }),
-    createSession: (_event, input: CreateCodingSessionInput) =>
-      runCodingHandler(CodingAgentIpc.CreateSession, async () => {
-        return { success: true, snapshot: await service.createSession(input) };
+      runCodingHandler(CodingAgentIpc.GetProfileAvailableCommands, async () => {
+        return { success: true, commands: await service.getProfileAvailableCommands(profileId) };
       }),
     startSession: (_event, input: StartCodingSessionInput) =>
       runCodingHandler(CodingAgentIpc.StartSession, async () => {
@@ -155,10 +135,6 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
           success: true,
           snapshot: await service.prepareLane(input.workspaceRoot, input.laneId),
         };
-      }),
-    createMission: (_event, input: CreateCodingMissionInput) =>
-      runCodingHandler(CodingAgentIpc.CreateMission, async () => {
-        return { success: true, snapshot: await service.createMission(input) };
       }),
     selectLane: (_event, input: { workspaceRoot: string; laneId: string }) =>
       runCodingHandler(CodingAgentIpc.SelectLane, () => {
@@ -224,20 +200,6 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       runCodingHandler(CodingAgentIpc.Cancel, async () => {
         return { success: true, snapshot: await service.cancel(input.workspaceRoot, input.laneId) };
       }),
-    previewHandoff: (
-      _event,
-      input: { workspaceRoot: string; sourceLaneId: string; targetLaneId: string },
-    ) =>
-      runCodingHandler(CodingAgentIpc.PreviewHandoff, async () => {
-        return {
-          success: true,
-          content: await service.previewHandoff(
-            input.workspaceRoot,
-            input.sourceLaneId,
-            input.targetLaneId,
-          ),
-        };
-      }),
     handoff: (
       _event,
       input: { workspaceRoot: string; sourceLaneId: string; targetLaneId: string },
@@ -250,20 +212,6 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
             input.sourceLaneId,
             input.targetLaneId,
           ),
-        };
-      }),
-    createCollaborationPreset: (_event, input: CreateCodingCollaborationPresetInput) =>
-      runCodingHandler(CodingAgentIpc.CreateCollaborationPreset, async () => {
-        return {
-          success: true,
-          snapshot: await service.createImplementationReviewVerificationPreset(input),
-        };
-      }),
-    addLane: (_event, input: { workspaceRoot: string; missionId: string; profileId: string }) =>
-      runCodingHandler(CodingAgentIpc.AddLane, async () => {
-        return {
-          success: true,
-          snapshot: await service.addLane(input.workspaceRoot, input.missionId, input.profileId),
         };
       }),
     saveLaneView: (_event, input: { workspaceRoot: string; view: CodingLaneViewStateInput }) =>
@@ -295,14 +243,6 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
     getGitDiff: (_event, input: CodingGitDiffInput) =>
       runCodingHandler(CodingAgentIpc.GetGitDiff, async () => {
         return { success: true, diff: await service.getGitDiff(input) };
-      }),
-    stageGitPaths: (_event, input: CodingGitPathActionInput) =>
-      runCodingHandler(CodingAgentIpc.StageGitPaths, async () => {
-        return { success: true, status: await service.stageGitPaths(input) };
-      }),
-    unstageGitPaths: (_event, input: CodingGitPathActionInput) =>
-      runCodingHandler(CodingAgentIpc.UnstageGitPaths, async () => {
-        return { success: true, status: await service.unstageGitPaths(input) };
       }),
     commitGitChanges: (_event, input: CodingGitCommitInput) =>
       runCodingHandler(CodingAgentIpc.CommitGitChanges, async () => {

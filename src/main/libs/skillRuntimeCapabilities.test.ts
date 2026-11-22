@@ -17,7 +17,7 @@ vi.mock('./pythonRuntime', () => ({
   getManagedPythonExecutable: () => '/managed/python',
 }));
 vi.mock('./skillPythonRuntime', () => ({
-  findSkillPythonExecutable: (skillId: string) => `/managed/${skillId}/python`,
+  findSkillPythonExecutable: async (skillId: string) => `/managed/${skillId}/python`,
 }));
 vi.mock('./uvRuntime', () => ({
   findBundledUvExecutable: () => '/managed/uv',

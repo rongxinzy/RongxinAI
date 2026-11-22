@@ -16,27 +16,57 @@ import {
   DESKTOP_PET_STORE_KEY,
   DESKTOP_PET_FAILURES_KEY,
 } from '../../shared/desktopPet/constants';
-import { CompanionComposerMode } from '../../shared/companion/constants';
-import { PiUiEventSequencer, PiUiEventType } from '../../shared/cowork/piUiEvent';
+import { CompanionComposerMode, CompanionRequestState } from '../../shared/companion/constants';
+import { PiUiEventSequencer, PiUiEventType, type PiUiEvent } from '../../shared/cowork/piUiEvent';
+import { piUiLifecycleStatus } from '../../shared/cowork/piUiRuntimeSnapshot';
+import { CoworkSessionStatus } from '../../shared/cowork/constants';
 import { CoworkErrorKind } from '../../common/coworkError';
+import { CompanionProfiles } from '../companion/profiles';
+import type { CompanionActivity } from '../companion/chat';
 
 import {
   initializeDesktopPet,
   disposeDesktopPet,
   setDesktopPetEnabled,
-  setDesktopPetBubbleVisible,
   isDesktopPetEnabled,
-  observeDesktopPetEvent,
+  observeDesktopPetEvent as notifyDesktopPet,
 } from './controller';
 
+const running = new Set<string>();
+const workRuntime = {
+  getRunningSessionIds: () => [...running],
+  getPendingModalPermissionSessionId: () => undefined,
+};
+function observeDesktopPetEvent(event: PiUiEvent) {
+  const status = piUiLifecycleStatus(event);
+  if (status && event.sessionId) {
+    if (status === CoworkSessionStatus.Running) running.add(event.sessionId);
+    else running.delete(event.sessionId);
+  }
+  notifyDesktopPet(event);
+}
+
 let saved: unknown;
+const listeners = new Map<string, (value: unknown, previous: unknown) => void>();
 const preferences = {
   get: <T>(key: string) =>
     (key === DESKTOP_PET_STORE_KEY ? saved : mocks.values.get(key)) as T | undefined,
   set: (key: string, value: unknown) => {
+    const previous = preferences.get(key);
     if (key === DESKTOP_PET_STORE_KEY) saved = value;
     else mocks.values.set(key, value);
+    listeners.get(key)?.(value, previous);
   },
+  onDidChange: (key: string, listener: (value: unknown, previous: unknown) => void) => {
+    listeners.set(key, listener);
+    return () => listeners.delete(key);
+  },
+};
+const profiles = new CompanionProfiles(preferences);
+const unsubscribeChat = vi.fn();
+const chat = {
+  hasPendingReply: vi.fn((_petId: string) => false),
+  onActivity: vi.fn((_listener: (activity: CompanionActivity) => void) => unsubscribeChat),
 };
 const getMainWindow = () =>
   ({
@@ -49,12 +79,15 @@ const getMainWindow = () =>
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
+  mocks.isChatVisible.mockReturnValue(false);
   mocks.options.length = 0;
   mocks.windows.length = 0;
   saved = undefined;
+  running.clear();
   mocks.fullscreen = false;
   mocks.values.clear();
-  initializeDesktopPet(preferences, getMainWindow, mocks.changed);
+  chat.hasPendingReply.mockReturnValue(false);
+  initializeDesktopPet(preferences, getMainWindow, mocks.changed, { profiles, chat }, workRuntime);
 });
 afterEach(() => {
   disposeDesktopPet();
@@ -84,6 +117,40 @@ test('the companion is opt-in and uses a dedicated sandboxed preload', () => {
   expect(saved).toEqual({ enabled: true, layoutVersion: 1, x: 300, y: 400 });
 });
 
+test('the desktop pet follows the active profile and its own chat activity subscription', () => {
+  setDesktopPetEnabled(true);
+  mocks.windows[0].emit('ready-to-show');
+  const contents = mocks.windows[0].webContents;
+  mocks.ipc.get(DesktopPetIpc.Ready)!({ sender: contents, senderFrame: contents.mainFrame });
+  const [first, second] = profiles.visibleSnapshot().profiles;
+  const [activity] = chat.onActivity.mock.calls[0];
+  const expectState = (state: DesktopPetState) =>
+    expect(contents.send).toHaveBeenLastCalledWith(
+      DesktopPetIpc.State,
+      expect.objectContaining({ state }),
+    );
+
+  chat.hasPendingReply.mockImplementation(petId => petId === first.petId);
+  activity({ petId: first.petId, submissionId: 1, state: CompanionRequestState.Accepted });
+  expectState(DesktopPetState.Thinking);
+  profiles.changeAppearance(first.petId, DesktopPetBuiltinId.Youli);
+  expectState(DesktopPetState.Thinking);
+  profiles.select(second.petId);
+  expectState(DesktopPetState.Idle);
+  profiles.select(first.petId);
+  expectState(DesktopPetState.Thinking);
+  activity({ petId: second.petId, submissionId: 2, state: CompanionRequestState.Answered });
+  expectState(DesktopPetState.Thinking);
+  chat.hasPendingReply.mockReturnValue(false);
+  mocks.ipc.get(DesktopPetIpc.Ready)!({ sender: contents, senderFrame: contents.mainFrame });
+  expectState(DesktopPetState.Idle);
+  activity({ petId: first.petId, submissionId: 1, state: CompanionRequestState.Answered });
+  expectState(DesktopPetState.Completed);
+
+  disposeDesktopPet();
+  expect(unsubscribeChat).toHaveBeenCalledOnce();
+});
+
 test('IPC rejects other windows and subframes and bounds the alpha mask', () => {
   setDesktopPetEnabled(true);
   const contents = mocks.windows[0].webContents;
@@ -92,6 +159,10 @@ test('IPC rejects other windows and subframes and bounds the alpha mask', () => 
   start({ sender: contents, senderFrame: {} });
   expect(mocks.begin).not.toHaveBeenCalled();
   const sender = { sender: contents, senderFrame: contents.mainFrame };
+  start(sender, 'unexpected');
+  mocks.ipc.get(DesktopPetIpc.DragEnd)!(sender, 'invalid');
+  expect(mocks.begin).not.toHaveBeenCalled();
+  expect(mocks.end).not.toHaveBeenCalled();
   start(sender);
   expect(mocks.begin).toHaveBeenCalledOnce();
   const mask = mocks.ipc.get(DesktopPetIpc.HitMask)!;
@@ -100,6 +171,15 @@ test('IPC rejects other windows and subframes and bounds the alpha mask', () => 
   expect(mocks.setMask).not.toHaveBeenCalled();
   mask(sender, new Uint8Array(192 * 192));
   expect(mocks.setMask).toHaveBeenCalledOnce();
+  const walk = mocks.ipc.get(DesktopPetIpc.WalkFrame)!;
+  walk(sender, { walkId: 1, mediaTime: 0.25 });
+  expect(mocks.observeWalkFrame).not.toHaveBeenCalled();
+  mocks.windows[0].emit('ready-to-show');
+  walk(sender, { walkId: 1, mediaTime: NaN });
+  walk(sender, { walkId: 1.5, mediaTime: 0.25 });
+  expect(mocks.observeWalkFrame).not.toHaveBeenCalled();
+  walk(sender, { walkId: 1, mediaTime: 0.25 });
+  expect(mocks.observeWalkFrame).toHaveBeenCalledExactlyOnceWith({ walkId: 1, mediaTime: 0.25 });
 });
 
 test('the renderer receives only a localized status snapshot', () => {
@@ -188,7 +268,7 @@ test('double click cancels pending single-click feedback and toggles chat while 
   );
   expect(mocks.openChat).toHaveBeenCalledOnce();
   expect(mocks.hideChat).not.toHaveBeenCalled();
-  setDesktopPetBubbleVisible(true);
+  mocks.isChatVisible.mockReturnValue(true);
   mocks.ipc.get(DesktopPetIpc.Open)!(sender);
   expect(mocks.hideChat).toHaveBeenCalledOnce();
   expect(mocks.main.show).not.toHaveBeenCalled();
@@ -211,10 +291,10 @@ test('right-click menu provides mode-specific companion entry, interact submenu,
   openMenu()('聊两句').click!();
   expect(mocks.openChat).toHaveBeenLastCalledWith(CompanionComposerMode.Chat);
 
-  setDesktopPetBubbleVisible(true);
+  mocks.isChatVisible.mockReturnValue(true);
   openMenu()('收起对话').click!();
   expect(mocks.hideChat).toHaveBeenCalledOnce();
-  setDesktopPetBubbleVisible(false);
+  mocks.isChatVisible.mockReturnValue(false);
 
   openMenu()('交代任务').click!();
   expect(mocks.openChat).toHaveBeenLastCalledWith(CompanionComposerMode.Task);
@@ -435,6 +515,15 @@ test('action chatter respects settings, visibility, and reduced motion', async (
   expect(lastBubble()).toBeNull();
 });
 
+test('disposing before a desktop pet is initialized does not access screen listeners', () => {
+  disposeDesktopPet();
+  mocks.screenOff.mockClear();
+
+  disposeDesktopPet();
+
+  expect(mocks.screenOff).not.toHaveBeenCalled();
+});
+
 test('hiding preserves position and disposal removes IPC and screen listeners', () => {
   setDesktopPetEnabled(true);
   setDesktopPetEnabled(false);
@@ -512,7 +601,7 @@ test('settings validate payload and sender, remain enabled while quiet, and sync
   });
 });
 
-test('released character settings restore saved pets and preserve failures across appearance changes', async () => {
+test('character settings use the active profile across restart and preserve failures', async () => {
   saved = { characterId: DesktopPetBuiltinId.Youli, enabled: false };
   expect(await invoke(DesktopPetIpc.GetSettings)).toMatchObject({
     characterId: DesktopPetBuiltinId.Youli,
@@ -525,6 +614,7 @@ test('released character settings restore saved pets and preserve failures acros
     enabled: true,
     characterId: DesktopPetBuiltinId.Youli,
   });
+  const original = profiles.active();
   await invoke(DesktopPetIpc.SetSettings, { enabled: true });
   const events = new PiUiEventSequencer(() => 'character-failure');
   observeDesktopPetEvent(
@@ -535,9 +625,11 @@ test('released character settings restore saved pets and preserve failures acros
     }),
   );
   await invoke(DesktopPetIpc.SetSettings, { characterId: DesktopPetBuiltinId.Yunmo });
+  expect(saved).toMatchObject({ characterId: DesktopPetBuiltinId.Youli, enabled: true });
+  expect(profiles.active()).toEqual({ ...original, characterId: DesktopPetBuiltinId.Yunmo });
   expect(mocks.values.get(DESKTOP_PET_FAILURES_KEY)).toHaveLength(1);
   disposeDesktopPet();
-  initializeDesktopPet(preferences, getMainWindow, mocks.changed);
+  initializeDesktopPet(preferences, getMainWindow, mocks.changed, { profiles, chat }, workRuntime);
   expect(await invoke(DesktopPetIpc.GetSettings)).toMatchObject({
     characterId: DesktopPetBuiltinId.Yunmo,
   });
@@ -546,6 +638,21 @@ test('released character settings restore saved pets and preserve failures acros
   expect(contents.send).toHaveBeenLastCalledWith(
     DesktopPetIpc.State,
     expect.objectContaining({ characterId: DesktopPetBuiltinId.Yunmo, state: 'error' }),
+  );
+  const other = profiles
+    .snapshot()
+    .profiles.find(pet => pet.personaId === DesktopPetBuiltinId.Tuantuan)!;
+  profiles.select(other.petId);
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ characterId: DesktopPetBuiltinId.Tuantuan }),
+  );
+  expect(await invoke(DesktopPetIpc.GetSettings)).toMatchObject({
+    characterId: DesktopPetBuiltinId.Tuantuan,
+  });
+  expect(saved).toMatchObject({ characterId: DesktopPetBuiltinId.Youli });
+  expect(profiles.snapshot().profiles.find(pet => pet.petId === original.petId)?.characterId).toBe(
+    DesktopPetBuiltinId.Yunmo,
   );
 });
 
@@ -587,7 +694,7 @@ test('task navigation keeps failures until a matching successful acknowledgement
   expect(mocks.values.get(DESKTOP_PET_FAILURES_KEY)).toEqual([]);
   fail();
   disposeDesktopPet();
-  initializeDesktopPet(preferences, getMainWindow, mocks.changed);
+  initializeDesktopPet(preferences, getMainWindow, mocks.changed, { profiles, chat }, workRuntime);
   const restored = mocks.windows.at(-1)!.webContents;
   mocks.ipc.get(DesktopPetIpc.Ready)!({ sender: restored, senderFrame: restored.mainFrame });
   expect(restored.send).toHaveBeenLastCalledWith(
@@ -618,5 +725,32 @@ test('reminder storage failure cannot throw into the task event pipeline', () =>
   } finally {
     writing.mockRestore();
     warning.mockRestore();
+  }
+});
+
+test('persists reminder mutations without rewriting them for transient task events', () => {
+  const writing = vi.spyOn(preferences, 'set');
+  const writes = () => writing.mock.calls.filter(([key]) => key === DESKTOP_PET_FAILURES_KEY);
+  let id = 0;
+  const events = new PiUiEventSequencer(() => `event-${++id}`);
+  try {
+    observeDesktopPetEvent(events.next({ type: PiUiEventType.Started, sessionId: 'first' }));
+    observeDesktopPetEvent(events.next({ type: PiUiEventType.Completed, sessionId: 'first' }));
+    expect(writes()).toEqual([]);
+    const failure = events.next({
+      type: PiUiEventType.Error,
+      sessionId: 'second',
+      error: { kind: CoworkErrorKind.Unknown, message: 'fixture' },
+    });
+    observeDesktopPetEvent(failure);
+    observeDesktopPetEvent(failure);
+    expect(writes()).toEqual([
+      [DESKTOP_PET_FAILURES_KEY, [{ sessionId: 'second', eventId: failure.eventId }]],
+    ]);
+    observeDesktopPetEvent(events.next({ type: PiUiEventType.Completed, sessionId: 'second' }));
+    expect(writes()).toHaveLength(2);
+    expect(writes().at(-1)).toEqual([DESKTOP_PET_FAILURES_KEY, []]);
+  } finally {
+    writing.mockRestore();
   }
 });

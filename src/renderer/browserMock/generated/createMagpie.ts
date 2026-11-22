@@ -10,6 +10,14 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
         version: '0.0.0-preview',
       };
     },
+    setSubscriptionAccounts: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.setSubscriptionAccounts');
+      return {
+        state: 'stopped',
+        version: '0.0.0-preview',
+      };
+    },
     start: async () => {
       runtime.warnOnce('magpie.start');
       return {
@@ -69,10 +77,6 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
         pending: false,
       };
     },
-    models: async () => {
-      runtime.warnOnce('magpie.models');
-      return [];
-    },
     catalog: async () => {
       runtime.warnOnce('magpie.catalog');
       return {
@@ -96,14 +100,6 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
         defaultModelId: '',
       };
     },
-    setSubscriptionAccounts: async _p0 => {
-      void _p0;
-      runtime.warnOnce('magpie.setSubscriptionAccounts');
-      return {
-        state: 'stopped',
-        version: '0.0.0-preview',
-      };
-    },
     providers: async () => {
       runtime.warnOnce('magpie.providers');
       return [];
@@ -113,9 +109,8 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
       runtime.warnOnce('magpie.saveProvider');
       return [];
     },
-    setProviderEnabled: async (_p0, _p1) => {
+    setProviderEnabled: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('magpie.setProviderEnabled');
       return [];
     },
@@ -258,10 +253,8 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
         unpriced: 0,
       };
     },
-    usageRequests: async (_p0, _p1, _p2) => {
+    usageRequests: async _p0 => {
       void _p0;
-      void _p1;
-      void _p2;
       runtime.warnOnce('magpie.usageRequests');
       return {
         period: '30d',

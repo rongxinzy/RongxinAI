@@ -11,7 +11,7 @@ import { SqliteStore } from '../../src/main/sqliteStore';
 import { PiRuntimeAdapter } from '../../src/main/libs/agentEngine/piRuntimeAdapter';
 import { initializeWorkbenchTaskSchema } from '../../src/main/workbenchTask/schema';
 import { WorkbenchTaskService } from '../../src/main/workbenchTask/taskService';
-import { installTestMagpie } from '../helpers/installTestMagpie';
+import { createTestMagpie } from '../helpers/createTestMagpie';
 import { PiAssistantStopReason } from '../../src/main/libs/agentEngine/piToolConstants';
 
 const mutableApp = app as unknown as Record<string, unknown>;
@@ -35,7 +35,7 @@ test.each([PiAssistantStopReason.Length, PiAssistantStopReason.Stop])(
       );
     });
     await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
-    const gateway = installTestMagpie({
+    const gateway = createTestMagpie({
       gatewayUrl: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`,
       defaultModelId: model,
     });
@@ -44,9 +44,11 @@ test.each([PiAssistantStopReason.Length, PiAssistantStopReason.Stop])(
     const db = store.getDatabase();
     initializeWorkbenchTaskSchema(db);
     const coworkStore = new CoworkStore(db);
-    const adapter = new PiRuntimeAdapter();
-    adapter.setCoworkStore(coworkStore);
-    adapter.setWorkbenchTaskService(new WorkbenchTaskService(db));
+    const adapter = new PiRuntimeAdapter({
+      modelService: gateway.modelService,
+      coworkStore,
+      workbenchTaskService: new WorkbenchTaskService(db),
+    });
     const complete = vi.fn();
     const error = vi.fn();
     adapter.on('complete', complete);
@@ -68,7 +70,6 @@ test.each([PiAssistantStopReason.Length, PiAssistantStopReason.Stop])(
       expect(requests).toBe(1);
     } finally {
       adapter.stopAllSessions();
-      gateway.dispose();
       await store.close();
       await new Promise<void>(resolve => {
         upstream.close(() => resolve());

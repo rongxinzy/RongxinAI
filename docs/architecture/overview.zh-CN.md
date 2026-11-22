@@ -9,7 +9,8 @@
 | Main | `src/main/` | 窗口、持久化、Pi 运行时、llama.cpp 生命周期、Skill/MCP、IPC handler |
 | Preload | `src/main/preload.ts` | `contextBridge` → `window.electron`（contextIsolation 开、nodeIntegration 关、sandbox 开） |
 | Renderer | `src/renderer/` | React UI；业务逻辑在 `src/renderer/services/`，禁止直接访问 Node/Electron |
-| Channel/Cron 传输 | `src/main/libs/ccConnect*`、`src/main/im/` | 只搬运渠道事件与 cron 触发，**不**执行 Agent、不持有任务状态 |
+| Channel 传输 | `src/main/libs/ccConnect*`、`src/main/im/` | 接收渠道事件、投递消息和定时任务结果 |
+| Cron 调度 | `src/scheduledTask/` | 用本地时钟触发，通过 Pi 执行，在主进程统一停止接收并等待执行收尾 |
 
 主进程在 IPC/agent 热路径上不得做同步整盘扫描、大文件读/哈希、重解析等 CPU 密集工作；可分离部分进 `worker_threads`（池 ≤2、可取消）。详见 [AGENTS.md](../../AGENTS.md)「主进程 / Worker 边界」。
 
@@ -23,9 +24,9 @@
 | `src/main/sqliteStore.ts` | `userData/zhiyuan.sqlite`（better-sqlite3） |
 | `src/main/ipcHandlers/` | IPC 注册；本地推理见 `ipcHandlers/llamacpp/` |
 | `src/main/libs/agentEngine/` | **Pi 唯一执行内核**（见下节） |
-| `src/main/libs/llamacppManager.ts` | llama.cpp 编排 barrel（实现于 `llamacppManager/`） |
+| `src/main/libs/llamacppManager.ts` | 本地模型库、运行时安装与能力探测的公共入口 |
 | `src/main/libs/llamacppBackendManager.ts` | 后端/runtime 安装 barrel（实现于 `llamacppBackendManager/`） |
-| `src/main/skillManager.ts` | 内置 Skill 管理 |
+| `src/main/skillManager.ts` | Skill 状态与目录根管理。目录扫描、元数据解析和图标编码由现有有界 Worker 池执行，主进程持有 SQLite 状态并验证返回结果。Windows 删除残留由监听器异步串行清理，应用退出时停止接收新清理并等待当前文件操作。 |
 | `src/main/pythonRuntime/` | 共享预装基线、工作区隔离的托管 Python 与统一 Skill 执行链路 |
 | `src/main/memory/` | Engram 投影与 `memory` 工具 |
 | `src/shared/llamacpp/` | 主/渲染共享的 llama.cpp 类型与常量 |
@@ -55,7 +56,19 @@
 
 ## Pi 运行时（Agent 引擎）
 
-**Pi First：** `src/main/libs/agentEngine/piRuntimeAdapter.ts` 是 Work / Chat / Channel / Cron 的**唯一**执行内核。新能力优先用 Pi 原生机制，不在 harness 层重造。
+**Pi First：** `src/main/libs/agentEngine/piRuntimeAdapter.ts` 是 Work / Chat / Channel / Cron 与伴侣聊天的**唯一**执行内核。新能力优先用 Pi 原生机制，不在 harness 层重造。
+
+启动时先恢复未结束的运行并应用企业与 MCP 配置，再装配 Pi 和事件转发。会话组合入口同时装配 Pi、定时任务服务及其执行器。启动层将 Magpie 持有的同一模型服务交给 Pi、伴侣服务、Coding Room 和集成就绪检查。Work 定时工具使用该任务服务，Cron 执行器直接使用同一个 Pi 实例。模型路由和 Channel 恢复后启用已保存的日程。Magpie 在创建时接收本地推理的模型读取入口。本地推理持有并关闭 llama.cpp 编排实例，Magpie 持有模型路由与组织网关。
+
+Windows 在创建首个窗口前异步检查开始菜单。只清理声明了本应用 AUMID、且指向遗留 Electron 可执行文件的快捷方式，开发版随后更新自己的快捷方式。
+
+Channel 边车由主进程拥有。已完成消息的重投递回执随主库初始化，Channel 启停只管理进程和连接。退出和重新配置共用同一停机操作，等待子进程退出，宽限超时后强制终止。
+
+伴侣聊天按宠物实例隔离 Pi 会话。首轮和后续轮次都从 `continueSession` 进入无工具的聊天模式，由 Pi 按需创建或恢复原生会话。主库保存气泡历史和请求回执，包括尚未送入 Pi 的已受理请求。重启时这些未完成的回复记为中断。Pi JSONL 保存模型续聊用的结构化上下文。伴侣档案负责活动身份、人格和外观。桌宠窗口呈现外观并管理运动与提醒，伴侣窗口呈现聊天。两个窗口订阅同一档案的变更。Windows 桌宠观察器负责停止传感器，应用退出等待所有尚未退出的传感器，包括所属窗口已经关闭的进程。旧版伴侣 SQLite 文件原地保留。
+
+Coding Room 的内置 Agent 也经 Pi 执行。用户在 Coding Room 选用外部 Agent 时，由该工作区的执行通道通过 ACP 管理所选外部进程及会话。这条入口承载现有的外部 Agent 功能。
+
+`CodingRoomService` 持有应用入口和事件出口。`CodingRoomState` 管理工作区快照、通道索引和驱动会话，`CodingRoomTurnExecution` 管理回合和待发送消息队列，两者由入口显式装配。
 
 | 模块 | 角色 |
 | --- | --- |
@@ -75,7 +88,21 @@ startSession() → IPC → PiRuntimeAdapter → 流事件 → Redux
 
 流式 IPC/渲染说明见 [streaming.md](streaming.md)（Pi 事件翻译为增量 UIMessageChunk，主进程仅 coalescer 一处合并，渲染端 rAF 批处理进 `LiveTextStore`，经 `ConversationStage` / 常驻 `<StageComposer>`、懒加载 `SessionStage`、`projectSessionToTurns` 回合投影、`AssistantTextPartView`/`ThinkingPartView` 隔离订阅与 Streamdown 2.7 / `@tanstack/react-virtual` 增量渲染；全文快照仅限异常路径与终态）。权限请求经 `CoworkPermissionModal` 回传引擎。
 
-存储：`cowork_sessions` / `cowork_messages`；Cowork 配置 `cowork_config`；应用 KV 在 SQLite `kv` 表。
+Work 回合的存储归属如下。
+
+| 记录 | 职责 |
+| --- | --- |
+| `cowork_sessions` / `cowork_messages` | 会话列表和用户可见消息，由 CoworkStore 提供 |
+| Pi JSONL | Pi 恢复模型上下文时使用的结构化历史，按会话生命周期隔离 |
+| `workbench_tasks` / `workbench_runs` / `workbench_run_events` | 任务尝试、结算、审批和测量。最终回复从结算事件传给记忆提炼 |
+| `artifact_ledger` | 会话或 Coding Room 执行通道的产物台账，用于展示、检查点范围判定，以及按运行 ID 提供记忆证据 |
+| `memory_checkpoints`、记忆归属与 outbox | 检查点正文、原生会话身份和 Engram 同步状态。会话关闭摘要和项目归属由 `memory_session_finalizations` 持有，关闭投递项只保存会话标识 |
+| `zhiyuan_activity_runs` | 渠道活动快照及定时任务的展示信息。定时任务活动的状态从 Cron 运行记录读取 |
+| `channel_inbox` | 渠道成功回执，按平台、账号和消息 ID 去重。失败或中断的请求在传输侧重投时再次执行 |
+
+新数据库只创建产物台账。已有数据库中的 `workbench_artifacts` 记录继续供运行审计读取，并随对应会话删除。Cowork 配置在 `cowork_config`，应用 KV 在 `kv`。
+
+主库由启动服务统一打开、发布和关闭。应用退出先等待写入收尾，启动超时或退出后才打开的连接由启动服务关闭。主库打开后，在同一个事务中把遗留的运行中会话恢复为空闲，取消上次进程遗留的 Workbench 排队与运行记录（含桌宠提交的任务），并让这些运行的待决审批过期。已开始但没有结果的工具操作标记为待核对，已受理但未完成的伴侣聊天回执标记为未回复。Cron 的中断运行、任务运行状态和活动流投影也在这个事务中更新。随后应用才启动备份、渠道接收、调度和窗口。桌宠凭原始回执关联任务与运行，显示状态由 Workbench 提供。Cron 历史按本地日期和状态在 SQLite 筛选并分页。
 
 ## 托管 Python
 
@@ -87,17 +114,18 @@ startSession() → IPC → PiRuntimeAdapter → 流事件 → Redux
 
 服务级选项控制 `llama-server` 进程；模型级选项在加载/运行时传入。类型与共享常量：`src/shared/llamacpp/`。
 
+应用选定的 Router 或 daemon 持有推理进程，并负责启动、加载、卸载与退出清理。服务状态和运行模型列表只查询现有实例，模型库列表直接扫描当前 GGUF 目录。显式启动和加载模型可以启动服务。更换模型目录由当前实例重启，停机时只保存配置。Router 按解析后的模型目录保存独立的生成预设。
+
+两种编排共用 `llamacppModelGateway.ts` 管理回环监听、端口重绑与关闭。退出时分别跟踪已接纳请求的排空和进程退出。守护进程控制凭证在发起停机时读取，后续控制请求脱离主库。Magpie 负责模型路由与局域网入口。
+
 2026-10 起超大单文件已按职责拆分（#1069 / #1116），**对外 import 路径不变**（barrel re-export）：
 
 ### `llamacppManager/`
 
 | 文件 | 职责 |
 | --- | --- |
-| `core.ts` | 基类与共享状态 |
-| `backendOps.ts` | 后端绑定与可执行文件 |
-| `serviceLifecycle.ts` | 服务启停 |
-| `modelOps.ts` | 模型加载/卸载（`LlamaCppManager` 导出类） |
-| `types.ts` / `fileUtils.ts` | 类型与 INI/路径工具 |
+| `manager.ts` | 模型库读取、安装与导入，后端包管理，以及对选定可执行文件的能力探测 |
+| `fileUtils.ts` | INI 与路径工具 |
 
 ### `llamacppBackendManager/`
 
@@ -116,7 +144,7 @@ startSession() → IPC → PiRuntimeAdapter → 流事件 → Redux
 | `config.ts` | 服务/模型偏好持久化 |
 | `registerHandlers.ts` | `window.electron.llamacpp` 方法注册 |
 
-单测按域拆分：`llamacppManager/serve.test.ts`、`models.test.ts`、`install.test.ts`；根 `llamacppManager.test.ts` 仅聚合 side-effect import。
+Vitest 直接运行 `llamacppManager/` 下的运行时、模型库、下载和导入测试。
 
 ### 模型市场目录
 
@@ -134,9 +162,13 @@ startSession() → IPC → PiRuntimeAdapter → 流事件 → Redux
 
 ### Zod IPC 契约
 
-Skills/MCP/Marketplace、AppSystem/Providers、CodingAgent/IM/自动化（定时任务+Activity）/Memory/Artifacts，以及 Cowork（sessions、queue、config、workspace、导出/权限、run snapshot、stream 恢复）、Workbench Task、Todo 走 `src/shared/ipc/contract.ts` 的 `defineIpcContract`（channel + zod args 元组 + result），单一事实来源。主进程用 `handleIpcContract`（`src/main/ipc/`）注册并运行时校验入参（失败即以含 channel 与 zod 摘要的错误拒绝，不调实现）；渲染层类型与 preload invoker 均从契约派生（`IpcContractApi` / `createIpcInvokers`）。沙箱 preload 不能引 zod，因此每个契约配一个 zod-free 的 `*.channels.ts` 通道映射（`IpcContractChannels` 锁定与契约一致）。新域 IPC 优先套用此模式。
+Skills/MCP/Marketplace、AppSystem/Providers、CodingAgent/IM/自动化（定时任务+Activity）/Memory/Artifacts，以及 Cowork（sessions、queue、config、workspace、权限、run snapshot、stream 恢复）、Workbench Task、Todo 走 `src/shared/ipc/contract.ts` 的 `defineIpcContract`（channel + zod args 元组 + result），单一事实来源。主进程用 `handleIpcContract`（`src/main/ipc/`）注册并运行时校验入参（失败即以含 channel 与 zod 摘要的错误拒绝，不调实现）；渲染层类型与 preload invoker 均从契约派生（`IpcContractApi` / `createIpcInvokers`）。沙箱 preload 不能引 zod，因此每个契约配一个 zod-free 的 `*.channels.ts` 通道映射（`IpcContractChannels` 锁定与契约一致）。新域 IPC 优先套用此模式。
 
-跨多个注册文件的契约（如 appSystem 覆盖 store/dialog/shell/appUpdate 等）按文件用 `handleIpcContractSubset` 注册各自子集；实现收到的 event 是完整 `IpcMainInvokeEvent`（`IpcContractHandlers` 的 event 参数按注册侧绑定）。Cowork 契约则按注册模块拆为多个子契约（`coworkContract.ts` 内 `coworkSession*` / `coworkQueue*` / `coworkConfig*` / `coworkExport*` / `workspaceContract` 等）。无论哪种方式，每个 channel 只能注册一次——重复注册会在启动时抛 "Attempted to register a second handler"。
+跨多个注册文件的契约（如 appSystem 覆盖 store/dialog/shell/appUpdate 等）按文件用 `handleIpcContractSubset` 注册各自子集；实现收到的 event 是完整 `IpcMainInvokeEvent`（`IpcContractHandlers` 的 event 参数按注册侧绑定）。Cowork 契约则按注册模块拆为多个子契约（`coworkContract.ts` 内 `coworkSession*` / `coworkQueue*` / `coworkConfig*` / `workspaceContract` 等）。无论哪种方式，每个 channel 只能注册一次——重复注册会在启动时抛 "Attempted to register a second handler"。
+
+渲染端单向事件使用 `listenToWindowIpcEvent`。它核对所属窗口和主帧，再验证参数元组，并返回注销函数。桌宠沙箱 preload 从事件契约取得 TypeScript 类型，通过通道常量发送事件。
+
+伴侣聊天、任务和档案的 IPC 由伴侣气泡的主帧调用，相关状态推送也由气泡接收。主窗口的伴侣桥只订阅打开工作台的导航事件，工作台会话继续使用 Cowork IPC。
 
 ### Toast
 

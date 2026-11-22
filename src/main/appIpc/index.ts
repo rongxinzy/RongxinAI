@@ -1,5 +1,5 @@
 /** App-level IPC: hardware, network, logs, auto-launch, prevent-sleep, window controls, devtools. */
-import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron';
+import { app, BrowserWindow, dialog, type WebContents } from 'electron';
 
 import { ensureZipFileName } from '../coworkIpc/fileExportHelpers';
 import path from 'path';
@@ -20,9 +20,15 @@ import { exportLogsZip } from '../libs/logExport';
 import { getCoworkLogPath } from '../libs/coworkLogger';
 import { APP_DATA_DIR_NAME } from '../appConstants';
 import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
-import { HardwareIpc } from '../../shared/ipc/channels';
+import {
+  appEventContract,
+  NetworkStatus,
+  type WindowMenuPosition,
+} from '../../shared/ipc/appEventContract';
 import { appSystemContract } from '../../shared/ipc/appSystemContract';
-import { handleIpcContractSubset } from '../ipc/handleIpcContract';
+import { hardwareContract } from '../../shared/ipc/hardwareContract';
+import { handleIpcContract, handleIpcContractSubset } from '../ipc/handleIpcContract';
+import { listenToWindowIpcEvent } from '../ipc/listenToWindowIpcEvent';
 import {
   resolveEffectiveInferenceEdition,
   usesBundledLlamaCppRuntime,
@@ -53,29 +59,38 @@ export interface AppIpcDeps {
   isEnterprise: () => boolean;
   getStore: () => SqliteStore;
   setPreventSleepBlockerEnabled: (enabled: boolean) => void;
-  showSystemMenu: (position?: { x?: number; y?: number }) => void;
+  showSystemMenu: (position?: WindowMenuPosition) => void;
   reconcileCcConnectChannelSidecars: () => Promise<void>;
   getMainWindow: () => Electron.BrowserWindow | null;
   hasIMGatewayManager: () => boolean;
 }
 
 export const registerAppIpc = (deps: AppIpcDeps): void => {
-  const toggleDevToolsForSenderSafe = (webContents: WebContents | null | undefined): boolean =>
-    toggleDevToolsForSender(webContents, deps.isDev);
-  ipcMain.handle('hardware:nvidia-smi', async () => getNvidiaSmiSnapshot());
-  ipcMain.handle(HardwareIpc.SystemMemory, async () => getSystemMemorySnapshot());
-
-  // Network status change handler
-  // Remove any existing listener first to avoid duplicate registrations
-  ipcMain.removeAllListeners('network:status-change');
-  ipcMain.on('network:status-change', (_event, status: 'online' | 'offline') => {
-    console.log(`[Main] Network status changed: ${status}`);
-
-    if (status === 'online' && deps.hasIMGatewayManager()) {
-      console.log('[Main] Network restored, reconciling channel sidecars...');
-      void deps.reconcileCcConnectChannelSidecars();
-    }
+  handleIpcContract(hardwareContract, {
+    nvidiaSmi: () => getNvidiaSmiSnapshot(),
+    systemMemory: () => getSystemMemorySnapshot(),
   });
+
+  listenToWindowIpcEvent(
+    appEventContract.networkStatusChange,
+    deps.getMainWindow,
+    (_window, status) => {
+      console.log(`[Main] Network status changed: ${status}`);
+
+      if (status === NetworkStatus.Online && deps.hasIMGatewayManager()) {
+        console.log('[Main] Network restored, reconciling channel sidecars...');
+        void deps.reconcileCcConnectChannelSidecars();
+      }
+    },
+  );
+  listenToWindowIpcEvent(
+    appEventContract.logFromRenderer,
+    deps.getMainWindow,
+    (_window, level, tag, message) => {
+      const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+      fn(`[Renderer][${tag}] ${message}`);
+    },
+  );
 
   handleIpcContractSubset(appSystemContract, {
     logGetPath: async () => {
@@ -203,34 +218,27 @@ export const registerAppIpc = (deps: AppIpcDeps): void => {
   });
 
   // Window control IPC handlers
-  ipcMain.on('window-minimize', () => {
-    deps.getMainWindow()?.minimize();
+  listenToWindowIpcEvent(appEventContract.windowMinimize, deps.getMainWindow, window => {
+    window.minimize();
   });
 
-  ipcMain.on('window-maximize', () => {
-    if (deps.getMainWindow()?.isMaximized()) {
-      deps.getMainWindow().unmaximize();
-    } else {
-      deps.getMainWindow()?.maximize();
-    }
+  listenToWindowIpcEvent(appEventContract.windowToggleMaximize, deps.getMainWindow, window => {
+    if (window.isMaximized()) window.unmaximize();
+    else window.maximize();
   });
 
-  ipcMain.on('window-close', () => {
-    deps.getMainWindow()?.close();
+  listenToWindowIpcEvent(appEventContract.windowClose, deps.getMainWindow, window => {
+    window.close();
   });
 
-  ipcMain.on(
-    'window:showSystemMenu',
-    (_event, position: { x?: number; y?: number } | undefined) => {
-      deps.showSystemMenu(position);
-    },
+  listenToWindowIpcEvent(appEventContract.windowShowSystemMenu, deps.getMainWindow, (_, position) =>
+    deps.showSystemMenu(position),
   );
 
   handleIpcContractSubset(appSystemContract, {
     windowIsMaximized: async () => {
       return deps.getMainWindow()?.isMaximized() ?? false;
     },
-    windowToggleDevTools: async event => toggleDevToolsForSenderSafe(event.sender),
     windowOpenDevTools: async event => {
       if (!canUseDevTools(deps.isDev)) return false;
       const target = event.sender?.isDestroyed?.()

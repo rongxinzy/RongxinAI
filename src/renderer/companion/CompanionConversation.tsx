@@ -1,7 +1,8 @@
 import { Square } from 'lucide-react';
 import { Button } from '@shared/components/ui/button';
 import { Conversation, ConversationContent } from '@shared/components/ai-elements/conversation';
-import { Message, MessageContent, MessageResponse } from '@shared/components/ai-elements/message';
+import { Message, MessageContent } from '@shared/components/ai-elements/message';
+import { MessageResponse } from '../components/ai-elements/messageResponse';
 import { CompanionCapability } from '../../shared/companion/constants';
 import { WorkbenchExecutionStatus } from '../../shared/workbenchTask';
 import type { CompanionWindowState } from '../../shared/companion/types';

@@ -3,8 +3,7 @@ import { buildPiWebSearchTool } from './piWebSearchTool';
 import { collectPiSystemPromptContributions } from './piSystemPromptContributions';
 
 vi.mock('../anysearchGatewayCredentials', () => ({
-  resolveAnySearchGatewayUrl: () => 'https://search.example.invalid/',
-  resolveAnySearchGatewayToken: () => 'test-token',
+  resolveAnySearchGateway: () => ({ url: 'https://search.example.invalid/', token: 'test-token' }),
 }));
 afterEach(() => vi.unstubAllGlobals());
 
@@ -25,6 +24,7 @@ test('searches the gateway and returns bounded, citable results', async () => {
     'https://search.example.invalid/v1/search',
     expect.objectContaining({
       method: 'POST',
+      redirect: 'error',
       body: JSON.stringify({ query: 'query', max_results: 2 }),
       headers: expect.objectContaining({ authorization: 'Bearer test-token' }),
     }),

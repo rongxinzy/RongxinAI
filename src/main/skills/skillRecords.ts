@@ -11,10 +11,39 @@ import {
   SKILL_FILE_NAME,
   SKILL_ICON_FILE_NAMES,
   SKILL_ICON_MIME_TYPES,
+  SkillCatalogLimit,
 } from './constants';
 import { listSkillDirs } from './skillDirs';
 import { extractDescription, isTruthy, parseFrontmatter } from './skillMarkdown';
 import type { SkillDefaultConfig, SkillRecord, SkillStateMap, SkillsConfig } from './types';
+
+export type SkillCatalogInput = {
+  primaryRoot: string;
+  bundledRoot: string;
+  roots: string[];
+  state: SkillStateMap;
+};
+
+function readCatalogFile(filePath: string): Buffer {
+  const file = fs.openSync(filePath, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
+  try {
+    const info = fs.fstatSync(file);
+    if (!info.isFile() || info.size > SkillCatalogLimit.FileBytes) {
+      throw new Error('Skill catalog file exceeds the supported limit');
+    }
+    const buffer = Buffer.allocUnsafe(info.size + 1);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const bytes = fs.readSync(file, buffer, offset, buffer.length - offset, null);
+      if (bytes === 0) break;
+      offset += bytes;
+    }
+    if (offset !== info.size) throw new Error('Skill catalog file changed during the read');
+    return buffer.subarray(0, offset);
+  } finally {
+    fs.closeSync(file);
+  }
+}
 
 const readRongxMetadata = (
   skillDir: string,
@@ -30,7 +59,7 @@ const readRongxMetadata = (
   if (!fs.existsSync(metadataPath)) return {};
 
   try {
-    const content = fs.readFileSync(metadataPath, 'utf8');
+    const content = readCatalogFile(metadataPath).toString('utf8');
     const parsed = yaml.load(content);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     const metadata = parsed as Record<string, unknown>;
@@ -74,14 +103,14 @@ const getSkillIconDataUrl = (iconPath: string): string | undefined => {
       .toLowerCase() as keyof typeof SKILL_ICON_MIME_TYPES;
     const mimeType = SKILL_ICON_MIME_TYPES[iconFileName];
     if (!mimeType) return undefined;
-    return `data:${mimeType};base64,${fs.readFileSync(iconPath).toString('base64')}`;
+    return `data:${mimeType};base64,${readCatalogFile(iconPath).toString('base64')}`;
   } catch (error) {
     console.warn('[skills] Failed to read skill icon:', iconPath, error);
     return undefined;
   }
 };
 
-export function parseSkillDir(
+function parseSkillDir(
   dir: string,
   state: SkillStateMap,
   defaults: Record<string, SkillDefaultConfig>,
@@ -90,7 +119,7 @@ export function parseSkillDir(
   const skillFile = path.join(dir, SKILL_FILE_NAME);
   if (!fs.existsSync(skillFile)) return null;
   try {
-    const raw = fs.readFileSync(skillFile, 'utf8');
+    const raw = readCatalogFile(skillFile).toString('utf8');
     const { frontmatter, content } = parseFrontmatter(raw);
     const name =
       (String(frontmatter.name || '') || path.basename(dir)).trim() || path.basename(dir);
@@ -157,7 +186,7 @@ export function loadSkillsDefaults(roots: string[]): Record<string, SkillDefault
     if (!fs.existsSync(configPath)) continue;
 
     try {
-      const raw = fs.readFileSync(configPath, 'utf8');
+      const raw = readCatalogFile(configPath).toString('utf8');
       const config = JSON.parse(raw) as SkillsConfig;
       if (config.defaults && typeof config.defaults === 'object') {
         for (const [id, settings] of Object.entries(config.defaults)) {
@@ -180,7 +209,7 @@ export function collectBuiltInSkillIds(builtInRoot: string): Set<string> {
     const builtInIds = new Set<string>();
     const configPath = path.join(builtInRoot, SKILLS_CONFIG_FILE);
     if (fs.existsSync(configPath)) {
-      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const parsed = JSON.parse(readCatalogFile(configPath).toString('utf8'));
       if (parsed?.defaults && typeof parsed.defaults === 'object') {
         Object.keys(parsed.defaults).forEach(id => builtInIds.add(id));
       }
@@ -194,4 +223,45 @@ export function collectBuiltInSkillIds(builtInRoot: string): Set<string> {
   // Treat every bundled directory as protected unless an install operation
   // explicitly marked that ID as user-installed in the persistent state.
   return new Set(listSkillDirs(builtInRoot).map(dir => path.basename(dir)));
+}
+
+export function readSkillCatalog(input: SkillCatalogInput): SkillRecord[] {
+  const { primaryRoot, bundledRoot, roots, state } = input;
+  const defaults = loadSkillsDefaults(roots);
+  const builtInIds = collectBuiltInSkillIds(bundledRoot);
+  const skills = new Map<string, { record: SkillRecord; bytes: number }>();
+  let candidates = 0;
+  let totalBytes = 0;
+  for (const root of roots.filter(root => root !== primaryRoot).concat(primaryRoot)) {
+    const dirs = listSkillDirs(root);
+    candidates += dirs.length;
+    if (candidates > SkillCatalogLimit.Candidates) throw new Error('Too many Skill directories');
+    for (const dir of dirs) {
+      const id = path.basename(dir);
+      const record = parseSkillDir(
+        dir,
+        state,
+        defaults,
+        builtInIds.has(id) && !state[id]?.userInstalled && !state[id]?.iconUrl,
+      );
+      if (!record) continue;
+      let bytes = 0;
+      for (const value of Object.values(record)) {
+        if (typeof value === 'string') bytes += Buffer.byteLength(value);
+      }
+      for (const [key, value] of Object.entries(record.metadataFields ?? {})) {
+        bytes += Buffer.byteLength(key) + Buffer.byteLength(value);
+      }
+      totalBytes += bytes - (skills.get(id)?.bytes ?? 0);
+      if (totalBytes > SkillCatalogLimit.ResultBytes)
+        throw new Error('Skill catalog exceeds the supported size');
+      skills.set(id, { record, bytes });
+    }
+  }
+  return Array.from(skills.values(), item => item.record).sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    const orderA = defaults[a.id]?.order ?? 999;
+    const orderB = defaults[b.id]?.order ?? 999;
+    return orderA !== orderB ? orderA - orderB : a.name.localeCompare(b.name);
+  });
 }

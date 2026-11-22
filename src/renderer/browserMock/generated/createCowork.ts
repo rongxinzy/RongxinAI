@@ -9,9 +9,6 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
     onStreamUiEvent: _p0 => {
       return runtime.subscribe('cowork.onStreamUiEvent', _p0);
     },
-    onSessionsChanged: _p0 => {
-      return runtime.subscribe('cowork.onSessionsChanged', _p0);
-    },
     getRunSnapshot: async _p0 => {
       void _p0;
       runtime.warnOnce('cowork.getRunSnapshot');
@@ -65,22 +62,6 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
     ensureWorkspace: async _p0 => {
       void _p0;
       runtime.warnOnce('cowork.ensureWorkspace');
-      return {
-        success: true,
-        workspace: {
-          id: 'preview',
-          name: 'Preview',
-          path: '/home/user/preview',
-          folders: [],
-          isHidden: false,
-          createdAt: 1792108800000,
-          updatedAt: 1792108800000,
-        },
-      };
-    },
-    renameWorkspace: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.renameWorkspace');
       return {
         success: true,
         workspace: {
@@ -174,6 +155,13 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
         },
       };
     },
+    respondToPermission: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.respondToPermission');
+      return {
+        success: true,
+      };
+    },
     stopSession: async _p0 => {
       void _p0;
       runtime.warnOnce('cowork.stopSession');
@@ -187,34 +175,6 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
       return {
         success: true,
         cancelled: false,
-      };
-    },
-    saveSession: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.saveSession');
-      return {
-        success: true,
-        session: {
-          id: 'preview',
-          title: 'Preview',
-          status: 'idle',
-          pinned: false,
-          cwd: '/home/user/preview',
-          systemPrompt: '',
-          modelOverride: '',
-          executionMode: 'auto',
-          activeSkillIds: [],
-          workspaceId: '',
-          agentId: '',
-          source: 'manual',
-          experts: [],
-          messages: [],
-          messagesOffset: 0,
-          totalMessages: 0,
-          artifacts: [],
-          createdAt: 1792108800000,
-          updatedAt: 1792108800000,
-        },
       };
     },
     deleteSession: async _p0 => {
@@ -301,14 +261,6 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
         },
       };
     },
-    remoteManaged: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.remoteManaged');
-      return {
-        success: true,
-        remoteManaged: false,
-      };
-    },
     listSessions: async _p0 => {
       void _p0;
       runtime.warnOnce('cowork.listSessions');
@@ -323,44 +275,6 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
       return {
         success: true,
         messages: [],
-      };
-    },
-    exportResultImage: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.exportResultImage');
-      return {
-        success: true,
-        canceled: false,
-      };
-    },
-    captureImageChunk: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.captureImageChunk');
-      return {
-        success: true,
-      };
-    },
-    saveResultImage: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.saveResultImage');
-      return {
-        success: true,
-        canceled: false,
-      };
-    },
-    exportSessionText: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.exportSessionText');
-      return {
-        success: true,
-        canceled: false,
-      };
-    },
-    respondToPermission: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.respondToPermission');
-      return {
-        success: true,
       };
     },
     listPendingMessages: async _p0 => {

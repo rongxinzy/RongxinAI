@@ -1,27 +1,36 @@
-// Workspace CRUD for the CoworkStore class chain.
-// Split from src/main/coworkStore.ts (issue #1069).
+import type Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
 
 import type { Workspace } from '../../shared/workspace';
+import { WorkspaceFolderRepository } from '../workspaceFolderRepository';
 import {
   normalizeWorkspacePath,
   workspaceIdForPath,
   workspaceNameForPath,
 } from '../workspaceUtils';
-import { CoworkStoreBase } from './base';
 
-export class CoworkWorkspaceStore extends CoworkStoreBase {
+interface WorkspaceRow {
+  id: string;
+  name: string;
+  path: string;
+  is_hidden: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export class CoworkWorkspaceStore {
+  private readonly workspaceFolders: WorkspaceFolderRepository;
+
+  constructor(private readonly db: Database.Database) {
+    this.workspaceFolders = new WorkspaceFolderRepository(db);
+  }
+
   listWorkspaces(): Workspace[] {
-    const rows = this.getAll<{
-      id: string;
-      name: string;
-      path: string;
-      is_hidden: number;
-      created_at: number;
-      updated_at: number;
-    }>(
-      'SELECT id, name, path, is_hidden, created_at, updated_at FROM workspaces ORDER BY updated_at DESC, name ASC',
-    );
+    const rows = this.db
+      .prepare<[], WorkspaceRow>(
+        'SELECT id, name, path, is_hidden, created_at, updated_at FROM workspaces ORDER BY updated_at DESC, name ASC',
+      )
+      .all();
     const foldersByWorkspace = this.workspaceFolders.listAllByWorkspace();
     return rows.map(row => ({
       id: row.id,
@@ -35,16 +44,11 @@ export class CoworkWorkspaceStore extends CoworkStoreBase {
   }
 
   getWorkspace(id: string): Workspace | null {
-    const row = this.getOne<{
-      id: string;
-      name: string;
-      path: string;
-      is_hidden: number;
-      created_at: number;
-      updated_at: number;
-    }>('SELECT id, name, path, is_hidden, created_at, updated_at FROM workspaces WHERE id = ?', [
-      id,
-    ]);
+    const row = this.db
+      .prepare<[string], WorkspaceRow>(
+        'SELECT id, name, path, is_hidden, created_at, updated_at FROM workspaces WHERE id = ?',
+      )
+      .get(id);
     if (!row) return null;
     return {
       id: row.id,
@@ -127,7 +131,12 @@ export class CoworkWorkspaceStore extends CoworkStoreBase {
     this.workspaceFolders.replaceFolders(id, folders);
   }
 
-  relocateWorkspace(id: string, workspacePath: string, name: string): Workspace | null {
+  relocateWorkspace(
+    id: string,
+    workspacePath: string,
+    name: string,
+    runningSessionIds: readonly string[],
+  ): Workspace | null {
     const existingWorkspace = this.getWorkspace(id);
     if (!existingWorkspace) return null;
 
@@ -140,11 +149,10 @@ export class CoworkWorkspaceStore extends CoworkStoreBase {
       throw new Error('A workspace already exists for the renamed directory');
     }
 
-    const runningSession = this.getOne<{ id: string }>(
-      "SELECT id FROM cowork_sessions WHERE workspace_id = ? AND status = 'running' LIMIT 1",
-      [id],
+    const belongsToWorkspace = this.db.prepare(
+      'SELECT 1 FROM cowork_sessions WHERE id = ? AND workspace_id = ?',
     );
-    if (runningSession) {
+    if (runningSessionIds.some(sessionId => belongsToWorkspace.get(sessionId, id))) {
       throw new Error('Cannot relocate a workspace while a session is running');
     }
 
@@ -178,24 +186,17 @@ export class CoworkWorkspaceStore extends CoworkStoreBase {
     return this.getWorkspace(nextId);
   }
 
-  /**
-   * Removes a workspace row and every session that belongs to it. Files on
-   * disk are never touched. Returns the ids of the deleted sessions so the
-   * renderer can drop them from its in-memory state.
-   */
-  deleteWorkspace(id: string): string[] {
-    const rows = this.db
-      .prepare('SELECT id FROM cowork_sessions WHERE workspace_id = ?')
-      .all(id) as { id: string }[];
-    const sessionIds = rows.map(row => row.id);
-    if (sessionIds.length > 0) {
-      const placeholders = sessionIds.map(() => '?').join(',');
-      this.db
-        .prepare(`DELETE FROM cowork_sessions WHERE id IN (${placeholders})`)
-        .run(...sessionIds);
-    }
-    this.db.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+  deleteWorkspace(id: string): boolean {
+    if (!this.db.prepare('DELETE FROM workspaces WHERE id = ?').run(id).changes) return false;
     this.workspaceFolders.deleteFolders(id);
-    return sessionIds;
+    return true;
+  }
+
+  private tableExists(tableName: string): boolean {
+    return (
+      this.db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .get(tableName) !== undefined
+    );
   }
 }

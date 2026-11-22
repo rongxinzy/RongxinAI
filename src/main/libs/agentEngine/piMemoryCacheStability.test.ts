@@ -6,7 +6,7 @@ import path from 'node:path';
 import { app } from 'electron';
 import { expect, test, vi } from 'vitest';
 
-import { installTestMagpie } from '../../../../tests/helpers/installTestMagpie';
+import { createTestMagpie } from '../../../../tests/helpers/createTestMagpie';
 import { CoworkExecutionMode } from '../../../shared/cowork/constants';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { CoworkStore } from '../../coworkStore';
@@ -76,12 +76,12 @@ test('real SDK keeps message-0 system prompt byte-identical across turns with ne
   });
 
   let store: SqliteStore | undefined;
-  let gateway: ReturnType<typeof installTestMagpie> | undefined;
-  const adapter = new PiRuntimeAdapter();
+  let gateway: ReturnType<typeof createTestMagpie> | undefined;
+  let adapter: PiRuntimeAdapter | undefined;
 
   try {
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
-    gateway = installTestMagpie({
+    gateway = createTestMagpie({
       gatewayUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
       defaultModelId: modelId,
       acceptUnknownModels: false,
@@ -107,18 +107,20 @@ test('real SDK keeps message-0 system prompt byte-identical across turns with ne
       'work',
       sessionId,
     );
-    adapter.setCoworkStore(cowork);
-    adapter.setWorkbenchTaskService(new WorkbenchTaskService(db));
-    adapter.setPiSessionStoreRoot(root);
-
     const buildProjectContext = vi
       .fn()
       .mockResolvedValueOnce('Workspace:\n- [memory:1] Decision Alpha')
       .mockResolvedValueOnce('Workspace:\n- [memory:1] Decision Alpha\n- [memory:2] Decision Beta');
-    adapter.setProjectMemoryService({
-      buildProjectContext,
-      registerSession: vi.fn().mockResolvedValue(undefined),
-    } as never);
+    adapter = new PiRuntimeAdapter({
+      modelService: gateway.modelService,
+      coworkStore: cowork,
+      workbenchTaskService: new WorkbenchTaskService(db),
+      piSessionStoreRoot: root,
+      projectMemoryService: {
+        buildProjectContext,
+        registerSession: vi.fn().mockResolvedValue(undefined),
+      } as never,
+    });
 
     let completes = 0;
     const errors: unknown[] = [];
@@ -167,9 +169,8 @@ test('real SDK keeps message-0 system prompt byte-identical across turns with ne
     expect(req1.max_completion_tokens).toBeUndefined();
     expect(req1.store).toBeUndefined();
   } finally {
-    await adapter.stopAllSessions();
+    await adapter?.stopAllSessions();
     await new Promise<void>(resolve => setTimeout(resolve, 0));
-    gateway?.dispose();
     store?.close();
     server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));

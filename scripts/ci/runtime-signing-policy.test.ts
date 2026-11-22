@@ -7,7 +7,7 @@ import path from 'node:path';
 import { expect, test } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { upstream } = require('../magpie-runtime.cjs');
+const { upstream, pinnedSource } = require('../magpie-runtime.cjs');
 
 const root = path.resolve(__dirname, '../..');
 
@@ -134,7 +134,7 @@ test('architecture gate accepts a pinned gateway binary that contains a retired-
         version: upstream.version,
         sha256: digest,
         buildSha256: digest,
-        source: { commit: upstream.commit },
+        source: pinnedSource,
       }),
     );
     const accepted = runGate();
@@ -150,7 +150,7 @@ test('architecture gate accepts a pinned gateway binary that contains a retired-
         version: 'not-the-pinned-version',
         sha256: digest,
         buildSha256: digest,
-        source: { commit: upstream.commit },
+        source: pinnedSource,
       }),
     );
     const rejected = runGate();

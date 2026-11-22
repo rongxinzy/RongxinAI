@@ -1,7 +1,4 @@
-import {
-  isMagpieManagedAgentId,
-  MAGPIE_EXTERNAL_AGENT_CATALOG,
-} from '../../shared/magpie/constants';
+import { isMagpieManagedAgentId } from '../../shared/magpie/constants';
 import type {
   MagpieAgentConnectPreview,
   MagpieAgentFileChange,
@@ -17,7 +14,6 @@ function assertManagedMagpieAgentId(agentId: string): void {
 
 type MagpieManagementClient = {
   managementJson(route: string, init?: RequestInit): Promise<Record<string, unknown>>;
-  agents(): Promise<MagpieAgents>;
 };
 
 /** Structural fields returned by the upstream CLI version probe. */
@@ -41,24 +37,22 @@ export async function magpieAgentPreview(
   };
 }
 
-export async function magpieAgentConnect(
+export function magpieAgentConnect(
   client: MagpieManagementClient,
   agentId: string,
-): Promise<MagpieAgents> {
+): Promise<Record<string, unknown>> {
   assertManagedMagpieAgentId(agentId);
   const encoded = encodeURIComponent(agentId);
-  await client.managementJson(`/api/agents/connect/${encoded}`, { method: 'POST' });
-  return client.agents();
+  return client.managementJson(`/api/agents/connect/${encoded}`, { method: 'POST' });
 }
 
-export async function magpieAgentDisconnect(
+export function magpieAgentDisconnect(
   client: MagpieManagementClient,
   agentId: string,
-): Promise<MagpieAgents> {
+): Promise<Record<string, unknown>> {
   assertManagedMagpieAgentId(agentId);
   const encoded = encodeURIComponent(agentId);
-  await client.managementJson(`/api/agents/disconnect/${encoded}`, { method: 'POST' });
-  return client.agents();
+  return client.managementJson(`/api/agents/disconnect/${encoded}`, { method: 'POST' });
 }
 
 async function magpieAgentReapply(client: MagpieManagementClient, agentId: string): Promise<void> {
@@ -70,32 +64,21 @@ async function magpieAgentReapply(client: MagpieManagementClient, agentId: strin
 export async function magpieReapplyConnectedAgents(
   client: MagpieManagementClient,
   agents: MagpieAgents,
+  signal: AbortSignal,
 ): Promise<Map<string, string>> {
   const errors = new Map<string, string>();
   for (const agent of agents.agents) {
+    signal.throwIfAborted();
     if (!agent.wired) continue;
     if (!isMagpieManagedAgentId(agent.id)) continue;
     try {
       await magpieAgentReapply(client, agent.id);
     } catch (error) {
+      signal.throwIfAborted();
       const message = error instanceof Error ? error.message : String(error);
       errors.set(agent.id, message);
       console.warn(`[Magpie] reapply failed for ${agent.id}:`, error);
     }
   }
   return errors;
-}
-
-export async function magpieDisconnectAllManaged(
-  client: MagpieManagementClient,
-): Promise<MagpieAgents> {
-  let snapshot = await client.agents();
-  for (const entry of MAGPIE_EXTERNAL_AGENT_CATALOG) {
-    for (const upstreamId of entry.upstreamIds) {
-      const agent = snapshot.agents.find(candidate => candidate.id === upstreamId);
-      if (!agent?.wired) continue;
-      snapshot = await magpieAgentDisconnect(client, upstreamId);
-    }
-  }
-  return snapshot;
 }

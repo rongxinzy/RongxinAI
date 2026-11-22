@@ -3,7 +3,6 @@ import { describe, expect, test } from 'vitest';
 import {
   coworkConfigContract,
   coworkContract,
-  coworkExportContract,
   coworkPiStreamContract,
   coworkQueueContract,
   coworkRunSnapshotContract,
@@ -28,7 +27,6 @@ const subContracts = [
   workspaceContract,
   coworkSessionLifecycleContract,
   coworkSessionAdminContract,
-  coworkExportContract,
   coworkQueueContract,
   coworkConfigContract,
 ] as const;
@@ -249,30 +247,6 @@ test('listSessions accepts the sidebar filters', () => {
   );
 });
 
-test('saveSession accepts the imported transcript row', () => {
-  // coworkService.saveChatSession forwards the whole renderer CoworkSession;
-  // main stores extra row fields verbatim (passthrough).
-  expect(
-    coworkSessionAdminContract.saveSession.args.safeParse([
-      {
-        id: 'import-1',
-        title: 'Imported chat',
-        status: 'completed',
-        mode: 'chat',
-        cwd: '/home/user',
-        systemPrompt: '',
-        modelOverride: '',
-        executionMode: 'auto',
-        activeSkillIds: [],
-        agentId: 'main',
-        workspaceId: 'workspace-1',
-        messages: [{ id: 'm1', type: 'user', content: 'hi', timestamp: 1770000000000 }],
-        extraField: 'kept',
-      },
-    ]).success,
-  ).toBe(true);
-});
-
 test('compactSession result accepts every CoworkCompactFailure shape', () => {
   const result = coworkSessionAdminContract.compactSession.result;
   expect(result.safeParse({ success: true, queued: true }).success).toBe(true);
@@ -396,39 +370,22 @@ test('getConfig result requires the full config row main always returns', () => 
   ).toBe(false);
 });
 
-// --- Export / permission ---------------------------------------------------------
-
-test('export methods accept the capture payloads', () => {
-  const rect = { x: 0, y: 0, width: 800, height: 600 };
-  expect(
-    coworkExportContract.exportResultImage.args.safeParse([{ rect, defaultFileName: 'result.png' }])
-      .success,
-  ).toBe(true);
-  expect(coworkExportContract.captureImageChunk.args.safeParse([{ rect }]).success).toBe(true);
-  expect(
-    coworkExportContract.saveResultImage.args.safeParse([{ pngBase64: 'iVBORw0KGgo=' }]).success,
-  ).toBe(true);
-  expect(
-    coworkExportContract.exportSessionText.args.safeParse([
-      { content: '# Export', defaultFileName: 'session', fileExtension: 'md' },
-    ]).success,
-  ).toBe(true);
-});
+// --- Permission ---------------------------------------------------------
 
 test('respondToPermission accepts both real decision shapes', () => {
   // CoworkPermissionModal approve/deny + AskUserQuestionCard builders
   expect(
-    coworkExportContract.respondToPermission.args.safeParse([
+    coworkSessionLifecycleContract.respondToPermission.args.safeParse([
       { requestId: 'req-1', result: { behavior: 'allow', updatedInput: { command: 'ls' } } },
     ]).success,
   ).toBe(true);
   expect(
-    coworkExportContract.respondToPermission.args.safeParse([
+    coworkSessionLifecycleContract.respondToPermission.args.safeParse([
       { requestId: 'req-1', result: { behavior: 'deny', message: 'Permission denied' } },
     ]).success,
   ).toBe(true);
   expect(
-    coworkExportContract.respondToPermission.args.safeParse([
+    coworkSessionLifecycleContract.respondToPermission.args.safeParse([
       { requestId: 'req-1', result: { behavior: 'maybe' } },
     ]).success,
   ).toBe(false);
@@ -484,9 +441,6 @@ test('workspace methods accept the manager payloads', () => {
   expect(
     workspaceContract.ensureWorkspace.args.safeParse([{ path: '/home/user/projects/new' }]).success,
   ).toBe(true);
-  expect(workspaceContract.renameWorkspace.args.safeParse(['workspace-1', 'Renamed']).success).toBe(
-    true,
-  );
   expect(
     workspaceContract.updateWorkspace.args.safeParse([
       {

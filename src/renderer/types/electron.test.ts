@@ -20,7 +20,6 @@ const ELECTRON_MEMBERS = [
   'companion',
   'skills',
   'mcp',
-  'ollama',
   'llamacpp',
   'marketplace',
   'hardware',
@@ -51,12 +50,9 @@ const ELECTRON_MEMBERS = [
   'scheduledTasks',
   'permissions',
   'auth',
-  'modelPool',
   'enterprise',
   'managedProviders',
   'networkStatus',
-  'feishu',
-  'dingtalk',
   'activity',
 ] as const;
 

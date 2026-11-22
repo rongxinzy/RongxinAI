@@ -235,10 +235,6 @@ export function filterLlamaCppServiceConfigByRuntimeCapabilities(
   return next;
 }
 
-export function shouldEnableLlamaCppModelsAutoload(modelsMax: string | undefined): boolean {
-  return normalizePositiveInteger(modelsMax) === 1;
-}
-
 export function buildLlamaCppServeEnv(
   baseEnv: NodeJS.ProcessEnv,
   executablePath: string,
@@ -401,13 +397,6 @@ function appendArg(args: string[], name: string, value: string | undefined): voi
   const trimmed = value?.trim();
   if (!trimmed) return;
   args.push(name, trimmed);
-}
-
-function normalizePositiveInteger(value: string | undefined): number | undefined {
-  const trimmed = value?.trim();
-  if (!trimmed) return undefined;
-  const parsed = Number.parseInt(trimmed, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function inferLlamaCppDeviceBackend(id: string, name: string): string {

@@ -22,20 +22,31 @@ import {
   SessionTarget,
   WakeMode,
 } from '../../../scheduledTask/constants';
+import { registerScheduledTaskIpc } from '../../../scheduledTask/ipc';
 import { getCcConnectScopedConversationId } from '../../im/ccConnectConversationId';
 import { t } from '../../i18n';
 import { registerScheduledTaskHandlers } from './handlers';
 
-test('task-list handler delegates to the canonical scheduler service', async () => {
-  const listJobs = vi.fn(async () => []);
-  registerScheduledTaskHandlers({
-    getCronJobService: () => ({ listJobs }) as unknown as ScheduledTaskService,
-    getIMGatewayManager: () => null,
+test('scheduled-task registration resolves the canonical service at each invocation', async () => {
+  const firstListJobs = vi.fn(async () => []);
+  const nextListJobs = vi.fn(async () => []);
+  const getScheduledTaskService = vi
+    .fn<() => ScheduledTaskService>()
+    .mockReturnValueOnce({ listJobs: firstListJobs } as unknown as ScheduledTaskService)
+    .mockReturnValueOnce({ listJobs: nextListJobs } as unknown as ScheduledTaskService);
+  registerScheduledTaskIpc({
+    getScheduledTaskService,
+    getActivityService: vi.fn(),
+    getIMStore: vi.fn(),
   });
+  expect(getScheduledTaskService).not.toHaveBeenCalled();
   const listHandler = electronMocks.handlers.get(IpcChannel.List);
 
   await expect(listHandler?.()).resolves.toEqual({ success: true, tasks: [] });
-  expect(listJobs).toHaveBeenCalledOnce();
+  await expect(listHandler?.()).resolves.toEqual({ success: true, tasks: [] });
+  expect(getScheduledTaskService).toHaveBeenCalledTimes(2);
+  expect(firstListJobs).toHaveBeenCalledOnce();
+  expect(nextListJobs).toHaveBeenCalledOnce();
 });
 
 /** Full `ScheduledTaskInput` base — delivery-focused tests vary the delivery. */
@@ -55,7 +66,7 @@ test('create preserves native conversation colons and full channel account IDs',
   const addJob = vi.fn(async input => ({ id: 'task-1', ...input }));
   registerScheduledTaskHandlers({
     getCronJobService: () => ({ addJob }) as unknown as ScheduledTaskService,
-    getIMGatewayManager: () => null,
+    getIMStore: () => null,
   });
   const input = {
     ...baseInput,
@@ -84,7 +95,7 @@ test('create restores and validates scoped conversation ownership', async () => 
   const addJob = vi.fn(async input => ({ id: 'task-1', ...input }));
   registerScheduledTaskHandlers({
     getCronJobService: () => ({ addJob }) as unknown as ScheduledTaskService,
-    getIMGatewayManager: () => null,
+    getIMStore: () => null,
   });
   const create = electronMocks.handlers.get(IpcChannel.Create);
   const scopedId = getCcConnectScopedConversationId('account-one', 'group:with:colons');
@@ -131,7 +142,7 @@ test('create preserves the selected execution binding when announce delivery is 
   const addJob = vi.fn(async input => ({ id: 'task-1', ...input }));
   registerScheduledTaskHandlers({
     getCronJobService: () => ({ addJob }) as unknown as ScheduledTaskService,
-    getIMGatewayManager: () => null,
+    getIMStore: () => null,
   });
 
   await electronMocks.handlers.get(IpcChannel.Create)?.(
@@ -156,7 +167,7 @@ test('partial update does not inject a missing delivery field', async () => {
   const updateJob = vi.fn(async input => ({ id: 'task-1', ...input }));
   registerScheduledTaskHandlers({
     getCronJobService: () => ({ updateJob }) as unknown as ScheduledTaskService,
-    getIMGatewayManager: () => null,
+    getIMStore: () => null,
   });
 
   await electronMocks.handlers.get(IpcChannel.Update)?.({}, 'task-1', { enabled: false });
@@ -169,18 +180,17 @@ test('conversation and delivery handlers expose native routing records', async (
   const scopedId = getCcConnectScopedConversationId('account-one', 'group:with:colons');
   registerScheduledTaskHandlers({
     getCronJobService: () => ({ listDeliveries }) as unknown as ScheduledTaskService,
-    getIMGatewayManager: () => ({
-      getIMStore: () => ({
-        getSessionMapping: () => undefined,
-        listSessionMappings: () => [
-          {
-            imConversationId: scopedId,
-            platform: 'dingtalk',
-            coworkSessionId: 'cowork-1',
-            lastActiveAt: 1,
-          },
-        ],
-      }),
+    getIMStore: () => ({
+      getConfig: vi.fn(),
+      listSessionMappings: () => [
+        {
+          imConversationId: scopedId,
+          platform: 'dingtalk',
+          coworkSessionId: 'cowork-1',
+          createdAt: 1,
+          lastActiveAt: 1,
+        },
+      ],
     }),
   });
 
@@ -213,7 +223,7 @@ test('preflight reports Delivery independently from the latest Run status', asyn
         listRuns: vi.fn(async () => [{ id: 'run-1', status: 'success', error: null }]),
         listDeliveries: vi.fn(async () => [latestDelivery]),
       }) as unknown as ScheduledTaskService,
-    getIMGatewayManager: () => null,
+    getIMStore: () => null,
   });
 
   await expect(

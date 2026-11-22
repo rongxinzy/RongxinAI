@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
@@ -11,6 +12,11 @@ import {
   shardGroupKey,
 } from './llamacppModelInstallation';
 import type { MarketplaceModelFile } from '../../shared/marketplace';
+
+vi.mock('./fileHasher', () => ({
+  sha256FileStream: async (filename: string) =>
+    createHash('sha256').update(readFileSync(filename)).digest('hex'),
+}));
 
 test('an aborted response does not produce an unhandled stream cancellation', async () => {
   const modelsDir = mkdtempSync(path.join(tmpdir(), 'model-install-abort-'));
@@ -37,9 +43,54 @@ test('an aborted response does not produce an unhandled stream cancellation', as
           if (progress.phase === 'downloading-progress') abort.abort();
         },
         options: { signal: abort.signal },
-        refreshModelsAfterInstall: async () => {},
       }),
     ).rejects.toThrow('Install cancelled');
+  } finally {
+    fetch.mockRestore();
+    rmSync(modelsDir, { recursive: true, force: true });
+  }
+});
+
+test('a reinstall verifies the primary, shards and projector before reusing them', async () => {
+  const modelsDir = mkdtempSync(path.join(tmpdir(), 'model-install-reuse-'));
+  const primary = 'model-00001-of-00002.gguf';
+  const shard = 'model-00002-of-00002.gguf';
+  const projector = 'mmproj.gguf';
+  const valid = Buffer.from([0x47, 0x47, 0x55, 0x46, 3, 0, 0, 0, 1]);
+  const corrupt = Buffer.from(valid);
+  corrupt[8] = 2;
+  const sha256 = createHash('sha256').update(valid).digest('hex');
+  const url = (file: string) => 'https://example.com/' + file;
+  const fetch = vi
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(async () => new Response(Uint8Array.from(valid)));
+  try {
+    writeFileSync(path.join(modelsDir, primary), valid);
+    writeFileSync(path.join(modelsDir, shard), corrupt);
+    const install = () =>
+      installModelOnce({
+        request: {
+          modelId: 'org/model',
+          filePath: primary,
+          downloadUrl: url(primary),
+          sha256,
+          fileSizeBytes: valid.length,
+          extraFiles: [{ path: shard, downloadUrl: url(shard), sha256, sizeBytes: valid.length }],
+          mmprojFilePath: projector,
+          mmprojDownloadUrl: url(projector),
+          mmprojSha256: sha256,
+        },
+        modelsDir,
+        safeModelDir: modelsDir,
+      });
+
+    await install();
+    expect(fetch.mock.calls.map(([request]) => request)).toEqual([url(shard), url(projector)]);
+    expect(readFileSync(path.join(modelsDir, shard))).toEqual(valid);
+    expect(readFileSync(path.join(modelsDir, projector))).toEqual(valid);
+    fetch.mockClear();
+    await install();
+    expect(fetch).not.toHaveBeenCalled();
   } finally {
     fetch.mockRestore();
     rmSync(modelsDir, { recursive: true, force: true });

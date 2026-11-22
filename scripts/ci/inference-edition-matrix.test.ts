@@ -6,7 +6,13 @@ import { load } from 'js-yaml';
 import { expect, test } from 'vitest';
 import { listReleaseCandidateBundles } from '../release/release-candidate-layout.mjs';
 
-type Step = { name?: string; run?: string; if?: string; env?: Record<string, string> };
+type Step = {
+  name?: string;
+  run?: string;
+  if?: string;
+  env?: Record<string, string>;
+  with?: { name?: string };
+};
 type MatrixLeg = { platform: string; target: string; runner: string; inference_edition: string };
 const workflow = load(readFileSync('.github/workflows/build-inference-editions.yml', 'utf8')) as {
   on: { workflow_call: { inputs: Record<string, { default?: string }> } };
@@ -26,8 +32,6 @@ function plan(overrides: Record<string, string> = {}) {
         BUILD_MACOS: 'true',
         MODE: 'verify',
         WINDOWS_RELEASE_STAGED: 'false',
-        LINUX_INFERENCE_EDITIONS:
-          workflow.on.workflow_call.inputs['linux-inference-editions'].default!,
         ...overrides,
         GITHUB_OUTPUT: output,
       },
@@ -79,38 +83,100 @@ test('staged Windows release leaves the Linux cuda leg and both macOS architectu
   ]);
 });
 
-test('Linux matrix builds cuda only and rejects dropped lite/CPU editions', () => {
+test.each(['cuda,cuda', ''])(
+  'a requested Linux build plans exactly one lane with stale edition environment %j',
+  edition => {
+    const result = plan({
+      BUILD_WINDOWS: 'false',
+      BUILD_MACOS: 'false',
+      LINUX_INFERENCE_EDITIONS: edition,
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.legs.map(leg => leg.target)).toEqual(['linux-x64-cuda']);
+  },
+);
+
+test.each([
+  ['verify', 'Upload shell acceptance evidence'],
+  ['release', 'Upload signed shell acceptance evidence'],
+])('%s Windows shell evidence has a unique name per matrix job and attempt', (mode, step) => {
+  const result = plan({ MODE: mode, BUILD_LINUX: 'false', BUILD_MACOS: 'false' });
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.legs.map(leg => leg.target)).toEqual(['win32-x64-lite', 'win32-x64-cuda']);
+  const template = workflow.jobs.build.steps.find(item => item.name === step)?.with?.name;
+  expect(template).toBeDefined();
+  const names = ['1', '2'].flatMap(attempt =>
+    result.legs.map(leg =>
+      template!
+        .replace('${{ github.run_id }}', '123')
+        .replace('${{ github.run_attempt }}', attempt)
+        .replace('${{ matrix.target }}', leg.target),
+    ),
+  );
+  expect(new Set(names).size).toBe(4);
+});
+
+test('Linux matrix exposes only the platform switch', () => {
+  expect(workflow.on.workflow_call.inputs).not.toHaveProperty('linux-inference-editions');
   const selected = plan({
     BUILD_WINDOWS: 'false',
     BUILD_MACOS: 'false',
   });
   expect(selected.status).toBe(0);
   expect(selected.legs.map(leg => leg.target)).toEqual(['linux-x64-cuda']);
-  for (const editions of ['lite', 'cpu,cuda']) {
-    const removed = plan({ LINUX_INFERENCE_EDITIONS: editions });
-    expect(removed.status).not.toBe(0);
-  }
-  const lite = plan({ LINUX_INFERENCE_EDITIONS: 'lite' });
-  expect(lite.stderr).toContain('Unsupported Linux inference edition: lite');
-  const cpu = plan({ LINUX_INFERENCE_EDITIONS: 'cpu,cuda' });
-  expect(cpu.stderr).toContain('Unsupported Linux inference edition: cpu');
 });
 
-test('Linux packaging uses staged runtimes and preserves the selected edition in both modes', () => {
+test('manual unsigned verification plans the supported Linux edition', () => {
+  const entry = load(readFileSync('.github/workflows/build-platforms.yml', 'utf8')) as {
+    jobs: { 'verify-inference-editions': { with: Record<string, string> } };
+  };
+  const inputs = entry.jobs['verify-inference-editions'].with;
+  expect(inputs['build-linux']).toBe('${{ inputs.build_linux }}');
+  expect(inputs).not.toHaveProperty('linux-inference-editions');
+  const result = plan({
+    BUILD_WINDOWS: 'false',
+    BUILD_MACOS: 'false',
+  });
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.legs.map(leg => leg.target)).toEqual(['linux-x64-cuda']);
+});
+
+test('POSIX packaging stages the inference runtime through the builder hook', () => {
   const action = load(
     readFileSync('.github/actions/build-inference-packages/action.yml', 'utf8'),
   ) as {
     runs: { steps: Step[] };
   };
   const steps = action.runs.steps;
-  const stageIndex = steps.findIndex(step => step.name === 'Stage bundled llama.cpp runtime');
-  expect(stageIndex).toBeGreaterThan(-1);
-  expect(steps[stageIndex].if).toBe("${{ inputs.inference-edition != 'lite' }}");
-  for (const name of ['Build Linux (verify)', 'Build Linux release']) {
-    const index = steps.findIndex(step => step.name === name);
-    expect(index).toBeGreaterThan(stageIndex);
-    expect(steps[index].run).toBe('bun run dist:linux');
-    expect(steps[index].env?.ZHIYUAN_UPDATE_VARIANT).toBe('${{ inputs.inference-edition }}');
+  expect(steps.some(step => step.run?.includes('prepare:inference-edition-runtime'))).toBe(false);
+  expect(
+    steps.find(step => step.name === 'Build macOS packages')?.env?.ZHIYUAN_UPDATE_VARIANT,
+  ).toBe('${{ inputs.inference-edition }}');
+  const { scripts } = JSON.parse(readFileSync('package.json', 'utf8')) as {
+    scripts: Record<string, string>;
+  };
+  for (const edition of ['cpu', 'cuda']) {
+    expect(scripts[`dist:linux:${edition}`]).toMatch(
+      new RegExp(`ZHIYUAN_UPDATE_VARIANT=${edition} bun run dist:linux$`),
+    );
+    expect(scripts[`dist:linux:${edition}`]).not.toContain('prepare:inference-edition-runtime');
   }
+  const index = steps.findIndex(step => step.name === 'Build Linux packages');
+  expect(index).toBeGreaterThan(-1);
+  const build = steps[index];
+  expect(build.if).toBe(
+    "${{ inputs.platform == 'linux' && (inputs.mode == 'verify' || inputs.mode == 'release') }}",
+  );
+  expect(build.run).toBe('bun run dist:linux');
+  expect(build.env?.ZHIYUAN_UPDATE_VARIANT).toBe('${{ inputs.inference-edition }}');
+  expect(build.env?.APP_BUILD_VERSION).toBe(
+    "${{ inputs.mode == 'release' && inputs.app-build-version || '' }}",
+  );
+  expect(build.env?.UPDATE_MANIFEST_KEY_ID).toBe(
+    "${{ inputs.mode == 'release' && inputs.UPDATE-MANIFEST-KEY-ID || '' }}",
+  );
+  expect(build.env?.UPDATE_MANIFEST_PUBLIC_KEY_BASE64).toBe(
+    "${{ inputs.mode == 'release' && inputs.UPDATE-MANIFEST-PUBLIC-KEY-BASE64 || '' }}",
+  );
   expect(steps.some(step => step.name === 'Build Windows release (cpu)')).toBe(false);
 });

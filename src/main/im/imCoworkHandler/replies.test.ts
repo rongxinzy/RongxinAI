@@ -2,13 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import { CoworkErrorKind } from '../../../common/coworkError';
 import { t } from '../../i18n';
-import {
-  DEFAULT_IM_EMPTY_REPLY,
-  formatIMErrorReply,
-  formatIMMessageWithMedia,
-  formatIMReply,
-  formatIMReplyRaw,
-} from './replies';
+import { formatIMErrorReply, formatIMMessageWithMedia, formatIMReply } from './replies';
 import type { IMMessage } from '../types';
 
 function assistantMessage(content: string, overrides: Record<string, unknown> = {}) {
@@ -21,23 +15,6 @@ function assistantMessage(content: string, overrides: Record<string, unknown> = 
     ...overrides,
   };
 }
-
-describe('formatIMReplyRaw', () => {
-  test('joins assistant text and skips thinking content', () => {
-    const messages = [
-      assistantMessage('  first  '),
-      assistantMessage('thinking only', { metadata: { isThinking: true } }),
-      { id: 'system-1', type: 'system', content: 'system note', timestamp: 0, metadata: {} },
-      assistantMessage('second'),
-    ];
-    expect(formatIMReplyRaw(messages)).toBe('first\n\nsecond');
-  });
-
-  test('falls back to the default empty reply', () => {
-    expect(formatIMReplyRaw([])).toBe(DEFAULT_IM_EMPTY_REPLY);
-    expect(formatIMReplyRaw([assistantMessage('   ')])).toBe(DEFAULT_IM_EMPTY_REPLY);
-  });
-});
 
 describe('formatIMReply', () => {
   test('returns assistant text when no reminder commitment is present', () => {

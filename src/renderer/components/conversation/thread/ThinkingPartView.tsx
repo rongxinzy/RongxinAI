@@ -1,8 +1,4 @@
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from '@shared/components/ai-elements/reasoning';
+import { Reasoning, ReasoningContent, ReasoningTrigger } from '../../ai-elements/reasoning';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
 import React, { useEffect, useRef, useState } from 'react';
 

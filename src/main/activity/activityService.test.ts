@@ -1,5 +1,7 @@
 import Database from 'better-sqlite3';
 import { expect, test, vi } from 'vitest';
+import { initializeScheduledTaskSchema } from '../../scheduledTask/schema';
+import { initializeActivitySchema } from './schema';
 
 import {
   ActivityErrorCode,
@@ -12,24 +14,34 @@ vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: () => [] } }));
 
 test('persists activity snapshots by run id and returns newest updates first', async () => {
   const { ActivityService } = await import('./activityService');
-  const service = new ActivityService(new Database(':memory:'));
-  service.upsert({
+  const db = new Database(':memory:');
+  initializeScheduledTaskSchema(db);
+  initializeActivitySchema(db);
+  expect(
+    db
+      .prepare(
+        "SELECT name FROM pragma_table_info('zhiyuan_activity_runs') WHERE name = 'input_preview'",
+      )
+      .get(),
+  ).toBeUndefined();
+  db.exec('ALTER TABLE zhiyuan_activity_runs ADD COLUMN input_preview TEXT');
+  const service = new ActivityService(db);
+  service.recordChannelRun({
     id: 'channel',
-    source: ActivitySource.Channel,
     status: ActivityStatus.Running,
-    inputPreview: 'hello',
     updatedAt: 1,
   });
-  service.upsert({
-    id: 'task',
-    source: ActivitySource.ScheduledTask,
-    status: ActivityStatus.Running,
-    taskName: 'Daily report',
-    updatedAt: 2,
-  });
-  service.upsert({
+  db.prepare('UPDATE zhiyuan_activity_runs SET input_preview = ? WHERE id = ?').run(
+    'legacy input',
+    'channel',
+  );
+  db.prepare(`INSERT INTO zhiyuan_activity_runs (id, source, status, task_name, started_at, updated_at)
+    VALUES ('task', ?, ?, 'Daily report', 2, 2)`).run(
+    ActivitySource.ScheduledTask,
+    ActivityStatus.Running,
+  );
+  service.recordChannelRun({
     id: 'channel',
-    source: ActivitySource.Channel,
     status: ActivityStatus.Completed,
     replyPreview: 'done',
     updatedAt: 3,
@@ -39,11 +51,17 @@ test('persists activity snapshots by run id and returns newest updates first', a
     expect.objectContaining({
       id: 'channel',
       status: ActivityStatus.Completed,
-      inputPreview: 'hello',
       replyPreview: 'done',
     }),
     expect.objectContaining({ id: 'task', taskName: 'Daily report' }),
   ]);
+  expect(service.list()[0]).not.toHaveProperty('inputPreview');
+  expect(
+    db
+      .prepare('SELECT input_preview FROM zhiyuan_activity_runs WHERE id = ?')
+      .pluck()
+      .get('channel'),
+  ).toBe('legacy input');
 });
 
 test('ignores an out-of-order update without broadcasting it', async () => {
@@ -59,16 +77,17 @@ test('ignores an out-of-order update without broadcasting it', async () => {
     },
   }));
   const { ActivityService } = await import('./activityService');
-  const service = new ActivityService(new Database(':memory:'));
-  service.upsert({
+  const db = new Database(':memory:');
+  initializeScheduledTaskSchema(db);
+  initializeActivitySchema(db);
+  const service = new ActivityService(db);
+  service.recordChannelRun({
     id: 'run',
-    source: ActivitySource.Channel,
     status: ActivityStatus.Running,
     updatedAt: 10,
   });
-  const result = service.upsert({
+  const result = service.recordChannelRun({
     id: 'run',
-    source: ActivitySource.Channel,
     status: ActivityStatus.Failed,
     errorMessage: 'late',
     updatedAt: 5,
@@ -77,25 +96,54 @@ test('ignores an out-of-order update without broadcasting it', async () => {
   expect(service.list()[0]).toMatchObject({ status: ActivityStatus.Running, updatedAt: 10 });
 });
 
+test('keeps the name and preview of existing Cron snapshots alongside their canonical status', async () => {
+  const { ActivityService } = await import('./activityService');
+  const db = new Database(':memory:');
+  initializeScheduledTaskSchema(db);
+  initializeActivitySchema(db);
+  const service = new ActivityService(db);
+  const started = new Date().toISOString();
+  db.prepare(`INSERT INTO zhiyuan_scheduled_task_runs
+    (id, task_id, schedule_version, status, started_at, finished_at)
+    VALUES ('legacy-cron', 'deleted-task', '1', 'success', ?, ?)`).run(started, started);
+  db.prepare(`INSERT INTO zhiyuan_activity_runs
+    (id, source, status, task_name, reply_preview, started_at, updated_at)
+    VALUES ('legacy-cron', ?, ?, 'Historical task', 'Historical reply', 1, 1)`).run(
+    ActivitySource.ScheduledTask,
+    ActivityStatus.Running,
+  );
+  expect(service.recordChannelRun({ id: 'legacy-cron', status: ActivityStatus.Failed })).toBeNull();
+
+  expect(service.list()).toMatchObject([
+    {
+      id: 'legacy-cron',
+      status: ActivityStatus.Completed,
+      taskName: 'Historical task',
+      replyPreview: 'Historical reply',
+    },
+  ]);
+  db.close();
+});
+
 test('prunes only activity snapshots older than 180 days', async () => {
   const { ActivityService } = await import('./activityService');
-  const service = new ActivityService(new Database(':memory:'));
+  const db = new Database(':memory:');
+  initializeScheduledTaskSchema(db);
+  initializeActivitySchema(db);
+  const service = new ActivityService(db);
   const now = Date.UTC(2026, 7, 13);
-  service.upsert({
+  service.recordChannelRun({
     id: 'expired',
-    source: ActivitySource.Channel,
     status: ActivityStatus.Completed,
     updatedAt: now - ActivityRetention.Milliseconds - 1,
   });
-  service.upsert({
+  service.recordChannelRun({
     id: 'boundary',
-    source: ActivitySource.Channel,
     status: ActivityStatus.Completed,
     updatedAt: now - ActivityRetention.Milliseconds,
   });
-  service.upsert({
+  service.recordChannelRun({
     id: 'recent',
-    source: ActivitySource.ScheduledTask,
     status: ActivityStatus.Completed,
     updatedAt: now - 1,
   });
@@ -106,16 +154,14 @@ test('prunes only activity snapshots older than 180 days', async () => {
 
 test('recovers interrupted running snapshots during startup', async () => {
   const { ActivityService } = await import('./activityService');
-  const service = new ActivityService(new Database(':memory:'));
-  service.upsert({
-    id: 'stale',
-    source: ActivitySource.ScheduledTask,
-    status: ActivityStatus.Running,
-    updatedAt: 10,
-  });
-  service.upsert({
+  const db = new Database(':memory:');
+  initializeScheduledTaskSchema(db);
+  initializeActivitySchema(db);
+  const service = new ActivityService(db);
+  db.prepare(`INSERT INTO zhiyuan_activity_runs (id, source, status, started_at, updated_at)
+    VALUES ('stale', ?, ?, 10, 10)`).run(ActivitySource.ScheduledTask, ActivityStatus.Running);
+  service.recordChannelRun({
     id: 'done',
-    source: ActivitySource.Channel,
     status: ActivityStatus.Completed,
     updatedAt: 11,
   });

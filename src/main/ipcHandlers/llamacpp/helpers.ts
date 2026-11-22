@@ -4,10 +4,10 @@ import {
   DEFAULT_LLAMACPP_SERVICE_CONFIG,
   getLlamaCppModelsMaxLimitViolation,
   LlamaCppIpcChannel,
+  type LlamaCppRunningModel,
 } from '../../../shared/llamacpp';
 import type { ModelCapabilities } from '../../../shared/providers';
 import { t } from '../../i18n';
-import type { LlamaCppManager } from '../../libs/llamacppManager';
 import {
   classifyLlamaCppModelLoadError,
   getLlamaCppModelLoadFailureI18nKey,
@@ -141,13 +141,13 @@ export function throwIfLlamaCppModelLoadCancelled(signal: AbortSignal): void {
 
 export async function waitForLlamaCppModelUnloadConfirmation(input: {
   modelName: string;
-  listRunningModels: () => Promise<Awaited<ReturnType<LlamaCppManager['listRunningModels']>>>;
+  listRunningModels: () => Promise<LlamaCppRunningModel[]>;
   timeoutMs?: number;
   intervalMs?: number;
   stableMissingPolls?: number;
 }): Promise<{
   confirmed: boolean;
-  runningModels: Awaited<ReturnType<LlamaCppManager['listRunningModels']>>;
+  runningModels: LlamaCppRunningModel[];
 }> {
   const timeoutMs = input.timeoutMs ?? LLAMACPP_UNLOAD_CONFIRM_TIMEOUT_MS;
   const intervalMs = input.intervalMs ?? LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS;

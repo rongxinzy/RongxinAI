@@ -2,9 +2,20 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
-import { getSkillConfigFromDir, setSkillConfigToDir } from './skillConfig';
+import {
+  ensureSkillDirDependencies,
+  getSkillConfigFromDir,
+  setSkillConfigToDir,
+} from './skillConfig';
+
+vi.mock('electron', () => ({ app: { isPackaged: true } }));
+vi.mock('../libs/npmRuntime', () => ({
+  NpmCli: { Npm: 'npm' },
+  resolveBundledNpmRuntime: () => null,
+}));
+vi.mock('./envUtils', () => ({ buildSkillEnv: async () => ({}) }));
 
 const tempDirs: string[] = [];
 
@@ -71,4 +82,38 @@ test('setSkillConfigToDir quotes values dotenv would misread, and reading restor
   const readResult = getSkillConfigFromDir(dir);
   expect(readResult.success).toBe(true);
   expect(readResult.config).toEqual(config);
+});
+
+test('concurrent bundled dependency repairs publish only the dependencies', async () => {
+  const root = makeSkillDir();
+  const target = path.join(root, '用户', 'mail');
+  const bundleRoot = path.join(root, 'bundled');
+  const bundle = path.join(bundleRoot, 'mail');
+  fs.mkdirSync(path.join(target, 'scripts'), { recursive: true });
+  fs.mkdirSync(path.join(bundle, 'node_modules'), { recursive: true });
+  fs.writeFileSync(path.join(target, 'package.json'), '{}');
+  fs.writeFileSync(path.join(target, 'a.txt'), 'user version');
+  fs.writeFileSync(path.join(bundle, 'a.txt'), 'bundled version');
+  fs.writeFileSync(path.join(bundle, 'node_modules', 'runtime.js'), 'fixture');
+  fs.writeFileSync(path.join(bundle, 'scripts'), 'collides with the existing directory');
+
+  const repair = ensureSkillDirDependencies(target, bundleRoot);
+  expect(ensureSkillDirDependencies(target, bundleRoot)).toBe(repair);
+  expect(await repair).toMatchObject({ success: true });
+  expect(fs.readFileSync(path.join(target, 'a.txt'), 'utf8')).toBe('user version');
+  expect(fs.readFileSync(path.join(target, 'node_modules', 'runtime.js'), 'utf8')).toBe('fixture');
+});
+
+test('rejects a non-directory dependency bundle without publishing an installed runtime', async () => {
+  const root = makeSkillDir();
+  const target = path.join(root, 'user', 'mail');
+  const bundleRoot = path.join(root, 'bundled');
+  const bundle = path.join(bundleRoot, 'mail');
+  fs.mkdirSync(target, { recursive: true });
+  fs.mkdirSync(bundle, { recursive: true });
+  fs.writeFileSync(path.join(target, 'package.json'), '{}');
+  fs.writeFileSync(path.join(bundle, 'node_modules'), 'not a runtime');
+
+  expect(await ensureSkillDirDependencies(target, bundleRoot)).toMatchObject({ success: false });
+  expect(fs.existsSync(path.join(target, 'node_modules'))).toBe(false);
 });

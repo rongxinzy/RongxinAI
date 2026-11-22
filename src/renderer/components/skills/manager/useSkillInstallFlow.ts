@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 
-import type { SkillSecurityReport as SkillSecurityReportData } from '../../../../main/libs/skillSecurity/skillSecurityTypes';
+import type { SkillSecurityReport as SkillSecurityReportData } from '../../../../shared/skills/securityTypes';
 import { i18nService } from '../../../services/i18n';
 import { skillService } from '../../../services/skill';
 import { setSkills } from '../../../store/slices/skillSlice';

@@ -116,7 +116,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
     setQrStatus('loading');
     setQrError('');
     try {
-      const result = await window.electron.dingtalk.install.qrcode();
+      const result = await window.electron.im.dingtalkLoginStart();
       if (!isMountedRef.current) return;
       setQrUrl(result.url);
       qrDeviceCodeRef.current = result.deviceCode;
@@ -144,7 +144,9 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
       const intervalMs = Math.max(result.interval ?? 5, 3) * 1000;
       qrPollTimerRef.current = setInterval(async () => {
         try {
-          const pollResult = await window.electron.dingtalk.install.poll(qrDeviceCodeRef.current);
+          const pollResult = await window.electron.im.dingtalkLoginPoll({
+            deviceCode: qrDeviceCodeRef.current,
+          });
           if (!isMountedRef.current) return;
           if (pollResult.done && pollResult.clientId && pollResult.clientSecret) {
             clearInterval(qrPollTimerRef.current!);

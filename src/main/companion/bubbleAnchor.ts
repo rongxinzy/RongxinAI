@@ -4,8 +4,7 @@ import { companionBubblePlacement } from './bubblePlacement';
 
 interface Options {
   getPetWindow?(): BrowserWindow | null;
-  onBubbleVisibility?(visible: boolean): void;
-  hideWindow?(): void;
+  hideWindow(): void;
 }
 
 /** One cancellable movement notification. No focus changes or model requests while following. */
@@ -15,7 +14,6 @@ export function anchorCompanionBubble(
   changed: (placement: CompanionBubblePlacement) => void,
 ) {
   let pet: BrowserWindow | null = null;
-  let active = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let previous = '';
   const place = () => {
@@ -52,13 +50,7 @@ export function anchorCompanionBubble(
       place();
     }, 16);
   };
-  const hide = () => {
-    if (options.hideWindow) options.hideWindow();
-    else {
-      window.hide();
-      hidden();
-    }
-  };
+  const hide = options.hideWindow;
   const detach = () => {
     clearTimeout(timer);
     timer = undefined;
@@ -71,37 +63,24 @@ export function anchorCompanionBubble(
   const activate = () => {
     if (window.isDestroyed()) return;
     const source = options.getPetWindow?.() ?? null;
-    if (active && source === pet) {
-      place();
-      return;
+    if (source !== pet) {
+      detach();
+      pet = source;
+      pet?.on('move', move);
+      pet?.on('resize', move);
+      pet?.on('hide', hide);
+      pet?.on('closed', hide);
     }
-    detach();
-    pet = source;
-    pet?.on('move', move);
-    pet?.on('resize', move);
-    pet?.on('hide', hide);
-    pet?.on('closed', hide);
-    active = true;
     place();
-    options.onBubbleVisibility?.(true);
-  };
-  const hidden = () => {
-    detach();
-    if (active) options.onBubbleVisibility?.(false);
-    active = false;
   };
   const dispose = () => {
-    hidden();
-    window.removeListener('show', activate);
-    window.removeListener('hide', hidden);
+    detach();
     screen.removeListener('display-metrics-changed', move);
     screen.removeListener('display-removed', move);
   };
-  window.on('show', activate);
-  window.on('hide', hidden);
   window.once('closed', dispose);
   screen.on('display-metrics-changed', move);
   screen.on('display-removed', move);
   place();
-  return { place, activate, deactivate: hidden };
+  return { place, activate, deactivate: detach };
 }

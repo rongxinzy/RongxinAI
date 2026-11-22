@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import vm from 'node:vm';
 import { load } from 'js-yaml';
 import { expect, test } from 'vitest';
 
 const source = readFileSync(path.join(__dirname, 'assemble-windows-edition.cjs'), 'utf8');
+const require = createRequire(import.meta.url);
 
 function assemble(edition: string, failPackaging = false) {
   const calls: Array<{ command: string; args: string[]; options: { env: Record<string, string> } }> = [];
@@ -18,6 +20,7 @@ function assemble(edition: string, failPackaging = false) {
   const modules = {
     'node:fs': fs,
     'node:path': path,
+    '../../packaging/package-windows-installer.cjs': require('../../packaging/package-windows-installer.cjs'),
     'node:child_process': {
       spawnSync: (command: string, args: string[], options: { env: Record<string, string> }) => {
         calls.push({ command, args, options });
@@ -28,7 +31,7 @@ function assemble(edition: string, failPackaging = false) {
   const execute = () => vm.runInNewContext(source, {
     __dirname,
     require: (name: keyof typeof modules) => modules[name],
-    process: { env: {}, argv: ['node', 'assemble', edition], execPath: process.execPath },
+    process: { env: { ZHIYUAN_ENTERPRISE_BUILD: '1' }, argv: ['node', 'assemble', edition], execPath: process.execPath },
     console: { log: () => undefined },
   });
   return { execute, calls, removed };
@@ -41,8 +44,19 @@ test.each(['cpu', 'cuda'])('%s reuses compilation but regenerates edition metada
   const packageIndex = f.calls.findIndex(call => call.args.includes('electron-builder'));
   expect(patch).toBeGreaterThan(-1);
   expect(packageIndex).toBeGreaterThan(patch);
-  expect(f.calls[packageIndex].args).not.toContain('--prepackaged');
+  expect(
+    f.calls.filter(call => call.args.includes('scripts/prepare-inference-edition-runtime.cjs')),
+  ).toHaveLength(1);
+  expect(f.calls[packageIndex - 1].args).toEqual(['scripts/prepare-inference-edition-runtime.cjs']);
+  expect(f.calls[packageIndex].args).toEqual([
+    'x', 'electron-builder', '--win', 'nsis', '--x64', '--config',
+    'electron-builder.windows-signed.cjs', '--publish', 'never',
+  ]);
+  expect(f.calls[packageIndex + 1].args).toEqual([
+    'scripts/installer-shell/build-distribution.cjs', '--signed',
+  ]);
   expect(f.calls.every(call => call.options.env.ZHIYUAN_UPDATE_VARIANT === edition)).toBe(true);
+  expect(f.calls.every(call => call.options.env.ZHIYUAN_ENTERPRISE_BUILD === '0')).toBe(true);
   expect(f.calls.some(call => call.args.includes('build') || call.args.includes('compile:electron'))).toBe(false);
   expect(f.removed).toEqual(['old.exe', 'old.exe.blockmap', 'latest.yml']);
 });
@@ -106,6 +120,7 @@ test('each edition restores exact inputs on a fresh runner before shared accepta
 
 test('producer checkpoints editions before repackaging without publishing candidates', () => {
   const steps = releaseWorkflow().jobs['windows-release'].steps;
+  expect(steps.some(step => step.run?.includes('engram:runtime:win-x64'))).toBe(false);
   const checkpoints = steps.filter(
     step => step.uses === './.github/actions/checkpoint-windows-package',
   );

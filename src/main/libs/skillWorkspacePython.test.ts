@@ -214,7 +214,7 @@ test('long-lived Python Skills launch the prepared workspace interpreter and pre
   // A Node fixture stands in for the resolved interpreter and makes its use observable.
   await writeFile(
     scriptPath,
-    'process.stdout.write(JSON.stringify({ready:true,python:process.env.UV_PYTHON,path:process.env.PATH,pythonPath:process.env.PYTHONPATH}));setInterval(()=>{},1000);\n',
+    'process.on("SIGTERM",()=>{});process.stdout.write(JSON.stringify({ready:true,python:process.env.UV_PYTHON,path:process.env.PATH,pythonPath:process.env.PYTHONPATH}));setInterval(()=>{},1000);\n',
   );
   service.prepare.mockResolvedValue({
     pythonPath: process.execPath,
@@ -245,7 +245,8 @@ test('long-lived Python Skills launch the prepared workspace interpreter and pre
     );
     expect(service.execute).not.toHaveBeenCalled();
   } finally {
-    await handle.stop();
+    await Promise.all([handle.stop(), handle.stop()]);
   }
   expect(handle.isRunning()).toBe(false);
+  expect(() => process.kill(handle.pid!, 0)).toThrow(expect.objectContaining({ code: 'ESRCH' }));
 });

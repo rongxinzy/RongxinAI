@@ -50,8 +50,10 @@ type LlamaCppModelResidencyManagerOptions = {
 
 export class LlamaCppModelResidencyManager {
   private readonly records = new Map<string, ModelRecord>();
+  private readonly unavailable = new Set<string>();
   private readonly timer: TimerApi;
   private expiryTimer: ReturnType<typeof setTimeout> | null = null;
+  private generation = 0;
   private nextLeaseId = 0;
 
   constructor(private readonly options: LlamaCppModelResidencyManagerOptions) {
@@ -69,6 +71,13 @@ export class LlamaCppModelResidencyManager {
     return record ? this.toSnapshot(record) : undefined;
   }
 
+  hasActiveWork(): boolean {
+    for (const record of this.records.values()) {
+      if (record.loading || record.activeRequests > 0) return true;
+    }
+    return false;
+  }
+
   markReady(modelName: string): void {
     const record = this.getOrCreateRecord(modelName);
     if (record.activeRequests > 0) {
@@ -83,17 +92,23 @@ export class LlamaCppModelResidencyManager {
   }
 
   markUnloaded(modelName: string): void {
-    const record = this.getOrCreateRecord(modelName);
+    this.markRecordUnloaded(this.getOrCreateRecord(modelName));
+    this.scheduleExpiryTimer();
+  }
+
+  private markRecordUnloaded(record: ModelRecord): void {
     record.state = LlamaCppModelResidencyState.Unloaded;
     record.expiresAt = undefined;
     record.loading = undefined;
     record.activeLeaseIds.clear();
     record.activeRequests = 0;
     this.emit(record);
-    this.scheduleExpiryTimer();
   }
 
   async ensureReady(modelName: string, load: () => Promise<void>): Promise<void> {
+    if (this.unavailable.has(modelName.trim()))
+      throw new Error('The local model is being deleted.');
+    const generation = this.generation;
     const record = this.getOrCreateRecord(modelName);
     if (
       record.state === LlamaCppModelResidencyState.Ready ||
@@ -101,33 +116,55 @@ export class LlamaCppModelResidencyManager {
     ) {
       return;
     }
-    if (record.loading) {
-      await record.loading;
-      return;
+    if (!record.loading) {
+      record.state = LlamaCppModelResidencyState.Loading;
+      record.expiresAt = undefined;
+      this.emit(record);
+      record.loading = load()
+        .then(() => {
+          this.assertGeneration(generation);
+          record.loading = undefined;
+          this.markReady(record.modelName);
+        })
+        .catch(error => {
+          if (generation === this.generation) {
+            record.loading = undefined;
+            record.state = LlamaCppModelResidencyState.Unloaded;
+            record.expiresAt = undefined;
+            this.emit(record);
+          }
+          throw error;
+        });
     }
+    await record.loading;
+    this.assertGeneration(generation);
+  }
 
-    record.state = LlamaCppModelResidencyState.Loading;
-    record.expiresAt = undefined;
-    this.emit(record);
-    const loading = load()
-      .then(() => {
-        record.loading = undefined;
-        this.markReady(record.modelName);
-      })
-      .catch(error => {
-        record.loading = undefined;
-        record.state = LlamaCppModelResidencyState.Unloaded;
-        record.expiresAt = undefined;
-        this.emit(record);
-        throw error;
-      });
-    record.loading = loading;
-    await loading;
+  async withModelUnavailable<T>(modelName: string, action: () => Promise<T>): Promise<T> {
+    const name = modelName.trim();
+    const state = this.records.get(name)?.state;
+    if (
+      this.unavailable.has(name) ||
+      state === LlamaCppModelResidencyState.Loading ||
+      state === LlamaCppModelResidencyState.Unloading
+    )
+      throw new Error('The local model is changing state.');
+    this.unavailable.add(name);
+    try {
+      return await action();
+    } finally {
+      this.unavailable.delete(name);
+      this.scheduleExpiryTimer();
+    }
   }
 
   async acquire(modelName: string, load: () => Promise<void>): Promise<() => void> {
+    const generation = this.generation;
     const record = this.getOrCreateRecord(modelName);
     await this.ensureReady(record.modelName, load);
+    this.assertGeneration(generation);
+    if (this.unavailable.has(record.modelName))
+      throw new Error('The local model is being deleted.');
     const leaseId = ++this.nextLeaseId;
     record.activeLeaseIds.add(leaseId);
     record.activeRequests = record.activeLeaseIds.size;
@@ -136,7 +173,9 @@ export class LlamaCppModelResidencyManager {
     this.emit(record);
     this.scheduleExpiryTimer();
 
-    return () => this.release(record.modelName, leaseId);
+    return () => {
+      if (generation === this.generation) this.release(record.modelName, leaseId);
+    };
   }
 
   beginManualUnload(modelName: string): void {
@@ -147,10 +186,27 @@ export class LlamaCppModelResidencyManager {
     this.scheduleExpiryTimer();
   }
 
+  reset(): void {
+    this.generation += 1;
+    this.dispose();
+    const previous = [...this.records.values()];
+    this.records.clear();
+    this.nextLeaseId = 0;
+    for (const record of previous) {
+      if (record.state !== LlamaCppModelResidencyState.Unloaded) this.markRecordUnloaded(record);
+    }
+  }
+
   dispose(): void {
     if (this.expiryTimer) {
       this.timer.clearTimeout(this.expiryTimer);
       this.expiryTimer = null;
+    }
+  }
+
+  private assertGeneration(generation: number): void {
+    if (generation !== this.generation) {
+      throw new DOMException('The local inference service was reset.', 'AbortError');
     }
   }
 
@@ -200,15 +256,22 @@ export class LlamaCppModelResidencyManager {
     }
     const now = this.timer.now();
     const nextExpiry = [...this.records.values()]
-      .filter(record => record.state === LlamaCppModelResidencyState.Ready && record.expiresAt)
+      .filter(
+        record =>
+          record.state === LlamaCppModelResidencyState.Ready &&
+          record.expiresAt &&
+          !this.unavailable.has(record.modelName),
+      )
       .map(record => record.expiresAt as number)
       .sort((left, right) => left - right)[0];
     if (!nextExpiry) return;
 
+    const generation = this.generation;
     this.expiryTimer = this.timer.setTimeout(
       () => {
+        if (generation !== this.generation) return;
         this.expiryTimer = null;
-        void this.handleExpiry().catch(error => {
+        void this.handleExpiry(generation).catch(error => {
           console.warn('[LlamaCppResidency] automatic model unload failed:', error);
         });
       },
@@ -216,30 +279,35 @@ export class LlamaCppModelResidencyManager {
     );
   }
 
-  private async handleExpiry(): Promise<void> {
+  private async handleExpiry(generation: number): Promise<void> {
     const now = this.timer.now();
     const dueRecords = [...this.records.values()].filter(
       record =>
         record.state === LlamaCppModelResidencyState.Ready &&
+        !this.unavailable.has(record.modelName) &&
         record.activeRequests === 0 &&
         record.expiresAt !== undefined &&
         record.expiresAt <= now,
     );
     for (const record of dueRecords) {
+      if (generation !== this.generation) return;
+      if (this.unavailable.has(record.modelName)) continue;
       record.state = LlamaCppModelResidencyState.Unloading;
       record.expiresAt = undefined;
       this.emit(record);
       try {
         await this.options.unload(record.modelName);
+        if (generation !== this.generation) return;
         this.markUnloaded(record.modelName);
       } catch (error) {
+        if (generation !== this.generation) return;
         record.state = LlamaCppModelResidencyState.Ready;
         this.renewExpiry(record);
         this.emit(record);
         throw error;
       }
     }
-    this.scheduleExpiryTimer();
+    if (generation === this.generation) this.scheduleExpiryTimer();
   }
 
   private emit(record: ModelRecord): void {

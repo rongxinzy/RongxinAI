@@ -2,18 +2,19 @@ import { expect, test, vi } from 'vitest';
 
 import { MemoryKind, MemorySensitivity } from '../../shared/memory';
 import {
+  CoworkArtifactRole,
+  CoworkArtifactSource,
+  type CoworkPersistedArtifact,
+} from '../../shared/cowork/artifacts';
+import {
   WorkbenchApprovalEffectStatus,
   WorkbenchApprovalDecision,
   WorkbenchApprovalDecisionSource,
   WorkbenchApprovalRiskLevel,
-  WorkbenchArtifactKind,
-  WorkbenchArtifactProvenance,
-  WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
   WorkbenchExecutionStatus,
   WorkbenchRunTrigger,
   type WorkbenchApproval,
-  type WorkbenchArtifact,
   type WorkbenchRun,
   type WorkbenchTask,
 } from '../../shared/workbenchTask';
@@ -49,18 +50,17 @@ function source(overrides: Partial<SettledWorkbenchRunMemorySource> = {}) {
   };
   const artifact = {
     id: 'artifact-1',
-    taskId: task.id,
     runId: run.id,
-    kind: WorkbenchArtifactKind.File,
-    mimeType: 'text/plain',
-    reference: 'result.txt',
-    contentHash: 'hash',
-    provenance: WorkbenchArtifactProvenance.Workspace,
-    verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
-    metadata: {},
+    messageId: 'tool-result',
+    type: 'text',
+    title: 'Result',
+    content: '',
+    filePath: '/workspace/result.txt',
+    source: CoworkArtifactSource.Tool,
+    role: CoworkArtifactRole.Deliverable,
+    declared: true,
     createdAt: 1,
-    updatedAt: 2,
-  } satisfies WorkbenchArtifact;
+  } satisfies CoworkPersistedArtifact;
   const approval = {
     id: 'approval-1',
     taskId: task.id,
@@ -119,7 +119,15 @@ test('creates an atomic review candidate with Task, Run, Artifact, and Approval 
       maxItems: 5,
       sources: expect.arrayContaining([
         expect.objectContaining({ id: 'run:run-1:final-answer' }),
-        expect.objectContaining({ id: 'artifact:artifact-1' }),
+        expect.objectContaining({
+          id: 'artifact:artifact-1',
+          content: JSON.stringify({
+            reference: '/workspace/result.txt',
+            title: 'Result',
+            source: CoworkArtifactSource.Tool,
+            role: CoworkArtifactRole.Deliverable,
+          }),
+        }),
         expect.objectContaining({ id: 'approval:approval-1' }),
       ]),
     }),

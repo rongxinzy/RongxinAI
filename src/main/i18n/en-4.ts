@@ -1,9 +1,4 @@
 export const enMain4 = {
-  modelPoolLoginRequired: 'Sign in to your ZhiYuan account to use the free model.',
-  modelPoolEntitlementRequired: 'This account is not entitled to use the free model.',
-  modelPoolQuotaExceeded: 'Your free model quota is exhausted for today. Try again tomorrow.',
-  modelPoolServiceUnavailable:
-    'The free model service is temporarily unavailable. Please try again later.',
   modelPoolSessionBusy: 'This conversation is still being processed. Please try again shortly.',
   modelPoolStreamInterrupted:
     'The response was interrupted. Received content is preserved. Retry or ask to continue.',

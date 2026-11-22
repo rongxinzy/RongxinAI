@@ -22,7 +22,7 @@ async function testBasicFunctionality() {
 
     // Step 2: Connect via Playwright
     console.log('Step 2: Connecting via Playwright...');
-    connectionId = await manager.connectToCDP(browserInstance.cdpPort);
+    connectionId = await manager.connectToCDP(browserInstance.cdpPort, browserInstance.cdpWebSocketUrl);
     console.log(`✓ Connected successfully (ID: ${connectionId})\n`);
 
     // Step 3: Get page

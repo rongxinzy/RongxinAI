@@ -5,6 +5,7 @@ const path = require('node:path');
 const { signAsync } = require('@electron/osx-sign');
 const { binaryName, sha256File, verifyRuntime } = require('./magpie-runtime.cjs');
 const { createSignAsyncWithTimestampRetry } = require('./macos-sign-timestamp-retry.cjs');
+const { refreshRuntimeManifest } = require('./prepare-inference-edition-runtime.cjs');
 
 const signAsyncWithTimestampRetry = createSignAsyncWithTimestampRetry(signAsync);
 
@@ -77,7 +78,9 @@ function optionsForSignedFile(options, filename) {
 }
 
 async function signWithRuntimeManifest(options, signer = signAsyncWithTimestampRetry) {
-  const root = path.join(options.app, 'Contents', 'Resources', 'magpie');
+  const resources = path.join(options.app, 'Contents', 'Resources');
+  const root = path.join(resources, 'magpie');
+  const bundledRuntime = path.join(resources, 'llamacpp-bundled');
   const packagedTargets = listPackagedMacMagpieTargets(root);
   if (packagedTargets.length === 0) {
     throw new Error(
@@ -120,6 +123,9 @@ async function signWithRuntimeManifest(options, signer = signAsyncWithTimestampR
             `${JSON.stringify(manifest, null, 2)}\n`,
           );
           verifyRuntime(root, key, { allowSigned: true });
+        }
+        if (fs.existsSync(path.join(bundledRuntime, 'manifest.json'))) {
+          refreshRuntimeManifest(bundledRuntime);
         }
         manifestSealed = true;
       }

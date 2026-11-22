@@ -1,10 +1,6 @@
 import { Message, MessageContent } from '@shared/components/ai-elements/message';
-import { StreamingMarkdownResponse } from '@shared/components/ai-elements/streamingMarkdownResponse';
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from '@shared/components/ai-elements/reasoning';
+import { StreamingMarkdownResponse } from '../ai-elements/streamingMarkdownResponse';
+import { Reasoning, ReasoningContent, ReasoningTrigger } from '../ai-elements/reasoning';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
 import { CollapsibleContent } from '@shared/components/ui/collapsible';
 import { CheckCircle2, CircleStop, TriangleAlert } from 'lucide-react';

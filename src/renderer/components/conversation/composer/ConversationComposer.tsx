@@ -9,7 +9,7 @@ import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
 import { TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 
 import { CoworkSessionMode } from '../../../../shared/cowork/constants';
 import { hasVisiblePromptContent } from '../../../../shared/cowork/submissionContent';
@@ -23,6 +23,7 @@ import {
 import { selectWorkMode } from '../../../store/selectors/workModeSelectors';
 import {
   clearDraftAttachments,
+  consumePromptFocus,
   setDraftAttachments,
   setDraftPrompt,
 } from '../../../store/slices/coworkSlice';
@@ -72,11 +73,13 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
     } = props;
 
     const dispatch = useDispatch();
+    const store = useStore<RootState>();
     const draftKey = sessionId || PromptDraftKey.Home;
     const draftPrompts = useSelector(selectDraftPrompts);
     const draftPromptDocs = useSelector(selectDraftPromptDocs);
     const draftPrompt = draftPrompts[draftKey] ?? '';
     const draftDoc = draftPromptDocs?.[draftKey] ?? null;
+    const focusRequest = useSelector((state: RootState) => state.cowork.promptFocusRequest);
     const rawAttachments = useSelector(
       (state: RootState) => state.cowork.draftAttachments[draftKey],
     );
@@ -126,6 +129,8 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
     const [imageVisionHint, setImageVisionHint] = useState(false);
     const [isCompactToolbar, setIsCompactToolbar] = useState(false);
     const [isTightToolbar, setIsTightToolbar] = useState(false);
+    const [editorReady, setEditorReady] = useState(false);
+    const markEditorReady = useCallback(() => setEditorReady(true), []);
 
     const editorRef = useRef<TiptapPromptEditorHandle>(null);
     const promptRootRef = useRef<HTMLDivElement>(null);
@@ -309,33 +314,29 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
     const handleSubmit = usePromptSubmissionLock(submitPrompt);
 
     useEffect(() => {
-      const handleFocusInput = (event: Event) => {
-        const detail = (
-          event as CustomEvent<{ clear?: boolean; clearExperts?: boolean; text?: string }>
-        ).detail;
-        const shouldClear = detail?.clear ?? true;
-        if (detail?.text !== undefined) {
-          setValue(detail.text);
-          dispatch(clearDraftAttachments(draftKey));
-          setImageVisionHint(false);
-        } else if (shouldClear) {
-          setValue('');
-          dispatch(clearDraftAttachments(draftKey));
-          setImageVisionHint(false);
-        }
-        if (detail?.clearExperts === true) {
-          setSelectedExpertIds([]);
-        }
-        requestAnimationFrame(() => {
-          editorRef.current?.focus();
-        });
-      };
-      window.addEventListener('cowork:focus-input', handleFocusInput);
-      return () => {
-        window.removeEventListener('cowork:focus-input', handleFocusInput);
-        cancelFolderWarningTimer();
-      };
-    }, [dispatch, draftKey, cancelFolderWarningTimer, setValue]);
+      const editor = editorRef.current;
+      if (
+        !editorReady ||
+        !editor ||
+        !focusRequest ||
+        store.getState().cowork.promptFocusRequest?.id !== focusRequest.id
+      )
+        return;
+      dispatch(consumePromptFocus(focusRequest.id));
+      if (focusRequest.draftKey !== draftKey) return;
+
+      if (focusRequest.text !== undefined || focusRequest.clear !== false) {
+        const nextValue = focusRequest.text ?? '';
+        setValue(nextValue);
+        dispatch(setDraftPrompt({ sessionId: draftKey, draft: nextValue }));
+        dispatch(clearDraftAttachments(draftKey));
+        setImageVisionHint(false);
+      }
+      if (focusRequest.clearExperts) setSelectedExpertIds([]);
+      editor.focus();
+    }, [dispatch, draftKey, editorReady, focusRequest, setValue, store]);
+
+    useEffect(() => cancelFolderWarningTimer, [cancelFolderWarningTimer, draftKey]);
 
     const handleKeyDown = usePromptKeyDown({
       value,
@@ -417,6 +418,7 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
               value={value}
               draftDoc={doc}
               externalVersion={externalVersion}
+              onReady={markEditorReady}
               placeholder={placeholder}
               disabled={disabled}
               attachments={attachments}

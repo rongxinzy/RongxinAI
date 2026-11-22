@@ -3,6 +3,7 @@ export const enMain1 = {
   webSearchInvalidInput: 'Invalid search query or result count.',
   webSearchInvalidResponse: 'Search returned an invalid or oversized response.',
   webSearchRequestFailed: 'Search request failed (HTTP {status}).',
+  webSearchConnectionFailed: 'Could not connect to the search service.',
   workbenchDeliveryHashFailed: 'Final deliverable content verification failed.',
   workbenchDeliveryNotReady: 'The result is not ready for delivery and cannot be accepted.',
   workbenchDeliverablesRequireAcceptance: '{count} final deliverable(s) require user acceptance.',
@@ -61,6 +62,7 @@ export const enMain1 = {
 
   // Session titles
   coworkDefaultSessionTitle: 'New Chat',
+  coworkTaskWorkspaceChanged: 'The task folder changed. Select a folder and submit again.',
   codingAgentDefaultMissionTitle: 'New coding task',
   codingAgentSessionRecovery:
     'The previous agent session could not be restored. A handoff summary was sent to a new session.',
@@ -72,6 +74,10 @@ export const enMain1 = {
   codingAgentConfigPlanMode: 'Plan mode',
   mcpIntegrationOperationBusy:
     'This MCP integration is busy with another operation. Try again shortly.',
+  mcpAuthorizationShuttingDown: 'The app is closing. MCP authorization is unavailable.',
+  mcpRegistryAlreadyInstalled: 'This marketplace MCP server is already installed.',
+  mcpServerNameExists: 'An MCP server with this name already exists.',
+  mcpAuthorizationEndpointMismatch: 'The installed MCP server uses a different endpoint.',
   codingAgentPlanModeExecute: 'Execute directly',
   codingAgentPlanModePlan: 'Plan only (read-only)',
   codingAgentPermissionModeAsk: 'Ask every time',
@@ -133,6 +139,7 @@ export const enMain1 = {
     'The coding session stopped, so this question was cancelled.',
   codingAgentElicitationCancelledByRestart:
     'The application restarted, so this question was cancelled.',
+  coworkToolInterruptedByRestart: 'The tool call was interrupted when the application restarted.',
   codingAgentElicitationPromptBlocked:
     'Answer or cancel the current question before sending another message.',
   codingAgentElicitationResponseRequired: 'Enter an answer to the question.',
@@ -179,6 +186,7 @@ export const enMain1 = {
   coworkErrorInputTooLong: 'Input too long, exceeding model context limit.',
   coworkErrorCouldNotProcessPdf: 'Unable to process the PDF file.',
   coworkErrorModelNotFound: 'The requested model does not exist or is unavailable.',
+  coworkErrorModelTextUnsupported: 'The selected model does not support text conversation.',
   coworkErrorGatewayStartFailed: 'Gateway failed to start. Please restart the app and try again.',
   coworkErrorGatewayDisconnected: 'AI engine connection lost. Please retry.',
   coworkErrorServiceRestart: 'AI engine is restarting. Please try again later.',

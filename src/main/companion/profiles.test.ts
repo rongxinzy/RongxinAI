@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
 import { DESKTOP_PET_STORE_KEY } from '../../shared/desktopPet/constants';
 import { CompanionProfiles, type CompanionProfileStore } from './profiles';
@@ -11,6 +11,7 @@ function fixture() {
     set: (key, value) => {
       values.set(key, structuredClone(value));
     },
+    onDidChange: () => () => {},
   };
   // Exercise retained multi-companion behavior separately from the single-character release.
   return { values, store, profiles: new CompanionProfiles(store, () => true) };
@@ -28,10 +29,14 @@ test('creates seven persistent identities, with only one active companion', () =
 test('preserves the current appearance when creating the first companion identity', () => {
   const f = fixture();
   f.values.set(DESKTOP_PET_STORE_KEY, { characterId: DesktopPetBuiltinId.Yunmo });
-  expect(f.profiles.active()).toMatchObject({
+  expect(f.profiles.storedActive()).toBeUndefined();
+  expect(f.values.has('companion_profiles')).toBe(false);
+  const active = f.profiles.active();
+  expect(active).toMatchObject({
     personaId: DesktopPetBuiltinId.Xiaoyuan,
     characterId: DesktopPetBuiltinId.Yunmo,
   });
+  expect(f.profiles.storedActive()).toEqual(active);
 });
 
 test('changing appearance keeps identity and personality; selecting another companion is separate', () => {
@@ -55,8 +60,16 @@ test('refuses corrupted identities instead of replacing them and stranding histo
     profiles: [state.profiles[0]],
   });
   expect(() => f.profiles.snapshot()).toThrow('inconsistent');
-  f.values.set('companion_profiles', { invalid: true });
+  const invalid = { invalid: true };
+  f.values.set('companion_profiles', invalid);
   expect(() => f.profiles.snapshot()).toThrow('Invalid');
+  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    expect(f.profiles.storedActive()).toBeUndefined();
+    expect(f.values.get('companion_profiles')).toBe(invalid);
+  } finally {
+    warning.mockRestore();
+  }
 });
 
 test('all seven personalities have distinct concise native instructions and shared truthfulness boundaries', () => {
@@ -80,6 +93,7 @@ test('the release hides dormant identities without rewriting their saved appeara
     { ...all.profiles[0], characterId: DesktopPetBuiltinId.Xiaoyuan },
   ]);
   expect(released.active().petId).toBe(all.profiles[0].petId);
+  expect(released.storedActive()).toEqual(released.active());
   expect(() => released.select(all.profiles[1].petId)).toThrow('Unknown');
   expect(() => released.changeAppearance(all.profiles[0].petId, DesktopPetBuiltinId.Youli)).toThrow(
     'not released',

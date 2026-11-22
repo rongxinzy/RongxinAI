@@ -1,4 +1,7 @@
 import { expect, test, vi } from 'vitest';
+import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 import {
   LlamaCppIpcChannel,
@@ -7,10 +10,12 @@ import {
   LlamaCppMemoryPolicy,
   LlamaCppModelResidencyMode,
   LlamaCppOrchestrator,
+  type LlamaCppServiceConfig,
 } from '../../shared/llamacpp';
 import { ModelCapabilityStatus } from '../../shared/providers';
 import type { LlamaCppManager } from '../libs/llamacppManager';
 import { LlamaCppModelDaemonController } from '../libs/llamacppModelDaemonController';
+import { LlamaCppRouterOrchestrator } from '../libs/llamacppRouterOrchestrator';
 import {
   applyStoredModelPreferencesToLaunchInput,
   enforceLlamaCppParallelTwo,
@@ -26,6 +31,7 @@ import {
   waitForLlamaCppStartupModelBindings,
   registerLlamaCppIpcHandlers,
 } from './llamacpp';
+import { LLAMACPP_MODEL_PREFERENCES_KEY, LLAMACPP_SERVICE_CONFIG_KEY } from './llamacpp/config';
 
 test('sanitizeLlamaCppModelPreference retains every supported capability field', () => {
   expect(
@@ -169,6 +175,120 @@ vi.mock('electron', () => ({
   },
 }));
 
+test.each([
+  { mode: LlamaCppOrchestrator.Router, outcome: 'stopped' },
+  { mode: LlamaCppOrchestrator.Daemon, outcome: 'stopped' },
+  { mode: LlamaCppOrchestrator.Router, outcome: 'running' },
+  { mode: LlamaCppOrchestrator.Daemon, outcome: 'running' },
+  { mode: LlamaCppOrchestrator.Router, outcome: 'running through full service config' },
+  { mode: LlamaCppOrchestrator.Router, outcome: 'failed restart' },
+  { mode: LlamaCppOrchestrator.Router, outcome: 'invalid directory' },
+])('sets the model directory with the $mode orchestrator ($outcome)', async ({ mode, outcome }) => {
+  const root = await mkdtemp(path.join(tmpdir(), 'zhiyuan-model-directory-'));
+  const originalDir = path.join(root, 'old');
+  const nextDir = path.join(root, 'new');
+  let config: LlamaCppServiceConfig = { orchestrator: mode, modelsDir: originalDir, parallel: '2' };
+  const store = {
+    get: vi.fn((key: string) => (key === LLAMACPP_SERVICE_CONFIG_KEY ? config : undefined)),
+    set: vi.fn((_key: string, value: LlamaCppServiceConfig) => {
+      config = value;
+    }),
+  };
+  const wasRunning = outcome !== 'stopped';
+  const invalidDirectory = outcome === 'invalid directory';
+  const oldStart = vi.fn(async () => ({ status: 'running' }));
+  const oldStop = vi.fn(async () => ({ status: 'stopped' }));
+  const clearLastLoadedModel = vi.fn();
+  const manager = {
+    on: vi.fn(),
+    getModelsDir: () => config.modelsDir,
+    getStatus: () => ({ status: !wasRunning || invalidDirectory ? 'running' : 'stopped' }),
+    start: oldStart,
+    stop: oldStop,
+    clearPersistedLastLoadedModel: clearLastLoadedModel,
+  } as unknown as LlamaCppManager;
+  const prototype =
+    mode === LlamaCppOrchestrator.Router
+      ? LlamaCppRouterOrchestrator.prototype
+      : LlamaCppModelDaemonController.prototype;
+  const gatewayUrl = 'http://127.0.0.1:8080';
+  const status = { status: 'running', checkedAt: new Date(0).toISOString() } as const;
+  let model = wasRunning ? { name: 'old-model', runtime_context_length: 8192 } : null;
+  const reconnect = vi
+    .spyOn(prototype, 'reconnect')
+    .mockImplementation(async () =>
+      model
+        ? { status, runningModels: [model], modelProcesses: [], gatewayBaseUrl: gatewayUrl }
+        : null,
+    );
+  const list = vi
+    .spyOn(prototype, 'listRunningModels')
+    .mockImplementation(async () => (model ? [model] : []));
+  const restart = vi.spyOn(prototype, 'restart').mockImplementation(async nextConfig => {
+    expect(config.modelsDir).toBe(nextDir);
+    expect(nextConfig.modelsDir).toBe(nextDir);
+    model = null;
+    if (outcome === 'failed restart') throw new Error('fixture restart failure');
+    model = { name: 'new-model', runtime_context_length: 16384 };
+    return status;
+  });
+  const leftover =
+    mode === LlamaCppOrchestrator.Router
+      ? vi.spyOn(LlamaCppModelDaemonController.prototype, 'reconnect').mockResolvedValue(null)
+      : undefined;
+  const onModelBindingsChanged = vi.fn();
+  try {
+    registerLlamaCppIpcHandlers(manager, {
+      getStore: () => store as never,
+      onModelBindingsChanged,
+    });
+    // Separate registration's reconnect from the user's directory change.
+    await new Promise<void>(resolve => setImmediate(resolve));
+    onModelBindingsChanged.mockClear();
+    list.mockClear();
+
+    const fullConfig = outcome === 'running through full service config';
+    if (invalidDirectory) await writeFile(nextDir, 'A file occupies the destination.');
+    const change = electronMocks.handlers.get(
+      fullConfig ? LlamaCppIpcChannel.SetServiceConfig : LlamaCppIpcChannel.SetModelsDir,
+    )!;
+    const result = change(
+      {},
+      fullConfig ? { ...config, modelsDir: ` ${nextDir} ` } : ` ${nextDir} `,
+    );
+    if (invalidDirectory || outcome === 'failed restart') {
+      await expect(result).rejects.toThrow(
+        invalidDirectory ? /EEXIST|ENOTDIR/ : 'fixture restart failure',
+      );
+      expect(config.modelsDir).toBe(originalDir);
+    } else {
+      if (fullConfig) await expect(result).resolves.toMatchObject({ modelsDir: nextDir });
+      else await expect(result).resolves.toBe(nextDir);
+      expect((await stat(nextDir)).isDirectory()).toBe(true);
+    }
+    expect(restart).toHaveBeenCalledTimes(wasRunning && !invalidDirectory ? 1 : 0);
+    expect(oldStart).not.toHaveBeenCalled();
+    expect(oldStop).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
+    if (invalidDirectory) {
+      expect(clearLastLoadedModel).not.toHaveBeenCalled();
+      expect(onModelBindingsChanged).not.toHaveBeenCalled();
+    } else if (outcome === 'running' || fullConfig) {
+      expect(onModelBindingsChanged).toHaveBeenLastCalledWith(gatewayUrl, [
+        expect.objectContaining({ id: 'new-model' }),
+      ]);
+    } else {
+      expect(onModelBindingsChanged).toHaveBeenLastCalledWith(null, []);
+    }
+  } finally {
+    reconnect.mockRestore();
+    list.mockRestore();
+    restart.mockRestore();
+    leftover?.mockRestore();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('enforceLlamaCppParallelTwo updates an existing saved service config without changing ctxSize', () => {
   const set = vi.fn();
   const store = {
@@ -183,6 +303,41 @@ test('enforceLlamaCppParallelTwo updates an existing saved service config withou
     parallel: '2',
     threadsHttp: '12',
   });
+});
+
+test('llama.cpp startup ignores the retired Ollama configuration', async () => {
+  const daemonReconnect = vi
+    .spyOn(LlamaCppModelDaemonController.prototype, 'reconnect')
+    .mockResolvedValue(null);
+  const routerReconnect = vi
+    .spyOn(LlamaCppRouterOrchestrator.prototype, 'reconnect')
+    .mockResolvedValue(null);
+  const listRunning = vi
+    .spyOn(LlamaCppRouterOrchestrator.prototype, 'listRunningModels')
+    .mockResolvedValue([]);
+  const retiredConfigKey = 'ollama_service_config';
+  const store = {
+    get: vi.fn((key: string) =>
+      key === retiredConfigKey ? { cudaVisibleDevices: '7' } : undefined,
+    ),
+    set: vi.fn(),
+  };
+  const manager = { getModelsDir: () => '/tmp/models', on: vi.fn() };
+
+  try {
+    registerLlamaCppIpcHandlers(manager as unknown as LlamaCppManager, {
+      getStore: () => store as never,
+    });
+    await vi.waitFor(() => expect(routerReconnect).toHaveBeenCalledOnce());
+
+    expect(listRunning).not.toHaveBeenCalled();
+    expect(store.get).not.toHaveBeenCalledWith(retiredConfigKey);
+    expect(store.set).not.toHaveBeenCalledWith(LLAMACPP_SERVICE_CONFIG_KEY, expect.anything());
+  } finally {
+    daemonReconnect.mockRestore();
+    routerReconnect.mockRestore();
+    listRunning.mockRestore();
+  }
 });
 
 test('sanitizeLlamaCppServiceConfig keeps valid fields and falls back for malformed structured numbers', () => {
@@ -502,19 +657,23 @@ test('getLlamaCppLoadedModelLimitViolation allows reloading an already running m
   ).toBeNull();
 });
 
-test('does not subscribe to obsolete manager status events', async () => {
+test('keeps a stopped daemon idle during registration, status and model listing', async () => {
   const reconnect = vi
     .spyOn(LlamaCppModelDaemonController.prototype, 'reconnect')
     .mockResolvedValue(null);
   const daemonListRunningModels = vi
     .spyOn(LlamaCppModelDaemonController.prototype, 'listRunningModels')
     .mockResolvedValue([]);
+  const start = vi.spyOn(LlamaCppModelDaemonController.prototype, 'start').mockResolvedValue({
+    status: 'running',
+    checkedAt: new Date(0).toISOString(),
+  });
   const manager = {
     on: vi.fn(() => manager),
     getModelsDir: vi.fn(() => '/tmp/models'),
   } as unknown as LlamaCppManager;
   const store = {
-    get: vi.fn(() => ({ orchestrator: 'daemon' })),
+    get: vi.fn(() => ({ orchestrator: LlamaCppOrchestrator.Daemon, parallel: '2' })),
     set: vi.fn(),
   };
 
@@ -522,11 +681,17 @@ test('does not subscribe to obsolete manager status events', async () => {
     getStore: () => store as never,
   });
 
-  await vi.waitFor(() => expect(daemonListRunningModels).toHaveBeenCalledOnce());
+  await vi.waitFor(() => expect(reconnect).toHaveBeenCalledOnce());
 
   expect(manager.on).toHaveBeenCalledWith('install-progress', expect.any(Function));
   expect(manager.on).not.toHaveBeenCalledWith('status', expect.any(Function));
-  expect(reconnect).toHaveBeenCalledOnce();
+
+  const status = electronMocks.handlers.get(LlamaCppIpcChannel.Status)!;
+  const listRunning = electronMocks.handlers.get(LlamaCppIpcChannel.ListRunningModels)!;
+  await expect(status({})).resolves.toMatchObject({ status: 'stopped' });
+  await expect(listRunning({})).resolves.toEqual([]);
+  expect(start).not.toHaveBeenCalled();
+  expect(daemonListRunningModels).not.toHaveBeenCalled();
 });
 
 test('retries startup binding synchronization until an automatically loaded model is available', async () => {
@@ -565,6 +730,13 @@ test('stops startup binding synchronization after the service transition is supe
   expect(wait).not.toHaveBeenCalled();
 });
 
+const runningModelSnapshot = {
+  status: { status: 'running', managedByApp: true, checkedAt: new Date(0).toISOString() },
+  runningModels: [{ name: 'qwen-local', status: 'loaded', runtime_context_length: 8192 }],
+  modelProcesses: [],
+  gatewayBaseUrl: 'http://127.0.0.1:8080',
+} satisfies Awaited<ReturnType<LlamaCppModelDaemonController['reconnect']>>;
+
 test('synchronizes running models and notifies renderers after service startup', async () => {
   electronMocks.handlers.clear();
   electronMocks.windows.length = 0;
@@ -573,29 +745,21 @@ test('synchronizes running models and notifies renderers after service startup',
   const manager = {
     on: vi.fn(() => manager),
     getModelsDir: vi.fn(() => '/tmp/models'),
-    start: vi.fn(async () => ({ status: 'running', checkedAt: new Date(0).toISOString() })),
-    listRunningModels: vi.fn(async () => [
-      { name: 'qwen-local', status: 'loaded', runtime_context_length: 8192 },
-    ]),
-    client: vi.fn(async () => ({ showModel: vi.fn(async () => ({})) })),
   } as unknown as LlamaCppManager;
   const store = {
-    get: vi.fn(() => ({ orchestrator: 'daemon' })),
+    get: vi.fn(() => ({ orchestrator: LlamaCppOrchestrator.Daemon })),
     set: vi.fn(),
   };
   const onModelBindingsChanged = vi.fn();
-  vi.spyOn(LlamaCppModelDaemonController.prototype, 'reconnect').mockResolvedValue(null);
-  vi.spyOn(LlamaCppModelDaemonController.prototype, 'gatewayBaseUrl').mockReturnValue(
-    'http://127.0.0.1:8080',
-  );
-  vi.spyOn(LlamaCppModelDaemonController.prototype, 'status').mockResolvedValue({
-    status: 'running',
-    managedByApp: true,
-    checkedAt: new Date(0).toISOString(),
-  });
-  vi.spyOn(LlamaCppModelDaemonController.prototype, 'listRunningModels').mockResolvedValue([
-    { name: 'qwen-local', status: 'loaded', runtime_context_length: 8192 },
-  ]);
+  const reconnect = vi
+    .spyOn(LlamaCppModelDaemonController.prototype, 'reconnect')
+    .mockResolvedValue(null);
+  const start = vi
+    .spyOn(LlamaCppModelDaemonController.prototype, 'start')
+    .mockImplementation(async () => {
+      reconnect.mockResolvedValue(runningModelSnapshot);
+      return runningModelSnapshot.status;
+    });
 
   registerLlamaCppIpcHandlers(manager, {
     getStore: () => store as never,
@@ -606,6 +770,7 @@ test('synchronizes running models and notifies renderers after service startup',
   if (!startHandler) throw new Error('The local inference start handler was not registered.');
 
   await expect(Promise.resolve(startHandler())).resolves.toMatchObject({ status: 'running' });
+  expect(start).toHaveBeenCalledOnce();
   expect(onModelBindingsChanged).toHaveBeenCalledWith('http://127.0.0.1:8080', [
     expect.objectContaining({ id: 'qwen-local', contextWindow: 8192 }),
   ]);
@@ -613,7 +778,7 @@ test('synchronizes running models and notifies renderers after service startup',
   expect(send).toHaveBeenCalledWith(LlamaCppIpcChannel.ModelBindingsChanged, undefined);
 });
 
-test('synchronizes current running models when model bindings are refreshed', async () => {
+test('reads running bindings with stored limits and no unused model metadata requests', async () => {
   electronMocks.handlers.clear();
   const manager = {
     on: vi.fn(() => manager),
@@ -624,69 +789,60 @@ test('synchronizes current running models when model bindings are refreshed', as
     client: vi.fn(async () => ({ showModel: vi.fn(async () => ({})) })),
   } as unknown as LlamaCppManager;
   const store = {
-    get: vi.fn(() => ({ orchestrator: 'daemon' })),
+    get: vi.fn((key: string) =>
+      key === LLAMACPP_MODEL_PREFERENCES_KEY
+        ? { 'qwen-local': { ctxSize: 32768, maxTokens: 1536 } }
+        : { orchestrator: LlamaCppOrchestrator.Daemon },
+    ),
     set: vi.fn(),
   };
-  const onModelBindingsChanged = vi.fn();
-  vi.spyOn(LlamaCppModelDaemonController.prototype, 'reconnect').mockResolvedValue(null);
-  vi.spyOn(LlamaCppModelDaemonController.prototype, 'gatewayBaseUrl').mockReturnValue(
-    'http://127.0.0.1:8080',
-  );
-  vi.spyOn(LlamaCppModelDaemonController.prototype, 'listRunningModels').mockResolvedValue([
-    { name: 'qwen-local', status: 'loaded', runtime_context_length: 8192 },
-  ]);
+  const reconnect = vi
+    .spyOn(LlamaCppModelDaemonController.prototype, 'reconnect')
+    .mockResolvedValue(null);
 
-  registerLlamaCppIpcHandlers(manager, {
+  const inference = registerLlamaCppIpcHandlers(manager, {
     getStore: () => store as never,
-    onModelBindingsChanged,
   });
+  await vi.waitFor(() => expect(reconnect).toHaveBeenCalled());
+  reconnect.mockResolvedValue(runningModelSnapshot);
 
-  const refreshHandler = electronMocks.handlers.get(LlamaCppIpcChannel.RefreshRunningModelBindings);
-  if (!refreshHandler) throw new Error('The local model refresh handler was not registered.');
-
-  await expect(Promise.resolve(refreshHandler())).resolves.toBeUndefined();
-  expect(onModelBindingsChanged).toHaveBeenCalledWith('http://127.0.0.1:8080', [
-    expect.objectContaining({ id: 'qwen-local', contextWindow: 8192 }),
-  ]);
+  const { baseUrl, models } = await inference.readModelBindings();
+  expect(baseUrl).toBe('http://127.0.0.1:8080');
+  expect(models[0]).toMatchObject({ id: 'qwen-local', contextWindow: 8192, maxTokens: 1536 });
+  expect(manager.client).not.toHaveBeenCalled();
   expect(store.set).not.toHaveBeenCalledWith('app_config', expect.anything());
 });
 
-test('preserves model bindings when the running-model query temporarily fails', async () => {
+test('clears published bindings after a failed passive refresh without changing stored models', async () => {
   electronMocks.handlers.clear();
   electronMocks.windows.length = 0;
   const manager = {
     on: vi.fn(() => manager),
     getModelsDir: vi.fn(() => '/tmp/models'),
-    start: vi.fn(async () => ({ status: 'running', checkedAt: new Date(0).toISOString() })),
-    listRunningModels: vi.fn(async () => {
-      throw new Error('temporary connection failure');
-    }),
   } as unknown as LlamaCppManager;
   const store = {
     get: vi.fn(() => ({
-      orchestrator: 'daemon',
+      orchestrator: LlamaCppOrchestrator.Daemon,
       providers: { llamacpp: { models: [{ id: 'qwen-local' }] } },
     })),
     set: vi.fn(),
   };
-  vi.spyOn(LlamaCppModelDaemonController.prototype, 'reconnect').mockResolvedValue(null);
-  vi.spyOn(LlamaCppModelDaemonController.prototype, 'status').mockResolvedValue({
-    status: 'running',
-    managedByApp: true,
-    checkedAt: new Date(0).toISOString(),
-  });
-  vi.spyOn(LlamaCppModelDaemonController.prototype, 'listRunningModels').mockRejectedValue(
-    new Error('temporary connection failure'),
-  );
+  const reconnect = vi
+    .spyOn(LlamaCppModelDaemonController.prototype, 'reconnect')
+    .mockResolvedValue(runningModelSnapshot);
+  const onModelBindingsChanged = vi.fn();
 
   registerLlamaCppIpcHandlers(manager, {
     getStore: () => store as never,
+    onModelBindingsChanged,
   });
+  await vi.waitFor(() => expect(onModelBindingsChanged).toHaveBeenCalled());
+  onModelBindingsChanged.mockClear();
+  reconnect.mockRejectedValue(new Error('temporary connection failure'));
 
-  const startHandler = electronMocks.handlers.get(LlamaCppIpcChannel.Start);
-  if (!startHandler) throw new Error('The local inference start handler was not registered.');
-
-  await expect(Promise.resolve(startHandler())).resolves.toMatchObject({ status: 'running' });
+  const setPreference = electronMocks.handlers.get(LlamaCppIpcChannel.SetModelPreference)!;
+  await setPreference({}, { modelName: 'qwen-local', preference: { maxTokens: 1536 } });
+  expect(onModelBindingsChanged).toHaveBeenCalledWith(null, []);
   expect(store.set).not.toHaveBeenCalledWith('app_config', expect.anything());
 });
 

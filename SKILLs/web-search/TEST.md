@@ -10,46 +10,10 @@ This guide walks through testing the entire Web Search Skill integration with Zh
 2. Google Chrome installed
 3. Internet connection available
 
-## Test 1: Service Auto-Start
+## Test 1: Standalone Service Start
 
-**Objective:** Verify that the Bridge Server starts automatically with ZhiYuan Agent.
-
-**Steps:**
-
-1. Start ZhiYuan Agent in development mode:
-
-   ```bash
-   bun run electron:dev
-   ```
-
-2. Check the console output for:
-
-   ```
-   [SkillServices] Starting skill services...
-   [SkillServices] Starting Web Search Bridge Server...
-   [SkillServices] Web Search Bridge Server started (PID: XXXXX)
-   ```
-
-3. Verify the server is running:
-
-   ```bash
-   curl http://127.0.0.1:8923/api/health
-   ```
-
-   Expected response:
-
-   ```json
-   {
-     "success": true,
-     "data": {
-       "status": "healthy",
-       "uptime": 123.45,
-       "connections": 0
-     }
-   }
-   ```
-
-**Expected Result:** ✅ Bridge Server starts automatically within 3 seconds of ZhiYuan Agent launch.
+Run `node scripts/start-server.mjs` from this Skill directory. Verify that
+`http://127.0.0.1:8923/api/health` reports a healthy server.
 
 ## Test 2: CLI Search from Terminal
 
@@ -117,35 +81,11 @@ This guide walks through testing the entire Web Search Skill integration with Zh
 
 **Expected Result:** ✅ Subsequent searches are faster due to connection caching.
 
-## Test 5: Service Cleanup on Exit
+## Test 5: Standalone Service Cleanup
 
-**Objective:** Verify graceful shutdown of services when ZhiYuan Agent quits.
-
-**Steps:**
-
-1. With ZhiYuan Agent running and searches completed, quit the application
-2. Check console output for:
-
-   ```
-   [SkillServices] Stopping skill services...
-   [SkillServices] Stopping Web Search Bridge Server...
-   [SkillServices] Web Search Bridge Server stopped
-   ```
-
-3. Verify server is stopped:
-
-   ```bash
-   curl http://127.0.0.1:8923/api/health
-   ```
-
-   Expected: Connection refused
-
-4. Check no orphaned processes:
-   ```bash
-   ps aux | grep "web-search"
-   ```
-
-**Expected Result:** ✅ All services stop cleanly, no orphaned processes.
+1. Run `node scripts/stop-server.mjs` from the same Skill directory.
+2. Verify that the standalone health endpoint stops responding and that the
+   browser launched for the fixture exits.
 
 ## Test 6: Error Handling - Server Not Running
 
@@ -328,11 +268,11 @@ rm SKILLs/web-search/.connection
 
 All tests pass when:
 
-- ✅ Server auto-starts with ZhiYuan Agent
+- ✅ The standalone search command starts its server on demand
 - ✅ Searches complete in < 3 seconds
 - ✅ Claude uses skill automatically when appropriate
 - ✅ Connection caching improves performance
-- ✅ Services cleanup gracefully on exit
+- ✅ The standalone server and its browser stop on explicit cleanup
 - ✅ Error messages are clear and actionable
 - ✅ Browser operations are visible
 - ✅ Works on macOS, Linux, Windows

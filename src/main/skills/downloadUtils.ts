@@ -69,28 +69,7 @@ export const downloadGithubArchive = async (
     throw new Error(lastError || 'Archive download failed');
   }
 
-  const zipPath = path.join(tempRoot, 'github-archive.zip');
-  const extractRoot = path.join(tempRoot, 'github-archive');
-  fs.writeFileSync(zipPath, buffer);
-  fs.mkdirSync(extractRoot, { recursive: true });
-  await extractZip(zipPath, { dir: extractRoot });
-
-  const extractedDirs = fs
-    .readdirSync(extractRoot)
-    .map(entry => path.join(extractRoot, entry))
-    .filter(entryPath => {
-      try {
-        return fs.statSync(entryPath).isDirectory();
-      } catch {
-        return false;
-      }
-    });
-
-  if (extractedDirs.length === 1) {
-    return extractedDirs[0];
-  }
-
-  return extractRoot;
+  return extractDownloadedZip(buffer, path.join(tempRoot, 'github-archive'));
 };
 
 /**
@@ -240,46 +219,25 @@ export const downloadZipUrl = async (zipUrl: string, tempRoot: string): Promise<
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
-  const zipPath = path.join(tempRoot, 'remote-skill.zip');
-  const extractRoot = path.join(tempRoot, 'remote-skill');
-  fs.writeFileSync(zipPath, buffer);
-  fs.mkdirSync(extractRoot, { recursive: true });
-  try {
-    await extractZip(zipPath, { dir: extractRoot });
-  } catch (error) {
-    if (!zipUrl.includes('modelscope.cn/skills/')) throw error;
-    console.warn(
-      '[SkillManager] standard ZIP extraction failed, using ModelScope-compatible parser',
-    );
-    await extractModelScopeZip(buffer, extractRoot);
-  }
-
-  const extractedDirs = fs
-    .readdirSync(extractRoot)
-    .map(entry => path.join(extractRoot, entry))
-    .filter(entryPath => {
-      try {
-        return fs.statSync(entryPath).isDirectory();
-      } catch {
-        return false;
-      }
-    });
-
-  if (extractedDirs.length === 1) {
-    return extractedDirs[0];
-  }
-
-  return extractRoot;
+  return extractDownloadedZip(buffer, path.join(tempRoot, 'remote-skill'));
 };
 
-async function extractModelScopeZip(buffer: Buffer, destination: string): Promise<void> {
-  // extract-zip owns entry walking and path sanitization (zip-slip); hand it
-  // the archive on disk instead of reimplementing both over JSZip.
-  const zipPath = `${destination}.zip`;
-  fs.writeFileSync(zipPath, buffer);
-  try {
-    await extractZip(zipPath, { dir: destination });
-  } finally {
-    fs.rmSync(zipPath, { force: true });
+async function extractDownloadedZip(buffer: Buffer, extractRoot: string): Promise<string> {
+  const zipPath = `${extractRoot}.zip`;
+  await fs.promises.writeFile(zipPath, buffer);
+  await fs.promises.mkdir(extractRoot, { recursive: true });
+  await extractZip(zipPath, { dir: extractRoot });
+
+  let directory: string | undefined;
+  for (const entry of await fs.promises.readdir(extractRoot, { withFileTypes: true })) {
+    const candidate = path.join(extractRoot, entry.name);
+    const isDirectory =
+      entry.isDirectory() ||
+      (entry.isSymbolicLink() &&
+        (await fs.promises.stat(candidate).catch((): null => null))?.isDirectory());
+    if (!isDirectory) continue;
+    if (directory) return extractRoot;
+    directory = candidate;
   }
+  return directory ?? extractRoot;
 }

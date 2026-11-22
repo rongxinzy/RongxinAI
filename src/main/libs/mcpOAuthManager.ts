@@ -27,14 +27,11 @@ function getMcpOAuthCallbackPort(serverId: string, offset = 0): number {
 }
 
 function getStoredOAuthCallbackPort(
-  store: SqliteStore,
   credentialVault: McpCredentialVault,
   serverId: string,
 ): number | undefined {
   const key = `${MCP_OAUTH_STORE_PREFIX}${serverId}`;
-  const storedRedirectUri =
-    credentialVault.getValue<OAuthSession>(key)?.clientRedirectUri ??
-    store.get<OAuthSession>(key)?.clientRedirectUri;
+  const storedRedirectUri = credentialVault.getValue<OAuthSession>(key)?.clientRedirectUri;
   if (!storedRedirectUri) return undefined;
   try {
     const redirectUrl = new URL(storedRedirectUri);
@@ -55,12 +52,14 @@ function getStoredOAuthCallbackPort(
 async function createOAuthCallbackServer(
   serverId: string,
   preferredPort?: number,
+  signal?: AbortSignal,
 ): Promise<{
   callbackPort: number;
   callbackServer: http.Server;
 }> {
   const attemptedPorts = new Set<number>();
   for (let attempt = 0; attempt < MCP_OAUTH_CALLBACK_PORT_ATTEMPTS; attempt += 1) {
+    signal?.throwIfAborted();
     const callbackPort =
       attempt === 0 && preferredPort !== undefined
         ? preferredPort
@@ -88,6 +87,16 @@ const electronFetch = (input: string | URL, init?: RequestInit): Promise<Respons
     init,
   ) as unknown as Promise<Response>;
 
+function oauthFetchWithSignal(signal: AbortSignal): typeof electronFetch {
+  return (input, init) => {
+    signal.throwIfAborted();
+    return electronFetch(input, {
+      ...init,
+      signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal,
+    });
+  };
+}
+
 function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
@@ -96,21 +105,20 @@ function withTimeout<T>(
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let timer: NodeJS.Timeout | null = null;
-    const abort = () => reject(new Error('MCP authorization was cancelled'));
     const cleanup = () => {
       if (timer) clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
+    };
+    const abort = () => {
+      cleanup();
+      reject(new Error('MCP authorization was cancelled'));
     };
     timer = setTimeout(() => {
       cleanup();
       reject(new Error(`${label} timed out after ${timeoutMs}ms`));
     }, timeoutMs);
-    if (signal?.aborted) {
-      cleanup();
-      abort();
-      return;
-    }
-    signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) abort();
+    else signal?.addEventListener('abort', abort, { once: true });
     promise.then(
       value => {
         cleanup();
@@ -131,26 +139,27 @@ interface OAuthSession {
   codeVerifier?: string;
 }
 
+class SilentRefreshStopped extends Error {}
+
 class StoredOAuthProvider implements OAuthClientProvider {
   private readonly key: string;
   private readonly redirectUri: string;
+  private readonly refreshRevision: string | undefined;
   private session: OAuthSession;
+  readonly saveClientInformation?: (value: OAuthClientInformationMixed) => void;
 
   constructor(
     private readonly store: SqliteStore,
     private readonly credentialVault: McpCredentialVault,
     serverId: string,
     redirectUri: string,
+    private readonly openAuthorizationUrl?: (url: URL) => Promise<void>,
+    private readonly authorizationSignal?: AbortSignal,
   ) {
     this.key = `${MCP_OAUTH_STORE_PREFIX}${serverId}`;
     this.redirectUri = redirectUri;
-    const secureSession = credentialVault.getValue<OAuthSession>(this.key);
-    const legacySession = secureSession ? undefined : store.get<OAuthSession>(this.key);
-    const storedSession = secureSession ?? legacySession ?? {};
-    if (legacySession) {
-      credentialVault.setValue(this.key, legacySession);
-      store.delete(this.key);
-    }
+    const storedSession = credentialVault.getValue<OAuthSession>(this.key) ?? {};
+    this.refreshRevision = openAuthorizationUrl ? undefined : JSON.stringify(store.get(this.key));
     // Dynamic OAuth registrations are bound to the callback URL. Older app
     // versions used a random port for every attempt, so their client records
     // cannot safely be reused with the stable callback URL below.
@@ -158,9 +167,17 @@ class StoredOAuthProvider implements OAuthClientProvider {
       !storedSession.tokens && Boolean(storedSession.clientInformation);
     if (storedSession.clientRedirectUri !== redirectUri || hasStaleInteractiveRegistration) {
       this.session = {};
-      this.persist();
+      if (openAuthorizationUrl) this.persist();
     } else {
       this.session = storedSession;
+    }
+    // The SDK treats an absent save callback as a pre-registered client.
+    if (openAuthorizationUrl) {
+      this.saveClientInformation = value => {
+        this.session.clientInformation = value;
+        this.session.clientRedirectUri = this.redirectUri;
+        this.persist();
+      };
     }
   }
 
@@ -173,22 +190,32 @@ class StoredOAuthProvider implements OAuthClientProvider {
   clientInformation() {
     return this.session.clientInformation;
   }
-  saveClientInformation(value: OAuthClientInformationMixed) {
-    this.session.clientInformation = value;
-    this.session.clientRedirectUri = this.redirectUri;
-    this.persist();
-  }
   tokens() {
     return this.session.tokens;
   }
   saveTokens(value: OAuthTokens) {
+    this.authorizationSignal?.throwIfAborted();
+    // Explicit authorization or unlink can change the stored session while a refresh is pending.
+    if (
+      !this.openAuthorizationUrl &&
+      JSON.stringify(this.store.get(this.key)) !== this.refreshRevision
+    ) {
+      throw new SilentRefreshStopped();
+    }
+    const client = this.session.clientInformation;
+    if (!this.openAuthorizationUrl && client && !client.issuer && value.issuer) {
+      this.session.clientInformation = { ...client, issuer: value.issuer };
+    }
     this.session.tokens = value;
     this.persist();
   }
   redirectToAuthorization(url: URL) {
-    return shell.openExternal(url.toString());
+    if (!this.openAuthorizationUrl) throw new SilentRefreshStopped();
+    this.authorizationSignal?.throwIfAborted();
+    return this.openAuthorizationUrl(url);
   }
   saveCodeVerifier(value: string) {
+    if (!this.openAuthorizationUrl) throw new SilentRefreshStopped();
     this.session.codeVerifier = value;
     this.persist();
   }
@@ -197,6 +224,7 @@ class StoredOAuthProvider implements OAuthClientProvider {
     return this.session.codeVerifier;
   }
   private persist() {
+    this.authorizationSignal?.throwIfAborted();
     this.credentialVault.setValue(this.key, this.session);
   }
 }
@@ -208,39 +236,49 @@ export class McpOAuthManager {
     this.credentialVault = new McpCredentialVault(store);
   }
 
-  async authorize(serverId: string, serverUrl: string, signal?: AbortSignal): Promise<string> {
+  async authorize(
+    serverId: string,
+    serverUrl: string,
+    requestSignal?: AbortSignal,
+  ): Promise<string> {
+    const authorization = new AbortController();
+    const signal = requestSignal
+      ? AbortSignal.any([requestSignal, authorization.signal])
+      : authorization.signal;
+    signal.throwIfAborted();
     const deadline = Date.now() + MCP_OAUTH_TOTAL_TIMEOUT_MS;
     const remainingTimeout = () => Math.max(1, deadline - Date.now());
-    const preferredCallbackPort = getStoredOAuthCallbackPort(
-      this.store,
-      this.credentialVault,
-      serverId,
-    );
+    const preferredCallbackPort = getStoredOAuthCallbackPort(this.credentialVault, serverId);
     const { callbackPort, callbackServer } = await createOAuthCallbackServer(
       serverId,
       preferredCallbackPort,
+      signal,
     );
     const redirectUri = `http://127.0.0.1:${callbackPort}${MCP_OAUTH_CALLBACK_PATH}`;
-    const provider = new StoredOAuthProvider(
-      this.store,
-      this.credentialVault,
-      serverId,
-      redirectUri,
-    );
-
     try {
+      signal.throwIfAborted();
+      const provider = new StoredOAuthProvider(
+        this.store,
+        this.credentialVault,
+        serverId,
+        redirectUri,
+        url => shell.openExternal(url.toString()),
+        signal,
+      );
+      const fetchFn = oauthFetchWithSignal(signal);
       const result = await withTimeout(
-        auth(provider, { serverUrl, scope: undefined, fetchFn: electronFetch }),
+        auth(provider, { serverUrl, scope: undefined, fetchFn }),
         Math.min(MCP_OAUTH_REQUEST_TIMEOUT_MS, remainingTimeout()),
         'MCP OAuth discovery',
         signal,
       );
+      signal.throwIfAborted();
       if (result === 'AUTHORIZED') return provider.tokens()?.access_token || '';
       const code = await new Promise<string>((resolve, reject) => {
         let settled = false;
         const cleanup = () => {
           clearTimeout(timeout);
-          signal?.removeEventListener('abort', abort);
+          signal.removeEventListener('abort', abort);
         };
         const finish = (error?: Error, value?: string) => {
           if (settled) return;
@@ -259,11 +297,11 @@ export class McpOAuthManager {
             ),
           remainingTimeout(),
         );
-        if (signal?.aborted) {
+        if (signal.aborted) {
           abort();
           return;
         }
-        signal?.addEventListener('abort', abort, { once: true });
+        signal.addEventListener('abort', abort, { once: true });
         callbackServer.once('request', (request, response) => {
           const url = new URL(request.url || '/', redirectUri);
           const authorizationCode = url.searchParams.get('code');
@@ -273,37 +311,64 @@ export class McpOAuthManager {
           else finish(undefined, authorizationCode);
         });
       });
+      signal.throwIfAborted();
       await withTimeout(
-        auth(provider, { serverUrl, authorizationCode: code, fetchFn: electronFetch }),
+        auth(provider, { serverUrl, authorizationCode: code, fetchFn }),
         Math.min(MCP_OAUTH_REQUEST_TIMEOUT_MS, remainingTimeout()),
         'MCP OAuth token exchange',
         signal,
       );
+      signal.throwIfAborted();
       return provider.tokens()?.access_token || '';
     } finally {
-      callbackServer.close();
+      // The SDK can still unwind after a timeout or cancellation.
+      authorization.abort();
+      await new Promise<void>((resolve, reject) => {
+        callbackServer.close(error => (error ? reject(error) : resolve()));
+        callbackServer.closeAllConnections();
+      });
     }
   }
 
   /**
-   * Refresh an existing OAuth session without opening a browser. Returns null
-   * when the session has no refresh token and therefore needs interactive auth.
+   * Refresh an existing OAuth session without starting interactive authorization.
    */
-  async refreshAccessToken(serverId: string, serverUrl: string): Promise<string | null> {
+  async refreshAccessToken(
+    serverId: string,
+    serverUrl: string,
+    requestSignal?: AbortSignal,
+  ): Promise<string | null> {
+    const refresh = new AbortController();
+    const signal = requestSignal
+      ? AbortSignal.any([requestSignal, refresh.signal])
+      : refresh.signal;
+    signal.throwIfAborted();
     const callbackPort =
-      getStoredOAuthCallbackPort(this.store, this.credentialVault, serverId) ??
+      getStoredOAuthCallbackPort(this.credentialVault, serverId) ??
       getMcpOAuthCallbackPort(serverId);
     const provider = new StoredOAuthProvider(
       this.store,
       this.credentialVault,
       serverId,
       `http://127.0.0.1:${callbackPort}${MCP_OAUTH_CALLBACK_PATH}`,
+      undefined,
+      signal,
     );
-    if (!provider.tokens()?.refresh_token) return null;
-    const result = await auth(provider, { serverUrl, scope: undefined, fetchFn: electronFetch });
-    if (result !== 'AUTHORIZED') {
-      throw new Error('OAuth token refresh requires interactive authorization');
+    if (!provider.tokens()?.refresh_token || !provider.clientInformation()) return null;
+    try {
+      const result = await withTimeout(
+        auth(provider, { serverUrl, scope: undefined, fetchFn: oauthFetchWithSignal(signal) }),
+        MCP_OAUTH_REQUEST_TIMEOUT_MS,
+        'MCP OAuth refresh',
+        signal,
+      );
+      signal.throwIfAborted();
+      return result === 'AUTHORIZED' ? provider.tokens()?.access_token || null : null;
+    } catch (error) {
+      if (error instanceof SilentRefreshStopped) return null;
+      throw error;
+    } finally {
+      refresh.abort();
     }
-    return provider.tokens()?.access_token || null;
   }
 }

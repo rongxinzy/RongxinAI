@@ -3,17 +3,14 @@ import { chmodSync, existsSync, mkdirSync, statSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import { coworkLog } from '../coworkLogger';
+import { NpmCli } from '../npmRuntime';
 
-export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string): string | null {
+export function ensureElectronNodeShim(
+  npmCliPaths: Readonly<Record<NpmCli, string | null>>,
+): string | null {
   try {
     const shimDir = join(app.getPath('userData'), 'cowork', 'bin');
     mkdirSync(shimDir, { recursive: true });
-    coworkLog(
-      'INFO',
-      'resolveNodeShim',
-      `Shim directory: ${shimDir}, electronPath: ${electronPath}, npmBinDir: ${npmBinDir || '(none)'}`,
-    );
-
     // --- node shim ---
     // Shell script (macOS/Linux/Windows git-bash)
     const nodeSh = join(shimDir, 'node');
@@ -52,97 +49,36 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
       coworkLog('INFO', 'resolveNodeShim', `Created node.cmd shim: ${nodeCmd}`);
     }
 
-    // --- npx / npm shims ---
-    // Create shims that invoke npx-cli.js / npm-cli.js from the bundled npm
-    // package via the node shim above. This avoids relying on symlinks in
-    // node_modules/.bin which do not work on Windows cross-platform builds.
-    if (npmBinDir && existsSync(npmBinDir)) {
-      const npxCliJs = join(npmBinDir, 'npx-cli.js');
-      const npmCliJs = join(npmBinDir, 'npm-cli.js');
+    // Resolve package paths once, before writing either shell wrapper.
+    for (const cli of Object.values(NpmCli)) {
+      const cliPath = npmCliPaths[cli];
+      if (!cliPath) continue;
 
-      // Convert to POSIX path for bash scripts on Windows (git-bash)
-      const npxCliJsPosix = npxCliJs.replace(/\\/g, '/');
-      const npmCliJsPosix = npmCliJs.replace(/\\/g, '/');
-
-      coworkLog(
-        'INFO',
-        'resolveNodeShim',
-        `npmBinDir exists: true, npx-cli.js exists: ${existsSync(npxCliJs)}, npm-cli.js exists: ${existsSync(npmCliJs)}`,
-      );
-
-      if (existsSync(npxCliJs)) {
-        // npx bash shim
-        const npxSh = join(shimDir, 'npx');
-        const npxShContent = [
+      const windows = process.platform === 'win32';
+      const shellPath = windows ? cliPath.replace(/\\/g, '/') : cliPath;
+      const shim = join(shimDir, cli);
+      writeFileSync(
+        shim,
+        [
           '#!/usr/bin/env bash',
           'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-          `exec "$SCRIPT_DIR/node" "${npxCliJsPosix}" "$@"`,
+          `exec "$SCRIPT_DIR/node" '${shellPath.replace(/'/g, "'\\''")}' "$@"`,
           '',
-        ].join('\n');
-        writeFileSync(npxSh, npxShContent, 'utf8');
-        try {
-          chmodSync(npxSh, 0o755);
-        } catch {
-          /* ignore */
-        }
-        coworkLog('INFO', 'resolveNodeShim', `Created npx bash shim: ${npxSh} -> ${npxCliJsPosix}`);
-
-        // npx.cmd for Windows — hardcode the absolute npmBinDir path so the
-        // shim works without ZHIYUAN_NPM_BIN_DIR env var (e.g. dev mode).
-        if (process.platform === 'win32') {
-          const npxCmd = join(shimDir, 'npx.cmd');
-          // normalise backslashes; cmd.exe accepts forward slashes for paths
-          const npxCliJsArg = npxCliJs.replace(/\\/g, '/');
-          const npxCmdContent = ['@echo off', `"%~dp0node.cmd" "${npxCliJsArg}" %*`, ''].join(
-            '\r\n',
-          );
-          writeFileSync(npxCmd, npxCmdContent, 'utf8');
-          coworkLog('INFO', 'resolveNodeShim', `Created npx.cmd shim: ${npxCmd} -> ${npxCliJsArg}`);
-        }
-      } else {
-        coworkLog('WARN', 'resolveNodeShim', `npx-cli.js not found at: ${npxCliJs}`);
-      }
-
-      if (existsSync(npmCliJs)) {
-        // npm bash shim
-        const npmSh = join(shimDir, 'npm');
-        const npmShContent = [
-          '#!/usr/bin/env bash',
-          'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-          `exec "$SCRIPT_DIR/node" "${npmCliJsPosix}" "$@"`,
-          '',
-        ].join('\n');
-        writeFileSync(npmSh, npmShContent, 'utf8');
-        try {
-          chmodSync(npmSh, 0o755);
-        } catch {
-          /* ignore */
-        }
-        coworkLog('INFO', 'resolveNodeShim', `Created npm bash shim: ${npmSh} -> ${npmCliJsPosix}`);
-
-        // npm.cmd for Windows — hardcode the absolute npmBinDir path so the
-        // shim works without ZHIYUAN_NPM_BIN_DIR env var (e.g. dev mode).
-        if (process.platform === 'win32') {
-          const npmCmd = join(shimDir, 'npm.cmd');
-          // normalise backslashes; cmd.exe accepts forward slashes for paths
-          const npmCliJsArg = npmCliJs.replace(/\\/g, '/');
-          const npmCmdContent = ['@echo off', `"%~dp0node.cmd" "${npmCliJsArg}" %*`, ''].join(
-            '\r\n',
-          );
-          writeFileSync(npmCmd, npmCmdContent, 'utf8');
-          coworkLog('INFO', 'resolveNodeShim', `Created npm.cmd shim: ${npmCmd} -> ${npmCliJsArg}`);
-        }
-      } else {
-        coworkLog('WARN', 'resolveNodeShim', `npm-cli.js not found at: ${npmCliJs}`);
-      }
-
-      coworkLog('INFO', 'resolveNodeShim', `Created npx/npm shims pointing to: ${npmBinDir}`);
-    } else {
-      coworkLog(
-        'WARN',
-        'resolveNodeShim',
-        `npmBinDir not available: ${npmBinDir || '(not provided)'}, exists: ${npmBinDir ? existsSync(npmBinDir) : 'N/A'}`,
+        ].join('\n'),
+        'utf8',
       );
+      try {
+        chmodSync(shim, 0o755);
+      } catch {
+        // Some file systems do not support POSIX modes.
+      }
+      if (windows) {
+        writeFileSync(
+          join(shimDir, `${cli}.cmd`),
+          ['@echo off', `"%~dp0node.cmd" "${shellPath.replace(/%/g, '%%')}" %*`, ''].join('\r\n'),
+          'utf8',
+        );
+      }
     }
 
     // Verify shim files exist and are executable

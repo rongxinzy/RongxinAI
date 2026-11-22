@@ -15,7 +15,7 @@ import { createIpcInvokers } from './createIpcInvokers';
 
 // Cowork sessions, workbench tasks, and todos. Invoke methods come from the
 // contract channel maps via createIpcInvokers; push subscriptions
-// (onStream* / onSessionsChanged / onChanged) stay hand-wired below.
+// stay hand-wired below.
 export const coworkApi = {
   cowork: {
     ...createIpcInvokers(coworkContractChannels),
@@ -23,23 +23,9 @@ export const coworkApi = {
       onPush(CoworkStreamIpc.RunState, callback),
     onStreamUiEvent: (callback: (event: PiUiEvent) => void) =>
       onPush(CoworkStreamIpc.UiEvent, callback),
-    onSessionsChanged: (
-      callback: (data: {
-        sessionId?: string;
-        deletedSessionIds?: string[];
-        agentId?: string;
-      }) => void,
-    ) => onPush(CoworkStreamIpc.SessionsChanged, callback),
   } as IpcContractApi<typeof coworkContract> & {
     onStreamRunState: (callback: (snapshot: CoworkRunSnapshot) => void) => () => void;
     onStreamUiEvent: (callback: (event: PiUiEvent) => void) => () => void;
-    onSessionsChanged: (
-      callback: (data: {
-        sessionId?: string;
-        deletedSessionIds?: string[];
-        agentId?: string;
-      }) => void,
-    ) => () => void;
   },
 
   workbenchTask: {

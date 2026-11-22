@@ -158,15 +158,6 @@ export const mcpContract = defineIpcContract({
       error: z.string().optional(),
     }),
   },
-  refreshBridge: {
-    channel: McpIpc.RefreshBridge,
-    args: z.tuple([]),
-    result: z.object({
-      success: z.boolean(),
-      tools: z.number(),
-      error: z.string().optional(),
-    }),
-  },
   authorize: {
     channel: McpIpc.Authorize,
     args: z.tuple([McpServerFormSchema.extend({ authorizationRequestId: z.string().optional() })]),

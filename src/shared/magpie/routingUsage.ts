@@ -34,9 +34,14 @@ export interface MagpieRoutingGroup {
   id: string;
   name: string;
   members: string[];
+  /** The gateway's member list was missing or could only be projected in part. */
+  membersIncomplete?: true;
   /** Upstream pattern-hit rows; read-only in the UI. */
   matched?: string[];
   routing?: string;
+  /** Upstream-selected member of a manually routed group. */
+  picked?: string;
+  disabled?: boolean;
   affinity?: string;
   off?: string[];
   ready: boolean;

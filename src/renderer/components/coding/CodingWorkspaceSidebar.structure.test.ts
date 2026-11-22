@@ -33,7 +33,7 @@ test('does not fall back to the static lucide plus icon', () => {
 });
 
 test('opens agent management before the add workspace action in the sidebar header', () => {
-  expect(source).toContain('new CustomEvent(CodingUiEvent.ManageAgents)');
+  expect(source).toContain('onClick={onManageAgents}');
   expect(source).toContain('<Settings2 />');
   expect(source.indexOf("i18nService.t('codingAgentManageAgents')")).toBeLessThan(
     source.indexOf("i18nService.t('codingWorkspaceAdd')"),

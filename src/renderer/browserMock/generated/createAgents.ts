@@ -80,7 +80,10 @@ export function createAgents(runtime: BrowserMockRuntime): Window['electron']['a
     delete: async _p0 => {
       void _p0;
       runtime.warnOnce('agents.delete');
-      return false;
+      return {
+        success: true,
+        deletedSessionIds: [],
+      };
     },
     importExpertPackage: async _p0 => {
       void _p0;

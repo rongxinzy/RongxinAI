@@ -3,7 +3,7 @@ import type { MagpieModel, MagpieStatus } from '../../shared/magpie/types';
 import { CompanionCapability, CompanionUnavailableReason } from '../../shared/companion/constants';
 import { MagpieModelService } from '../magpie/modelService';
 import { projectMagpieCatalog } from '../magpie/catalog';
-import { CompanionModelAssignment } from './modelAssignment.mjs';
+import { CompanionModelAssignment } from './modelAssignment';
 
 function fixture() {
   let status: MagpieStatus = {
@@ -53,11 +53,11 @@ function fixture() {
 
 test('uses the global default when available and auto assigns without rewriting it', async () => {
   const f = fixture();
-  expect((await f.assignment.resolve('pet')).availability.modelId).toBe('a');
+  expect((await f.assignment.resolve()).modelId).toBe('a');
   f.setDefault('b');
-  expect((await f.assignment.resolve('pet')).availability.modelId).toBe('b');
+  expect((await f.assignment.resolve()).modelId).toBe('b');
   f.setDefault('removed');
-  expect((await f.assignment.resolve('pet')).availability.modelId).toBe('a');
+  expect((await f.assignment.resolve()).modelId).toBe('a');
   expect(f.write).not.toHaveBeenCalled();
 });
 
@@ -65,9 +65,7 @@ test('does not start or discover accounts for a service without existing consent
   const f = fixture();
   for (const enabled of [undefined, false]) {
     f.setStatus({ state: 'stopped', version: 'test', enabled });
-    expect((await f.assignment.resolve('pet')).availability.capability).toBe(
-      CompanionCapability.Local,
-    );
+    expect((await f.assignment.resolve()).capability).toBe(CompanionCapability.Local);
   }
   expect(f.start).not.toHaveBeenCalled();
   expect(f.beforeCatalog).not.toHaveBeenCalled();
@@ -76,9 +74,7 @@ test('does not start or discover accounts for a service without existing consent
 test('an explicit companion request can start a previously enabled service', async () => {
   const f = fixture();
   f.setStatus({ state: 'stopped', version: 'test', enabled: true });
-  expect((await f.assignment.resolve('pet')).availability.capability).toBe(
-    CompanionCapability.Chat,
-  );
+  expect((await f.assignment.resolve()).capability).toBe(CompanionCapability.Chat);
   expect(f.start).toHaveBeenCalledTimes(1);
 });
 
@@ -86,13 +82,11 @@ test('failed gateway startup degrades to local capability and a later request ca
   const f = fixture();
   f.setStatus({ state: 'failed', version: 'test', enabled: true });
   f.start.mockRejectedValueOnce(new Error('Fixture gateway startup failed'));
-  expect((await f.assignment.resolve('pet')).availability).toMatchObject({
+  expect(await f.assignment.resolve()).toMatchObject({
     capability: CompanionCapability.Local,
     reason: CompanionUnavailableReason.ServiceUnavailable,
   });
-  expect((await f.assignment.resolve('pet')).availability.capability).toBe(
-    CompanionCapability.Chat,
-  );
+  expect((await f.assignment.resolve()).capability).toBe(CompanionCapability.Chat);
 });
 
 test('stops assigning when service consent is revoked before its process has exited', async () => {
@@ -103,9 +97,7 @@ test('stops assigning when service consent is revoked before its process has exi
     version: 'test',
     enabled: false,
   });
-  expect((await f.assignment.resolve('pet')).availability.capability).toBe(
-    CompanionCapability.Local,
-  );
+  expect((await f.assignment.resolve()).capability).toBe(CompanionCapability.Local);
   expect(f.beforeCatalog).not.toHaveBeenCalled();
 });
 
@@ -117,32 +109,28 @@ test('policy restrictions and non-chat modalities apply to automatic assignment'
     { id: 'image', modalities: { input: ['text'], output: ['image'] } },
     { id: 'embedding', native_endpoints: ['/v1/embeddings'] },
   ]);
-  expect((await f.assignment.resolve('pet')).availability.reason).toBe(
-    CompanionUnavailableReason.NoModel,
-  );
+  expect((await f.assignment.resolve()).reason).toBe(CompanionUnavailableReason.NoModel);
 });
 
 test('failed models cool down with bounded fallback, and can recover after expiry', async () => {
   const f = fixture();
   f.setDefault('b');
   f.assignment.failed('b');
-  expect((await f.assignment.resolve('pet')).availability.modelId).toBe('a');
+  expect((await f.assignment.resolve()).modelId).toBe('a');
   f.assignment.failed('a');
-  expect((await f.assignment.resolve('pet')).availability.reason).toBe(
-    CompanionUnavailableReason.ModelFailed,
-  );
+  expect((await f.assignment.resolve()).reason).toBe(CompanionUnavailableReason.ModelFailed);
   f.advance();
-  expect((await f.assignment.resolve('pet')).availability.modelId).toBe('b');
+  expect((await f.assignment.resolve()).modelId).toBe('b');
 });
 
 test('does not infer tools from catalog presence; visual support requires a declared modality', async () => {
   const f = fixture();
-  expect((await f.assignment.resolve('pet')).availability).toMatchObject({
+  expect(await f.assignment.resolve()).toMatchObject({
     toolUse: false,
     imageInput: false,
   });
   f.setModels([{ id: 'vision', modalities: { input: ['text', 'image'], output: ['text'] } }]);
-  expect((await f.assignment.resolve('pet')).availability).toMatchObject({
+  expect(await f.assignment.resolve()).toMatchObject({
     toolUse: false,
     imageInput: true,
   });
@@ -157,49 +145,25 @@ test('image requests automatically choose a permitted visual model without chang
     { id: 'vision', modalities: { input: ['text', 'image'], output: ['text'] } },
     { id: 'unknown', modalities: { input: [], output: [] } },
   ]);
-  expect((await f.assignment.resolve('pet', true)).availability).toMatchObject({
+  expect(await f.assignment.resolve(true)).toMatchObject({
     modelId: 'vision',
     imageInput: true,
   });
-  expect((await f.assignment.resolve('pet')).availability.modelId).toBe('text');
+  expect((await f.assignment.resolve()).modelId).toBe('text');
   expect(f.write).not.toHaveBeenCalled();
   f.assignment.failed('vision');
-  expect((await f.assignment.resolve('pet', true)).availability.capability).toBe(
-    CompanionCapability.Local,
-  );
+  expect((await f.assignment.resolve(true)).capability).toBe(CompanionCapability.Local);
   f.advance();
-  expect((await f.assignment.resolve('pet', true)).availability.modelId).toBe('vision');
+  expect((await f.assignment.resolve(true)).modelId).toBe('vision');
 });
 
 test('vision selection never enables a disabled service or accepts unknown image capabilities', async () => {
   const f = fixture();
-  expect((await f.assignment.resolve('pet', true)).availability.capability).toBe(
-    CompanionCapability.Local,
-  );
+  expect((await f.assignment.resolve(true)).capability).toBe(CompanionCapability.Local);
   f.setModels([{ id: 'vision', modalities: { input: ['text', 'image'], output: ['text'] } }]);
   f.setStatus({ state: 'stopped', enabled: false, version: 'test' });
-  expect((await f.assignment.resolve('pet', true)).availability.capability).toBe(
-    CompanionCapability.Local,
-  );
+  expect((await f.assignment.resolve(true)).capability).toBe(CompanionCapability.Local);
   expect(f.start).not.toHaveBeenCalled();
-});
-
-test('explicit tool rejection preserves text assignment and expires without changing defaults', async () => {
-  const f = fixture();
-  f.assignment.observeTools('a', false);
-  expect(f.assignment.permitsTools('a')).toBe(false);
-  expect((await f.assignment.resolve('pet')).availability).toMatchObject({
-    modelId: 'a',
-    toolUse: false,
-    capability: CompanionCapability.Chat,
-  });
-  f.advance();
-  expect(f.assignment.permitsTools('a')).toBe(true);
-  f.assignment.observeTools('a', true);
-  expect((await f.assignment.resolve('pet')).availability.toolUse).toBe(true);
-  f.setDefault('b');
-  expect((await f.assignment.resolve('pet')).availability.toolUse).toBe(false);
-  expect(f.write).not.toHaveBeenCalled();
 });
 
 test('gateway metadata with unknown modalities permits a text attempt without asserting other capabilities', async () => {
@@ -209,7 +173,7 @@ test('gateway metadata with unknown modalities permits a text attempt without as
       data: [{ id: 'fixture/model', native_endpoints: ['/v1/chat/completions'] }],
     }),
   );
-  expect((await f.assignment.resolve('pet')).availability).toMatchObject({
+  expect(await f.assignment.resolve()).toMatchObject({
     capability: CompanionCapability.Chat,
     modelId: 'fixture/model',
     imageInput: false,
@@ -218,11 +182,7 @@ test('gateway metadata with unknown modalities permits a text attempt without as
   f.setModels(
     projectMagpieCatalog({ data: [{ id: 'embedding', native_endpoints: ['/v1/embeddings'] }] }),
   );
-  expect((await f.assignment.resolve('pet')).availability.capability).toBe(
-    CompanionCapability.Local,
-  );
+  expect((await f.assignment.resolve()).capability).toBe(CompanionCapability.Local);
   f.setModels([{ id: 'image-input', modalities: { input: ['image'], output: [] } }]);
-  expect((await f.assignment.resolve('pet')).availability.capability).toBe(
-    CompanionCapability.Local,
-  );
+  expect((await f.assignment.resolve()).capability).toBe(CompanionCapability.Local);
 });

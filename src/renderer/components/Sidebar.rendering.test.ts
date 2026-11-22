@@ -85,7 +85,6 @@ vi.mock('./agentSidebar/AgentTaskRow', () => ({
         }),
       ),
       createElement('button', { onClick: props.onSelect }, 'chat select'),
-      createElement('button', { onClick: props.onShare }, 'chat share'),
       createElement('button', { onClick: props.onEnterBatchMode }, 'chat batch'),
     );
   },
@@ -146,6 +145,8 @@ const session: CoworkSessionSummary = {
 };
 const props = (): ComponentProps<typeof Sidebar> => ({
   activeView: 'cowork',
+  searchOpen: false,
+  onSearchOpenChange: vi.fn(),
   isCollapsed: false,
   hideLogin: true,
   onShowSettings: vi.fn(),
@@ -162,6 +163,8 @@ const props = (): ComponentProps<typeof Sidebar> => ({
   onToggleCollapse: vi.fn(),
   codingSelection: { workspaceId: null, workspaceRoot: '', laneId: null, draft: null },
   onCodingSelectionChange: vi.fn(),
+  onCreateCodingSession: vi.fn(),
+  onOpenCodingAgentManager: vi.fn(),
 });
 
 async function mountSidebar() {
@@ -289,18 +292,16 @@ test('memoized chat tasks still react to selection, titles, streams, unread and 
   expect(screen.getByTestId('chat-one')).toHaveTextContent('"selected":true');
 });
 
-test('chat share still selects the session before scheduling share options', async () => {
-  await mountSidebar();
+test('selecting a chat history row opens and loads that conversation', async () => {
+  const { handlers } = await mountSidebar();
   fireEvent.click(screen.getByRole('button', { name: 'switch mode' }));
-  const listener = vi.fn();
-  window.addEventListener('cowork:open-share-options', listener);
+  vi.mocked(handlers.onShowCowork).mockClear();
 
-  fireEvent.click(screen.getAllByRole('button', { name: 'chat share' })[0]);
+  const row = await screen.findByTestId('chat-one');
+  fireEvent.click(within(row).getByRole('button', { name: 'chat select' }));
 
-  await waitFor(() => expect(listener).toHaveBeenCalledOnce());
-  expect(mocks.loadSession).toHaveBeenCalledWith('chat-one');
-  expect(listener.mock.calls[0][0].detail).toEqual({ sessionId: 'chat-one' });
-  window.removeEventListener('cowork:open-share-options', listener);
+  await waitFor(() => expect(mocks.loadSession).toHaveBeenCalledExactlyOnceWith('chat-one'));
+  expect(handlers.onShowCowork).toHaveBeenCalledOnce();
 });
 
 test('memoized history still reacts to selection, streaming, unread, titles and language', async () => {

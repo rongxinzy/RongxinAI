@@ -1,4 +1,4 @@
-import { CcConnectSchedulerRuntime } from './ccConnectSchedulerRuntime';
+import type { SchedulerRuntime } from './schedulerRuntime';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 import type { ScheduledTaskService } from './scheduledTaskService';
 import type {
@@ -10,12 +10,20 @@ import type {
   RunFilter,
 } from './types';
 
-/** SQLite-backed user-facing service. cc-connect remains only a trigger projection. */
+/** SQLite-backed scheduled tasks and their local clock projections. */
 export class CanonicalScheduledTaskService implements ScheduledTaskService {
   constructor(
     private readonly store: SqliteScheduledTaskStore,
-    private readonly runtime: CcConnectSchedulerRuntime,
+    private readonly runtime: SchedulerRuntime,
   ) {}
+
+  armSavedSchedules(): Promise<void> {
+    return this.runtime.reconcile(this.store.list());
+  }
+
+  stop(): Promise<void> {
+    return this.runtime.stop();
+  }
 
   async addJob(input: ScheduledTaskInput): Promise<ScheduledTask> {
     const task = this.store.create(input);
@@ -53,53 +61,24 @@ export class CanonicalScheduledTaskService implements ScheduledTaskService {
     offset = 0,
     filter?: RunFilter,
   ): Promise<ScheduledTaskRun[]> {
-    return filterRuns(this.store.listRuns(taskId), filter).slice(offset, offset + limit);
+    return this.store.listRuns(taskId, limit, offset, filter);
   }
   async listDeliveries(runId: string): Promise<ScheduledTaskDeliveryRecord[]> {
     return this.store.listDeliveries(runId);
-  }
-  async countRuns(taskId: string): Promise<number> {
-    return this.store.listRuns(taskId).length;
   }
   async listAllRuns(
     limit = 20,
     offset = 0,
     filter?: RunFilter,
   ): Promise<ScheduledTaskRunWithName[]> {
-    return filterRuns(this.store.listRunsWithName(), filter).slice(offset, offset + limit);
-  }
-  getJobNameSync(jobId: string): string | null {
-    return this.store.get(jobId)?.name ?? null;
-  }
-  hasRunningJobs(): boolean {
-    return this.store.list().some(task => task.state.runningAtMs !== null);
+    return this.store.listRunsWithName(limit, offset, filter);
   }
 
   private async projectBestEffort(task: ScheduledTask): Promise<void> {
     try {
       await this.runtime.register(task);
     } catch (error) {
-      console.warn(
-        `[Scheduler] canonical task ${task.id} is waiting for sidecar reconciliation:`,
-        error,
-      );
+      console.warn(`[Scheduler] failed to project local schedule for task ${task.id}:`, error);
     }
   }
-}
-
-function filterRuns<T extends ScheduledTaskRun>(runs: readonly T[], filter?: RunFilter): T[] {
-  // Run timestamps are stored in UTC but rendered in local time, so the
-  // calendar-day bounds must be local days too: `2026-09-14` means local
-  // midnight through local 23:59:59.999, not the UTC day.
-  const startMs = filter?.startDate ? Date.parse(`${filter.startDate}T00:00:00`) : NaN;
-  const endMs = filter?.endDate ? Date.parse(`${filter.endDate}T23:59:59.999`) : NaN;
-  return runs.filter(run => {
-    if (filter?.status && run.status !== filter.status) return false;
-    if (!Number.isFinite(startMs) && !Number.isFinite(endMs)) return true;
-    const startedMs = Date.parse(run.startedAt);
-    if (!Number.isFinite(startedMs)) return false;
-    if (Number.isFinite(startMs) && startedMs < startMs) return false;
-    if (Number.isFinite(endMs) && startedMs > endMs) return false;
-    return true;
-  });
 }

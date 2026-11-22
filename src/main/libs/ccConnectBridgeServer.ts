@@ -59,6 +59,7 @@ export interface CcConnectBridgeHandlers {
 export class CcConnectBridgeServer {
   private server: http.Server | null = null;
   private readonly authenticator: CcConnectRequestAuthenticator;
+  private readonly activeTurns = new Map<Promise<CcConnectTurnResponse>, AbortController>();
 
   constructor(
     private readonly token: string,
@@ -70,27 +71,44 @@ export class CcConnectBridgeServer {
 
   async start(): Promise<string> {
     if (this.server) throw new Error('cc-connect bridge already started');
-    this.server = http.createServer((request, response) => void this.handle(request, response));
-    await new Promise<void>((resolve, reject) => {
-      this.server?.once('error', reject);
-      this.server?.listen(0, '127.0.0.1', () => resolve());
-    });
-    const address = this.server.address();
-    if (!address || typeof address === 'string')
-      throw new Error('cc-connect bridge has no TCP address');
-    return `http://127.0.0.1:${address.port}`;
+    const server = http.createServer((request, response) => void this.handle(request, response));
+    this.server = server;
+    try {
+      const listening = Promise.withResolvers<void>();
+      const onClose = () => listening.reject(new Error('cc-connect bridge stopped during startup'));
+      server.once('close', onClose);
+      server.once('error', listening.reject);
+      try {
+        server.listen(0, '127.0.0.1', listening.resolve);
+        await listening.promise;
+      } finally {
+        server.off('close', onClose);
+        server.off('error', listening.reject);
+      }
+      const address = server.address();
+      if (!address || typeof address === 'string')
+        throw new Error('cc-connect bridge has no TCP address');
+      return `http://127.0.0.1:${address.port}`;
+    } catch (error) {
+      if (this.server === server) this.server = null;
+      throw error;
+    }
   }
 
   async stop(): Promise<void> {
     const server = this.server;
     this.server = null;
     if (!server) return;
+    for (const turn of this.activeTurns.values()) turn.abort();
     // Idle keep-alive sockets are not closed by server.close(), which used to
     // hold app quit until the socket timeout expired. Drop them immediately and
     // force-close whatever is still in flight, then wait for the server.
     server.closeIdleConnections();
     const closed = new Promise<void>((resolve, reject) => {
-      server.close(error => (error ? reject(error) : resolve()));
+      server.close((error: NodeJS.ErrnoException | undefined) => {
+        if (error && error.code !== 'ERR_SERVER_NOT_RUNNING') reject(error);
+        else resolve();
+      });
     });
     const forceCloseTimer = setTimeout(() => server.closeAllConnections(), 250);
     forceCloseTimer.unref?.();
@@ -98,6 +116,7 @@ export class CcConnectBridgeServer {
       await closed;
     } finally {
       clearTimeout(forceCloseTimer);
+      await Promise.allSettled(this.activeTurns.keys());
     }
   }
 
@@ -109,6 +128,7 @@ export class CcConnectBridgeServer {
       if (!this.authenticator.authorize(request)) return void response.writeHead(401).end();
       if (request.method !== 'POST') return void response.writeHead(404).end();
       const body = await readJson(request);
+      if (!this.server) return void response.writeHead(503).end();
       if (request.url === '/v1/cc-connect/turn') {
         const turnRequest = normalizeMediaFields(body);
         if (!isTurnRequest(turnRequest))
@@ -117,10 +137,13 @@ export class CcConnectBridgeServer {
         const abortTurn = () => abortController.abort();
         request.once('aborted', abortTurn);
         response.once('close', abortTurn);
+        const turn = this.handlers.onTurn(turnRequest, abortController.signal);
+        this.activeTurns.set(turn, abortController);
         let result: CcConnectTurnResponse;
         try {
-          result = await this.handlers.onTurn(turnRequest, abortController.signal);
+          result = await turn;
         } finally {
+          this.activeTurns.delete(turn);
           request.off('aborted', abortTurn);
           response.off('close', abortTurn);
         }

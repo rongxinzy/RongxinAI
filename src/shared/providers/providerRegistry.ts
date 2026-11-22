@@ -254,7 +254,7 @@ class ProviderRegistryImpl {
   /**
    * Provider IDs for English locale display:
    * EN_PRIORITY providers first (sorted by enPriority), then CHINA, then remaining GLOBAL.
-   * local providers are always pushed to the end, with Ollama last.
+   * The built-in local provider appears last.
    */
   idsForEnLocale(): readonly string[] {
     const priority = this.defs
@@ -265,18 +265,9 @@ class ProviderRegistryImpl {
     const global = this.idsByRegion('global');
 
     const orderedProviders = [...priority, ...china, ...global];
-    const unique = [...new Set(orderedProviders)];
-
-    // Move local providers to the end.
-    for (const localProvider of [ProviderName.LlamaCpp, ProviderName.Ollama]) {
-      const idx = unique.indexOf(localProvider);
-      if (idx !== -1) {
-        unique.splice(idx, 1);
-      }
-    }
-    unique.push(ProviderName.LlamaCpp);
-    unique.push(ProviderName.Ollama);
-    return unique;
+    const unique = new Set(orderedProviders);
+    if (unique.delete(ProviderName.LlamaCpp)) unique.add(ProviderName.LlamaCpp);
+    return [...unique];
   }
 }
 

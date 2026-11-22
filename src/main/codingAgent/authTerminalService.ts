@@ -14,7 +14,7 @@ export interface AuthTerminalStartedEvent {
   workspaceRoot: string;
 }
 
-interface AuthTerminalExitedEvent extends AuthTerminalStartedEvent {
+export interface AuthTerminalExitedEvent extends AuthTerminalStartedEvent {
   exitCode: number;
   signal?: number;
 }
@@ -84,8 +84,15 @@ export class AuthTerminalService extends EventEmitter {
   }
 
   dispose(): void {
-    for (const terminal of this.terminals.values()) terminal.terminal.kill();
+    const terminals = [...this.terminals.values()];
     this.terminals.clear();
+    for (const { id, terminal } of terminals) {
+      try {
+        terminal.kill();
+      } catch (error) {
+        console.warn(`[CodingRoom] Failed to stop authentication terminal ${id}:`, error);
+      }
+    }
   }
 
   private require(id: string): ActiveTerminal {

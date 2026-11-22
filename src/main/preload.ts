@@ -4,6 +4,7 @@ import { appSystemApi } from './preload/appSystem';
 import { artifactsApi } from './preload/artifacts';
 import { automationApi } from './preload/automation';
 import { codingAgentApi } from './preload/codingAgent';
+import { companionNavigationApi } from './preload/companion';
 import { coworkApi } from './preload/cowork';
 import { imApi } from './preload/im';
 import { localInferenceApi } from './preload/localInference';
@@ -23,6 +24,7 @@ contextBridge.exposeInMainWorld('electron', {
   ...providersApi,
   ...coworkApi,
   ...codingAgentApi,
+  ...companionNavigationApi,
   ...imApi,
   ...memoryApi,
   ...automationApi,

@@ -30,13 +30,12 @@ test('a reused summary tool reads the current run and turn for content and metri
     getConversationHistoryService: () => null,
     getScheduledTaskService: () => null,
     getStore: () => null,
-    getPiAgentsDir: () => '/tmp',
     emit: vi.fn(),
   };
   const recordActivation = (_event: HarnessActivationEvent) => {
     activationRuns.push(active.workbenchRunId);
   };
-  const { customTools } = buildPiSessionCustomTools(host as never, {
+  const { customTools } = await buildPiSessionCustomTools(host as never, {
     pi: {} as never,
     sessionId: 'session-1',
     options: { sessionMode: CoworkSessionMode.Work },
@@ -102,7 +101,6 @@ test('subagent custom tool bubbles child events to host toolActivityTracker and 
     getConversationHistoryService: () => null,
     getScheduledTaskService: () => null,
     getStore: () => null,
-    getPiAgentsDir: () => '/tmp',
     emit: vi.fn((event: string, sid: string, payload: unknown) => {
       if (event === 'toolActivity') {
         emittedActivities.push({ sid, payload });
@@ -115,7 +113,7 @@ test('subagent custom tool bubbles child events to host toolActivityTracker and 
     .spyOn(resourceLoaderModule, 'createPiRuntimeResourceLoader')
     .mockReturnValue({} as never);
 
-  const { customTools } = buildPiSessionCustomTools(host as never, {
+  const { customTools } = await buildPiSessionCustomTools(host as never, {
     pi: {} as never,
     sessionId: 'session-1',
     options: { sessionMode: CoworkSessionMode.Work },
@@ -128,7 +126,7 @@ test('subagent custom tool bubbles child events to host toolActivityTracker and 
     } as never,
     resolvedModel: {
       model: { provider: 'test', id: 'test-model' },
-      modelRuntime: null,
+      modelRuntime: { registerNativeProvider: vi.fn(), completeSimple: vi.fn() },
       maxOutputTokens: 4096,
     } as never,
     workspaceRoot: '/work',
@@ -202,10 +200,10 @@ test('subagent custom tool bubbles child events to host toolActivityTracker and 
     '/work',
     expect.objectContaining({
       nativeToolsOnly: true,
+      skillIds: [],
     }),
     expect.objectContaining({
       isSubagent: true,
     }),
-    undefined,
   );
 });

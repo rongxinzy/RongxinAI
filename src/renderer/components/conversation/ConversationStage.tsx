@@ -17,7 +17,7 @@ import {
   selectLoadingSessionId,
 } from '../../store/selectors/coworkSelectors';
 import { selectWorkMode } from '../../store/selectors/workModeSelectors';
-import { clearCurrentSession } from '../../store/slices/coworkSlice';
+import { clearCurrentSession, requestPromptFocus } from '../../store/slices/coworkSlice';
 import {
   ArtifactLayoutMode,
   selectIsSessionArtifactPanelOpen,
@@ -38,6 +38,7 @@ import SecurityStatusIndicator from '../cowork/SecurityStatusIndicator';
 import { useAgentSelectedModel } from '../cowork/agentModelSelection';
 import { CoworkRunStatus } from '../cowork/components/CoworkRunStatus';
 import { useCoworkSessionActions } from '../cowork/hooks/useCoworkSessionActions';
+import { PromptDraftKey } from '../cowork/promptInput/constants';
 import type { CoworkPromptInputProps, CoworkPromptInputRef } from '../cowork/promptInput/types';
 import { useUnmanagedWorkingDirectory } from '../cowork/useUnmanagedWorkingDirectory';
 import { PromptPanel, QuickActionBar } from '../quick-actions';
@@ -237,9 +238,7 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
     } else {
       dispatch(clearActiveSkills());
     }
-    window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: false } }));
-    }, 0);
+    dispatch(requestPromptFocus({ draftKey: PromptDraftKey.Home, clear: false }));
   };
 
   useEffect(() => {
@@ -275,20 +274,16 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
 
   useEffect(() => {
     const handleNewSession = () => {
-      const shouldClear = !currentSession;
+      const shouldClear = !displayedSessionId;
       dispatch(clearCurrentSession());
       dispatch(clearSelection());
-      window.dispatchEvent(
-        new CustomEvent('cowork:focus-input', {
-          detail: { clear: shouldClear },
-        }),
-      );
+      dispatch(requestPromptFocus({ draftKey: PromptDraftKey.Home, clear: shouldClear }));
     };
     window.addEventListener('cowork:shortcut:new-session', handleNewSession);
     return () => {
       window.removeEventListener('cowork:shortcut:new-session', handleNewSession);
     };
-  }, [dispatch, currentSession]);
+  }, [dispatch, displayedSessionId]);
 
   useEffect(() => {
     if (!currentSession || !isStreaming) return;

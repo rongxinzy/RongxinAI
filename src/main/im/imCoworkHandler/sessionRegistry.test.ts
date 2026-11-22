@@ -11,6 +11,9 @@ class FakeRuntime {
 }
 
 function createCoworkStore() {
+  const workspaceRows = new Map([
+    ['workspace-1', { id: 'workspace-1', name: 'Workspace 1', path: 'C:\\workspace-1' }],
+  ]);
   return {
     config: {
       workingDirectory: process.cwd(),
@@ -20,16 +23,11 @@ function createCoworkStore() {
     },
     sessions: new Map<string, Record<string, unknown>>(),
     sessionCounter: 0,
-    workspaces: new Map([
-      ['workspace-1', { id: 'workspace-1', name: 'Workspace 1', path: 'C:\\workspace-1' }],
-    ]),
+    workspaces: { getWorkspace: (id: string) => workspaceRows.get(id) || null },
     titleUpdates: [] as Array<{ id: string; updates: Record<string, unknown> }>,
 
     getConfig() {
       return this.config;
-    },
-    getWorkspace(id: string) {
-      return this.workspaces.get(id) || null;
     },
     createSession(title: string, cwd: string) {
       const session = {
@@ -127,13 +125,12 @@ describe('IMCoworkSessionRegistry construction', () => {
     expect(coworkStore.sessions.get(session.id)?.title).toBe('客户沟通');
   });
 
-  test('lazily tracks mappings even when the cowork session is gone', () => {
+  test('reads the persisted mapping even when the cowork session is gone', () => {
     const coworkStore = createCoworkStore();
     const imStore = createIMStore();
     imStore.createSessionMapping('default:user-42', 'qq', 'session-missing');
 
     const { registry } = createRegistry(coworkStore, imStore);
-    expect(registry.ensureTrackedSession('session-missing')).toBe(true);
     expect(registry.getConversation('session-missing')).toEqual({
       conversationId: 'default:user-42',
       platform: 'qq',
@@ -162,13 +159,16 @@ describe('getOrCreateSession', () => {
     const sessionId = await registry.getOrCreateSession('conv-1', 'feishu', false, 'workspace-1');
 
     expect(coworkStore.sessions.get(sessionId)?.title).toBe('飞书会话');
+    expect(registry.getConversation(sessionId)).toEqual({
+      conversationId: 'conv-1',
+      platform: 'feishu',
+    });
     expect(imStore.mappings).toHaveLength(1);
     expect(imStore.mappings[0]).toMatchObject({
       imConversationId: 'conv-1',
       platform: 'feishu',
       coworkSessionId: sessionId,
     });
-    expect(registry.ensureTrackedSession(sessionId)).toBe(true);
   });
 
   test('requires a configured workspace when creating a session', async () => {
@@ -214,20 +214,18 @@ describe('getOrCreateSession', () => {
   });
 });
 
-describe('ensureTrackedSession', () => {
-  test('lazily tracks sessions that exist in the mapping store', async () => {
+describe('persisted conversation routing', () => {
+  test('observes mapping deletion without rebuilding the registry', () => {
     const { registry, coworkStore, imStore } = createRegistry();
     const session = coworkStore.createSession('IM-dingtalk', process.cwd());
     imStore.createSessionMapping('default:user-42', 'dingtalk', session.id);
 
-    expect(registry.ensureTrackedSession(session.id)).toBe(true);
     expect(registry.getConversation(session.id)).toEqual({
       conversationId: 'default:user-42',
       platform: 'dingtalk',
     });
-    expect(registry.ensureTrackedSession(session.id)).toBe(true);
 
-    expect(registry.ensureTrackedSession('session-unknown')).toBe(false);
-    expect(registry.getConversation('session-unknown')).toBeUndefined();
+    imStore.deleteSessionMapping('default:user-42', 'dingtalk');
+    expect(registry.getConversation(session.id)).toBeUndefined();
   });
 });

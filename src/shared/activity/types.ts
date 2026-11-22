@@ -1,6 +1,6 @@
 import type { ActivitySource, ActivityStatus } from './constants';
 
-/** Durable, display-only snapshot of a channel or scheduled-task execution. */
+/** Display record for a channel or scheduled-task execution. */
 export interface ActivityRun {
   id: string;
   source: ActivitySource;
@@ -11,12 +11,6 @@ export interface ActivityRun {
   platform?: string;
   conversationId?: string;
   taskName?: string;
-  inputPreview?: string;
   replyPreview?: string;
   errorMessage?: string;
 }
-
-export type ActivityRunUpdate = Omit<ActivityRun, 'startedAt' | 'updatedAt'> & {
-  startedAt?: number;
-  updatedAt?: number;
-};

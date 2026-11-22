@@ -11,18 +11,16 @@
  *   parallel — {parallel: [{agent, task}, ...]} with a concurrency cap
  *
  * Sub-session constraints:
- *   - no customTools (subagents cannot spawn sub-subagents)
+ *   - researchers may search the web; subagents cannot delegate further
  *   - no AskUserQuestion tool
  *   - cancellation inherited from the parent, aborted on completion
  */
 
-import * as fs from 'fs';
-import path from 'path';
+import type { BundledPresetMember } from '../../presetExpertSnapshot';
 
 import type { AgentToolUpdateCallback, ToolAnnotations } from '@earendil-works/pi-coding-agent';
 
 import { safeSlice } from '../../../shared/lib/safeSlice';
-import { CoreSkillId } from '../../../shared/skills/constants';
 import {
   PiSubagentProfileId,
   PiSubagentTerminationReason,
@@ -34,8 +32,9 @@ import {
   type PiSubagentExecutionMetadata,
   type PiSubagentSession,
 } from './piSubagentExecution';
-import type { PiExtensionFactory } from './piExtensionTypes';
-import type { PiSettingsManager } from './piRuntimeSessionState';
+import { buildPiWebSearchTool } from './piWebSearchTool';
+import { PiWebSearchToolName } from './constants';
+import type { PiResolvedModel, PiSettingsManager } from './piRuntimeSessionState';
 
 // ── Constants ──
 
@@ -48,11 +47,6 @@ export const PiSubagentToolAnnotations: ToolAnnotations = {
 
 /** Maximum number of subagent sessions running at once in parallel mode. */
 export const SUBAGENT_PARALLEL_LIMIT = 4;
-
-/** Separator between presetId and agentId in team member definition filenames. */
-const MEMBER_FILE_SEPARATOR = '--';
-
-/** Placeholder for single and parallel subagent execution. */
 
 /** Maximum characters returned by subagent execution to prevent context overflow (clamped to 30,000 for CJK token safety). */
 export const PI_SUBAGENT_MAX_OUTPUT_CHARS = 30_000;
@@ -81,50 +75,24 @@ interface PiSubagentModules {
   };
 }
 
-interface PiSubagentResolvedModel {
-  model: Record<string, unknown>;
-  /** Opaque model runtime handle, forwarded to sub-session options when set. */
-  modelRuntime: unknown;
-  /** Output token budget of the resolved model. */
-  maxOutputTokens: number;
-}
+type PiSubagentResolvedModel = Pick<PiResolvedModel, 'model' | 'modelRuntime' | 'maxOutputTokens'>;
 
 export interface PiSubagentToolDeps {
-  /** Resolves the pi agents directory (~/.pi/agent/agents) holding team member definitions. */
-  getPiAgentsDir(): string;
-  /** Team preset id; when set, member agents `<presetId>--<agentId>.md` are exposed. */
-  presetId?: string | null;
-  /**
-   * Live bundled member source. When the preset ships inside the app's
-   * bundled SKILLs, member definitions are read from disk per session so
-   * editing a member file takes effect without re-importing; falls back to
-   * the synced pi agents directory when absent or when the preset is a
-   * user-imported package.
-   */
-  loadBundledMembers?: (presetId: string) => SubagentProfile[] | null;
+  memberProfiles?: readonly BundledPresetMember[];
   resolvedModel: PiSubagentResolvedModel;
   getResolvedModel?: () => PiSubagentResolvedModel;
   signal?: AbortSignal;
   workspaceRoot?: string;
-  /** Absolute bundled web-search skill directory for researcher subagents. */
-  webSearchSkillPath?: string;
   /** Builds the per-session Pi resource loader for a subagent system prompt. */
   createPiResourceLoader(
     cwd: string,
     systemPrompt: string,
     maxOutputTokens: number,
-    skillIds?: string[],
-    extensionFactories?: PiExtensionFactory[],
   ): Promise<unknown>;
   onChildToolActivity?: (event: PiSubagentChildToolEvent) => void;
 }
 
-interface SubagentProfile {
-  id: string;
-  description: string;
-  systemPrompt: string;
-  source: 'builtin' | 'member';
-}
+type SubagentProfile = BundledPresetMember;
 
 interface SubagentTaskSpec {
   agent: string;
@@ -144,7 +112,7 @@ interface SubagentToolResult {
 
 // ── Built-in agent profiles ──
 
-const BUILTIN_AGENT_PROFILES: ReadonlyArray<Omit<SubagentProfile, 'source'>> = [
+const BUILTIN_AGENT_PROFILES: ReadonlyArray<SubagentProfile> = [
   {
     id: PiSubagentProfileId.Researcher,
     description: 'Web/docs research with cited sources.',
@@ -210,63 +178,11 @@ function getPiSubagentModules(): Promise<PiSubagentModules> {
 
 // ── Agent profile resolution ──
 
-/**
- * Load team member agent definitions from the pi agents directory.
- * Files are named `<presetId>--<agentId>.md`; YAML frontmatter is stripped and
- * the body becomes the subagent system prompt.
- */
-function loadMemberProfiles(piAgentsDir: string, presetId: string): SubagentProfile[] {
-  const prefix = `${presetId}${MEMBER_FILE_SEPARATOR}`;
-  const profiles: SubagentProfile[] = [];
-  if (!fs.existsSync(piAgentsDir)) {
-    return profiles;
-  }
-  for (const entry of fs.readdirSync(piAgentsDir)) {
-    if (!entry.startsWith(prefix) || !entry.endsWith('.md')) {
-      continue;
-    }
-    const agentId = entry.slice(prefix.length, -3);
-    let systemPrompt = '';
-    let description = `Team member ${agentId}`;
-    try {
-      const content = fs.readFileSync(path.join(piAgentsDir, entry), 'utf-8');
-      const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-      systemPrompt = (frontmatterMatch ? frontmatterMatch[2] : content).trim();
-      const descriptionMatch = frontmatterMatch?.[1].match(/^description:\s*(.+)$/m);
-      if (descriptionMatch) {
-        description = descriptionMatch[1].trim();
-      }
-    } catch (err) {
-      console.warn(
-        `[PiSubagentTool] skipping unreadable member agent definition for "${agentId}":`,
-        err,
-      );
-      continue;
-    }
-    if (!systemPrompt) {
-      continue;
-    }
-    profiles.push({ id: agentId, description, systemPrompt, source: 'member' });
-  }
-  return profiles;
-}
-
 /** Merge built-in profiles with team member agents; members override same-name builtins. */
 function resolveAgentProfiles(deps: PiSubagentToolDeps): SubagentProfile[] {
   const profiles = new Map<string, SubagentProfile>();
-  for (const builtin of BUILTIN_AGENT_PROFILES) {
-    profiles.set(builtin.id, { ...builtin, source: 'builtin' });
-  }
-  if (deps.presetId) {
-    // Bundled presets are file-sourced: prefer the live member definitions
-    // so member edits take effect without re-importing. User-imported
-    // packages keep the synced pi agents files.
-    const bundled =
-      deps.loadBundledMembers?.(deps.presetId) ??
-      loadMemberProfiles(deps.getPiAgentsDir(), deps.presetId);
-    for (const member of bundled) {
-      profiles.set(member.id, member);
-    }
+  for (const profile of [...BUILTIN_AGENT_PROFILES, ...(deps.memberProfiles ?? [])]) {
+    profiles.set(profile.id, profile);
   }
   return [...profiles.values()];
 }
@@ -295,10 +211,9 @@ async function runSubagent(
     const subOptions: Record<string, unknown> = {
       cwd,
       model,
+      modelRuntime: resolvedModel.modelRuntime,
       // Subagent sessions are ephemeral and must never persist throwaway JSONL files.
       ...(pi.SessionManager ? { sessionManager: pi.SessionManager.inMemory(cwd) } : {}),
-      // No customTools: subagents must not recursively spawn sub-subagents,
-      // and AskUserQuestion is reserved for the parent session.
     };
     if (
       profile.id === PiSubagentProfileId.Reviewer ||
@@ -309,18 +224,12 @@ async function runSubagent(
     } else if (process.platform === 'win32') {
       subOptions.excludeTools = ['bash'];
     }
-    const researcherUsesWebSearch =
-      profile.id === PiSubagentProfileId.Researcher && Boolean(deps.webSearchSkillPath);
-    const systemPrompt = researcherUsesWebSearch
-      ? `${profile.systemPrompt}\n\nYou have an explicit retrieval capability. Before reporting a web claim, run the bundled web-search skill:\n` +
-        `node "${path.join(deps.webSearchSkillPath || '', 'scripts', 'search.mjs')}" "<query>" 10\n` +
-        'Open the returned primary sources where possible. Never substitute model memory for a retrieved citation.'
+    const researcher = profile.id === PiSubagentProfileId.Researcher;
+    if (researcher) subOptions.customTools = [buildPiWebSearchTool()];
+    const systemPrompt = researcher
+      ? `${profile.systemPrompt}\n\nUse ${PiWebSearchToolName} to retrieve sources before reporting current web claims.`
       : profile.systemPrompt;
-    const resourceLoader = researcherUsesWebSearch
-      ? await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens, [
-          CoreSkillId.WebSearch,
-        ])
-      : await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens);
+    const resourceLoader = await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens);
     subOptions.resourceLoader = resourceLoader;
     if (
       resourceLoader &&
@@ -332,10 +241,6 @@ async function runSubagent(
         .settingsManager;
       subOptions.settingsManager = settingsManager;
     }
-    if (resolvedModel.modelRuntime) {
-      subOptions.modelRuntime = resolvedModel.modelRuntime;
-    }
-
     const { session } = await pi.createAgentSession(subOptions);
     subSession = session;
     signal?.throwIfAborted();

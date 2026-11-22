@@ -54,6 +54,7 @@ function coreSchemaDdl(): string {
       execution_mode TEXT,
       workspace_id TEXT,
       source TEXT NOT NULL DEFAULT '${CoworkSessionSource.Manual}',
+      pi_history_key TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -454,6 +455,13 @@ function coreMigrations(userDataPath: string): Migration[] {
         } catch (error) {
           console.warn('[SqliteStore] failed to migrate electron-store data:', error);
         }
+      },
+    },
+    {
+      version: 3,
+      name: 'pi-history-key',
+      up: db => {
+        addColumnIfMissing(db, 'cowork_sessions', 'pi_history_key', 'TEXT');
       },
     },
   ];

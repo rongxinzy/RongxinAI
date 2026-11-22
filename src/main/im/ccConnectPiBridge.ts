@@ -52,6 +52,10 @@ export class CcConnectPiBridge {
 
   private readonly turnCoordinator: ChannelTurnCoordinator;
 
+  dispose(): void {
+    this.handler.destroy();
+  }
+
   async runTurn(
     request: CcConnectTurnRequest,
     signal?: AbortSignal,
@@ -65,58 +69,50 @@ export class CcConnectPiBridge {
       request.accountId,
       nativeConversationId,
     );
-    this.imStore.setCcConnectSessionKey(
-      request.accountId,
-      platform,
-      nativeConversationId,
-      request.message.sessionKey,
-    );
-    const workspaceId = this.imStore.getChannelAccountWorkspaceId(request.accountId);
-    const workspace = workspaceId ? this.coworkStore.getWorkspace(workspaceId) : null;
-    if (!workspace) throw new Error('Channel account workspace is not configured');
-    const attachments = await persistCcConnectMedia({
-      workspacePath: workspace.path,
-      accountId: request.accountId,
-      messageId: request.message.messageId,
-      images: request.message.images,
-      files: request.message.files,
-      audio: request.message.audio,
-    });
-    const message: IMMessage = {
-      platform,
-      messageId: request.message.messageId,
-      // Scope the persisted Pi session by the stable ChannelAccount id so two bots in the same
-      // platform conversation can never resume one another's session.
-      conversationId,
-      senderId: request.message.userId,
-      senderName: request.message.userName,
-      groupName: request.message.chatName,
-      content: mergeMessageContent(request.message.extraContent, request.message.content),
-      chatType: request.message.chatType,
-      timestamp: request.message.userMessageTimeMs ?? Date.now(),
-      ...(attachments.length > 0 ? { attachments } : {}),
-    };
     const content = await this.turnCoordinator.run(
       {
         platform: request.message.platform,
         accountId: request.accountId,
         conversationId: nativeConversationId,
         messageId: request.message.messageId,
-        // Metadata only (work package L): media is already on disk by now, so
-        // the inbox row must not duplicate the full request — the base64
-        // bodies were written into SQLite with no reader ever consuming them.
-        payload: JSON.stringify({
-          messageId: request.message.messageId,
-          sessionKey: request.message.sessionKey,
-          contentPreview: request.message.content.slice(0, 200),
-          attachments: attachments.map(attachment => ({
-            type: attachment.type,
-            localPath: attachment.localPath,
-            fileSize: attachment.fileSize,
-          })),
-        }),
       },
-      () => this.handler.processMessage(message, signal, workspaceId ?? undefined),
+      async () => {
+        const workspaceId = this.imStore.getChannelAccountWorkspaceId(request.accountId);
+        const workspace = workspaceId
+          ? this.coworkStore.workspaces.getWorkspace(workspaceId)
+          : null;
+        if (!workspace) throw new Error('Channel account workspace is not configured');
+        const attachments = await persistCcConnectMedia({
+          workspacePath: workspace.path,
+          accountId: request.accountId,
+          messageId: request.message.messageId,
+          images: request.message.images,
+          files: request.message.files,
+          audio: request.message.audio,
+        });
+        const message: IMMessage = {
+          platform,
+          messageId: request.message.messageId,
+          // Scope the persisted Pi session by the stable ChannelAccount id so two bots in the same
+          // platform conversation can never resume one another's session.
+          conversationId,
+          senderId: request.message.userId,
+          senderName: request.message.userName,
+          groupName: request.message.chatName,
+          content: mergeMessageContent(request.message.extraContent, request.message.content),
+          chatType: request.message.chatType,
+          timestamp: request.message.userMessageTimeMs ?? Date.now(),
+          ...(attachments.length > 0 ? { attachments } : {}),
+        };
+        signal?.throwIfAborted();
+        this.imStore.setCcConnectSessionKey(
+          request.accountId,
+          platform,
+          nativeConversationId,
+          request.message.sessionKey,
+        );
+        return this.handler.processMessage(message, signal, workspaceId ?? undefined);
+      },
       signal,
     );
     return buildCcConnectTurnResponse(content);

@@ -74,7 +74,6 @@ test('unsigned defaults and protected release signing environment remain intact'
     'build-macos': '${{ inputs.build_macos }}',
     'build-windows': '${{ inputs.build_windows }}',
     'build-linux': '${{ inputs.build_linux }}',
-    'linux-inference-editions': 'lite,cuda',
   });
   expect(unsigned.secrets).toEqual({ MODELSCOPE_TOKENS: '${{ secrets.MODELSCOPE_TOKENS }}' });
   for (const name of ['build_macos', 'build_windows', 'build_linux']) {

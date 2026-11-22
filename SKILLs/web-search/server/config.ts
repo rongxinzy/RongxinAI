@@ -5,9 +5,7 @@
 export interface BrowserConfig {
   /** Chrome executable path (auto-detected if not provided) */
   chromePath?: string;
-  /** CDP debugging port */
-  cdpPort: number;
-  /** User data directory for browser isolation */
+  /** Parent directory for the managed browser's temporary profile */
   userDataDir?: string;
   /** Whether to run browser headless */
   headless: boolean;
@@ -48,7 +46,6 @@ export interface Config {
  */
 export const defaultConfig: Config = {
   browser: {
-    cdpPort: 9222,
     headless: true,
     fallbackToHeadful: true,
     chromeFlags: [

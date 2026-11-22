@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import crypto from 'crypto';
 
+import { t } from './i18n';
 import type { McpCredentialPayload } from './libs/mcpCredentialVault';
 
 export interface McpCredentialStore {
@@ -165,7 +166,26 @@ export class McpStore {
     return this.deserializeRow(row);
   }
 
+  /** One credential owner for historical rows that share a marketplace identity. */
+  getRegistryOwner(registryId: string): McpServerRecord | null {
+    const row = this.db
+      .prepare(`
+      SELECT id, name, description, enabled, transport_type, config_json, created_at, updated_at
+      FROM mcp_servers
+      WHERE CASE WHEN json_valid(config_json) THEN json_extract(config_json, '$.registryId') END = ?
+      ORDER BY created_at, id LIMIT 1
+    `)
+      .get(registryId) as McpServerRow | undefined;
+    return row ? this.deserializeRow(row) : null;
+  }
+
+  private assertRegistryAvailable(registryId?: string): void {
+    if (registryId && this.getRegistryOwner(registryId))
+      throw new Error(t('mcpRegistryAlreadyInstalled'));
+  }
+
   createServer(data: McpServerFormData): McpServerRecord {
+    this.assertRegistryAvailable(data.registryId);
     const id = crypto.randomUUID();
     const now = Date.now();
     const configJson = this.serializeConfig(data);
@@ -189,6 +209,7 @@ export class McpStore {
   updateServer(id: string, data: Partial<McpServerFormData>): McpServerRecord | null {
     const existing = this.getServer(id);
     if (!existing) return null;
+    if (data.registryId !== existing.registryId) this.assertRegistryAvailable(data.registryId);
 
     const now = Date.now();
     const merged: McpServerFormData = {

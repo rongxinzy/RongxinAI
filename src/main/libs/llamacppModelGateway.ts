@@ -1,6 +1,8 @@
+import { addAbortListener } from 'node:events';
 import http from 'node:http';
 
 const GATEWAY_HOST = '127.0.0.1';
+const DEFAULT_GATEWAY_PORT = 8080;
 const GATEWAY_PATH_PREFIX = '/v1/';
 const MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
 
@@ -12,14 +14,19 @@ export type LlamaCppGatewayModelLease = {
 export type LlamaCppModelGatewayOptions = {
   acquireModel: (modelName: string) => Promise<LlamaCppGatewayModelLease>;
   listModels: () => Array<{ id: string; owned_by?: string }>;
-  getConfig: () => { port: number };
+  shutdownSignal: AbortSignal;
 };
 
 export type LlamaCppModelGateway = {
   baseUrl: () => string | null;
-  start: () => Promise<void>;
+  isChanging: () => boolean;
+  start: (port: number) => Promise<void>;
   stop: () => Promise<void>;
 };
+
+export function resolveLlamaCppGatewayPort(port?: string): number {
+  return Number.parseInt(port ?? '', 10) || DEFAULT_GATEWAY_PORT;
+}
 
 /**
  * Loopback-only model gateway in front of the llama-server router: on-demand
@@ -32,45 +39,80 @@ export function createLlamaCppModelGateway(
 ): LlamaCppModelGateway {
   let server: http.Server | null = null;
   let boundPort: number | null = null;
+  let configuredPort: number | null = null;
+  let pending: Promise<void> | undefined;
+  const { shutdownSignal } = options;
+
+  const changeListener = (change: () => Promise<void>): Promise<void> => {
+    const operation = Promise.resolve(pending)
+      .catch(() => {})
+      .then(change)
+      .finally(() => {
+        if (pending === operation) pending = undefined;
+      });
+    pending = operation;
+    return operation;
+  };
+
+  const closeListener = async (): Promise<void> => {
+    const current = server;
+    if (!current) return;
+    server = null;
+    boundPort = null;
+    configuredPort = null;
+    const closed = new Promise<void>((resolve, reject) => {
+      current.close(error => (error ? reject(error) : resolve()));
+    });
+    using _shutdown = addAbortListener(shutdownSignal, () => current.closeAllConnections());
+    await closed;
+  };
 
   return {
     baseUrl: () => (boundPort ? `http://${GATEWAY_HOST}:${boundPort}/v1` : null),
-    start: async () => {
-      if (server) return;
-      const config = options.getConfig();
-      await new Promise<void>((resolve, reject) => {
-        const nextServer = http.createServer((request, response) => {
-          void handleGatewayRequest(request, response, options).catch(error => {
-            const message = error instanceof Error ? error.message : 'Local model gateway failed.';
-            writeJsonError(response, 502, message);
+    isChanging: () => pending !== undefined,
+    start: port =>
+      changeListener(async () => {
+        shutdownSignal.throwIfAborted();
+        if (configuredPort === port) return;
+        await closeListener();
+        shutdownSignal.throwIfAborted();
+        await new Promise<void>((resolve, reject) => {
+          const nextServer = http.createServer((request, response) => {
+            void handleGatewayRequest(request, response, options).catch(error => {
+              if (response.destroyed || response.writableEnded) return;
+              if (response.headersSent) {
+                // A truncated stream must fail at the client so it can detect the missing output.
+                response.destroy();
+                return;
+              }
+              const message =
+                error instanceof Error ? error.message : 'Local model gateway failed.';
+              writeJsonError(response, 502, message);
+            });
+          });
+          nextServer.once('error', reject);
+          nextServer.listen(port, GATEWAY_HOST, () => {
+            const address = nextServer.address();
+            if (!address || typeof address === 'string') {
+              nextServer.close();
+              reject(new Error('Local model gateway did not expose a TCP port.'));
+              return;
+            }
+            server = nextServer;
+            boundPort = address.port;
+            configuredPort = port;
+            console.log(
+              `[LlamaCppGateway] local model gateway started on ${GATEWAY_HOST}:${boundPort}`,
+            );
+            resolve();
           });
         });
-        nextServer.once('error', reject);
-        nextServer.listen(config.port, GATEWAY_HOST, () => {
-          const address = nextServer.address();
-          if (!address || typeof address === 'string') {
-            nextServer.close();
-            reject(new Error('Local model gateway did not expose a TCP port.'));
-            return;
-          }
-          server = nextServer;
-          boundPort = address.port;
-          console.log(
-            `[LlamaCppGateway] local model gateway started on ${GATEWAY_HOST}:${boundPort}`,
-          );
-          resolve();
-        });
-      });
-    },
-    stop: async () => {
-      if (!server) return;
-      const current = server;
-      server = null;
-      boundPort = null;
-      await new Promise<void>((resolve, reject) => {
-        current.close(error => (error ? reject(error) : resolve()));
-      });
-    },
+        if (shutdownSignal.aborted) {
+          await closeListener();
+          shutdownSignal.throwIfAborted();
+        }
+      }),
+    stop: () => changeListener(closeListener),
   };
 }
 

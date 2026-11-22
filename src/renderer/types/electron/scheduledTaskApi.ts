@@ -8,20 +8,13 @@
 import type { IpcContractApi } from '../../../shared/ipc/contract';
 import type { scheduledTasksContract } from '../../../shared/ipc/automationContract';
 import type { ScheduledTaskStatusEvent, ScheduledTaskRunEvent } from '../../../scheduledTask/types';
-import type { CoworkSession } from '../cowork';
 
 type ScheduledTasksContractApi = IpcContractApi<typeof scheduledTasksContract>;
 
 export interface ScheduledTasksApi extends Omit<
   ScheduledTasksContractApi,
-  'onStatusUpdate' | 'onRunUpdate' | 'onRefresh' | 'resolveSession' | 'listChannelConversations'
+  'listChannelConversations'
 > {
-  /** Runs store their Pi session id directly; the resolved session is null. */
-  resolveSession: (sessionKey: string) => Promise<{
-    success: boolean;
-    session?: CoworkSession | null;
-    error?: string;
-  }>;
   listChannelConversations?: (
     channel: string,
     accountId?: string,

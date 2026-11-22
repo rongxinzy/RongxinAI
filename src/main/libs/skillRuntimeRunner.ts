@@ -1,9 +1,14 @@
-import { execFile, spawn, type ChildProcess } from 'child_process';
+import { spawn } from 'child_process';
+import { terminateProcessTree } from './ownedProcessStop';
 import fs from 'fs';
 import path from 'path';
 import { StringDecoder } from 'string_decoder';
+import { app } from 'electron';
 
 import { getElectronNodeRuntimePath, getEnhancedEnv, getSkillsRoot } from './coworkUtil';
+import { resolveBundledSkillsRoots } from './coworkEnv/skillsRoot';
+import { searchAnySearchGateway } from './anysearchGateway';
+import { t } from '../i18n';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
 import {
   applyWorkspaceSkillPythonEnvironment,
@@ -133,20 +138,23 @@ const isWithin = (root: string, candidate: string): boolean => {
   );
 };
 
-const resolveRealPathIfPossible = (value: string): string => {
-  try {
-    return fs.realpathSync(value);
-  } catch {
-    return path.resolve(value);
-  }
-};
+const resolveRealPathIfPossible = (value: string): Promise<string> =>
+  fs.promises.realpath(value).catch(() => value);
 
-export function resolveSkillScriptPath(
+const pathExists = (value: string): Promise<boolean> =>
+  fs.promises.access(value).then(
+    () => true,
+    () => false,
+  );
+
+export async function resolveSkillScriptPath(
   skillsRoot: string,
   skillId: string,
   script: string,
-): { scriptPath: string; skillDir: string } | { errorCode: SkillScriptErrorCode; error: string } {
-  const root = resolveRealPathIfPossible(path.resolve(skillsRoot));
+): Promise<
+  { scriptPath: string; skillDir: string } | { errorCode: SkillScriptErrorCode; error: string }
+> {
+  const root = await resolveRealPathIfPossible(path.resolve(skillsRoot));
   const normalizedSkillId = skillId.trim();
   const normalizedScript = script.trim();
   const skillDir = path.resolve(root, normalizedSkillId);
@@ -164,8 +172,10 @@ export function resolveSkillScriptPath(
     };
   }
 
-  const realSkillDir = resolveRealPathIfPossible(skillDir);
-  const realScriptPath = resolveRealPathIfPossible(scriptPath);
+  const [realSkillDir, realScriptPath] = await Promise.all([
+    resolveRealPathIfPossible(skillDir),
+    resolveRealPathIfPossible(scriptPath),
+  ]);
   if (!isWithin(root, realSkillDir) || !isWithin(realSkillDir, realScriptPath)) {
     return {
       errorCode: 'SKILL_SCRIPT_OUTSIDE_ROOT',
@@ -173,7 +183,7 @@ export function resolveSkillScriptPath(
     };
   }
 
-  if (!fs.existsSync(scriptPath) || !fs.statSync(scriptPath).isFile()) {
+  if (!(await fs.promises.stat(scriptPath).catch((): null => null))?.isFile()) {
     return {
       errorCode: 'SKILL_SCRIPT_NOT_FOUND',
       error: `Skill script not found: ${scriptPath}`,
@@ -227,9 +237,13 @@ async function resolveRuntime(
         error: 'Shell (.sh) Skill scripts are not supported on Windows; use .py, .mjs, or .ps1.',
       };
     }
-    const command = fs.existsSync('/bin/bash') ? '/bin/bash' : process.env.SHELL || 'bash';
     const requirementsPath = path.join(skillDir, 'requirements.txt');
-    const preparedPython = fs.existsSync(requirementsPath)
+    const [hasBash, hasRequirements] = await Promise.all([
+      pathExists('/bin/bash'),
+      pathExists(requirementsPath),
+    ]);
+    const command = hasBash ? '/bin/bash' : process.env.SHELL || 'bash';
+    const preparedPython = hasRequirements
       ? await prepareWorkspaceSkillPython(options, skillDir)
       : null;
     if (preparedPython && 'errorCode' in preparedPython) return preparedPython;
@@ -256,7 +270,7 @@ async function resolveRuntime(
       };
     }
     const requirementsPath = path.join(skillDir, 'requirements.txt');
-    const preparedPython = fs.existsSync(requirementsPath)
+    const preparedPython = (await pathExists(requirementsPath))
       ? await prepareWorkspaceSkillPython(options, skillDir)
       : null;
     if (preparedPython && 'errorCode' in preparedPython) return preparedPython;
@@ -288,11 +302,13 @@ type PreparedSkillScript = {
   env: Record<string, string | undefined>;
 };
 
-function resolveSkillInvocation(
+type SkillInvocation = { skillsRoot: string; scriptPath: string; skillDir: string };
+
+async function resolveSkillInvocation(
   options: RunSkillScriptOptions,
-): { skillsRoot: string; scriptPath: string; skillDir: string } | { result: SkillScriptRunResult } {
+): Promise<SkillInvocation | { result: SkillScriptRunResult }> {
   const skillsRoot = options.skillsRoot || getSkillsRoot();
-  const resolved = resolveSkillScriptPath(skillsRoot, options.skillId, options.script);
+  const resolved = await resolveSkillScriptPath(skillsRoot, options.skillId, options.script);
   if ('errorCode' in resolved) {
     return {
       result: invalidInputResult(
@@ -322,9 +338,8 @@ function resolveSkillInvocation(
 
 async function prepareSkillScript(
   options: RunSkillScriptOptions,
+  resolved: SkillInvocation,
 ): Promise<PreparedSkillScript | { result: SkillScriptRunResult }> {
-  const resolved = resolveSkillInvocation(options);
-  if ('result' in resolved) return resolved;
   const { skillsRoot } = resolved;
   const args = options.args ?? [];
   const runtime = await resolveRuntime(resolved.scriptPath, resolved.skillDir, options);
@@ -401,11 +416,123 @@ function invalidInputResult(
   };
 }
 
+async function runManagedWebSearch(
+  options: RunSkillScriptOptions,
+  scriptPath: string,
+  allowQueryFile: boolean,
+): Promise<SkillScriptRunResult> {
+  const startedAt = Date.now();
+  const [queryArg = '', count = '10'] = options.args ?? [];
+  const maxResults = Number(count);
+  const timeout = AbortSignal.timeout(
+    Math.trunc(Math.min(Math.max(1_000, options.timeoutMs || DEFAULT_TIMEOUT_MS), MAX_TIMEOUT_MS)),
+  );
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  try {
+    signal.throwIfAborted();
+    let query = queryArg;
+    if (allowQueryFile && queryArg.startsWith('@')) {
+      const file = await fs.promises.open(
+        path.resolve(options.workspaceRoot, queryArg.slice(1)),
+        fs.constants.O_RDONLY | fs.constants.O_NONBLOCK,
+      );
+      try {
+        if (!(await file.stat()).isFile()) throw new Error(t('webSearchInvalidInput'));
+        const input = Buffer.alloc(MAX_ARGUMENT_LENGTH + 1);
+        const { bytesRead } = await file.read(input, 0, input.length, 0);
+        if (bytesRead > MAX_ARGUMENT_LENGTH) throw new Error(t('webSearchInvalidInput'));
+        query = input.toString('utf8', 0, bytesRead);
+      } finally {
+        await file.close();
+      }
+    }
+    const { results, total, elapsed } = await searchAnySearchGateway(query, maxResults, signal);
+    const time = elapsed === undefined ? '' : `  \n**Time:** ${elapsed}ms`;
+    const markdown = (value: string) =>
+      value
+        .replace(/[\[\]]/g, '\\$&')
+        .replace(/\r?\n+/g, ' ')
+        .trim();
+    const sections = results.map(({ title, url, snippet }) =>
+      [`## ${markdown(title)}`, `**URL:** [${url}](${url})`, markdown(snippet)]
+        .filter(Boolean)
+        .join('\n\n'),
+    );
+    return {
+      ok: true,
+      status: 'completed',
+      runtime: 'node',
+      command: null,
+      args: [scriptPath, ...(options.args ?? [])],
+      scriptPath,
+      exitCode: 0,
+      stdout: [`# Search Results: ${query}\n\n**Results:** ${total}${time}`, ...sections, '']
+        .join('\n\n---\n\n')
+        .trim(),
+      stderr: '',
+      durationMs: Date.now() - startedAt,
+      timedOut: false,
+    };
+  } catch (error) {
+    const interrupted = options.signal?.aborted
+      ? 'aborted'
+      : timeout.aborted
+        ? 'timed-out'
+        : undefined;
+    const result = invalidInputResult(
+      scriptPath,
+      interrupted === 'aborted'
+        ? 'SKILL_SCRIPT_ABORTED'
+        : interrupted
+          ? 'SKILL_SCRIPT_TIMEOUT'
+          : 'SKILL_SCRIPT_FAILED',
+      error instanceof Error ? error.message : String(error),
+    );
+    return {
+      ...result,
+      status: interrupted ?? result.status,
+      durationMs: Date.now() - startedAt,
+      timedOut: interrupted === 'timed-out',
+    };
+  }
+}
+
+const activeSkillScriptStops = new Set<() => Promise<void> | undefined>();
+let skillScriptAdmissionClosed = false;
+
+export async function shutdownManagedSkillScripts(): Promise<void> {
+  skillScriptAdmissionClosed = true;
+  await Promise.all([...activeSkillScriptStops].map(stop => stop()));
+}
+
 export async function runManagedSkillScript(
   options: RunSkillScriptOptions,
 ): Promise<SkillScriptRunResult> {
-  const invocation = resolveSkillInvocation(options);
+  const invocation = await resolveSkillInvocation(options);
   if ('result' in invocation) return invocation.result;
+  if (options.signal?.aborted || skillScriptAdmissionClosed) {
+    return {
+      ...invalidInputResult(
+        invocation.scriptPath,
+        'SKILL_SCRIPT_ABORTED',
+        'Skill script was aborted before it started.',
+      ),
+      status: 'aborted',
+    };
+  }
+  if (options.skillId.trim() === 'web-search') {
+    const root = path.resolve(invocation.skillsRoot);
+    const script = path.relative(invocation.skillDir, invocation.scriptPath);
+    const allowQueryFile = script === path.join('scripts', 'search.mjs');
+    if (
+      (allowQueryFile || script === path.join('scripts', 'anysearch-search.mjs')) &&
+      (root === path.resolve(getSkillsRoot()) ||
+        (app.isPackaged &&
+          resolveBundledSkillsRoots().some(candidate => root === path.resolve(candidate))))
+    ) {
+      return runManagedWebSearch(options, invocation.scriptPath, allowQueryFile);
+    }
+  }
   if (path.extname(invocation.scriptPath).toLowerCase() === '.py') {
     return runWorkspaceSkillPython(
       options,
@@ -414,7 +541,7 @@ export async function runManagedSkillScript(
       invocation.skillsRoot,
     );
   }
-  const prepared = await prepareSkillScript(options);
+  const prepared = await prepareSkillScript(options, invocation);
   if ('result' in prepared) return prepared.result;
   const { runtime, scriptPath, commandArgs, env } = prepared;
   const timeoutMs = Math.min(
@@ -423,7 +550,7 @@ export async function runManagedSkillScript(
   );
   const startedAt = Date.now();
 
-  if (options.signal?.aborted) {
+  if (options.signal?.aborted || skillScriptAdmissionClosed) {
     return {
       ok: false,
       status: 'aborted',
@@ -447,12 +574,13 @@ export async function runManagedSkillScript(
     let settled = false;
     let timedOut = false;
     let aborted = false;
-    let forceKillTimer: NodeJS.Timeout | null = null;
+    let stopping: Promise<void> | undefined;
 
     const child = spawn(runtime.command, commandArgs, {
       cwd: path.resolve(options.workspaceRoot),
       env: env as NodeJS.ProcessEnv,
       shell: false,
+      detached: process.platform !== 'win32',
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -460,24 +588,38 @@ export async function runManagedSkillScript(
     const finish = (result: SkillScriptRunResult): void => {
       if (settled) return;
       settled = true;
+      clearTimeout(timeoutTimer);
+      options.signal?.removeEventListener('abort', onAbort);
+      activeSkillScriptStops.delete(onAbort);
       resolve(result);
     };
 
-    const stopChild = (): void => {
-      child.kill('SIGTERM');
-      forceKillTimer = setTimeout(() => child.kill('SIGKILL'), 2_000);
+    const stopChild = (): Promise<void> => {
+      if (stopping) return stopping;
+      clearTimeout(timeoutTimer);
+      stopping = terminateProcessTree(child)
+        .catch(error => {
+          console.warn('[SkillRuntime] Failed to stop script process tree:', error);
+        })
+        .finally(() => {
+          child.stdout.destroy();
+          child.stderr.destroy();
+          finishExit(child.exitCode);
+        });
+      return stopping;
     };
 
     const timeoutTimer = setTimeout(() => {
       timedOut = true;
-      stopChild();
+      void stopChild();
     }, timeoutMs);
 
-    const onAbort = (): void => {
-      if (settled) return;
+    const onAbort = (): Promise<void> | undefined => {
+      if (settled || stopping) return stopping;
       aborted = true;
-      stopChild();
+      return stopChild();
     };
+    activeSkillScriptStops.add(onAbort);
     options.signal?.addEventListener('abort', onAbort, { once: true });
 
     child.stdout.on('data', chunk => {
@@ -502,9 +644,7 @@ export async function runManagedSkillScript(
       };
     };
     child.on('error', (error: NodeJS.ErrnoException) => {
-      clearTimeout(timeoutTimer);
-      if (forceKillTimer) clearTimeout(forceKillTimer);
-      options.signal?.removeEventListener('abort', onAbort);
+      if (stopping) return;
       const errorCode = timedOut
         ? 'SKILL_SCRIPT_TIMEOUT'
         : aborted
@@ -531,10 +671,7 @@ export async function runManagedSkillScript(
         stderrTruncated: output.stderrTruncated,
       });
     });
-    child.on('close', exitCode => {
-      clearTimeout(timeoutTimer);
-      if (forceKillTimer) clearTimeout(forceKillTimer);
-      options.signal?.removeEventListener('abort', onAbort);
+    const finishExit = (exitCode: number | null): void => {
       const failed = timedOut || aborted || exitCode !== 0;
       const output = capturedResult();
       finish({
@@ -566,41 +703,20 @@ export async function runManagedSkillScript(
         stdoutTruncated: output.stdoutTruncated,
         stderrTruncated: output.stderrTruncated,
       });
+    };
+    child.on('close', exitCode => {
+      if (!stopping) finishExit(exitCode);
     });
   });
 }
-
-const stopManagedProcess = async (child: ChildProcess): Promise<void> => {
-  const pid = child.pid;
-  if (!pid || child.killed) return;
-  if (process.platform === 'win32') {
-    await new Promise<void>(resolve => {
-      execFile('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, () =>
-        resolve(),
-      );
-    });
-    return;
-  }
-  try {
-    process.kill(-pid, 'SIGTERM');
-  } catch {
-    child.kill('SIGTERM');
-  }
-  await new Promise(resolve => setTimeout(resolve, 2_000));
-  if (!child.killed) {
-    try {
-      process.kill(-pid, 'SIGKILL');
-    } catch {
-      child.kill('SIGKILL');
-    }
-  }
-};
 
 /** Start a long-lived Skill process whose lifetime is managed by the caller. */
 export async function startManagedSkillProcess(
   options: RunSkillScriptOptions,
 ): Promise<ManagedSkillProcess> {
-  const prepared = await prepareSkillScript(options);
+  const invocation = await resolveSkillInvocation(options);
+  const prepared =
+    'result' in invocation ? invocation : await prepareSkillScript(options, invocation);
   if ('result' in prepared) {
     throw new Error(`${prepared.result.errorCode}: ${prepared.result.error}`);
   }
@@ -617,6 +733,7 @@ export async function startManagedSkillProcess(
   let stdout = '';
   let stderr = '';
   let closed = false;
+  let stopping: Promise<void> | undefined;
   const waiters = new Set<{
     ready: (stdout: string, stderr: string) => boolean;
     resolve: (value: { stdout: string; stderr: string }) => void;
@@ -661,7 +778,7 @@ export async function startManagedSkillProcess(
 
   return {
     pid: child.pid,
-    isRunning: () => !closed,
+    isRunning: () => !closed && child.exitCode === null && child.signalCode === null,
     runtime: prepared.runtime.runtime,
     command: prepared.runtime.command,
     args: prepared.commandArgs,
@@ -680,6 +797,6 @@ export async function startManagedSkillProcess(
         waiters.add(waiter);
       });
     },
-    stop: () => stopManagedProcess(child),
+    stop: () => (stopping ??= terminateProcessTree(child)),
   };
 }

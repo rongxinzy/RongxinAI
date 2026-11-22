@@ -1,6 +1,7 @@
 /** App icon resolution, Windows window icon and dev-mode taskbar branding. */
 import fs from 'fs';
 import path from 'path';
+import { setImmediate as yieldToMain } from 'node:timers/promises';
 
 import { app, shell, type BrowserWindow } from 'electron';
 
@@ -45,36 +46,36 @@ export const applyWindowsWindowIcon = (window: BrowserWindow): void => {
 
 const START_MENU_MAX_DEPTH = 2;
 
-const collectStartMenuShortcuts = (programsDir: string): StartMenuShortcut[] => {
+const collectStartMenuShortcuts = async (programsDir: string): Promise<StartMenuShortcut[]> => {
   const shortcuts: StartMenuShortcut[] = [];
-  const readDirectory = (directory: string, depth: number): void => {
-    let entries: fs.Dirent[];
+  const readDirectory = async (directory: string, depth: number): Promise<void> => {
     try {
-      entries = fs.readdirSync(directory, { withFileTypes: true });
+      for await (const entry of await fs.promises.opendir(directory)) {
+        const entryPath = path.join(directory, entry.name);
+        // 旧版本地化目录（如「程序」）是 junction，isDirectory() 对它返回 false。
+        if (entry.isDirectory()) {
+          if (depth < START_MENU_MAX_DEPTH) await readDirectory(entryPath, depth + 1);
+          continue;
+        }
+        if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.lnk')) continue;
+        // Shell must run on Main, so give other startup work a turn between links.
+        await yieldToMain();
+        try {
+          const details = shell.readShortcutLink(entryPath);
+          shortcuts.push({
+            shortcutPath: entryPath,
+            appUserModelId: details.appUserModelId,
+            target: details.target,
+          });
+        } catch {
+          // 解析不了的快捷方式不归我们管。
+        }
+      }
     } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const entryPath = path.join(directory, entry.name);
-      // 旧版本地化目录（如「程序」）是 junction，isDirectory() 对它返回 false。
-      if (entry.isDirectory()) {
-        if (depth < START_MENU_MAX_DEPTH) readDirectory(entryPath, depth + 1);
-        continue;
-      }
-      if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.lnk')) continue;
-      try {
-        const details = shell.readShortcutLink(entryPath);
-        shortcuts.push({
-          shortcutPath: entryPath,
-          appUserModelId: details.appUserModelId,
-          target: details.target,
-        });
-      } catch {
-        // 解析不了的快捷方式不归我们管。
-      }
+      // The Start Menu folder can be missing or become unavailable during startup.
     }
   };
-  readDirectory(programsDir, 1);
+  await readDirectory(programsDir, 1);
   return shortcuts;
 };
 
@@ -84,27 +85,27 @@ const collectStartMenuShortcuts = (programsDir: string): StartMenuShortcut[] => 
  * 图标解析到它，导致装好新版本后仍显示 Electron 原子图标。必须在创建窗口
  * 之前调用，任务栏才会按清理后的结果解析身份。
  */
-export const repairWindowsTaskbarIdentity = (): void => {
+export const prepareWindowsTaskbarIdentity = async (): Promise<void> => {
   if (process.platform !== 'win32') return;
+  const programsDir = path.join(
+    app.getPath('appData'),
+    'Microsoft',
+    'Windows',
+    'Start Menu',
+    'Programs',
+  );
   try {
-    const programsDir = path.join(
-      app.getPath('appData'),
-      'Microsoft',
-      'Windows',
-      'Start Menu',
-      'Programs',
-    );
     // 打包态只用产品 AUMID；开发态连 .dev 一起清理，自己的开发快捷方式指向
     // 当前 electron.exe，不会被判定为残留。
     const appUserModelIds = app.isPackaged
       ? [WINDOWS_TASKBAR_APP_USER_MODEL_ID]
       : [WINDOWS_TASKBAR_APP_USER_MODEL_ID, APP_USER_MODEL_ID];
-    const staleShortcuts = findStaleTaskbarShortcuts(collectStartMenuShortcuts(programsDir), {
+    const staleShortcuts = findStaleTaskbarShortcuts(await collectStartMenuShortcuts(programsDir), {
       execPath: process.execPath,
       appUserModelIds,
     });
     for (const shortcut of staleShortcuts) {
-      fs.rmSync(shortcut.shortcutPath, { force: true });
+      await fs.promises.rm(shortcut.shortcutPath, { force: true });
       console.warn(
         '[Main] removed stale Start Menu shortcut claiming the taskbar identity:',
         shortcut.shortcutPath,
@@ -113,41 +114,24 @@ export const repairWindowsTaskbarIdentity = (): void => {
   } catch (error) {
     console.warn('[Main] failed to repair the Windows taskbar identity:', error);
   }
+  if (!app.isPackaged) await writeDevelopmentTaskbarShortcut(programsDir);
 };
 
 /**
  * Windows 任务栏：开发态必须有一条「相同 AUMID + 知远 .ico」的开始菜单快捷方式。
  * 文件名只用 ASCII，避免控制台/文件系统编码把「知远 (开发).lnk」写成乱码后对不上。
  */
-export const ensureWindowsTaskbarBrand = (): void => {
-  if (process.platform !== 'win32' || app.isPackaged) return;
+const writeDevelopmentTaskbarShortcut = async (programsDir: string): Promise<void> => {
   const iconPath = path.join(__dirname, '..', 'build', 'icons', 'win', 'icon.ico');
-  if (!fs.existsSync(iconPath)) {
+  try {
+    await fs.promises.access(iconPath);
+  } catch {
     console.warn('[Main] 知远 logo 不存在，无法绑定任务栏图标:', iconPath);
     return;
   }
-  const programsDir = path.join(
-    app.getPath('appData'),
-    'Microsoft',
-    'Windows',
-    'Start Menu',
-    'Programs',
-  );
-  fs.mkdirSync(programsDir, { recursive: true });
   const shortcutPath = path.join(programsDir, 'ZhiYuan-Dev.lnk');
   try {
-    // 清掉历史上编码损坏的中文快捷方式名，避免 Shell 继续命中坏缓存。
-    for (const name of fs.readdirSync(programsDir)) {
-      if (!name.endsWith('.lnk')) continue;
-      if (name === 'ZhiYuan-Dev.lnk') continue;
-      if (name.includes('开发') || name.includes('知远') || /ZhiYuan|zhiyuan/i.test(name)) {
-        try {
-          fs.unlinkSync(path.join(programsDir, name));
-        } catch {
-          /* ignore */
-        }
-      }
-    }
+    await fs.promises.mkdir(programsDir, { recursive: true });
     // create：文件不存在时 replace 会失败且不抛错，快捷方式实际没写上，任务栏继续用原子图标缓存。
     const wrote = shell.writeShortcutLink(shortcutPath, 'create', {
       target: process.execPath,
@@ -158,10 +142,11 @@ export const ensureWindowsTaskbarBrand = (): void => {
       iconIndex: 0,
       description: runtimeAppName,
     });
-    if (!wrote || !fs.existsSync(shortcutPath)) {
+    if (!wrote) {
       console.warn('[Main] Failed to write Windows taskbar brand shortcut:', shortcutPath);
       return;
     }
+    await fs.promises.access(shortcutPath);
     console.log('[Main] Windows taskbar brand shortcut ready:', shortcutPath, iconPath);
   } catch (error) {
     console.warn('[Main] Failed to write Windows taskbar brand shortcut:', error);

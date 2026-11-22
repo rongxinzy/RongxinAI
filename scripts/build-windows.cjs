@@ -4,17 +4,23 @@
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { ensureWindowsJobRunner } = require('./python-runtime/ensure-job-runner.cjs');
+const { packageWindowsInstaller } = require('./packaging/package-windows-installer.cjs');
 
 const root = path.resolve(__dirname, '..');
 const enterprise = process.argv.includes('--enterprise');
+const xiaoruan = process.argv.includes('--xiaoruan');
 const signed =
   process.argv.includes('--signed') || (enterprise && Boolean(process.env.CERTUM_CERT_THUMBPRINT));
+if (xiaoruan && (enterprise || signed)) {
+  throw new Error('The Xiaoruan NSIS package has a separate product configuration.');
+}
 const env = {
   ...process.env,
   ZHIYUAN_ALLOW_HOST_CHANNEL_RUNTIME: '1',
   ZHIYUAN_ENTERPRISE_BUILD: enterprise ? '1' : '0',
 };
-if (enterprise) env.ZHIYUAN_UPDATE_VARIANT = 'lite';
+if (enterprise || xiaoruan) env.ZHIYUAN_UPDATE_VARIANT = 'lite';
+if (xiaoruan) env.APP_EDITION = 'xiaoruan';
 
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, env, stdio: 'inherit' });
@@ -34,25 +40,6 @@ for (const task of [
 }
 run(process.execPath, ['scripts/ensure-build-version.js']);
 run('bun', ['run', 'build']);
-if (enterprise) run('bun', ['run', 'build:enterprise']);
-run('bun', ['run', 'build:skills']);
-const config = enterprise
-  ? 'electron-builder.enterprise.cjs'
-  : signed
-    ? 'electron-builder.windows-signed.cjs'
-    : 'electron-builder.json';
-run('bun', [
-  'x',
-  'electron-builder',
-  '--win',
-  'nsis',
-  '--x64',
-  '--config',
-  config,
-  '--publish',
-  'never',
-]);
-run(process.execPath, [
-  'scripts/installer-shell/build-distribution.cjs',
-  ...(signed ? ['--signed'] : []),
-]);
+if (enterprise) run('bun', ['run', 'build:enterprise:verified']);
+const edition = (env.ZHIYUAN_UPDATE_VARIANT || 'lite').trim().toLowerCase();
+packageWindowsInstaller(run, { signed, enterprise, xiaoruan, edition });

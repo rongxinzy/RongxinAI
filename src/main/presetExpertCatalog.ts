@@ -6,6 +6,12 @@ import {
   type ExpertSkillCatalogEntry,
   readPresetExpertPackageMetadata,
 } from '../shared/expert/presetPackageMetadata';
+import { PRESET_EXPERTS_DIR, readPresetText } from './presetExpertSnapshot';
+
+export const PresetCatalogLimit = {
+  Entries: 256,
+  ResultCharacters: 2_000_000,
+} as const;
 
 interface LocalizedText {
   en: string;
@@ -59,47 +65,55 @@ function readWorkflow(presetDir: string, agentPaths: unknown): string[] {
     if (!resolvedPath.startsWith(`${path.resolve(presetDir)}${path.sep}`)) continue;
     if (!fs.existsSync(resolvedPath)) continue;
 
-    return extractPresetExpertWorkflow(fs.readFileSync(resolvedPath, 'utf-8'));
+    return extractPresetExpertWorkflow(readPresetText(resolvedPath));
   }
 
   return [];
 }
 
 export function listPresetExperts(bundledSkillsRoot: string): PresetExpertCatalogEntry[] {
-  const presetsDir = path.join(bundledSkillsRoot, 'zhiyuan-expert-manager', 'presets');
+  const presetsDir = path.join(bundledSkillsRoot, ...PRESET_EXPERTS_DIR);
   if (!fs.existsSync(presetsDir)) return [];
 
-  return fs
+  const directories = fs
     .readdirSync(presetsDir, { withFileTypes: true })
-    .filter(entry => entry.isDirectory())
-    .flatMap(entry => {
-      const presetDir = path.join(presetsDir, entry.name);
-      const pluginPath = path.join(presetDir, 'plugin.json');
-      if (!fs.existsSync(pluginPath)) return [];
+    .filter(entry => entry.isDirectory());
+  if (directories.length > PresetCatalogLimit.Entries) {
+    throw new Error('Bundled expert catalog exceeds the supported entry limit.');
+  }
 
-      try {
-        const plugin = JSON.parse(fs.readFileSync(pluginPath, 'utf-8')) as Record<string, unknown>;
-        const packageMetadata = readPresetExpertPackageMetadata(plugin);
-        return [
-          {
-            name: plugin.name as string,
-            displayName: plugin.displayName as LocalizedText,
-            profession: plugin.profession as LocalizedText,
-            displayDescription: plugin.displayDescription as LocalizedText,
-            categoryId: plugin.categoryId as string,
-            tags: plugin.tags as LocalizedText[],
-            quickPrompts: plugin.quickPrompts as LocalizedText[],
-            workflow: readWorkflow(presetDir, plugin.agents),
-            path: presetDir,
-            mcpIds: packageMetadata.mcpIds,
-            pythonRequirements: packageMetadata.pythonRequirements,
-            pypiMirrors: packageMetadata.pypiMirrors,
-            skillCatalog: packageMetadata.skillCatalog,
-          },
-        ];
-      } catch (error) {
-        console.warn(`[PresetExpertCatalog] skipped invalid preset in ${entry.name}:`, error);
-        return [];
-      }
-    });
+  let remaining: number = PresetCatalogLimit.ResultCharacters;
+  const experts: PresetExpertCatalogEntry[] = [];
+  for (const entry of directories) {
+    const presetDir = path.join(presetsDir, entry.name);
+    const pluginPath = path.join(presetDir, 'plugin.json');
+    if (!fs.existsSync(pluginPath)) continue;
+
+    try {
+      const plugin = JSON.parse(readPresetText(pluginPath)) as Record<string, unknown>;
+      const packageMetadata = readPresetExpertPackageMetadata(plugin);
+      const expert: PresetExpertCatalogEntry = {
+        name: plugin.name as string,
+        displayName: plugin.displayName as LocalizedText,
+        profession: plugin.profession as LocalizedText,
+        displayDescription: plugin.displayDescription as LocalizedText,
+        categoryId: plugin.categoryId as string,
+        tags: plugin.tags as LocalizedText[],
+        quickPrompts: plugin.quickPrompts as LocalizedText[],
+        workflow: readWorkflow(presetDir, plugin.agents),
+        path: presetDir,
+        mcpIds: packageMetadata.mcpIds,
+        pythonRequirements: packageMetadata.pythonRequirements,
+        pypiMirrors: packageMetadata.pypiMirrors,
+        skillCatalog: packageMetadata.skillCatalog,
+      };
+      remaining -= JSON.stringify(expert).length;
+      if (remaining >= 0) experts.push(expert);
+    } catch (error) {
+      console.warn(`[PresetExpertCatalog] skipped invalid preset in ${entry.name}:`, error);
+    }
+    if (remaining < 0) throw new Error('Bundled expert catalog exceeds the supported size limit.');
+  }
+
+  return experts;
 }

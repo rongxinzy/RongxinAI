@@ -5,6 +5,7 @@
     "lib": ["ES2020", "DOM"],
     "outDir": "./dist",
     "rootDir": "./",
+    "allowJs": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

@@ -13,20 +13,17 @@ import {
   planLlamaCppModelGpuPlacement,
 } from './llamacppModelGpuPlacement';
 import { LlamaCppModelLoadFailureReason } from './llamacppModelLoadErrors';
-import { readGgufBlockCount } from './ggufMetadata';
+import { readGgufPlacementAsync } from '../workbenchTask/artifactWorkerPool';
 
-vi.mock('./ggufMetadata', async importOriginal => {
-  const actual = await importOriginal<typeof import('./ggufMetadata')>();
-  return { ...actual, readGgufBlockCount: vi.fn(actual.readGgufBlockCount) };
-});
+vi.mock('../workbenchTask/artifactWorkerPool', () => ({ readGgufPlacementAsync: vi.fn() }));
 
 beforeEach(() => {
-  vi.mocked(readGgufBlockCount).mockReset();
+  vi.mocked(readGgufPlacementAsync).mockReset().mockResolvedValue({});
 });
 
 describe('llamacppModelGpuPlacement', () => {
-  test('writes llama.cpp device IDs for automatically selected GPUs', () => {
-    const result = planLlamaCppModelGpuPlacement({
+  test('writes llama.cpp device IDs for automatically selected GPUs', async () => {
+    const result = await planLlamaCppModelGpuPlacement({
       launchInput: modelLaunchInput({ options: { ctxSize: 8192 } }),
       runtimeBackend: LlamaCppRuntimeBackend.Cuda,
       runtimeCapabilities: gpuCapabilities(),
@@ -63,8 +60,8 @@ describe('llamacppModelGpuPlacement', () => {
       ]),
     ],
   ])('auto placement fit guard (%s)', (_label, nvidiaSnapshot) => {
-    test('keeps fit enabled: gpuLayers auto, no tensor overrides', () => {
-      const result = planLlamaCppModelGpuPlacement({
+    test('keeps fit enabled: gpuLayers auto, no tensor overrides', async () => {
+      const result = await planLlamaCppModelGpuPlacement({
         launchInput: modelLaunchInput({ options: { ctxSize: 8192 } }),
         runtimeBackend: LlamaCppRuntimeBackend.Cuda,
         runtimeCapabilities: gpuCapabilities(),
@@ -90,8 +87,8 @@ describe('llamacppModelGpuPlacement', () => {
     });
   });
 
-  test('does not treat nCpuMoe as explicit GPU placement and keeps gpuLayers auto', () => {
-    const result = planLlamaCppModelGpuPlacement({
+  test('does not treat nCpuMoe as explicit GPU placement and keeps gpuLayers auto', async () => {
+    const result = await planLlamaCppModelGpuPlacement({
       launchInput: modelLaunchInput({
         modelPath: '/models/qwen3-30b.gguf',
         options: { nCpuMoe: 12 },
@@ -113,9 +110,9 @@ describe('llamacppModelGpuPlacement', () => {
     ).toBe(12);
   });
 
-  test('rejects nCpuMoe exceeding the model block count', () => {
-    vi.mocked(readGgufBlockCount).mockReturnValue(48);
-    const result = planLlamaCppModelGpuPlacement({
+  test('rejects nCpuMoe exceeding the model block count', async () => {
+    vi.mocked(readGgufPlacementAsync).mockResolvedValue({ blockCount: 48 });
+    const result = await planLlamaCppModelGpuPlacement({
       launchInput: modelLaunchInput({
         modelPath: '/models/qwen3-30b-a3b.gguf',
         options: { nCpuMoe: 49 },
@@ -133,9 +130,9 @@ describe('llamacppModelGpuPlacement', () => {
     expect(result.success === false && result.detail).toContain('49');
   });
 
-  test('allows nCpuMoe within the model block count (Qwen3-30B-A3B: 48)', () => {
-    vi.mocked(readGgufBlockCount).mockReturnValue(48);
-    const result = planLlamaCppModelGpuPlacement({
+  test('allows nCpuMoe within the model block count (Qwen3-30B-A3B: 48)', async () => {
+    vi.mocked(readGgufPlacementAsync).mockResolvedValue({ blockCount: 48 });
+    const result = await planLlamaCppModelGpuPlacement({
       launchInput: modelLaunchInput({
         modelPath: '/models/qwen3-30b-a3b.gguf',
         options: { nCpuMoe: 48 },
@@ -152,9 +149,8 @@ describe('llamacppModelGpuPlacement', () => {
     });
   });
 
-  test('passes nCpuMoe through when the block count is unreadable', () => {
-    vi.mocked(readGgufBlockCount).mockReturnValue(undefined);
-    const result = planLlamaCppModelGpuPlacement({
+  test('passes nCpuMoe through when the block count is unreadable', async () => {
+    const result = await planLlamaCppModelGpuPlacement({
       launchInput: modelLaunchInput({
         modelPath: '/models/unknown.gguf',
         options: { nCpuMoe: 999 },
@@ -168,8 +164,8 @@ describe('llamacppModelGpuPlacement', () => {
     expect(result).toMatchObject({ success: true });
   });
 
-  test('keeps a CPU runtime launch input unchanged', () => {
-    const result = planLlamaCppModelGpuPlacement({
+  test('keeps a CPU runtime launch input unchanged', async () => {
+    const result = await planLlamaCppModelGpuPlacement({
       launchInput: modelLaunchInput(),
       runtimeBackend: LlamaCppRuntimeBackend.Cpu,
       modelSizeBytes: gib(7),
@@ -179,11 +175,11 @@ describe('llamacppModelGpuPlacement', () => {
     expect(result.success && result.input).toEqual(modelLaunchInput({ model: 'qwen.gguf' }));
   });
 
-  test('does not alter explicit GPU placement', () => {
+  test('does not alter explicit GPU placement', async () => {
     const launchInput = modelLaunchInput({
       options: { device: '1', gpuLayers: 32, splitMode: 'layer' },
     });
-    const result = planLlamaCppModelGpuPlacement({
+    const result = await planLlamaCppModelGpuPlacement({
       launchInput,
       runtimeBackend: LlamaCppRuntimeBackend.Cuda,
     });
@@ -195,8 +191,8 @@ describe('llamacppModelGpuPlacement', () => {
     });
   });
 
-  test('allows a manual budget when the model estimate fits system-memory budget plus free VRAM', () => {
-    const result = planLlamaCppModelGpuPlacement({
+  test('allows a manual budget when the model estimate fits system-memory budget plus free VRAM', async () => {
+    const result = await planLlamaCppModelGpuPlacement({
       launchInput: modelLaunchInput({ options: { ctxSize: 1024 } }),
       runtimeBackend: LlamaCppRuntimeBackend.Cuda,
       memoryPolicy: LlamaCppMemoryPolicy.Manual,
@@ -209,8 +205,8 @@ describe('llamacppModelGpuPlacement', () => {
     expect(result).toMatchObject({ success: true, mode: LlamaCppModelGpuPlacementMode.Auto });
   });
 
-  test('blocks a manual budget when the model estimate exceeds system-memory budget plus free VRAM', () => {
-    const result = planLlamaCppModelGpuPlacement({
+  test('blocks a manual budget when the model estimate exceeds system-memory budget plus free VRAM', async () => {
+    const result = await planLlamaCppModelGpuPlacement({
       launchInput: modelLaunchInput({ options: { ctxSize: 1024 } }),
       runtimeBackend: LlamaCppRuntimeBackend.Cuda,
       memoryPolicy: LlamaCppMemoryPolicy.Manual,
@@ -229,8 +225,8 @@ describe('llamacppModelGpuPlacement', () => {
     );
   });
 
-  test('blocks manual loading when a system-memory snapshot is unavailable', () => {
-    const result = planLlamaCppModelGpuPlacement({
+  test('blocks manual loading when a system-memory snapshot is unavailable', async () => {
+    const result = await planLlamaCppModelGpuPlacement({
       launchInput: modelLaunchInput(),
       memoryPolicy: LlamaCppMemoryPolicy.Manual,
       modelSizeBytes: gib(7),

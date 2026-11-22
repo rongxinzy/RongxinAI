@@ -1,91 +1,102 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 
-import { MagpieIpc } from '../../shared/magpie/types';
-import { providersContract } from '../../shared/ipc/providersContract';
-import { handleIpcContractSubset } from '../ipc/handleIpcContract';
+import { MagpieIpc } from '../../shared/ipc/providersContract.channels';
+import { magpieContract } from '../../shared/ipc/providersContract';
+import { handleIpcContract } from '../ipc/handleIpcContract';
 import type { MagpieManager } from './manager';
 import type { MagpieModelService } from './modelService';
-import type { MagpieRoutingUsageService } from './routingUsageService';
 import { HOST_PROVIDER_PREFIX } from './hostProviders';
 
 /** The app supplies its existing trusted-main-frame predicate. No arbitrary URL/HTTP IPC. */
 export function registerMagpieIpc(
   manager: MagpieManager,
   trusted: (event: IpcMainInvokeEvent) => boolean,
-  models?: MagpieModelService,
-  routingUsage?: MagpieRoutingUsageService,
+  models: MagpieModelService,
 ): () => Promise<void> {
-  const usage = routingUsage ?? manager.routingUsage;
+  const usage = manager.routingUsage;
+  const pending = new Set<Promise<unknown>>();
+  let closing = false;
+  const assertAdmitted = (event: IpcMainInvokeEvent): void => {
+    if (!trusted(event)) throw new Error('Untrusted model management request');
+    if (closing) throw new Error('The model service is shutting down.');
+  };
+  const routeMutation = <T>(task: Promise<T>): Promise<T> =>
+    task.finally(() => models.invalidateCatalog());
   // All magpie channels share one trust gate (main-frame sender only); apply
   // it around each impl so the contract layer keeps its arg validation.
   const gated =
-    <A extends unknown[], R>(
-      handler: (event: IpcMainInvokeEvent, ...args: A) => R,
-    ): ((event: IpcMainInvokeEvent, ...args: A) => R) =>
-    (event, ...args) => {
-      if (!trusted(event)) throw new Error('Untrusted model management request');
-      return handler(event, ...args);
+    <A extends unknown[], R>(handler: (event: IpcMainInvokeEvent, ...args: A) => R) =>
+    async (event: IpcMainInvokeEvent, ...args: A): Promise<Awaited<R>> => {
+      assertAdmitted(event);
+      const task = Promise.resolve(handler(event, ...args));
+      pending.add(task);
+      try {
+        return await task;
+      } finally {
+        pending.delete(task);
+      }
     };
 
-  handleIpcContractSubset(providersContract, {
-    magpieCatalog: gated(() => {
-      if (!models) throw new Error('Model catalog is not initialized');
-      return models.catalog();
-    }),
-    magpieSelectDefault: gated((_event, id) => {
-      if (!models) throw new Error('Model catalog is not initialized');
-      return models.selectDefault(id);
-    }),
-    magpieSetSubscriptionAccounts: gated((_event, enabled) =>
-      manager.setSubscriptionAccounts(enabled),
+  handleIpcContract(magpieContract, {
+    catalog: gated(() => models.catalog()),
+    selectDefault: gated((_event, id) => models.selectDefault(id)),
+    setSubscriptionAccounts: gated((_event, enabled) =>
+      routeMutation(manager.setSubscriptionAccounts(enabled)),
     ),
-    magpieStatus: gated(() => manager.status()),
-    magpieStart: gated(() => manager.start()),
-    magpieStop: gated(() => manager.stop()),
-    magpieModels: gated(() => manager.models()),
-    magpieAgents: gated(() => manager.agents()),
-    magpieSetModel: gated((_event, selection) => manager.setModel(selection)),
-    magpiePreviewAgent: gated((_event, agentId) => manager.previewAgent(agentId)),
-    magpieConnectAgent: gated((_event, agentId) => manager.connectAgent(agentId)),
-    magpieDisconnectAgent: gated((_event, agentId) => manager.disconnectAgent(agentId)),
-    magpieDisconnectAllAgents: gated(() => manager.disconnectAllAgents()),
-    magpieProviders: gated(() => manager.providers()),
-    magpieSaveProvider: gated((_event, input) => {
+    status: gated(() => manager.status()),
+    start: gated(() => manager.start()),
+    stop: gated(() => manager.stop()),
+    agents: gated(() => manager.agents()),
+    setModel: gated((_event, selection) => manager.setModel(selection)),
+    previewAgent: gated((_event, agentId) => manager.previewAgent(agentId)),
+    connectAgent: gated((_event, agentId) => manager.connectAgent(agentId)),
+    disconnectAgent: gated((_event, agentId) => manager.disconnectAgent(agentId)),
+    disconnectAllAgents: gated(() => manager.disconnectAllAgents()),
+    providers: gated(() => manager.providers()),
+    saveProvider: gated((_event, input) => {
       if (input?.id?.startsWith(HOST_PROVIDER_PREFIX)) {
         throw new Error('Host-managed providers cannot be modified via user settings');
       }
-      return manager.saveProvider(input);
+      return routeMutation(manager.saveProvider(input));
     }),
-    magpieSetProviderEnabled: gated((_event, id, enabled) => {
+    setProviderEnabled: gated((_event, id, enabled) => {
       if (id.startsWith(HOST_PROVIDER_PREFIX)) {
         throw new Error('Host-managed providers cannot be toggled via user settings');
       }
-      return manager.setProviderEnabled(id, enabled);
+      return routeMutation(manager.setProviderEnabled(id, enabled));
     }),
-    magpieDeleteProvider: gated((_event, id) => {
+    deleteProvider: gated((_event, id) => {
       if (id.startsWith(HOST_PROVIDER_PREFIX)) {
         throw new Error('Host-managed providers cannot be deleted via user settings');
       }
-      return manager.deleteProvider(id);
+      return routeMutation(manager.deleteProvider(id));
     }),
-    magpieTestProvider: gated((_event, input) => manager.testProvider(input)),
-    magpieDiagnostics: gated(() => manager.diagnostics()),
-    magpieClearDiagnostics: gated(() => manager.clearDiagnostics()),
-    magpiePreferences: gated(() => manager.preferences()),
-    magpieUpdatePreferences: gated((_event, patch) => manager.updatePreferences(patch)),
-    magpieRoutingGroups: gated(() => usage.routingGroups()),
-    magpieSaveRoutingGroup: gated((_event, input) => usage.saveRoutingGroup(input)),
-    magpieDeleteRoutingGroup: gated((_event, id) => usage.deleteRoutingGroup(id)),
-    magpieArrangeRoutingGroups: gated((_event, order) => usage.arrangeRoutingGroups(order)),
-    magpieUsageSummary: gated((_event, period) => usage.usageSummary(period)),
-    magpieUsageRequests: gated((_event, period, offset, limit) =>
+    testProvider: (event, input) => {
+      assertAdmitted(event);
+      return manager.testProvider(input);
+    },
+    diagnostics: gated(() => manager.diagnostics()),
+    clearDiagnostics: gated(() => manager.clearDiagnostics()),
+    preferences: gated(() => manager.preferences()),
+    updatePreferences: gated((_event, patch) => manager.updatePreferences(patch)),
+    routingGroups: gated(() => usage.routingGroups()),
+    saveRoutingGroup: gated((_event, input) => routeMutation(usage.saveRoutingGroup(input))),
+    deleteRoutingGroup: gated((_event, id) => routeMutation(usage.deleteRoutingGroup(id))),
+    arrangeRoutingGroups: gated((_event, order) =>
+      routeMutation(usage.arrangeRoutingGroups(order)),
+    ),
+    usageSummary: gated((_event, period) => usage.usageSummary(period)),
+    usageRequests: gated((_event, period, offset, limit) =>
       usage.usageRequests(period, offset, limit),
     ),
-    magpieUsageQuotas: gated((_event, asked) => usage.usageQuotas(asked)),
-    magpieUsageBudget: gated(() => usage.usageBudget()),
+    usageQuotas: gated((_event, asked) => usage.usageQuotas(asked)),
+    usageBudget: gated(() => usage.usageBudget()),
   });
   return async () => {
-    for (const channel of Object.values(MagpieIpc)) ipcMain.removeHandler(channel);
-    await manager.shutdown();
+    if (!closing) {
+      closing = true;
+      for (const channel of Object.values(MagpieIpc)) ipcMain.removeHandler(channel);
+    }
+    await Promise.allSettled(pending);
   };
 }

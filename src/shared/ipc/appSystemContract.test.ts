@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { appSystemContract } from './appSystemContract';
-import { appSystemContractChannels } from './appSystemContract.channels';
+import * as appSystemChannels from './appSystemContract.channels';
 
 /**
  * Schema fidelity tests: fixtures below are copied from real renderer call
@@ -24,7 +24,6 @@ test('store get/set/remove accept the localStore adapter payloads', () => {
 
 test('window and app info methods take no arguments', () => {
   expect(appSystemContract.windowIsMaximized.args.safeParse([]).success).toBe(true);
-  expect(appSystemContract.windowToggleDevTools.args.safeParse([]).success).toBe(true);
   expect(appSystemContract.appGetInferenceEdition.result.safeParse('cuda').success).toBe(true);
   expect(appSystemContract.appGetInferenceEdition.result.safeParse('tensorrt').success).toBe(false);
 });
@@ -69,11 +68,10 @@ test('dialog selectDirectory accepts the optional defaultPath', () => {
   expect(appSystemContract.dialogSelectDirectory.args.safeParse([]).success).toBe(true);
 });
 
-test('dialog selectFile accepts the SkillsManager zip filter payload', () => {
-  // SkillsManager import zip: selectFile({ filters: [{ name: 'Zip', extensions: ['zip'] }] })
+test('dialog selectFiles validates single-selection Skill zip and multi-selection attachment payloads', () => {
   expect(
-    appSystemContract.dialogSelectFile.args.safeParse([
-      { filters: [{ name: 'Zip', extensions: ['zip'] }] },
+    appSystemContract.dialogSelectFiles.args.safeParse([
+      { multiple: false, filters: [{ name: 'Zip', extensions: ['zip'] }] },
     ]).success,
   ).toBe(true);
   expect(
@@ -82,8 +80,11 @@ test('dialog selectFile accepts the SkillsManager zip filter payload', () => {
     ]).success,
   ).toBe(true);
   expect(
-    appSystemContract.dialogSelectFile.args.safeParse([{ filters: [{ name: 'Zip' }] }]).success,
+    appSystemContract.dialogSelectFiles.args.safeParse([{ filters: [{ name: 'Zip' }] }]).success,
   ).toBe(false);
+  expect(appSystemContract.dialogSelectFiles.args.safeParse([{ multiple: 'no' }]).success).toBe(
+    false,
+  );
 });
 
 test('dialog saveInlineFile accepts the usePromptAttachments payload', () => {
@@ -105,59 +106,14 @@ test('dialog saveInlineFile accepts the usePromptAttachments payload', () => {
   expect(appSystemContract.dialogSaveInlineFile.args.safeParse([{}]).success).toBe(false);
 });
 
-test('dialog readFileAsDataUrl and generateThumbnail take a path', () => {
+test('dialog file readers accept artifact paths', () => {
   expect(appSystemContract.dialogReadFileAsDataUrl.args.safeParse(['/tmp/a.png']).success).toBe(
-    true,
-  );
-  expect(appSystemContract.dialogGenerateThumbnail.args.safeParse(['/tmp/a.pdf']).success).toBe(
     true,
   );
   expect(
     appSystemContract.dialogCheckArtifactFile.args.safeParse(['file:///tmp/a.html']).success,
   ).toBe(true);
   expect(appSystemContract.dialogReadFileAsDataUrl.args.safeParse([null]).success).toBe(false);
-});
-
-test('dialog showMessageBox accepts the artifact confirm payload', () => {
-  // MarkdownContent / confirm flows send { message, type?, title? }
-  expect(
-    appSystemContract.dialogShowMessageBox.args.safeParse([
-      { message: '文件不存在', type: 'warning' },
-    ]).success,
-  ).toBe(true);
-  expect(appSystemContract.dialogShowMessageBox.args.safeParse([{ message: 'hi' }]).success).toBe(
-    true,
-  );
-  expect(
-    appSystemContract.dialogShowMessageBox.args.safeParse([{ message: 'x', type: 'severe' }])
-      .success,
-  ).toBe(false);
-  expect(appSystemContract.dialogShowMessageBox.args.safeParse([{ type: 'info' }]).success).toBe(
-    false,
-  );
-});
-
-// --- project ----------------------------------------------------------------
-
-test('project createDirectory accepts the CreateProjectDialog payload', () => {
-  expect(
-    appSystemContract.projectCreateDirectory.args.safeParse([{ name: 'demo-project' }]).success,
-  ).toBe(true);
-  expect(
-    appSystemContract.projectCreateDirectory.args.safeParse([
-      { name: 'demo', baseDir: '/home/me/projects' },
-    ]).success,
-  ).toBe(true);
-  // name is required by the shared schema.
-  expect(appSystemContract.projectCreateDirectory.args.safeParse([{}]).success).toBe(false);
-
-  expect(
-    appSystemContract.projectCreateDirectory.result.safeParse({
-      success: false,
-      path: null,
-      code: 'already-exists',
-    }).success,
-  ).toBe(true);
 });
 
 // --- shell ----------------------------------------------------------------
@@ -199,14 +155,8 @@ test('appUpdate setChannel accepts the stable/beta preference', () => {
 
 describe('contract/channel consistency', () => {
   test('channel map stays in sync with the contract', () => {
-    expect(Object.keys(appSystemContractChannels).sort()).toEqual(
-      Object.keys(appSystemContract).sort(),
-    );
-    for (const method of Object.keys(appSystemContract)) {
-      expect(appSystemContractChannels[method as keyof typeof appSystemContract]).toBe(
-        (appSystemContract[method as keyof typeof appSystemContract] as { channel: string })
-          .channel,
-      );
-    }
+    const preloadChannels = Object.values(appSystemChannels).flatMap(map => Object.values(map));
+    const contractChannels = Object.values(appSystemContract).map(method => method.channel);
+    expect(preloadChannels.sort()).toEqual(contractChannels.sort());
   });
 });

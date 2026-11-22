@@ -54,10 +54,12 @@ describe('Empirical Adversarial Stress Harness: Queue Controller Steer & Follow-
     } as unknown as ActivePiSession;
 
     mockStore = {
-      addMessage: vi.fn((_id: string, msg: CoworkMessage) => {
-        persistedMessages.push(msg);
-        return msg;
-      }),
+      messages: {
+        addMessage: vi.fn((_id: string, msg: CoworkMessage) => {
+          persistedMessages.push(msg);
+          return msg;
+        }),
+      },
     };
 
     mockHost = {
@@ -103,8 +105,8 @@ describe('Empirical Adversarial Stress Harness: Queue Controller Steer & Follow-
       activeSession.isRunning = true;
 
       // Enqueue follow-ups
-      const q1 = queueController.enqueuePendingMessage(sessionId, 'FollowUp 1');
-      const q2 = queueController.enqueuePendingMessage(sessionId, 'FollowUp 2');
+      const q1 = await queueController.enqueuePendingMessage(sessionId, 'FollowUp 1');
+      const q2 = await queueController.enqueuePendingMessage(sessionId, 'FollowUp 2');
       expect(q1.success && q2.success).toBe(true);
 
       // Enqueue control actions

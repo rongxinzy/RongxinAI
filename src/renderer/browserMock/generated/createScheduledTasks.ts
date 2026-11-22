@@ -5,34 +5,6 @@ export function createScheduledTasks(
   runtime: BrowserMockRuntime,
 ): Window['electron']['scheduledTasks'] {
   return {
-    resolveSession: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.resolveSession');
-      return {
-        success: true,
-        session: {
-          id: 'preview',
-          title: 'Preview',
-          status: 'idle',
-          pinned: false,
-          cwd: '/home/user/preview',
-          systemPrompt: '',
-          modelOverride: '',
-          executionMode: 'auto',
-          activeSkillIds: [],
-          workspaceId: '',
-          agentId: '',
-          source: 'manual',
-          experts: [],
-          messages: [],
-          messagesOffset: 0,
-          totalMessages: 0,
-          artifacts: [],
-          createdAt: 1792108800000,
-          updatedAt: 1792108800000,
-        },
-      };
-    },
     onStatusUpdate: _p0 => {
       return runtime.subscribe('scheduledTasks.onStatusUpdate', _p0);
     },
@@ -47,45 +19,6 @@ export function createScheduledTasks(
       return {
         success: true,
         tasks: [],
-      };
-    },
-    get: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.get');
-      return {
-        success: true,
-        task: {
-          name: 'Preview',
-          description: '',
-          enabled: false,
-          schedule: {
-            kind: 'at',
-            at: '',
-          },
-          sessionTarget: 'isolated',
-          wakeMode: 'next-heartbeat',
-          payload: {
-            kind: 'agentTurn',
-            message: 'Preview',
-          },
-          id: 'preview',
-          workspaceId: '',
-          sessionKey: '',
-          state: {
-            nextRunAtMs: 0,
-            lastRunAtMs: 0,
-            lastStatus: 'success',
-            lastError: '',
-            lastDurationMs: 0,
-            runningAtMs: 0,
-            consecutiveErrors: 0,
-          },
-          createdAt: '',
-          updatedAt: '',
-          delivery: {
-            mode: 'none',
-          },
-        },
       };
     },
     create: async _p0 => {
@@ -219,13 +152,6 @@ export function createScheduledTasks(
         success: true,
       };
     },
-    stop: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.stop');
-      return {
-        success: true,
-      };
-    },
     preflight: async _p0 => {
       void _p0;
       runtime.warnOnce('scheduledTasks.preflight');
@@ -250,13 +176,6 @@ export function createScheduledTasks(
       return {
         success: true,
         deliveries: [],
-      };
-    },
-    countRuns: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.countRuns');
-      return {
-        success: true,
       };
     },
     listAllRuns: async _p0 => {

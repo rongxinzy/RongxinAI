@@ -29,39 +29,6 @@ const IpcResult = <T extends z.ZodRawShape>(data: T) =>
 
 // ─── MCP ────────────────────────────────────────────────────────────────────
 
-// ─── Model Pool ─────────────────────────────────────────────────────────────
-
-export const ModelPoolStreamSchema = {
-  input: z.object({
-    conversationId: z
-      .string()
-      .min(1)
-      .max(160)
-      .regex(/^[A-Za-z0-9_-]+$/u),
-    requestId: z
-      .string()
-      .min(1)
-      .max(160)
-      .regex(/^[A-Za-z0-9_-]+$/u),
-    body: z.record(z.string(), z.unknown()),
-  }),
-  output: z.object({
-    ok: z.boolean(),
-    status: z.number(),
-    statusText: z.string(),
-    error: z.string().optional(),
-  }),
-};
-
-export const ModelPoolModelsSchema = {
-  output: z.object({
-    ok: z.boolean(),
-    status: z.number(),
-    models: z.array(z.string()),
-    error: z.string().optional(),
-  }),
-};
-
 // ─── Window ─────────────────────────────────────────────────────────────────
 
 // ─── Cowork Session ─────────────────────────────────────────────────────────
@@ -154,16 +121,6 @@ export const CoworkConfigSetSchema = {
     codemodeEnabled: z.boolean().optional(),
   }),
   output: IpcResult({}),
-};
-
-// ─── Project (working directory helpers) ────────────────────────────────────
-
-export const ProjectCreateDirectorySchema = {
-  input: z.object({
-    name: z.string().min(1),
-    baseDir: z.string().min(1).optional(),
-  }),
-  output: IpcResult({ path: z.string() }),
 };
 
 // ─── Dialog ─────────────────────────────────────────────────────────────────

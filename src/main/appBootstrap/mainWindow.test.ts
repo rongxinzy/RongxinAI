@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => {
     unregisterContextMenu,
     createTray: vi.fn(),
     emitWindowState: vi.fn(),
+    cancelPersistAppWindowState: vi.fn(),
     schedulePersistAppWindowState: vi.fn(),
     persistAppWindowState: vi.fn(),
     scheduleReload: vi.fn(),
@@ -117,6 +118,7 @@ vi.mock('./windowBranding', () => ({
 }));
 vi.mock('./windowManagement', () => ({
   emitWindowState: mocks.emitWindowState,
+  cancelPersistAppWindowState: mocks.cancelPersistAppWindowState,
   schedulePersistAppWindowState: mocks.schedulePersistAppWindowState,
   persistAppWindowState: mocks.persistAppWindowState,
   getTitleBarOverlayOptions: () => ({}),
@@ -135,7 +137,6 @@ vi.mock('../autoLaunchManager', () => ({ isAutoLaunched: mocks.isAutoLaunched })
 vi.mock('./runtimeServices', () => ({
   getStore: () => ({
     get: (key: string) => (key === 'app_config' ? { language: 'zh' } : undefined),
-    getDatabase: () => ({}),
   }),
 }));
 vi.mock('../contextMenu', () => ({ registerContextMenu: mocks.registerContextMenu }));
@@ -144,18 +145,19 @@ vi.mock('../desktopPet/controller', () => ({
   initializeDesktopPet: vi.fn(),
   openDesktopPetSession: vi.fn(),
   getDesktopPetWindow: vi.fn(() => null),
-  setDesktopPetBubbleVisible: vi.fn(),
-  observeDesktopPetCompanionActivity: vi.fn(),
+  refreshDesktopPetState: vi.fn(),
 }));
 vi.mock('../companion/window', () => ({ initializeCompanionWindow: vi.fn() }));
+vi.mock('./companionTasks', () => ({
+  getCompanionServices: () => ({ companions: {}, tasks: {} }),
+}));
+vi.mock('./sessionServices', () => ({
+  getPiRuntimeAdapter: () => ({
+    getRunningSessionIds: () => [],
+    getPendingModalPermissionSessionId: () => undefined,
+  }),
+}));
 vi.mock('./appConfigSettings', () => ({ getInitialTheme: () => 'light' }));
-vi.mock('../../scheduledTask/migrate', () => ({
-  migrateLegacyScheduledTasksToCanonical: vi.fn(() => Promise.resolve()),
-  migrateLegacyScheduledTaskRunsToCanonical: vi.fn(() => Promise.resolve()),
-}));
-vi.mock('../../scheduledTask/sqliteScheduledTaskStore', () => ({
-  SqliteScheduledTaskStore: vi.fn(),
-}));
 
 import { BrowserWindow } from 'electron';
 
@@ -249,8 +251,22 @@ describe('createMainWindow', () => {
 
     expect(lifecycleRuntime.mainWindow).toBeNull();
     expect(mocks.unregisterContextMenu).toHaveBeenCalled();
+    expect(mocks.cancelPersistAppWindowState).toHaveBeenCalledOnce();
     expect(mocks.appQuit).toHaveBeenCalledTimes(1);
     window.emitWebContents('did-finish-load');
+  });
+
+  test('ignores late window readiness events during quit', () => {
+    createMainWindow();
+    const window = currentWindow();
+    window.isVisible.mockReturnValue(false);
+    lifecycleRuntime.isQuitting = true;
+
+    window.emitWebContents('did-finish-load');
+    window.emit('ready-to-show');
+
+    expect(window.show).not.toHaveBeenCalled();
+    expect(mocks.createTray).not.toHaveBeenCalled();
   });
 
   test('does not quit again while a quit is already in progress', () => {

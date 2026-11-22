@@ -7,6 +7,7 @@
  */
 
 import {
+  createTestPiRuntime,
   adapter,
   mockCreateAgentSession,
   mockDefaultResourceLoader,
@@ -15,6 +16,9 @@ import {
 } from './piRuntimeAdapter.testHarness';
 
 import { describe, expect, it, vi } from 'vitest';
+import { ArtifactLedger } from '../../artifactLedger/artifactLedger';
+import { ArtifactRecorder } from '../../artifactLedger/artifactRecorder';
+import { createCoworkStoreHarness } from '../../coworkStore/coworkStore.testHarness';
 import type { CoworkStore } from '../../coworkStore';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 
@@ -27,6 +31,51 @@ describe('PiRuntimeAdapter', () => {
       // Should not throw; falls back to creating new session
       expect(mockSession.subscribe).toHaveBeenCalled();
     });
+
+    it.each(['stop', 'shutdown'] as const)(
+      'cancels a prompt waiting for artifact capture on %s',
+      async action => {
+        const { db } = createCoworkStoreHarness();
+        const capture = Promise.withResolvers<number>();
+        const sessionId = 'artifact-capture';
+        const recorder = new ArtifactRecorder({
+          sessionId,
+          workspaceRoot: '',
+          ledger: new ArtifactLedger(db),
+        });
+        vi.spyOn(recorder, 'pendingFinalCapture', 'get').mockReturnValue(capture.promise);
+        try {
+          await adapter.startSession(sessionId, 'First');
+          const listener = mockSession.subscribe.mock.calls[0]![0] as (event: {
+            type: string;
+          }) => void;
+          listener({ type: 'agent_settled' });
+          const active = adapter.activeSessions.get(sessionId)!;
+          active.artifactRecorder = recorder;
+
+          const next = adapter.continueSession(sessionId, 'Second');
+          const waitingFinished = vi.fn();
+          const cancelled = expect(next)
+            .rejects.toThrow('The session closed')
+            .then(waitingFinished);
+          adapter.evictIdleSessions(Date.now() + 60 * 60 * 1000);
+          expect(adapter.activeSessions.get(sessionId)).toBe(active);
+          expect(mockSession.prompt).toHaveBeenCalledTimes(1);
+
+          const shutdown = action === 'shutdown' ? adapter.shutdown() : undefined;
+          if (action === 'stop') adapter.stopSession(sessionId);
+          await vi.waitFor(() => expect(waitingFinished).toHaveBeenCalledOnce());
+          await cancelled;
+          expect(mockSession.prompt).toHaveBeenCalledTimes(1);
+          capture.resolve(1);
+          await shutdown?.drained;
+        } finally {
+          capture.resolve(1);
+          adapter.stopAllSessions();
+          db.close();
+        }
+      },
+    );
   });
 
   describe('builtin control actions', () => {
@@ -112,13 +161,17 @@ describe('PiRuntimeAdapter', () => {
       const added: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
       // Only the members this path reads; getSession backs both the transcript
       // lookup and the experts/turn snapshot.
-      adapter.setCoworkStore({
-        addMessage: (_sessionId: string, message: unknown) => {
-          added.push(message as { content: string; metadata?: Record<string, unknown> });
-          return message;
-        },
-        getSession: () => ({ messages: [], experts: [] }),
-      } as unknown as CoworkStore);
+      const adapter = createTestPiRuntime({
+        coworkStore: {
+          messages: {
+            addMessage: (_sessionId: string, message: unknown) => {
+              added.push(message as { content: string; metadata?: Record<string, unknown> });
+              return message;
+            },
+          },
+          getSession: () => ({ messages: [], experts: [] }),
+        } as unknown as CoworkStore,
+      });
 
       await adapter.startSession('attached-skills', 'First', {
         skipInitialUserMessage: true,
@@ -146,7 +199,7 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('reloads the session in place before the next turn after MCP configuration changes', async () => {
-      adapter.setMcpServerSource({ listEnabled: () => [] });
+      const adapter = createTestPiRuntime({ mcpServerSource: { listEnabled: () => [] } });
       await adapter.startSession('test', 'First');
 
       adapter.markMcpConfigurationChanged();
@@ -160,21 +213,27 @@ describe('PiRuntimeAdapter', () => {
 
     it('persists the selected expert on a continuation user message', async () => {
       const addMessage = vi.fn((_sessionId: string, message: Record<string, unknown>) => message);
+      const getSessionExperts = vi.fn().mockReturnValue([]);
+      const adapter = createTestPiRuntime({
+        coworkStore: {
+          messages: { addMessage },
+          getSessionExperts,
+          getAgent: vi.fn(),
+          updateSession: vi.fn(),
+        } as unknown as CoworkStore,
+      });
 
-      await adapter.startSession('test', 'First', { expertIds: ['expert-a'] });
-      adapter.setCoworkStore({
-        addMessage,
-        getSession: vi.fn(() => ({
-          experts: [
-            {
-              expertId: 'expert-a',
-              expertName: 'Expert A',
-              packageId: 'package-a',
-            },
-          ],
-        })),
-        updateSession: vi.fn(),
-      } as unknown as CoworkStore);
+      await adapter.startSession('test', 'First', {
+        expertIds: ['expert-a'],
+        skipInitialUserMessage: true,
+      });
+      getSessionExperts.mockReturnValue([
+        {
+          expertId: 'expert-a',
+          expertName: 'Expert A',
+          packageId: 'package-a',
+        },
+      ]);
 
       await adapter.continueSession('test', 'Second', { expertIds: ['expert-a'] });
 
@@ -288,12 +347,14 @@ describe('PiRuntimeAdapter', () => {
       const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
         run: { id: `run-${beginRun.mock.calls.length}` },
       }));
-      adapter.setWorkbenchTaskService({
-        beginRun,
-        updateRunContext: vi.fn(),
-        on: vi.fn(),
-        off: vi.fn(),
-      } as unknown as WorkbenchTaskService);
+      const adapter = createTestPiRuntime({
+        workbenchTaskService: {
+          beginRun,
+          updateRunContext: vi.fn(),
+          on: vi.fn(),
+          off: vi.fn(),
+        } as unknown as WorkbenchTaskService,
+      });
 
       await adapter.startSession('test', 'First', { sessionMode: 'work', skillIds: ['skill-a'] });
       await adapter.continueSession('test', 'Second', {

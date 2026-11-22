@@ -143,12 +143,9 @@ describe('accumulatorFromPendingPermissions', () => {
       conversationId: 'conv-1',
       platform: 'dingtalk',
       createdAt: 0,
-      backgroundDelivery: { conversationId: 'conv-1', platform: 'dingtalk' },
     } satisfies PendingIMPermission;
     expect(accumulatorFromPendingPermissions([pending])).toEqual({
       runId: 'run-1',
-      messages: [],
-      backgroundDelivery: { conversationId: 'conv-1', platform: 'dingtalk' },
     });
   });
 });

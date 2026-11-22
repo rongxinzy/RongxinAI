@@ -1,15 +1,7 @@
 import { ProviderName } from './constants';
 
-const LocalProviderName = {
-  LlamaCpp: ProviderName.LlamaCpp,
-  Ollama: ProviderName.Ollama,
-} as const;
-
-const LOCAL_PROVIDER_NAMES = new Set<string>(Object.values(LocalProviderName));
-
 export function isLocalProviderName(providerName?: string | null): boolean {
-  const normalized = providerName?.trim().toLowerCase();
-  return !!normalized && LOCAL_PROVIDER_NAMES.has(normalized);
+  return providerName?.trim().toLowerCase() === ProviderName.LlamaCpp;
 }
 
 function getProviderNameFromModelRef(modelRef?: string | null): string | null {

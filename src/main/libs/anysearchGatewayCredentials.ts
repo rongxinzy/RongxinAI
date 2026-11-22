@@ -12,14 +12,16 @@ const encoded = new Uint8Array([
   134, 54, 225, 146, 15, 243, 145, 100, 149, 68, 121, 121, 76, 104, 30, 79, 136, 12, 140, 134,
 ]);
 
-export function resolveAnySearchGatewayToken(): string {
-  const deploymentOverride = process.env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN?.trim();
-  if (deploymentOverride) return deploymentOverride;
+// Capture launch overrides before app bootstrap starts any subprocesses.
+const deploymentToken = process.env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN?.trim();
+const deploymentUrl = process.env.ZHIYUAN_ANYSEARCH_GATEWAY_URL?.trim();
+delete process.env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN;
+delete process.env.ZHIYUAN_ANYSEARCH_GATEWAY_URL;
 
+export function resolveAnySearchGateway(): { url: string; token: string } | null {
+  if (deploymentUrl && !deploymentToken) return null;
+  const url = deploymentUrl || 'https://search.rongxzyai.com';
+  if (deploymentToken) return { url, token: deploymentToken };
   const clear = encoded.map((value, index) => value ^ mask[(index * 7 + 3) % mask.length]);
-  return new TextDecoder().decode(clear);
-}
-
-export function resolveAnySearchGatewayUrl(): string {
-  return process.env.ZHIYUAN_ANYSEARCH_GATEWAY_URL?.trim() || 'https://search.rongxzyai.com';
+  return { url, token: new TextDecoder().decode(clear) };
 }

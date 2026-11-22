@@ -22,7 +22,7 @@ test('retiring workflow state preserves task history and releases foreign keys',
     initializeWorkbenchTaskSchema(db);
     expect(repository.getTask(task.id)?.goal).toBe('Keep the task');
     expect(repository.getRun(run.id)?.id).toBe(run.id);
-    expect(() => repository.deleteSessionDomainData('session')).not.toThrow();
+    expect(() => repository.deleteSessionDomainData(['session'])).not.toThrow();
     expect(repository.getTask(task.id)).toBeNull();
   } finally {
     db.close();

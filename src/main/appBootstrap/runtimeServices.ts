@@ -2,29 +2,23 @@ import { app, powerSaveBlocker } from 'electron';
 
 import { isEnterprise } from './appEnv';
 import { lifecycleRuntime } from './lifecycleRuntimeState';
-import { agentRuntime } from './agentRuntimeState';
-import { storageRuntime } from './storageRuntimeState';
-import { inferenceRuntime } from './inferenceRuntimeState';
-import { mcpRuntime } from './mcpRuntimeState';
 import {
   APP_UPDATE_POLL_INTERVAL_MS,
   APP_UPDATE_STARTUP_DELAY_JITTER_MS,
   APP_UPDATE_STARTUP_DELAY_MIN_MS,
 } from '../../shared/appUpdate/constants';
-import { getLlamaCppServiceConfig } from '../ipcHandlers/llamacpp';
-import { getOllamaServiceConfig } from '../ipcHandlers/ollama';
 import { AppUpdateCoordinator } from '../libs/appUpdateCoordinator';
-import { LlamaCppManager } from '../libs/llamacppManager';
-import { OllamaManager } from '../libs/ollamaManager';
 import { McpCredentialVault } from '../libs/mcpCredentialVault';
 import { McpStore } from '../mcpStore';
 import { AgentManager } from '../agentManager';
 import { CoworkStore } from '../coworkStore';
+import { IMStore } from '../im/imStore';
 import { ArtifactLedger } from '../artifactLedger/artifactLedger';
 import { SkillManager } from '../skillManager';
 import { ActivityService } from '../activity/activityService';
 import { SqliteStore } from '../sqliteStore';
-import { channelRuntime } from './channelRuntimeState';
+import { SqliteBackupManager } from '../libs/sqliteBackup/sqliteBackupManager';
+import { SqliteScheduledTaskStore } from '../../scheduledTask/sqliteScheduledTaskStore';
 
 const PowerSaveBlockerType = {
   PreventAppSuspension: 'prevent-app-suspension',
@@ -32,6 +26,7 @@ const PowerSaveBlockerType = {
 
 const activeRunSleepBlockerIds = new Set<string>();
 let manualPreventSleepEnabled = false;
+let preventSleepBlockerId: number | null = null;
 
 function isSleepBlockerActive(id: number | null): boolean {
   if (id === null) return false;
@@ -41,21 +36,16 @@ function isSleepBlockerActive(id: number | null): boolean {
 function syncPreventSleepBlocker(): void {
   const shouldBlock = manualPreventSleepEnabled || activeRunSleepBlockerIds.size > 0;
   if (shouldBlock) {
-    if (!isSleepBlockerActive(lifecycleRuntime.preventSleepBlockerId)) {
-      lifecycleRuntime.preventSleepBlockerId = powerSaveBlocker.start(
-        PowerSaveBlockerType.PreventAppSuspension,
-      );
+    if (!isSleepBlockerActive(preventSleepBlockerId)) {
+      preventSleepBlockerId = powerSaveBlocker.start(PowerSaveBlockerType.PreventAppSuspension);
     }
     return;
   }
 
-  if (
-    lifecycleRuntime.preventSleepBlockerId !== null &&
-    isSleepBlockerActive(lifecycleRuntime.preventSleepBlockerId)
-  ) {
-    powerSaveBlocker.stop(lifecycleRuntime.preventSleepBlockerId);
+  if (preventSleepBlockerId !== null && isSleepBlockerActive(preventSleepBlockerId)) {
+    powerSaveBlocker.stop(preventSleepBlockerId);
   }
-  lifecycleRuntime.preventSleepBlockerId = null;
+  preventSleepBlockerId = null;
 }
 
 export function setPreventSleepBlockerEnabled(enabled: boolean): void {
@@ -78,125 +68,159 @@ export function clearActiveRunSleepBlockers(): void {
   syncPreventSleepBlocker();
 }
 
+const STORE_OPEN_TIMEOUT_MS = 15_000;
+let store: SqliteStore | undefined;
+let storeInitialization: Promise<SqliteStore> | undefined;
+let sqliteBackupManager: SqliteBackupManager | undefined;
+
 export const initStore = async (): Promise<SqliteStore> => {
-  if (!storageRuntime.storeInitPromise) {
-    if (!app.isReady()) {
-      throw new Error('Store accessed before app is ready.');
+  if (lifecycleRuntime.isQuitting) throw new Error('The application is shutting down.');
+  if (storeInitialization) return storeInitialization;
+  if (!app.isReady()) throw new Error('Store accessed before app is ready.');
+
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const opening = SqliteStore.create(app.getPath('userData')).then(opened => {
+    if (timedOut || lifecycleRuntime.isQuitting) {
+      opened.close();
+      throw new Error('Store initialization was abandoned.');
     }
-    // better-sqlite3 opens the database synchronously, so Promise.resolve() resolves
-    // immediately. The timeout acts as a safety net for unexpected OS-level
-    // blocking during store initialization and recovery.
-    storageRuntime.storeInitPromise = Promise.race([
-      SqliteStore.create(app.getPath('userData')),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Store initialization timed out after 15s')), 15_000),
-      ),
-    ]);
-  }
-  return storageRuntime.storeInitPromise;
+    store = opened;
+    return opened;
+  });
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      reject(new Error('Store initialization timed out after 15s'));
+    }, STORE_OPEN_TIMEOUT_MS);
+  });
+  storeInitialization = Promise.race([opening, deadline]).finally(() => clearTimeout(timer));
+  return storeInitialization;
 };
+
+export const getStoreIfOpen = () => store;
 
 export const getStore = (): SqliteStore => {
-  if (!storageRuntime.store) {
-    throw new Error('Store not initialized. Call initStore() first.');
-  }
-  return storageRuntime.store;
+  if (!store) throw new Error('Store not initialized. Call initStore() first.');
+  return store;
 };
 
-export const getLlamaCppManager = (): LlamaCppManager => {
-  if (!inferenceRuntime.llamaCppManager) {
-    inferenceRuntime.llamaCppManager = new LlamaCppManager(() =>
-      getLlamaCppServiceConfig(getStore()),
-    );
-  }
-  return inferenceRuntime.llamaCppManager;
-};
+export function closeStore(): void {
+  store?.close();
+  store = undefined;
+}
 
-export const getOllamaManager = (): OllamaManager => {
-  if (!inferenceRuntime.ollamaManager) {
-    inferenceRuntime.ollamaManager = new OllamaManager(() => getOllamaServiceConfig(getStore()));
-  }
-  return inferenceRuntime.ollamaManager;
-};
+export async function startSqliteBackupLoop(): Promise<void> {
+  if (lifecycleRuntime.isQuitting) return;
+  sqliteBackupManager ??= new SqliteBackupManager(app.getPath('userData'));
+  await sqliteBackupManager.startPeriodicBackupLoop(() => getStore().getDatabase());
+}
+
+export function stopSqliteBackupLoop(): void {
+  sqliteBackupManager?.stopPeriodicBackupLoop();
+}
+
+export function shutdownSqliteBackup() {
+  return sqliteBackupManager?.shutdown();
+}
+
+let appUpdateCoordinator: AppUpdateCoordinator | undefined;
+let lastSuccessfulAppUpdateCheckAt = 0;
 
 export const getAppUpdateCoordinator = (): AppUpdateCoordinator => {
-  if (!lifecycleRuntime.appUpdateCoordinator) {
-    lifecycleRuntime.appUpdateCoordinator = new AppUpdateCoordinator(
-      getStore(),
-      undefined,
-      undefined,
-      {
-        enterpriseBuild: isEnterprise,
-      },
-    );
+  if (!appUpdateCoordinator) {
+    if (lifecycleRuntime.isQuitting) throw new Error('The application is shutting down.');
+    appUpdateCoordinator = new AppUpdateCoordinator(getStore(), undefined, undefined, {
+      enterpriseBuild: isEnterprise,
+    });
   }
-  return lifecycleRuntime.appUpdateCoordinator;
+  return appUpdateCoordinator;
 };
 
-export const checkForAppUpdate = (): void => {
+const checkForAppUpdate = (): void => {
+  if (lifecycleRuntime.isQuitting) return;
   void getAppUpdateCoordinator()
     .checkNow()
     .then(result => {
-      if (result.success) lifecycleRuntime.lastSuccessfulAppUpdateCheckAt = Date.now();
+      if (result.success && !lifecycleRuntime.isQuitting)
+        lastSuccessfulAppUpdateCheckAt = Date.now();
     });
 };
+
+export const checkForAppUpdateOnResume = (): void => {
+  if (Date.now() - lastSuccessfulAppUpdateCheckAt >= APP_UPDATE_POLL_INTERVAL_MS) {
+    checkForAppUpdate();
+  }
+};
+
+let stopAppUpdateTimers: (() => void) | undefined;
 
 export const startAppUpdatePolling = (): void => {
   // Enterprise builds receive updates through the enterprise distribution
   // channel; the client never runs startup or periodic update checks.
-  if (isEnterprise || lifecycleRuntime.appUpdatePollTimer) return;
+  if (isEnterprise || lifecycleRuntime.isQuitting || stopAppUpdateTimers) return;
   const startupDelay =
     APP_UPDATE_STARTUP_DELAY_MIN_MS +
     Math.floor(Math.random() * APP_UPDATE_STARTUP_DELAY_JITTER_MS);
-  setTimeout(checkForAppUpdate, startupDelay);
-  lifecycleRuntime.appUpdatePollTimer = setInterval(checkForAppUpdate, APP_UPDATE_POLL_INTERVAL_MS);
+  const initial = setTimeout(checkForAppUpdate, startupDelay);
+  const poll = setInterval(checkForAppUpdate, APP_UPDATE_POLL_INTERVAL_MS);
+  stopAppUpdateTimers = () => {
+    clearTimeout(initial);
+    clearInterval(poll);
+  };
 };
 
-export const getCoworkStore = () => {
-  if (!storageRuntime.coworkStore) {
-    const sqliteStore = getStore();
-    storageRuntime.coworkStore = new CoworkStore(sqliteStore.getDatabase(), getArtifactLedger());
-  }
-  return storageRuntime.coworkStore;
+export const shutdownAppUpdates = (): Promise<void> | undefined => {
+  stopAppUpdateTimers?.();
+  stopAppUpdateTimers = undefined;
+  return appUpdateCoordinator?.shutdown();
 };
+
+let coworkStore: CoworkStore | undefined;
+let artifactLedger: ArtifactLedger | undefined;
+
+export const getCoworkStore = () =>
+  (coworkStore ??= new CoworkStore(getStore().getDatabase(), getArtifactLedger()));
+
+let imStore: IMStore | undefined;
+export const getIMStore = () => (imStore ??= new IMStore(getStore().getDatabase()));
 
 /** Shared artifact ledger over the main SQLite database (event-time source of truth). */
-export const getArtifactLedger = (): ArtifactLedger => {
-  if (!storageRuntime.artifactLedger) {
-    storageRuntime.artifactLedger = new ArtifactLedger(getStore().getDatabase());
-  }
-  return storageRuntime.artifactLedger;
-};
+export const getArtifactLedger = () =>
+  (artifactLedger ??= new ArtifactLedger(getStore().getDatabase()));
 
-export const getAgentManager = () => {
-  if (!agentRuntime.agentManager) {
-    agentRuntime.agentManager = new AgentManager(getCoworkStore());
-  }
-  return agentRuntime.agentManager;
-};
+let agentManager: AgentManager | undefined;
+let skillManager: SkillManager | undefined;
 
-export const getSkillManager = () => {
-  if (!agentRuntime.skillManager) {
-    agentRuntime.skillManager = new SkillManager(getStore);
-  }
-  return agentRuntime.skillManager;
-};
+export const getAgentManager = () => (agentManager ??= new AgentManager(getCoworkStore()));
+
+export const getSkillManager = () => (skillManager ??= new SkillManager(getStore));
+
+export function shutdownSkillManager(): Promise<void> | undefined {
+  return skillManager?.shutdown();
+}
+
+let mcpStore: McpStore | undefined;
 
 export const getMcpStore = () => {
-  if (!mcpRuntime.store) {
+  if (!mcpStore) {
     const sqliteStore = getStore();
     const nextMcpStore = new McpStore(
       sqliteStore.getDatabase(),
       new McpCredentialVault(sqliteStore),
     );
     nextMcpStore.migrateLegacyCredentials();
-    mcpRuntime.store = nextMcpStore;
+    mcpStore = nextMcpStore;
   }
-  return mcpRuntime.store;
+  return mcpStore;
 };
 
-/** Lazily constructed shared activity service (single source in runtime state). */
-export const getActivityService = (): ActivityService => {
-  channelRuntime.activityService ??= new ActivityService(getStore().getDatabase());
-  return channelRuntime.activityService;
-};
+let scheduledTaskStore: SqliteScheduledTaskStore | undefined;
+
+export const getScheduledTaskStore = () =>
+  (scheduledTaskStore ??= new SqliteScheduledTaskStore(getStore().getDatabase()));
+
+let activityService: ActivityService | undefined;
+
+export const getActivityService = () =>
+  (activityService ??= new ActivityService(getStore().getDatabase()));

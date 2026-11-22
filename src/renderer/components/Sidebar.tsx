@@ -46,6 +46,7 @@ import ChatSkillShortcuts from './chat/ChatSkillShortcuts';
 import {
   CodingWorkspaceSidebar,
   type CodingSidebarSelection,
+  type CodingWorkspaceSidebarHandle,
 } from './coding/CodingWorkspaceSidebar';
 import { SidebarSearchTrigger } from './shell/SidebarSearchTrigger';
 import CoworkSearchModal from './cowork/CoworkSearchModal';
@@ -73,7 +74,12 @@ interface SidebarProps {
   onShowTodo: () => void;
   codingSelection: CodingSidebarSelection;
   onCodingSelectionChange: (selection: CodingSidebarSelection) => void;
+  onCreateCodingSession: React.ComponentProps<typeof CodingWorkspaceSidebar>['onCreateSession'];
+  onOpenCodingAgentManager: () => void;
+  codingWorkspaceSidebarRef?: React.Ref<CodingWorkspaceSidebarHandle>;
   onNewChat: () => void;
+  searchOpen: boolean;
+  onSearchOpenChange: (open: boolean) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   updateEntry?: React.ReactNode;
@@ -100,7 +106,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   onShowTodo,
   codingSelection,
   onCodingSelectionChange,
+  onCreateCodingSession,
+  onOpenCodingAgentManager,
+  codingWorkspaceSidebarRef,
   onNewChat,
+  searchOpen,
+  onSearchOpenChange,
   isCollapsed,
   onToggleCollapse,
   updateEntry,
@@ -118,7 +129,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const currentSessionId = useSelector(selectCurrentSessionId);
   const unreadSessionIds = useSelector(selectUnreadSessionIds);
   const workMode = useSelector(selectWorkMode);
-  const [searchActive, setSearchActive] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [recentlyDeletedSessionIds, setRecentlyDeletedSessionIds] = useState<string[]>([]);
@@ -177,22 +187,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   const isMac = window.electron.platform === 'darwin';
 
   useEffect(() => {
-    const handleSearch = () => {
-      setSearchActive(true);
-    };
-    window.addEventListener('cowork:shortcut:search', handleSearch);
-    return () => {
-      window.removeEventListener('cowork:shortcut:search', handleSearch);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!isCollapsed) return;
-    setSearchActive(false);
+    onSearchOpenChange(false);
     setIsBatchMode(false);
     setSelectedIds(new Set());
     setShowBatchDeleteConfirm(false);
-  }, [isCollapsed]);
+  }, [isCollapsed, onSearchOpenChange]);
 
   const handleSelectSession = useCallback(
     async (session: CoworkSessionSummary) => {
@@ -290,9 +290,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     workVisibleSessionIdsRef.current = ids;
   }, []);
 
-  const handleDismissSearch = useCallback(() => {
-    setSearchActive(false);
-  }, []);
+  const handleOpenSearch = useCallback(() => onSearchOpenChange(true), [onSearchOpenChange]);
+  const handleDismissSearch = useCallback(() => onSearchOpenChange(false), [onSearchOpenChange]);
 
   const handleCreateScheduledTask = useCallback(
     (workspace: WorkspaceSidebarNode) => {
@@ -400,7 +399,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     <div className={cn('shrink-0', !isChatMode && 'px-2')}>
       <SidebarSearchTrigger
         label={i18nService.t(workMode === WorkMode.Chat ? 'searchChats' : 'search')}
-        onClick={() => setSearchActive(true)}
+        onClick={handleOpenSearch}
       />
     </div>
   );
@@ -456,7 +455,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               onShowActivity={onShowActivity}
               onWorkModeChange={handleWorkModeChange}
               workMode={workMode}
-              onSearch={workMode === WorkMode.Work ? () => setSearchActive(true) : undefined}
+              onSearch={workMode === WorkMode.Work ? handleOpenSearch : undefined}
               searchLabel={i18nService.t(workMode === WorkMode.Chat ? 'searchChats' : 'search')}
               managedModelsOnly={managedModelsOnly}
               inferenceEdition={inferenceEdition}
@@ -467,8 +466,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             {activeView === 'coding' ? (
               <div className="flex min-h-0 flex-1 px-2">
                 <CodingWorkspaceSidebar
+                  ref={codingWorkspaceSidebarRef}
                   selection={codingSelection}
                   onSelectionChange={onCodingSelectionChange}
+                  onCreateSession={onCreateCodingSession}
+                  onManageAgents={onOpenCodingAgentManager}
                 />
               </div>
             ) : null}
@@ -645,8 +647,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </aside>
       <CoworkSearchModal
-        isOpen={searchActive}
-        onClose={() => setSearchActive(false)}
+        isOpen={searchOpen}
+        onClose={handleDismissSearch}
         sessions={sessions}
         currentSessionId={currentSessionId}
         onSelectSession={handleSelectSession}

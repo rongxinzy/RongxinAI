@@ -5,6 +5,61 @@ import { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
 
 afterEach(() => vi.unstubAllGlobals());
 
+test('a first memory write joins the session registration already in flight', async () => {
+  const registration = Promise.withResolvers<void>();
+  const started = Promise.withResolvers<void>();
+  const fetch = vi.fn((url: string | URL) => {
+    if (new URL(url).pathname === '/sessions') {
+      started.resolve();
+      return registration.promise.then(() => jsonResponse({ id: 'session-1:resume:2' }, 201));
+    }
+    return Promise.resolve(jsonResponse({ id: 42 }, 201));
+  });
+  vi.stubGlobal('fetch', fetch);
+  const adapter = new ZhiYuanEngramAdapter({
+    start: async () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
+  });
+  const resumed = adapter.resumeSession('session-1', 'project-a', '/work');
+  await started.promise;
+  const onRuntimeSession = vi.fn();
+  const confirmed = adapter.confirmMemory(
+    adapter.saveCandidate({
+      sessionId: 'session-1',
+      project: 'project-a',
+      scope: EngramMemoryScope.Session,
+      type: EngramObservationType.SessionSummary,
+      title: 'Session summary',
+      content: 'checkpoint',
+    }),
+    '/work',
+    onRuntimeSession,
+  );
+  await Promise.resolve();
+  registration.resolve();
+  await expect(resumed).resolves.toBe('session-1:resume:2');
+  await expect(confirmed).resolves.toBe(42);
+  expect(onRuntimeSession).toHaveBeenCalledExactlyOnceWith('session-1:resume:2');
+  expect(fetch.mock.calls.map(([url]) => new URL(url).pathname)).toEqual([
+    '/sessions',
+    '/observations',
+  ]);
+});
+
+test('a failed native registration can be retried', async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(jsonResponse({}, 503))
+    .mockResolvedValueOnce(jsonResponse({ id: 'session-1' }, 201));
+  vi.stubGlobal('fetch', fetch);
+  const adapter = new ZhiYuanEngramAdapter({
+    start: async () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
+  });
+
+  await expect(adapter.resumeSession('session-1', 'project-a', '/work')).rejects.toThrow('503');
+  await expect(adapter.resumeSession('session-1', 'project-a', '/work')).resolves.toBe('session-1');
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
+
 test('continuation identity is used for observations and repeated finalize without re-resume', async () => {
   const requests: Array<{ pathname: string; body?: Record<string, unknown> }> = [];
   vi.stubGlobal(
@@ -28,8 +83,7 @@ test('continuation identity is used for observations and repeated finalize witho
     }),
   );
   const adapter = new ZhiYuanEngramAdapter({
-    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
-    start: vi.fn(),
+    start: async () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
   } as never);
   const effective = await adapter.resumeSession('session-1', 'project-a', '/work');
   const candidate = adapter.saveCandidate({
@@ -71,8 +125,7 @@ test('a committed result is recovered with its original identity even when a run
     }),
   );
   const adapter = new ZhiYuanEngramAdapter({
-    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
-    start: vi.fn(),
+    start: async () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
   } as never);
   const candidate = adapter.saveCandidate({
     sessionId: 'session-1',
@@ -117,8 +170,7 @@ test('a failed finalize clears the cached identity so the next write resumes', a
     }),
   );
   const adapter = new ZhiYuanEngramAdapter({
-    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
-    start: vi.fn(),
+    start: async () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
   } as never);
   await adapter.resumeSession('session-1', 'project-a', '/work');
   await expect(

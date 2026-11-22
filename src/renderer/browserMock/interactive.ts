@@ -348,7 +348,6 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
       catalog: () => Promise.resolve(mockMagpieCatalog),
       selectDefault: () => Promise.resolve(mockMagpieCatalog),
       status: () => Promise.resolve(mockMagpieCatalog.status),
-      models: () => Promise.resolve(mockMagpieCatalog.models),
       agents: () => Promise.resolve(mockMagpieAgents),
       providers: () => Promise.resolve(mockMagpieProviders),
       preferences: () => Promise.resolve(preferences),
@@ -469,11 +468,6 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
           nextOffset: 32,
         }),
     },
-    ollama: {
-      listLocalModels: () => Promise.resolve([]),
-      listRunningModels: () => Promise.resolve([]),
-      modelsDir: () => Promise.resolve('/home/user/.ollama/models'),
-    },
     skills: {
       list: () => Promise.resolve({ success: true, skills }),
       getConfig: (id: string) =>
@@ -523,9 +517,7 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
     },
     dialog: {
       selectDirectory: () => Promise.resolve({ success: true, path: PREVIEW_ROOT }),
-      selectFile: () => Promise.resolve({ success: true, path: `${PREVIEW_ROOT}/notes.md` }),
       selectFiles: () => Promise.resolve({ success: true, paths: [`${PREVIEW_ROOT}/notes.md`] }),
-      showMessageBox: () => Promise.resolve({ response: 0 }),
     },
     shell: {
       // 浏览器预览无真实文件系统；本地路径一律按「未解析」处理，渲染为普通文本。
@@ -533,8 +525,6 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
     },
     project: {
       getDefaultBaseDir: () => Promise.resolve({ success: true, path: '/home/user/projects' }),
-      createDirectory: ({ name }: { name: string }) =>
-        Promise.resolve({ success: true, path: `/home/user/projects/${name}` }),
     },
     cowork: {
       getConfig: () => Promise.resolve({ success: true, config: mockCoworkConfig }),

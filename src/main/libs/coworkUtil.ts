@@ -7,6 +7,5 @@
 export { applyApplicationRuntimeEnv } from './coworkEnv/applyApplicationRuntimeEnv';
 export { getElectronNodeRuntimePath } from './coworkEnv/electronNodeRuntime';
 export { getEnhancedEnv } from './coworkEnv/enhancedEnv';
-export { probeCoworkModelReadiness } from './coworkEnv/modelProbe';
 export { getSkillsRoot } from './coworkEnv/skillsRoot';
 export { generateSessionTitle } from './coworkEnv/sessionTitle';

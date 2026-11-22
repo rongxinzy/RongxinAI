@@ -168,8 +168,8 @@ describe('streaming guards (Cowork end-to-end IPC pipeline)', () => {
    * G2 — no snapshot IPC while streaming (before message_end).
    *
    * Guards: during regular streaming the renderer may only receive StreamPart
-   * deltas. The runtime DOES emit `messageUpdate` bus events for every
-   * message_update (asserted non-zero below, so this guard is not vacuous) — a
+   * deltas. A Coding Room subscriber enables the in-process `messageUpdate`
+   * bus for this session (asserted non-zero below, so this guard is not vacuous) — a
    * "fix" that simply re-forwards all of them would pass content tests while
    * flooding full-text snapshots per delta. This guard blocks that shortcut.
    *
@@ -188,6 +188,9 @@ describe('streaming guards (Cowork end-to-end IPC pipeline)', () => {
     });
     const streamingPiEvents = turn.streamEvents;
     const harness = await createStreamingHarness({ sessionId: 'guards-g2-no-snapshot-streaming' });
+    const unsubscribe = harness.runtime.registerStreamingTextInterestResolver(
+      sessionId => sessionId === 'guards-g2-no-snapshot-streaming',
+    );
     try {
       for (const event of streamingPiEvents) {
         harness.emitPi(event);
@@ -216,6 +219,7 @@ describe('streaming guards (Cowork end-to-end IPC pipeline)', () => {
       harness.flushDeliveries();
       harness.runFrames();
     } finally {
+      unsubscribe();
       harness.dispose();
     }
   }, 10_000);

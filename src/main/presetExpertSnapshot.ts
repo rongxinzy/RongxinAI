@@ -26,7 +26,7 @@ export interface BundledPresetMember {
   systemPrompt: string;
 }
 
-const PRESET_EXPERTS_DIR = ['zhiyuan-expert-manager', 'presets'];
+export const PRESET_EXPERTS_DIR = ['zhiyuan-expert-manager', 'presets'] as const;
 
 const normalizeId = (name: string): string =>
   name
@@ -52,7 +52,7 @@ const readPluginJson = (presetDir: string): Record<string, unknown> | null => {
   const pluginPath = path.join(presetDir, 'plugin.json');
   if (!fs.existsSync(pluginPath)) return null;
   try {
-    return JSON.parse(fs.readFileSync(pluginPath, 'utf-8')) as Record<string, unknown>;
+    return JSON.parse(readPresetText(pluginPath)) as Record<string, unknown>;
   } catch (error) {
     console.warn(`[PresetExpert] failed to read bundled preset plugin.json:`, error);
     return null;
@@ -129,7 +129,7 @@ export function resolveBundledPresetExpertSnapshot(
     const agentMdPath = selected === undefined ? null : agentFilePath(presetDir, selected);
     if (!agentMdPath) return null;
 
-    let promptSnapshot = stripFrontmatter(fs.readFileSync(agentMdPath, 'utf-8'));
+    let promptSnapshot = stripFrontmatter(readPresetText(agentMdPath));
     if (!promptSnapshot) return null;
 
     // Team leads get the same member roster the registration script embeds;
@@ -204,26 +204,98 @@ export function resolveBundledPresetMembers(
   const members = Array.isArray(teamInfo?.memberAgents) ? teamInfo.memberAgents : [];
   if (members.length === 0) return null;
 
-  const result: BundledPresetMember[] = [];
-  for (const member of members) {
-    const memberId = String(member);
-    const memberPath = agentFilePath(presetDir, path.join('agents', `${memberId}.md`));
-    if (!memberPath) {
-      console.warn(`[PresetExpert] bundled team member file not found: ${memberId}`);
-      continue;
+  const result = readMemberProfiles(members.slice(0, PresetMemberLimit.Members).map(String), id =>
+    path.join(presetDir, 'agents', `${id}.md`),
+  );
+  return result.length > 0 ? result : null;
+}
+
+export const PresetMemberLimit = {
+  Members: 256,
+  FileBytes: 512 * 1024,
+  ResultCharacters: 2_000_000,
+} as const;
+
+export const isPathSegment = (value: string): boolean =>
+  Boolean(value && value !== '.' && value !== '..' && !/[/\\\0]/.test(value));
+
+export function readPresetText(filePath: string): string {
+  const file = fs.openSync(filePath, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
+  try {
+    const info = fs.fstatSync(file);
+    if (!info.isFile() || info.size > PresetMemberLimit.FileBytes) {
+      throw new Error('Expert definition exceeds the supported file limit.');
     }
-    const content = fs.readFileSync(memberPath, 'utf-8');
+    const bytes = Buffer.allocUnsafe(info.size + 1);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const read = fs.readSync(file, bytes, offset, bytes.length - offset, null);
+      if (!read) break;
+      offset += read;
+    }
+    if (offset !== info.size) throw new Error('Expert definition changed during the read.');
+    return bytes.toString('utf8', 0, offset);
+  } finally {
+    fs.closeSync(file);
+  }
+}
+
+function readMemberProfile(filePath: string, id: string): BundledPresetMember | null {
+  try {
+    const content = readPresetText(filePath);
     const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
     const systemPrompt = (frontmatterMatch ? frontmatterMatch[2] : content).trim();
-    if (!systemPrompt) continue;
+    if (!systemPrompt) return null;
     const descriptionMatch = frontmatterMatch?.[1].match(/^description:\s*(.+)$/m);
-    result.push({
-      id: memberId,
-      description: descriptionMatch?.[1].trim() ?? `Team member ${memberId}`,
+    return {
+      id,
+      description: descriptionMatch?.[1].trim() ?? `Team member ${id}`,
       systemPrompt,
-    });
+    };
+  } catch (error) {
+    console.warn(`[PresetExpert] skipping unreadable team member '${id}':`, error);
+    return null;
   }
-  return result.length > 0 ? result : null;
+}
+
+function readMemberProfiles(
+  ids: readonly string[],
+  fileFor: (id: string) => string,
+): BundledPresetMember[] {
+  const profiles: BundledPresetMember[] = [];
+  let remaining = PresetMemberLimit.ResultCharacters as number;
+  for (const id of ids) {
+    if (!isPathSegment(id)) continue;
+    const profile = readMemberProfile(fileFor(id), id);
+    if (!profile) continue;
+    remaining -= id.length + profile.description.length + profile.systemPrompt.length;
+    if (remaining < 0) break;
+    profiles.push(profile);
+    if (profiles.length >= PresetMemberLimit.Members) break;
+  }
+  return profiles;
+}
+
+export function readPresetMemberProfiles(input: {
+  skillsRoot: string;
+  piAgentsDir: string;
+  presetId: string;
+}): BundledPresetMember[] {
+  const { skillsRoot, piAgentsDir, presetId } = input;
+  if (!isPathSegment(presetId)) return [];
+  const bundled = resolveBundledPresetMembers(skillsRoot, presetId);
+  if (bundled) return bundled;
+  if (!fs.existsSync(piAgentsDir)) return [];
+
+  const prefix = `${presetId}--`;
+  return readMemberProfiles(
+    fs
+      .readdirSync(piAgentsDir)
+      .filter(entry => entry.startsWith(prefix) && entry.endsWith('.md'))
+      .slice(0, PresetMemberLimit.Members)
+      .map(entry => entry.slice(prefix.length, -3)),
+    id => path.join(piAgentsDir, `${prefix}${id}.md`),
+  );
 }
 
 function resolveSkillIdsFromRegistry(

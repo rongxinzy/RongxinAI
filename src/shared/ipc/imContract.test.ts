@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { feishuInstallContract, imContract, imInstanceContract } from './imContract';
+import { imContract, imInstanceContract } from './imContract';
 import { PlatformRegistry } from '../platform/constants';
 
 /**
@@ -196,14 +196,14 @@ describe('im contract results', () => {
     ).toBe(true);
   });
 
-  test('feishu install verify accepts and returns the success envelope', () => {
+  test('DingTalk setup shares the IM contract and validates the device code', () => {
+    expect(imContract.dingtalkLoginStart.args.safeParse([]).success).toBe(true);
+    expect(imContract.dingtalkLoginPoll.args.safeParse([{ deviceCode: 'device' }]).success).toBe(
+      true,
+    );
+    expect(imContract.dingtalkLoginPoll.args.safeParse(['device']).success).toBe(false);
     expect(
-      feishuInstallContract.verify.args.safeParse([{ appId: 'cli_a', appSecret: 's' }]).success,
-    ).toBe(true);
-    expect(feishuInstallContract.verify.args.safeParse(['cli_a']).success).toBe(false);
-    expect(
-      feishuInstallContract.verify.result.safeParse({ success: false, error: 'bad secret' })
-        .success,
+      imContract.dingtalkLoginPoll.result.safeParse({ done: false, error: 'pending' }).success,
     ).toBe(true);
   });
 });

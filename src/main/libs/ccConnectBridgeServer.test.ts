@@ -63,6 +63,19 @@ test('the cron trigger route is gone (the clock is in-process)', async () => {
   expect(response.status).toBe(404);
 });
 
+test('shutdown during loopback bind settles startup without opening admission', async () => {
+  const server = new CcConnectBridgeServer('secret', {
+    onTurn: async () => ({ content: 'unused' }),
+  });
+  servers.push(server);
+
+  const startup = server.start().catch((error: unknown) => error);
+  await expect(server.stop()).resolves.toBeUndefined();
+  await expect(startup).resolves.toMatchObject({
+    message: 'cc-connect bridge stopped during startup',
+  });
+});
+
 test('aborts the active turn when the sidecar disconnects', async () => {
   let observedSignal: AbortSignal | null = null;
   const server = new CcConnectBridgeServer('secret', {
@@ -103,6 +116,49 @@ test('aborts the active turn when the sidecar disconnects', async () => {
 
   await expect(request).rejects.toThrow();
   await vi.waitFor(() => expect(observedSignal?.aborted).toBe(true));
+});
+
+test('shutdown cancels the request and waits for its handler after the socket closes', async () => {
+  const started = Promise.withResolvers<AbortSignal>();
+  const finish = Promise.withResolvers<void>();
+  const server = new CcConnectBridgeServer('secret', {
+    onTurn: async (_request, signal) => {
+      started.resolve(signal);
+      await finish.promise;
+      return { content: 'done' };
+    },
+  });
+  servers.push(server);
+  const url = await server.start();
+  const fetchResult = fetch(`${url}/v1/cc-connect/turn`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer secret', ...createCcConnectProtocolHeaders('shutdown') },
+    body: JSON.stringify({
+      requestId: 'shutdown',
+      accountId: 'account',
+      message: {
+        sessionKey: 'weixin:dm:user',
+        platform: 'weixin',
+        messageId: 'message',
+        userId: 'user',
+        chatType: 'direct',
+        content: 'hello',
+      },
+    }),
+  }).catch(() => null);
+  try {
+    const signal = await started.promise;
+    const drained = vi.fn();
+    const stopping = server.stop().then(drained);
+    expect(signal.aborted).toBe(true);
+    await fetchResult;
+    expect(drained).not.toHaveBeenCalled();
+    finish.resolve();
+    await stopping;
+    expect(drained).toHaveBeenCalledOnce();
+  } finally {
+    finish.resolve();
+  }
 });
 
 test('accepts a turn when the platform only supplies a session key', async () => {

@@ -20,12 +20,12 @@ export interface CodingExpertSelection {
  * the resolver throw. That failure is left to the caller on purpose: running the
  * turn without the expert the user asked for is worse than a visible error.
  */
-export const resolveCodingExpertSelection = (input: {
+export const resolveCodingExpertSelection = async (input: {
   expertIds: readonly string[];
-  resolveSnapshots: (expertIds: string[]) => readonly CodingExpertPromptSnapshot[];
-}): CodingExpertSelection => {
+  resolveSnapshots: (expertIds: string[]) => Promise<readonly CodingExpertPromptSnapshot[]>;
+}): Promise<CodingExpertSelection> => {
   if (input.expertIds.length === 0) return { expertIds: [], systemPrompt: '' };
-  const snapshots = input.resolveSnapshots([...input.expertIds]);
+  const snapshots = await input.resolveSnapshots([...input.expertIds]);
   return {
     expertIds: [...input.expertIds],
     systemPrompt: snapshots

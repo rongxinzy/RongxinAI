@@ -1,3 +1,11 @@
+export const LlamaCppModelStatus = {
+  Loaded: 'loaded',
+  Loading: 'loading',
+  Unloaded: 'unloaded',
+  Sleeping: 'sleeping',
+  Error: 'error',
+} as const;
+
 export const LlamaCppIpcChannel = {
   Status: 'llamacpp:status',
   Install: 'llamacpp:install',
@@ -15,10 +23,8 @@ export const LlamaCppIpcChannel = {
   SetModelsDir: 'llamacpp:models-dir:set',
   ListLocalModels: 'llamacpp:list-local-models',
   ListRunningModels: 'llamacpp:list-running-models',
-  RefreshRunningModelBindings: 'llamacpp:running-model-bindings:refresh',
   ImportModelFiles: 'llamacpp:import-model-files',
   DeleteModel: 'llamacpp:delete-model',
-  ShowModel: 'llamacpp:show-model',
   GetModelPreferences: 'llamacpp:model-preferences:get',
   SetModelPreference: 'llamacpp:model-preference:set',
   LoadModel: 'llamacpp:load-model',
@@ -27,14 +33,9 @@ export const LlamaCppIpcChannel = {
   InstallModel: 'llamacpp:install-model',
   CancelInstall: 'llamacpp:cancel-install',
   ImportRuntime: 'llamacpp:import-runtime',
-  ListRuntimeDevices: 'llamacpp:runtime:list-devices',
   ListBackends: 'llamacpp:backends:list',
-  GetBackendDownloadSize: 'llamacpp:backends:download-size',
-  GetBackendSelection: 'llamacpp:backends:selection:get',
-  SetBackendSelection: 'llamacpp:backends:selection:set',
   InstallBackend: 'llamacpp:backends:install',
   UninstallBackend: 'llamacpp:backends:uninstall',
-  GetRuntimeCapabilities: 'llamacpp:runtime:get-capabilities',
   StatusChanged: 'llamacpp:status-changed',
   ModelBindingsChanged: 'llamacpp:model-bindings-changed',
   ModelResidencyChanged: 'llamacpp:model-residency-changed',

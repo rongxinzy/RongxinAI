@@ -1,9 +1,7 @@
-import Database from 'better-sqlite3';
-
 import { t } from '../i18n';
 import type { CcConnectAccountRuntimeStatus } from '../libs/ccConnectRuntimeStatusRegistry';
 import { fetchJsonWithTimeout } from './http';
-import { IMStore } from './imStore';
+import type { IMStore } from './imStore';
 import {
   appendRuntimeConnectivity,
   resolveFeishuAuthEndpoint,
@@ -29,14 +27,10 @@ const CONNECTIVITY_TIMEOUT_MS = 10_000;
 export type ChannelRuntimeProbe = (accountId: string) => Promise<CcConnectAccountRuntimeStatus>;
 
 export class ChannelAccountManager {
-  private readonly imStore: IMStore;
-
   constructor(
-    db: Database.Database,
+    private readonly imStore: IMStore,
     private readonly runtimeProbe?: ChannelRuntimeProbe,
-  ) {
-    this.imStore = new IMStore(db);
-  }
+  ) {}
 
   getConfig(): IMGatewayConfig {
     return this.imStore.getConfig();

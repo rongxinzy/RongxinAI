@@ -1,7 +1,6 @@
 import { BackgroundKind, DEFAULT_BACKGROUND } from '../background/background';
-import { classicComponentAppearances } from '../components/classic';
-import type { ThemeDefinition } from './types';
-import { quietStudioAppearances, quietStudioLightTokens } from './quiet-studio-v4';
+import type { ThemeAppearance } from './types';
+import { quietStudioLightTokens } from './quiet-studio-v4';
 
 /**
  * Zenith Light - Premium Futuristic Design
@@ -9,14 +8,13 @@ import { quietStudioAppearances, quietStudioLightTokens } from './quiet-studio-v
  * Philosophy: 清新 (fresh) · 轻盈 (light/airy) · 畅快 (smooth, fluid) · 科技感 (tech-forward)
  * Features: Glassmorphism, generous spacing, fluid motion, luminous gradients
  */
-export const zenithLight: ThemeDefinition = {
+export const zenithLight: ThemeAppearance = {
   meta: {
     id: 'zenith-light',
     name: 'Zenith Light',
     description: 'Premium futuristic light theme with glassmorphism',
     appearance: 'light',
   },
-  components: { ...classicComponentAppearances(), ...quietStudioAppearances() },
   background: {
     ...DEFAULT_BACKGROUND,
     kind: BackgroundKind.Color,

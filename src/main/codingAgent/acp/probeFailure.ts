@@ -9,11 +9,16 @@ import { AcpProtocolIncompatibleError } from './protocol';
 export function classifyProbeFailure(error: unknown): CodingAgentCheckFailure {
   if (error instanceof AcpProtocolIncompatibleError) return CodingAgentCheckFailure.Protocol;
   const message = error instanceof Error ? error.message : '';
-  if (message === CodingErrorMessage.AgentProbeNoAnswer) return CodingAgentCheckFailure.NoReply;
+  if (
+    message === CodingErrorMessage.AgentProbeNoAnswer ||
+    message === CodingErrorMessage.AgentNoOutput
+  )
+    return CodingAgentCheckFailure.NoReply;
   if (message === CodingErrorMessage.AgentAuthRequired)
     return CodingAgentCheckFailure.Authentication;
   if (
     message.includes(CodingErrorDetailMessage.AcpRequestTimedOut) ||
+    message === CodingErrorMessage.AgentNoOutputTimeout ||
     /timed?\s*out|ETIMEDOUT/i.test(message)
   )
     return CodingAgentCheckFailure.Timeout;

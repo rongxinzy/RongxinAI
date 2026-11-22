@@ -19,14 +19,17 @@ import { CoworkStore } from '../../src/main/coworkStore';
 import { getDefaultSystemPrompt } from '../../src/main/coworkStore/helpers';
 import { composeCoworkSystemPrompt } from '../../src/main/coworkPrompt/composer';
 import { buildMagpiePiModel } from '../../src/main/libs/agentEngine/piMagpiePiModel';
-import { PiRuntimeAdapter } from '../../src/main/libs/agentEngine/piRuntimeAdapter';
+import {
+  PiRuntimeAdapter,
+  type PiRuntimeDependencies,
+} from '../../src/main/libs/agentEngine/piRuntimeAdapter';
 import { MAGPIE_RUNTIME_API_KEY } from '../../src/main/magpie/modelService';
 import { SqliteStore } from '../../src/main/sqliteStore';
 import { initializeWorkbenchTaskSchema } from '../../src/main/workbenchTask/schema';
 import { WorkbenchTaskService } from '../../src/main/workbenchTask/taskService';
 import { CoworkExecutionMode } from '../../src/shared/cowork/constants';
 import { WorkbenchApprovalMode } from '../../src/shared/workbenchTask';
-import { installTestMagpie } from '../helpers/installTestMagpie';
+import { createTestMagpie } from '../helpers/createTestMagpie';
 import {
   forwardRequest,
   type LivePiRequest,
@@ -38,7 +41,7 @@ import {
 export interface LiveFixture {
   prompt: string;
   allowTool: (tool: string, input: Record<string, unknown>) => boolean;
-  prepareWork?: (adapter: PiRuntimeAdapter) => void;
+  workDependencies?: PiRuntimeDependencies;
   score: () => Promise<{
     actual: unknown;
     expected: unknown;
@@ -127,7 +130,7 @@ async function runWork(
   gatewayUrl: string,
   fixture: LiveFixture,
 ): Promise<void> {
-  const gateway = installTestMagpie({
+  const gateway = createTestMagpie({
     gatewayUrl,
     defaultModelId: config.model,
     acceptUnknownModels: false,
@@ -138,17 +141,21 @@ async function runWork(
   });
   gateway.setImage(config.model, false);
   const store = await SqliteStore.create(data);
-  const adapter = new PiRuntimeAdapter();
+  let runtime: PiRuntimeAdapter | undefined;
   const errors: string[] = [];
   let completions = 0;
   try {
     const db = store.getDatabase();
     initializeWorkbenchTaskSchema(db);
     const cowork = new CoworkStore(db);
-    adapter.setCoworkStore(cowork);
-    adapter.setPiSessionStoreRoot(data);
-    adapter.setWorkbenchTaskService(new WorkbenchTaskService(db));
-    fixture.prepareWork?.(adapter);
+    const adapter = new PiRuntimeAdapter({
+      modelService: gateway.modelService,
+      ...fixture.workDependencies,
+      coworkStore: cowork,
+      piSessionStoreRoot: data,
+      workbenchTaskService: new WorkbenchTaskService(db),
+    });
+    runtime = adapter;
     const authorize = adapter.authorizeToolCall.bind(adapter);
     adapter.authorizeToolCall = async input =>
       fixture.allowTool(input.toolName, input.toolInput)
@@ -195,9 +202,8 @@ async function runWork(
     expect(errors).toEqual([]);
     expect(completions).toBe(1);
   } finally {
-    await adapter.stopAllSessions();
+    await runtime?.stopAllSessions();
     store.close();
-    gateway.dispose();
   }
 }
 

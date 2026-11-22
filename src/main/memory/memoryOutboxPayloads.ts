@@ -44,16 +44,20 @@ export interface ForgetPayload {
 export interface FinalizeSessionPayload {
   sessionId: string;
   runtimeSessionId: string;
-  projectId: string;
-  summary: string;
 }
 
 export function parseFinalizeSessionPayload(
   payload: Record<string, unknown>,
 ): FinalizeSessionPayload | null {
-  const required = ['sessionId', 'runtimeSessionId', 'projectId', 'summary'] as const;
-  if (required.some(key => typeof payload[key] !== 'string' || !payload[key])) return null;
-  return payload as unknown as FinalizeSessionPayload;
+  const { sessionId, runtimeSessionId } = payload;
+  if (
+    typeof sessionId !== 'string' ||
+    !sessionId ||
+    typeof runtimeSessionId !== 'string' ||
+    !runtimeSessionId
+  )
+    return null;
+  return { sessionId, runtimeSessionId };
 }
 
 export function parseConfirmPayload(payload: Record<string, unknown>): ConfirmPayload | null {

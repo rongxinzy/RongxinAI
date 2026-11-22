@@ -58,7 +58,7 @@ function listSessions(db: Database, limit: number, offset: number) {
   );
 }
 
-/** Mirror of countSessions() */
+/** Fixture row count for pagination assertions. */
 function countSessions(db: Database): number {
   return countRows(db, 'cowork_sessions');
 }
@@ -201,19 +201,6 @@ test('listSessions: third page returns remaining 21 items', () => {
 test('listSessions: page beyond total returns empty array', () => {
   const page = listSessions(db, 50, 200);
   expect(page.length).toBe(0);
-});
-
-test('listSessions: hasMore is correct for each page', () => {
-  const total = countSessions(db);
-
-  const page1 = listSessions(db, 50, 0);
-  expect(0 + page1.length < total).toBe(true);
-
-  const page2 = listSessions(db, 50, 50);
-  expect(50 + page2.length < total).toBe(true);
-
-  const page3 = listSessions(db, 50, 100);
-  expect(100 + page3.length < total).toBe(false);
 });
 
 test('listSessions: no duplicate IDs across pages', () => {

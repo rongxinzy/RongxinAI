@@ -15,7 +15,6 @@ export const mcpContractChannels: IpcContractChannels<typeof mcpContract> = {
   setEnabled: McpIpc.SetEnabled,
   testConnection: McpIpc.TestConnection,
   fetchMarketplace: McpIpc.FetchMarketplace,
-  refreshBridge: McpIpc.RefreshBridge,
   authorize: McpIpc.Authorize,
   cancelAuthorize: McpIpc.CancelAuthorize,
   getFeishuCliStatus: McpIpc.GetFeishuCliStatus,

@@ -1,38 +1,41 @@
 /** Cowork session image persistence and session teardown helpers. */
-import { app } from 'electron';
+import { isRecord } from '../../shared/lib/isRecord';
 
+import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { getCoworkStore } from './runtimeServices';
 import { getPiRuntimeAdapter } from './sessionServices';
-import type { CoworkMessageMetadata } from '../coworkStore';
+import { getCoworkImageRoot } from './workspacePaths';
 import {
-  coworkImageRoot,
   deleteCoworkSessionImages,
-  persistMessageImageMetadata,
+  hasInlineCoworkImages,
+  persistInlineMessageImages,
 } from '../coworkImageAttachments';
 
-export const getCoworkImageRoot = (): string => coworkImageRoot(app.getPath('userData'));
-
-const materializeSessionImages = (
+const materializeSessionImages = async (
   sessionId: string,
+  piHistoryKey: string | null,
   messages: Array<{ id: string; metadata?: unknown }>,
-): void => {
-  const root = getCoworkImageRoot();
+): Promise<void> => {
   const store = getCoworkStore();
+  const isCurrent = () =>
+    !lifecycleRuntime.isQuitting && store.getPiHistoryKey(sessionId) === piHistoryKey;
+  if (!isCurrent()) return;
+  const root = getCoworkImageRoot();
+  const messageStore = store.messages;
   for (const message of messages) {
-    if (!message.metadata || typeof message.metadata !== 'object') continue;
-    const next = persistMessageImageMetadata(
-      root,
-      sessionId,
-      message.metadata as Record<string, unknown>,
-    );
-    if (!next.changed || !next.metadata) continue;
-    store.updateMessage(
+    const imageAttachments = await persistInlineMessageImages(root, sessionId, message.metadata, {
+      isCurrent,
+    });
+    if (!isCurrent()) return;
+    if (!imageAttachments) continue;
+    const current = messageStore.getMessage(sessionId, message.id);
+    if (!hasInlineCoworkImages(current?.metadata?.imageAttachments)) continue;
+    messageStore.updateMessage(
       sessionId,
       message.id,
-      { metadata: next.metadata as CoworkMessageMetadata },
+      { metadata: { ...current.metadata, imageAttachments } },
       { touchUpdatedAt: false },
     );
-    message.metadata = next.metadata;
   }
 };
 
@@ -41,54 +44,39 @@ export const scheduleBackgroundMaterialize = (
   messages: Array<{ id: string; metadata?: unknown }>,
 ): void => {
   const hasInlineImages = messages.some(
-    m =>
-      m.metadata &&
-      typeof m.metadata === 'object' &&
-      Array.isArray((m.metadata as Record<string, unknown>).imageAttachments) &&
-      ((m.metadata as Record<string, unknown>).imageAttachments as unknown[]).some(img =>
-        Boolean(
-          img &&
-          typeof img === 'object' &&
-          'base64Data' in img &&
-          (img as { base64Data?: string }).base64Data,
-        ),
-      ),
+    m => isRecord(m.metadata) && hasInlineCoworkImages(m.metadata.imageAttachments),
   );
   if (!hasInlineImages) return;
+  const piHistoryKey = getCoworkStore().getPiHistoryKey(sessionId);
+  if (piHistoryKey === undefined) return;
 
   setImmediate(() => {
-    try {
-      materializeSessionImages(sessionId, messages);
-    } catch (error) {
+    if (lifecycleRuntime.isQuitting) return;
+    void materializeSessionImages(sessionId, piHistoryKey, messages).catch((error: unknown) => {
+      if (error instanceof Error && error.name === 'AbortError') return;
       console.warn('[CoworkImages] background materialize failed for session:', sessionId, error);
-    }
+    });
   });
 };
 
-export const listAllMatchingSessionIds = (filter: {
-  agentId?: string;
-  workspaceId?: string;
-}): string[] => {
-  const store = getCoworkStore();
-  const ids: string[] = [];
-  const pageSize = 200;
-  for (let offset = 0; ; offset += pageSize) {
-    const batch = store.listSessions(pageSize, offset, filter.agentId, filter.workspaceId);
-    ids.push(...batch.map(session => session.id));
-    if (batch.length < pageSize) break;
-  }
-  return ids;
-};
-
-export const forgetCoworkSession = (sessionId: string): void => {
+export const forgetCoworkSession = async (
+  sessionId: string,
+  piHistoryKey: string | null,
+): Promise<void> => {
+  let runtimeCleanup: Promise<void> | undefined;
   try {
-    getPiRuntimeAdapter().onSessionDeleted(sessionId);
+    runtimeCleanup = getPiRuntimeAdapter()
+      .onSessionDeleted(sessionId, piHistoryKey)
+      .catch(error => {
+        console.error('[Cowork] failed to release session runtime:', error);
+      });
   } catch (error) {
     console.error('[Cowork] failed to release session runtime:', error);
   }
   try {
-    deleteCoworkSessionImages(getCoworkImageRoot(), sessionId);
+    await deleteCoworkSessionImages(getCoworkImageRoot(), sessionId);
   } catch (error) {
     console.error('[Cowork] failed to delete session images:', error);
   }
+  await runtimeCleanup;
 };

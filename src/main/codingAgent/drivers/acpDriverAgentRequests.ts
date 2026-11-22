@@ -44,16 +44,22 @@ export class AcpAgentRequestBroker {
     if (method === AcpMethod.TerminalCreate) return await this.createTerminal(params);
     if (method === AcpMethod.TerminalOutput) return this.getTerminalOutput(params);
     if (method === AcpMethod.TerminalWaitForExit) return await this.waitForTerminal(params);
-    if (method === AcpMethod.TerminalKill) return this.killTerminal(params);
-    if (method === AcpMethod.TerminalRelease) return this.releaseTerminal(params);
+    if (method === AcpMethod.TerminalKill) {
+      await this.terminalBroker.kill(this.requireTerminalId(params.terminalId));
+      return {};
+    }
+    if (method === AcpMethod.TerminalRelease) {
+      await this.terminalBroker.release(this.requireTerminalId(params.terminalId));
+      return {};
+    }
     throw new AcpRequestError(
       AcpErrorCode.MethodNotFound,
       `Unsupported ACP agent request: ${method}.`,
     );
   }
 
-  dispose(): void {
-    this.terminalBroker.dispose();
+  dispose(): Promise<void> {
+    return this.terminalBroker.dispose();
   }
 
   private async readWorkspaceFile(
@@ -146,16 +152,6 @@ export class AcpAgentRequestBroker {
   private async waitForTerminal(params: Record<string, unknown>): Promise<Record<string, unknown>> {
     const terminal = await this.terminalBroker.wait(this.requireTerminalId(params.terminalId));
     return { exitCode: terminal.exitCode, signal: terminal.signal };
-  }
-
-  private killTerminal(params: Record<string, unknown>): Record<string, unknown> {
-    this.terminalBroker.kill(this.requireTerminalId(params.terminalId));
-    return {};
-  }
-
-  private releaseTerminal(params: Record<string, unknown>): Record<string, unknown> {
-    this.terminalBroker.release(this.requireTerminalId(params.terminalId));
-    return {};
   }
 
   private async resolveWorkspacePath(value: unknown): Promise<string> {

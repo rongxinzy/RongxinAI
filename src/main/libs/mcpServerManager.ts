@@ -1,9 +1,5 @@
 /**
- * McpServerManager — manages MCP server lifecycles and tool discovery
- * for the in-process Pi runtime.
- *
- * Starts enabled MCP servers via MCP SDK transports (stdio, SSE, Streamable HTTP),
- * discovers available tools, and routes tool calls to the correct server.
+ * Connects MCP servers for tool discovery over stdio, SSE or Streamable HTTP.
  */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
@@ -18,13 +14,7 @@ import path from 'path';
 import type { McpServerRecord } from '../mcpStore';
 import { getElectronNodeRuntimePath, getEnhancedEnv } from './coworkUtil';
 import { mergeMcpSpawnEnv } from './mcpEnvironment';
-import {
-  getToolTextPreview,
-  looksLikeTransportErrorText,
-  serializeForLog,
-  serializeToolContentForLog,
-  truncateForLog,
-} from './mcpLog';
+import { serializeForLog, truncateForLog } from './mcpLog';
 import { appendPythonRuntimeToEnv, getBundledPythonRoot, getUserPythonRoot } from './pythonRuntime';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './uvRuntime';
 import { findBundledUvExecutable } from './uvRuntime';
@@ -47,28 +37,42 @@ export interface McpServerRuntimeStatus {
 interface ManagedMcpServer {
   record: McpServerRecord;
   client: Client;
-  transport: Transport;
   tools: McpToolManifestEntry[];
-  recentStderr: string[];
 }
 
 const MAX_RECENT_STDERR_LINES = 20;
-const MCP_SERVER_CLOSE_TIMEOUT_MS = 3_000;
+// The SDK waits two seconds each for stdin EOF and SIGTERM before SIGKILL.
+const MCP_SERVER_CLOSE_TIMEOUT_MS = 4_500;
 
-function withMcpTimeout<T>(promise: Promise<T>, timeoutSeconds: number, label: string): Promise<T> {
+function withMcpTimeout<T>(
+  promise: Promise<T>,
+  timeoutSeconds: number,
+  label: string,
+  signal?: AbortSignal,
+): Promise<T> {
   const timeoutMs = timeoutSeconds * 1000;
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${timeoutSeconds}s`)),
-      timeoutMs,
-    );
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(signal?.reason);
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`${label} timed out after ${timeoutSeconds}s`));
+    }, timeoutMs);
+    if (signal?.aborted) onAbort();
+    else signal?.addEventListener('abort', onAbort, { once: true });
     promise.then(
       value => {
-        clearTimeout(timer);
+        cleanup();
         resolve(value);
       },
       error => {
-        clearTimeout(timer);
+        cleanup();
         reject(error);
       },
     );
@@ -98,30 +102,6 @@ async function closeClientWithTimeout(client: Client, serverName: string): Promi
   } finally {
     if (timer) clearTimeout(timer);
   }
-}
-
-/**
- * Race a promise against an AbortSignal.  When the signal fires first the
- * returned promise rejects with an Error whose message is `reason`.
- * The original promise is NOT cancelled — it keeps running in the background
- * but its result is discarded.
- */
-function raceAbortSignal<T>(promise: Promise<T>, signal: AbortSignal, reason: string): Promise<T> {
-  if (signal.aborted) return Promise.reject(new Error(reason));
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(new Error(reason));
-    signal.addEventListener('abort', onAbort, { once: true });
-    promise.then(
-      value => {
-        signal.removeEventListener('abort', onAbort);
-        resolve(value);
-      },
-      err => {
-        signal.removeEventListener('abort', onAbort);
-        reject(err);
-      },
-    );
-  });
 }
 
 const log = (level: string, msg: string) => {
@@ -505,7 +485,11 @@ export class McpServerManager {
    * Unchanged connections remain alive; only added, removed, or materially
    * changed records are connected or restarted.
    */
-  async reconcileServers(enabledServers: McpServerRecord[]): Promise<McpToolManifestEntry[]> {
+  async reconcileServers(
+    enabledServers: McpServerRecord[],
+    signal?: AbortSignal,
+  ): Promise<McpToolManifestEntry[]> {
+    signal?.throwIfAborted();
     const desiredByName = new Map(enabledServers.map(server => [server.name, server]));
     const unchangedStatuses = new Map(this._serverStatuses.map(status => [status.name, status]));
     const serversToStop = [...this.servers.entries()].filter(([name, server]) => {
@@ -517,6 +501,7 @@ export class McpServerManager {
       log('INFO', `Stopping ${serversToStop.length} changed or removed MCP server connection(s)`);
       await this.stopManagedServers(serversToStop);
     }
+    signal?.throwIfAborted();
 
     this._serverStatuses = enabledServers.map(server => {
       const managed = this.servers.get(server.name);
@@ -530,8 +515,9 @@ export class McpServerManager {
       log('INFO', `Starting ${serversToStart.length} new or changed MCP server connection(s)`);
     }
     const results = await Promise.allSettled(
-      serversToStart.map(server => this.startSingleServer(server)),
+      serversToStart.map(server => this.startSingleServer(server, signal)),
     );
+    signal?.throwIfAborted();
 
     for (const [index, result] of results.entries()) {
       if (result.status === 'rejected') {
@@ -581,12 +567,16 @@ export class McpServerManager {
     };
   }
 
-  private async startSingleServer(record: McpServerRecord): Promise<ManagedMcpServer | null> {
+  private async startSingleServer(
+    record: McpServerRecord,
+    signal?: AbortSignal,
+  ): Promise<ManagedMcpServer | null> {
     const recentStderr: string[] = [];
 
     let transport: Transport;
     if (record.transportType === 'stdio') {
       const resolved = await resolveStdioCommand(record);
+      signal?.throwIfAborted();
       if (!resolved.command) {
         const error = 'No command is configured.';
         this.updateServerStatus(record.name, { error });
@@ -595,6 +585,7 @@ export class McpServerManager {
       }
 
       const enhancedEnv = await getEnhancedEnv();
+      signal?.throwIfAborted();
       const spawnEnv = mergeMcpSpawnEnv(enhancedEnv, resolved.env);
       log(
         'INFO',
@@ -680,19 +671,22 @@ export class McpServerManager {
         client.connect(transport),
         record.timeout ?? 60,
         `MCP server "${record.name}" connection`,
+        signal,
       );
+      signal?.throwIfAborted();
       log('INFO', `Connected to MCP server "${record.name}"`);
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      const stderrSummary =
-        recentStderr.length > 0 ? ` | recent stderr: ${summarizeRecentStderr(recentStderr)}` : '';
-      log('ERROR', `Failed to connect to "${record.name}": ${errMsg}${stderrSummary}`);
-      this.updateServerStatus(record.name, { error: truncateForLog(`${errMsg}${stderrSummary}`) });
       try {
         await transport.close();
       } catch {
         /* ignore */
       }
+      signal?.throwIfAborted();
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const stderrSummary =
+        recentStderr.length > 0 ? ` | recent stderr: ${summarizeRecentStderr(recentStderr)}` : '';
+      log('ERROR', `Failed to connect to "${record.name}": ${errMsg}${stderrSummary}`);
+      this.updateServerStatus(record.name, { error: truncateForLog(`${errMsg}${stderrSummary}`) });
       return null;
     }
 
@@ -703,7 +697,9 @@ export class McpServerManager {
         client.listTools(),
         record.timeout ?? 60,
         `MCP server "${record.name}" tool discovery`,
+        signal,
       );
+      signal?.throwIfAborted();
       tools = (result.tools || []).map(t => ({
         server: record.name,
         name: t.name,
@@ -720,6 +716,10 @@ export class McpServerManager {
         error: undefined,
       });
     } catch (error) {
+      if (signal?.aborted) {
+        await transport.close().catch(() => {});
+        signal.throwIfAborted();
+      }
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.updateServerStatus(record.name, {
         connected: true,
@@ -731,95 +731,9 @@ export class McpServerManager {
       );
     }
 
-    const managed: ManagedMcpServer = { record, client, transport, tools, recentStderr };
+    const managed: ManagedMcpServer = { record, client, tools };
     this.servers.set(record.name, managed);
     return managed;
-  }
-
-  /**
-   * Execute a tool on the specified MCP server.
-   */
-  async callTool(
-    serverName: string,
-    toolName: string,
-    args: Record<string, unknown>,
-    options?: { signal?: AbortSignal },
-  ): Promise<{ content: Array<{ type: string; text?: string }>; isError: boolean }> {
-    const server = this.servers.get(serverName);
-    if (!server) {
-      return {
-        content: [{ type: 'text', text: `MCP server "${serverName}" not found or not running` }],
-        isError: true,
-      };
-    }
-
-    if (options?.signal?.aborted) {
-      return {
-        content: [{ type: 'text', text: 'Tool execution aborted: request cancelled before start' }],
-        isError: true,
-      };
-    }
-
-    try {
-      const startedAt = Date.now();
-      const argsPreview = serializeForLog(args);
-      log(
-        'INFO',
-        `Calling tool "${toolName}" on server "${serverName}" with arguments ${argsPreview}`,
-      );
-
-      // Race the tool call against the abort signal so that in-flight MCP calls
-      // return immediately when the gateway drops the HTTP connection (e.g. after chat.abort).
-      const toolPromise = withMcpTimeout(
-        server.client.callTool({ name: toolName, arguments: args }),
-        server.record.timeout ?? 60,
-        `Tool "${toolName}"`,
-      );
-      let result: Awaited<typeof toolPromise>;
-      if (options?.signal) {
-        result = await raceAbortSignal(toolPromise, options.signal, `Tool "${toolName}" aborted`);
-      } else {
-        result = await toolPromise;
-      }
-
-      const content = Array.isArray(result.content)
-        ? (result.content as Array<{ type: string; text?: string }>)
-        : [{ type: 'text', text: String(result.content) }];
-      const elapsedMs = Date.now() - startedAt;
-      const contentPreview = serializeToolContentForLog(content);
-      const textPreview = getToolTextPreview(content);
-      const recentStderr = summarizeRecentStderr(server.recentStderr);
-      log(
-        'INFO',
-        `Tool "${toolName}" on "${serverName}" completed in ${elapsedMs}ms with isError=${result.isError === true}. Result=${contentPreview}`,
-      );
-      if (result.isError === true) {
-        const stderrSuffix = recentStderr ? ` | recent stderr: ${recentStderr}` : '';
-        log(
-          'WARN',
-          `Tool "${toolName}" on "${serverName}" returned isError=true. Result text="${textPreview || '(none)'}"${stderrSuffix}`,
-        );
-      } else if (looksLikeTransportErrorText(textPreview)) {
-        const stderrSuffix = recentStderr ? ` | recent stderr: ${recentStderr}` : '';
-        log(
-          'WARN',
-          `Tool "${toolName}" on "${serverName}" returned transport-style error text without isError. Result text="${textPreview}"${stderrSuffix}`,
-        );
-      }
-      return { content, isError: result.isError === true };
-    } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      const recentStderr = summarizeRecentStderr(server.recentStderr);
-      const stderrSuffix = recentStderr ? ` | recent stderr: ${recentStderr}` : '';
-      log(
-        'ERROR',
-        `Tool call "${toolName}" on "${serverName}" failed. Arguments=${serializeForLog(args)}${stderrSuffix} | error=${errMsg}`,
-      );
-      return {
-        content: [{ type: 'text', text: `Tool execution error: ${errMsg}` }],
-        isError: true,
-      };
-    }
   }
 
   /**
@@ -835,10 +749,10 @@ export class McpServerManager {
   private async stopManagedServers(entries: Array<[string, ManagedMcpServer]>): Promise<void> {
     await Promise.allSettled(
       entries.map(async ([name, server]) => {
+        this.servers.delete(name);
         if (await closeClientWithTimeout(server.client, name)) {
           log('INFO', `Stopped MCP server "${name}"`);
         }
-        this.servers.delete(name);
       }),
     );
   }

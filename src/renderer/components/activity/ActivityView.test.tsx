@@ -122,13 +122,12 @@ test('localizes an interrupted run instead of showing the persisted marker', () 
   expect(screen.queryByText(ActivityErrorCode.Interrupted)).toBeNull();
 });
 
-test('shows reply preview and keeps running rows quiet until a reply exists', () => {
+test('shows the completed run reply preview', () => {
   renderView([
-    run({ id: 'running', platform: 'weixin', inputPreview: '帮我看下今天的日志', updatedAt: 3 }),
+    run({ id: 'running', platform: 'weixin', updatedAt: 3 }),
     run({
       id: 'done',
       status: ActivityStatus.Completed,
-      inputPreview: '帮我处理一下',
       replyPreview: '已经处理好了',
       updatedAt: 2,
     }),
@@ -136,6 +135,4 @@ test('shows reply preview and keeps running rows quiet until a reply exists', ()
 
   clickStatusPill(t('activityFilterAll'));
   expect(screen.getByText('已经处理好了')).toBeInTheDocument();
-  expect(screen.queryByText('帮我看下今天的日志')).toBeNull();
-  expect(screen.queryByText('帮我处理一下')).toBeNull();
 });

@@ -33,7 +33,6 @@ import {
   setChatSessions,
   setCurrentSession,
   setHasMoreSessions,
-  setRemoteManaged,
   setSessions,
   updateSessionPinned,
   updateCurrentSessionModelOverride,
@@ -48,7 +47,6 @@ import type {
   CoworkPermissionResult,
   CoworkSession,
   CoworkSessionListResult,
-  CoworkSessionResult,
   CoworkStartOptions,
 } from '../types/cowork';
 import { i18nService } from './i18n';
@@ -218,54 +216,6 @@ class CoworkService {
       .catch(error =>
         console.error('[CoworkService] failed to recover Pi runtime state on attach:', error),
       );
-
-    // Sessions changed listener (new channel sessions discovered by polling,
-    // or reconcileWithHistory replaced messages for a channel session)
-    const sessionsChangedCleanup = cowork.onSessionsChanged(data => {
-      const beforeState = store.getState().cowork;
-      const changedSessionId = data?.sessionId;
-      const deletedSessionIds = data?.deletedSessionIds ?? [];
-      if (deletedSessionIds.length > 0) {
-        store.dispatch(deleteSessionsAction(deletedSessionIds));
-        for (const sessionId of deletedSessionIds) {
-          store.dispatch(clearPendingPermissionsForSession(sessionId));
-          store.dispatch(clearSessionArtifacts(sessionId));
-        }
-      }
-      console.log(
-        '[CoworkService] onSessionsChanged: received IPC event, changedSessionId:',
-        changedSessionId,
-        'deletedSessionIds:',
-        deletedSessionIds.length,
-        'before sessions:',
-        beforeState.sessions.length,
-        'sessionIds:',
-        beforeState.sessions.map(s => s.id).slice(0, 5),
-      );
-      void Promise.all([this.loadSessions(), this.loadChatSessions()])
-        .then(() => {
-          const state = store.getState().cowork;
-          console.log(
-            '[CoworkService] onSessionsChanged: loadSessions complete, total sessions:',
-            state.sessions.length,
-            'sessionIds:',
-            state.sessions.map(s => s.id).slice(0, 5),
-          );
-
-          const currentId = state.currentSessionId;
-          if (currentId) {
-            // Only reload the current session if the change affects it directly,
-            // or if no specific sessionId was provided (backward compat).
-            if (!changedSessionId || changedSessionId === currentId) {
-              void this.loadSession(currentId);
-            }
-          }
-        })
-        .catch(err => {
-          console.error('[CoworkService] onSessionsChanged: loadSessions FAILED:', err);
-        });
-    });
-    this.streamListenerCleanups.push(sessionsChangedCleanup);
   }
 
   private cleanupListeners(): void {
@@ -475,14 +425,13 @@ class CoworkService {
     return false;
   }
 
-  async saveChatSession(session: CoworkSession): Promise<CoworkSessionResult> {
-    const cowork: Record<string, unknown> =
-      (window.electron?.cowork as unknown as Record<string, unknown>) || {};
-    const saveSession = cowork.saveSession as
-      | ((s: Record<string, unknown>) => Promise<CoworkSessionResult>)
-      | undefined;
-    if (!saveSession) return { success: false, error: 'saveSession API unavailable' };
-    return saveSession(session as unknown as Record<string, unknown>);
+  forgetSessions(sessionIds: string[]): void {
+    if (sessionIds.length === 0) return;
+    store.dispatch(deleteSessionsAction(sessionIds));
+    for (const sessionId of sessionIds) {
+      store.dispatch(clearPendingPermissionsForSession(sessionId));
+      store.dispatch(clearSessionArtifacts(sessionId));
+    }
   }
 
   async deleteSession(sessionId: string): Promise<boolean> {
@@ -491,9 +440,7 @@ class CoworkService {
 
     const result = await cowork.deleteSession(sessionId);
     if (result.success) {
-      store.dispatch(deleteSessionAction(sessionId));
-      store.dispatch(clearPendingPermissionsForSession(sessionId));
-      store.dispatch(clearSessionArtifacts(sessionId));
+      this.forgetSessions([sessionId]);
       const permissionModeBySession = { ...store.getState().cowork.config.permissionModeBySession };
       if (permissionModeBySession?.[sessionId]) {
         delete permissionModeBySession[sessionId];
@@ -512,11 +459,7 @@ class CoworkService {
 
     const result = await cowork.deleteSessions(sessionIds);
     if (result.success) {
-      store.dispatch(deleteSessionsAction(sessionIds));
-      for (const sessionId of sessionIds) {
-        store.dispatch(clearPendingPermissionsForSession(sessionId));
-        store.dispatch(clearSessionArtifacts(sessionId));
-      }
+      this.forgetSessions(sessionIds);
       const permissionModeBySession = { ...store.getState().cowork.config.permissionModeBySession };
       let changed = false;
       for (const sessionId of sessionIds) {
@@ -571,71 +514,6 @@ class CoworkService {
     return null;
   }
 
-  async exportSessionResultImage(options: {
-    rect: { x: number; y: number; width: number; height: number };
-    defaultFileName?: string;
-  }): Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }> {
-    const cowork = window.electron?.cowork;
-    if (!cowork?.exportResultImage) {
-      return { success: false, error: 'Cowork export API not available' };
-    }
-
-    try {
-      const result = await cowork.exportResultImage(options);
-      return result ?? { success: false, error: 'Failed to export session image' };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to export session image',
-      };
-    }
-  }
-
-  async captureSessionImageChunk(options: {
-    rect: { x: number; y: number; width: number; height: number };
-  }): Promise<{
-    success: boolean;
-    width?: number;
-    height?: number;
-    pngBase64?: string;
-    error?: string;
-  }> {
-    const cowork = window.electron?.cowork;
-    if (!cowork?.captureImageChunk) {
-      return { success: false, error: 'Cowork capture API not available' };
-    }
-
-    try {
-      const result = await cowork.captureImageChunk(options);
-      return result ?? { success: false, error: 'Failed to capture session image chunk' };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to capture session image chunk',
-      };
-    }
-  }
-
-  async saveSessionResultImage(options: {
-    pngBase64: string;
-    defaultFileName?: string;
-  }): Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }> {
-    const cowork = window.electron?.cowork;
-    if (!cowork?.saveResultImage) {
-      return { success: false, error: 'Cowork save image API not available' };
-    }
-
-    try {
-      const result = await cowork.saveResultImage(options);
-      return result ?? { success: false, error: 'Failed to save session image' };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to save session image',
-      };
-    }
-  }
-
   /**
    * Projects the session's ledger rows (read with the session) into the
    * artifact store. Idempotent — the slice's path-dedupe merge makes this a
@@ -668,6 +546,7 @@ class CoworkService {
         await workspaceService.selectWorkspace(result.session.workspaceId, {
           preserveSessionLoading,
         });
+        if (requestId !== this.latestLoadSessionRequestId) return result.session;
       }
       if (result.session.agentId) {
         store.dispatch(setCurrentAgentId(result.session.agentId));
@@ -678,7 +557,7 @@ class CoworkService {
       this.runSync?.requestRecovery(sessionId);
       // Only restore streaming for running sessions — never clear it here.
       // Clearing is the responsibility of complete/error stream events.
-      // loadSession can be called reactively (onSessionsChanged) while a task
+      // loadSession can be called reactively while a task
       // is still executing; the backend may report a transitional 'idle' status
       // that would prematurely hide the stop button.
       // Session skills describe already-sent messages. Never reattach them to
@@ -686,11 +565,6 @@ class CoworkService {
       // Re-edit explicitly restores a message's skills in CoworkSessionDetail.
       if (!wasCurrentSession) {
         store.dispatch(clearActiveSkills());
-      }
-
-      const imResult = await cowork.remoteManaged(sessionId);
-      if (requestId === this.latestLoadSessionRequestId) {
-        store.dispatch(setRemoteManaged(imResult?.remoteManaged ?? false));
       }
 
       return result.session;

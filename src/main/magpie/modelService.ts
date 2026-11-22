@@ -1,3 +1,8 @@
+import { isDeepStrictEqual } from 'node:util';
+import type { LlamaCppAgentEligibility } from '../../shared/llamacpp';
+import { ModelCapabilityStatus } from '../../shared/providers';
+import { t } from '../i18n';
+import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '../../shared/magpie/constants';
 import type { MagpieRoutingGroup } from '../../shared/magpie/routingUsage';
 import type {
   MagpieModel,
@@ -5,8 +10,20 @@ import type {
   MagpieProviderSummary,
   MagpieStatus,
 } from '../../shared/magpie/types';
-import { routingGroupAllowed } from './routingGroupPolicy';
+import {
+  assertLlamaCppWorkModeContext,
+  assertWorkModeContextWindow,
+  isWorkModeContextTooSmall,
+} from '../libs/llamacppWorkModeContextGuard';
+import {
+  collectRoutableGroupModels,
+  routingGroupAllowed,
+  routingGroupIdForModel,
+  workRouteModelId,
+} from './routingGroupPolicy';
 import type { MagpieRoutingUsageService } from './routingUsageService';
+import { ENTERPRISE_HOST_PROVIDER_PREFIX } from './hostProviders';
+import { magpieImageInput, supportsMagpieTextConversation } from './catalog';
 
 /** Upper bound above which an unconfigured private/self-hosted model's catalog guess is suspect. */
 const UNCONFIGURED_PRIVATE_CATALOG_CONTEXT_SUSPECT_MIN = 500_000;
@@ -77,28 +94,82 @@ function sanitizeCatalogModelsForPrivateProviders(
   });
 }
 
-/** Loopback credential the runtime presents to the owned gateway. The gateway, not this process, holds upstream keys. */
+/** Shared loopback credential for read-only Chat and Companion inference. */
 export const MAGPIE_RUNTIME_API_KEY = 'magpie-zhiyuan';
+export const MAGPIE_DEFAULT_MODEL_ID_KEY = 'magpie_default_model_id';
+export const MagpieWorkHeader = {
+  Workload: 'X-Magpie-Workload',
+  Models: 'X-Magpie-Work-Models',
+} as const;
+export const MAGPIE_ENTERPRISE_CHAT_WORKLOAD = 'enterprise-chat';
+
+type ScopedRequest = {
+  key: () => string | undefined;
+  models: () => string | undefined;
+};
+
+type ModelResolveOptions = { work?: boolean; requirePublishedModel?: boolean };
+
+const MAX_WORK_MODELS = 500;
+const MAX_WORK_MODELS_HEADER = 16384;
+
+function encodeWorkModels(models: string[]): string | undefined {
+  if (!models.length || models.length > MAX_WORK_MODELS) return;
+  // Fetch headers are bytes. Escape Unicode so model IDs survive the wire unchanged.
+  const value = JSON.stringify(models).replace(
+    /[^\x20-\x7e]/g,
+    char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`,
+  );
+  return value.length <= MAX_WORK_MODELS_HEADER ? value : undefined;
+}
 
 export interface MagpieModelBackend {
   status(): MagpieStatus;
+  catalogOwner?(): AbortSignal | undefined;
+  waitForStartup?(): Promise<unknown> | undefined;
   ensureRunning?(): Promise<MagpieStatus>;
+  workKeyResolver?(gatewayUrl: string): (() => string | undefined) | undefined;
   recoverIfNeeded?(): Promise<MagpieStatus>;
   models(): Promise<MagpieModel[]>;
-  providers?(): Promise<MagpieProviderSummary[]>;
+  providers?(options: { probeStoredKeys: false }): Promise<MagpieProviderSummary[]>;
   recordError?(message: string, providerId?: string): void;
 }
 export interface MagpieModelServiceOptions {
   readDefaultModelId(): string | undefined | null;
   writeDefaultModelId(id: string): void | Promise<void>;
   /** Refresh host-owned enterprise/GPU bindings before reading the single authoritative catalog. */
-  beforeCatalog?(): Promise<void>;
+  beforeCatalog?(owner?: AbortSignal): Promise<void>;
   /** Main-owned enterprise policy. Never trust a renderer filter or a routing group's label. */
   allowedModel?(model: MagpieModel): boolean;
+  allowProviderFallback?: boolean;
+  readLocalGpuEligibility?(modelId: string): LlamaCppAgentEligibility | undefined;
 }
+
+type CatalogOwner = { gatewayUrl: string | undefined; signal: AbortSignal | undefined };
+type CatalogRead = {
+  catalog: MagpieModelCatalog;
+  modelsById: ReadonlyMap<string, MagpieModel>;
+  groupsById: Map<string, MagpieRoutingGroup>;
+  publishedModels: MagpieModel[];
+  providers: MagpieProviderSummary[];
+  owner: CatalogOwner;
+};
+
+function providerForModel(providers: MagpieProviderSummary[], model: MagpieModel) {
+  const qualifiedId = model.canonical_id ?? model.id;
+  const owner =
+    model.owned_by ?? (qualifiedId.includes('/') ? qualifiedId.split('/', 1)[0] : undefined);
+  if (owner) return providers.find(provider => !provider.off && provider.id === owner);
+  return (
+    providers.find(provider => !provider.off && provider.models.includes(model.id)) ??
+    providers.find(provider => !provider.off && provider.fallback?.includes(model.id))
+  );
+}
+
 export class MagpieModelService {
-  private latestModels: MagpieModel[] = [];
-  private latestProviders: MagpieProviderSummary[] = [];
+  private latest?: CatalogRead & { revision: number };
+  private readRevision = 0;
+  private invalidatedRevision = 0;
 
   constructor(
     private readonly backend: MagpieModelBackend,
@@ -112,58 +183,105 @@ export class MagpieModelService {
     return this.backend.recoverIfNeeded?.() ?? Promise.resolve(undefined);
   }
 
-  /** Last catalog projection, for synchronous capability reads between turns. */
-  peekModel(modelId: string): MagpieModel | undefined {
-    return this.latestModels.find(model => model.id === modelId);
-  }
-
-  /** Last provider projection matching a catalog model id, if known. */
-  peekProviderForModel(modelId: string): MagpieProviderSummary | undefined {
-    const enabled = this.latestProviders.filter(provider => !provider.off);
-    return (
-      enabled.find(provider => modelId.startsWith(`${provider.id}/`)) ??
-      enabled.find(provider => provider.models.includes(modelId)) ??
-      enabled.find(provider => provider.fallback?.includes(modelId))
-    );
+  private ownsCatalog(owner: CatalogOwner, status?: MagpieStatus): boolean {
+    if (owner.signal?.aborted || owner.signal !== this.backend.catalogOwner?.()) return false;
+    // The production backend only exposes an owner for its running process.
+    if (!status && owner.signal) return true;
+    const current = status ?? this.backend.status();
+    return current.state === 'running' && current.gatewayUrl === owner.gatewayUrl;
   }
   async catalog(): Promise<MagpieModelCatalog> {
-    const status = this.backend.status();
+    return (await this.catalogAndRoutes()).catalog;
+  }
+
+  invalidateCatalog(): void {
+    this.invalidatedRevision = this.readRevision;
+    this.latest = undefined;
+  }
+
+  private async catalogAndRoutes(): Promise<CatalogRead> {
+    const groupsById = new Map<string, MagpieRoutingGroup>();
+    let status = this.backend.status();
+    if (status.state === 'starting' && this.backend.waitForStartup) {
+      await this.backend.waitForStartup();
+      status = this.backend.status();
+    }
+    const owner = { gatewayUrl: status.gatewayUrl, signal: this.backend.catalogOwner?.() };
     if (status.state !== 'running')
-      return { status, models: [], defaultModelId: this.options.readDefaultModelId() || null };
-    await this.options.beforeCatalog?.();
-    let groupsById = new Map<string, MagpieRoutingGroup>();
+      return {
+        groupsById,
+        modelsById: new Map(),
+        publishedModels: [],
+        providers: [],
+        owner,
+        catalog: { status, models: [], defaultModelId: this.options.readDefaultModelId() || null },
+      };
+    const revision = ++this.readRevision;
+    await this.options.beforeCatalog?.(owner.signal);
+    if (!this.ownsCatalog(owner))
+      throw new Error('Model service changed while reading its catalog. Try again.');
     if (this.routingUsage) {
       try {
         const routing = await this.routingUsage.routingGroups();
-        groupsById = new Map(routing.groups.map(group => [group.id, group]));
+        for (const group of routing.groups) groupsById.set(group.id, group);
       } catch {
         /* routing metadata is optional for catalog reads */
       }
     }
-    const rawModels = (await this.backend.models()).filter(model =>
+    const publishedModels = await this.backend.models();
+    const allowedModels = publishedModels.filter(model =>
       routingGroupAllowed(model, groupsById, this.options.allowedModel),
     );
     let providers: MagpieProviderSummary[] = [];
     if (this.backend.providers) {
       try {
-        providers = await this.backend.providers();
+        providers = await this.backend.providers({ probeStoredKeys: false });
       } catch {
         /* provider metadata is optional for catalog reads */
       }
     }
-    const models = sanitizeCatalogModelsForPrivateProviders(rawModels, providers);
-    this.latestModels = models;
-    this.latestProviders = providers;
+    const models = sanitizeCatalogModelsForPrivateProviders(allowedModels, providers);
     const current = this.backend.status();
-    if (current.state !== 'running' || current.gatewayUrl !== status.gatewayUrl)
+    if (!this.ownsCatalog(owner, current))
       throw new Error('Model service changed while reading its catalog. Try again.');
-    return { status: current, models, defaultModelId: this.options.readDefaultModelId() || null };
+    if (revision <= this.invalidatedRevision) return this.catalogAndRoutes();
+    if (
+      this.latest &&
+      revision < this.latest.revision &&
+      this.ownsCatalog(this.latest.owner, current)
+    ) {
+      return {
+        ...this.latest,
+        catalog: {
+          ...this.latest.catalog,
+          status: current,
+          defaultModelId: this.options.readDefaultModelId() || null,
+        },
+      };
+    }
+    const snapshot = {
+      revision,
+      groupsById,
+      modelsById: new Map(models.map(model => [model.id, model])),
+      publishedModels,
+      providers,
+      owner,
+      catalog: {
+        status: current,
+        models,
+        defaultModelId: this.options.readDefaultModelId() || null,
+      },
+    };
+    this.latest = snapshot;
+    return snapshot;
   }
   async selectDefault(modelId: string): Promise<MagpieModelCatalog> {
     if (typeof modelId !== 'string' || !modelId || modelId.length > 500)
       throw new Error('Invalid model selection');
-    const catalog = await this.catalog();
-    if (!catalog.models.some(model => model.id === modelId))
+    const { catalog, owner, modelsById } = await this.catalogAndRoutes();
+    if (catalog.status.state === 'running' && !this.ownsCatalog(owner))
+      throw new Error('Model service changed while reading its catalog. Try again.');
+    if (!modelsById.has(modelId))
       throw new Error('The selected model is unavailable. Refresh the model list.');
     await this.options.writeDefaultModelId(modelId);
     return { ...catalog, defaultModelId: modelId };
@@ -180,100 +298,269 @@ export class MagpieModelService {
       };
     }
   }
-  async resolve(modelRef?: string): Promise<{
+  async resolve(modelRef?: string, options?: ModelResolveOptions) {
+    await this.backend.ensureRunning?.();
+    return this.resolveFromCatalog(await this.catalogAndRoutes(), modelRef, options);
+  }
+
+  private resolveFromCatalog(
+    snapshot: CatalogRead,
+    modelRef?: string,
+    { work = false, requirePublishedModel = false }: ModelResolveOptions = {},
+  ): {
     model: MagpieModel;
+    gatewayModel: MagpieModel;
     catalog: MagpieModelCatalog;
     gatewayUrl: string;
+    isCurrentGateway: () => boolean;
+    isCurrentRoute: () => boolean;
     provider?: MagpieProviderSummary;
-  }> {
-    await this.backend.ensureRunning?.();
-    const catalog = await this.catalog();
+    routingGroupId?: string;
+    workRequest?: ScopedRequest;
+    enterpriseChatRequest?: ScopedRequest;
+  } {
+    const { catalog, modelsById, groupsById, publishedModels, providers, owner } = snapshot;
     if (catalog.status.state !== 'running' || !catalog.status.gatewayUrl)
       throw new Error('Enable the unified model service in model settings before starting a task.');
+    if (!this.ownsCatalog(owner))
+      throw new Error('Model service changed while reading its catalog. Try again.');
+    const gatewayUrl = catalog.status.gatewayUrl;
     const id = modelRef?.trim() || catalog.defaultModelId;
     if (!id) throw new Error('Choose a default model in model settings before starting a task.');
-    let model = catalog.models.find(candidate => candidate.id === id);
-    let fallbackProvider: MagpieProviderSummary | undefined;
-    if (!model && this.backend.providers) {
-      try {
-        const providers = await this.backend.providers();
-        const provider = providers.find(p => !p.off && (p.models.includes(id) || p.id === id));
-        if (provider && Array.isArray(provider.fallback) && provider.fallback.length > 0) {
-          for (const fallbackId of provider.fallback) {
-            const candidate = catalog.models.find(m => m.id === fallbackId);
-            if (candidate) {
-              if (provider.api === 'anthropic-messages') {
-                const endpoints = candidate.native_endpoints ?? [];
-                if (!endpoints.includes('/v1/messages')) continue;
+    const model = modelsById.get(id);
+    if (!model && !requirePublishedModel && this.options.allowProviderFallback !== false) {
+      const qualified = providers.find(provider => id.startsWith(`${provider.id}/`));
+      const provider =
+        qualified ??
+        providers.find(
+          candidate => !candidate.off && (candidate.models.includes(id) || candidate.id === id),
+        );
+      const fallbackIds =
+        !provider ||
+        provider.off ||
+        (qualified && !qualified.models.includes(id.slice(qualified.id.length + 1)))
+          ? []
+          : (provider.fallback ?? []);
+      let rejected: unknown;
+      for (const fallbackId of fallbackIds) {
+        if (!modelsById.has(fallbackId)) continue;
+        try {
+          const fallback = this.resolveFromCatalog(snapshot, fallbackId, {
+            work,
+            requirePublishedModel: true,
+          });
+          if (
+            provider?.api === 'anthropic-messages' &&
+            !fallback.gatewayModel.native_endpoints?.includes('/v1/messages')
+          )
+            continue;
+          if (work && (!fallback.workRequest?.key() || !fallback.workRequest.models())) continue;
+          return {
+            ...fallback,
+            isCurrentRoute: () => {
+              const latest = this.latest;
+              if (!latest || !fallback.isCurrentRoute()) return false;
+              try {
+                // A live fallback can stop being the route for the original selection.
+                return (
+                  this.resolveFromCatalog(latest, id, { work }).gatewayModel.id ===
+                  fallback.gatewayModel.id
+                );
+              } catch {
+                return false;
               }
-              model = candidate;
-              fallbackProvider = provider;
-              break;
-            }
-          }
+            },
+          };
+        } catch (error) {
+          rejected ??= error;
         }
-      } catch {
-        /* ignore fallback resolution error */
       }
+      if (rejected) throw rejected;
     }
-    if (!model)
+    const gatewayId = work && model ? workRouteModelId(model, groupsById) : undefined;
+    const gatewayModel = work ? gatewayId && modelsById.get(gatewayId) : model;
+    if (!model || !gatewayModel)
       throw new Error(
         'The selected model is no longer available or is restricted. Choose a model in model settings.',
       );
+    if (!supportsMagpieTextConversation(gatewayModel)) {
+      throw new Error(t('coworkErrorModelTextUnsupported'));
+    }
+    const canonicalId = gatewayModel.canonical_id ?? gatewayModel.id;
+    const groupId = routingGroupIdForModel(canonicalId, groupsById);
+    const provider = groupId === undefined ? providerForModel(providers, gatewayModel) : undefined;
+    const selectionId = model.id;
+    const isCurrentGateway = () => this.ownsCatalog(owner);
+    const isCurrentRoute = () => {
+      const latest = this.latest;
+      if (!latest || !isCurrentGateway()) return false;
+      if (work) {
+        const selection = latest.modelsById.get(selectionId);
+        if (!selection || workRouteModelId(selection, latest.groupsById) !== gatewayModel.id)
+          return false;
+      }
+      const current = latest.modelsById.get(gatewayModel.id);
+      if (!current || !isDeepStrictEqual(current, gatewayModel)) return false;
+      const currentGroupId = routingGroupIdForModel(canonicalId, latest.groupsById);
+      const currentProvider =
+        currentGroupId === undefined ? providerForModel(latest.providers, current) : undefined;
+      return (
+        currentGroupId === groupId &&
+        currentProvider?.id === provider?.id &&
+        currentProvider?.baseUrl === provider?.baseUrl &&
+        currentProvider?.api === provider?.api
+      );
+    };
+    const groupModels =
+      groupId === undefined ? null : collectRoutableGroupModels(groupId, groupsById);
+    const localPrefix = `${LOCAL_GPU_MAGPIE_PROVIDER_ID}/`;
+    if (work) {
+      const candidates =
+        groupId === undefined
+          ? [canonicalId]
+          : (groupModels ?? publishedModels.map(candidate => candidate.id));
+      for (const candidate of candidates) {
+        if (candidate.startsWith(localPrefix)) {
+          assertLlamaCppWorkModeContext(this.options.readLocalGpuEligibility?.(candidate) ?? null);
+        }
+      }
+      assertWorkModeContextWindow({
+        modelId: gatewayModel.id,
+        contextWindow: gatewayModel.context_window,
+      });
+    }
+
+    const enterpriseChat =
+      !work &&
+      (groupId === undefined
+        ? canonicalId.startsWith(ENTERPRISE_HOST_PROVIDER_PREFIX)
+        : [...(groupModels ?? [])].some(id => id.startsWith(ENTERPRISE_HOST_PROVIDER_PREFIX)));
+    const workKey = work ? this.backend.workKeyResolver?.(gatewayUrl) : undefined;
+    let enterpriseChatRequest: ScopedRequest | undefined;
+    if (enterpriseChat) {
+      const key = this.backend.workKeyResolver?.(gatewayUrl);
+      const candidates = groupId === undefined ? [canonicalId] : [...(groupModels ?? [])];
+      if (!key?.() || !encodeWorkModels(candidates)) {
+        throw new Error('The managed model route does not have an authorized desktop scope.');
+      }
+      enterpriseChatRequest = {
+        key,
+        models: () => {
+          const latest = this.latest;
+          if (!latest || !isCurrentRoute()) return;
+          const published =
+            groupId === undefined
+              ? [canonicalId]
+              : collectRoutableGroupModels(groupId, latest.groupsById);
+          return encodeWorkModels(
+            [...(published ?? [])].filter(
+              id =>
+                this.options.allowedModel?.(
+                  latest.modelsById.get(id) ?? { id, owned_by: id.split('/')[0] },
+                ) !== false,
+            ),
+          );
+        },
+      };
+    }
+    let workRequest: ScopedRequest | undefined;
+    if (workKey && (groupId === undefined || groupModels)) {
+      workRequest = {
+        key: workKey,
+        models: () => {
+          const latest = this.latest;
+          if (!latest || !isCurrentRoute()) return;
+          return this.workModelScope(latest, gatewayModel, canonicalId, groupId);
+        },
+      };
+    }
     return {
       model,
+      gatewayModel,
       catalog,
       gatewayUrl: catalog.status.gatewayUrl,
-      provider: this.peekProviderForModel(model.id) ?? fallbackProvider,
+      isCurrentGateway,
+      isCurrentRoute,
+      provider,
+      routingGroupId: groupId,
+      workRequest,
+      enterpriseChatRequest,
     };
+  }
+
+  private workModelScope(
+    { modelsById, groupsById, providers }: CatalogRead,
+    gatewayModel: MagpieModel,
+    canonicalId: string,
+    groupId: string | undefined,
+  ): string | undefined {
+    const provider = groupId === undefined ? providerForModel(providers, gatewayModel) : undefined;
+    const fallbacks =
+      provider && canonicalId.startsWith(`${provider.id}/`) ? (provider.fallback ?? []) : [];
+    const candidates =
+      groupId === undefined
+        ? new Set([
+            canonicalId,
+            ...fallbacks.flatMap(id => {
+              const model = modelsById.get(id);
+              const canonical = model && workRouteModelId(model, groupsById);
+              return canonical && modelsById.has(canonical) ? [canonical] : [];
+            }),
+          ])
+        : collectRoutableGroupModels(groupId, groupsById);
+    const localPrefix = `${LOCAL_GPU_MAGPIE_PROVIDER_ID}/`;
+    return encodeWorkModels(
+      [...(candidates ?? [])].filter(id => {
+        if (routingGroupIdForModel(id, groupsById) !== undefined) return false;
+        const model = modelsById.get(id) ?? { id, owned_by: id.split('/')[0] };
+        return (
+          supportsMagpieTextConversation(model) &&
+          !isWorkModeContextTooSmall(model.context_window) &&
+          this.options.allowedModel?.(model) !== false &&
+          (!id.startsWith(localPrefix) ||
+            this.options.readLocalGpuEligibility?.(id)?.eligible === true)
+        );
+      }),
+    );
   }
 
   /** Companion requests use existing consent and policy, without changing the global default. */
   async resolveAutomatic(
     excludedIds: ReadonlySet<string> = new Set(),
-    requirements: { imageInput?: boolean } = {},
+    requirements: { imageInput?: boolean; work?: boolean } = {},
   ): Promise<{
-    model: MagpieModel;
-    gatewayUrl: string;
+    modelId: string;
+    imageInput: boolean;
   } | null> {
     const status = this.backend.status();
     if (status.enabled === false) return null;
     if (status.state !== 'running' && status.enabled === true) await this.backend.ensureRunning?.();
-    const catalog = await this.catalog();
-    if (catalog.status.state !== 'running' || !catalog.status.gatewayUrl) return null;
-    const candidates = catalog.models.filter(model => {
-      if (excludedIds.has(model.id)) return false;
-      if (requirements.imageInput && !model.modalities?.input.includes('image')) return false;
-      // The gateway projects absent capability metadata as empty arrays.
-      // Only an explicit non-text declaration excludes a text attempt.
-      if (model.modalities?.input.length && !model.modalities.input.includes('text')) return false;
-      if (model.modalities?.output.length && !model.modalities.output.includes('text'))
-        return false;
-      return (
-        !model.native_endpoints?.length ||
-        model.native_endpoints.some(endpoint =>
-          ['/v1/messages', '/v1/responses', '/v1/chat/completions'].includes(endpoint),
-        )
-      );
-    });
-    candidates.sort((a, b) => a.id.localeCompare(b.id, 'en'));
-    const model =
-      candidates.find(candidate => candidate.id === catalog.defaultModelId) ?? candidates[0];
-    return model ? { model, gatewayUrl: catalog.status.gatewayUrl } : null;
+    const snapshot = await this.catalogAndRoutes();
+    const { catalog, owner } = snapshot;
+    if (!catalog.status.gatewayUrl || !this.ownsCatalog(owner)) return null;
+    const candidates = catalog.models.filter(model => !excludedIds.has(model.id));
+    candidates.sort(
+      (a, b) =>
+        Number(b.id === catalog.defaultModelId) - Number(a.id === catalog.defaultModelId) ||
+        a.id.localeCompare(b.id, 'en'),
+    );
+    for (const candidate of candidates) {
+      try {
+        const { gatewayModel, workRequest, enterpriseChatRequest } = this.resolveFromCatalog(
+          snapshot,
+          candidate.id,
+          { work: requirements.work, requirePublishedModel: true },
+        );
+        const imageInput = magpieImageInput(gatewayModel) === ModelCapabilityStatus.Supported;
+        if (requirements.imageInput && !imageInput) continue;
+        const scope = requirements.work ? workRequest : enterpriseChatRequest;
+        if (scope ? scope.key() && scope.models() : !requirements.work) {
+          return { modelId: candidate.id, imageInput };
+        }
+      } catch {
+        // Continue to the next eligible route in catalog order.
+      }
+    }
+    return null;
   }
-}
-let installed: MagpieModelService | undefined;
-export function installMagpieModelService(service: MagpieModelService): () => void {
-  if (installed) throw new Error('Model service is already registered');
-  installed = service;
-  return () => {
-    if (installed === service) installed = undefined;
-  };
-}
-export function hasMagpieModelService(): boolean {
-  return installed !== undefined;
-}
-export function getMagpieModelService(): MagpieModelService {
-  if (!installed) throw new Error('Unified model service is not initialized');
-  return installed;
 }

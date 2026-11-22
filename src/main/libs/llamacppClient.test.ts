@@ -7,6 +7,14 @@ describe('LlamaCppClient', () => {
     vi.restoreAllMocks();
   });
 
+  test('rejects malformed router status instead of treating it as no models', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ model: 'unexpected-response' })),
+    );
+    await expect(new LlamaCppClient().listRouterModels()).rejects.toThrow('invalid model list');
+  });
+
   test('lists local models from router /models endpoint', async () => {
     vi.stubGlobal(
       'fetch',

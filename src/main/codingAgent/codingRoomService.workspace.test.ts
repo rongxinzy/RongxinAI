@@ -8,11 +8,13 @@ import {
   CodingAgentDriverKind,
   CodingAgentProfileId,
   CodingAgentProfileStatus,
+  CodingErrorMessage,
   CodingEventKind,
   CodingLaneStatus,
 } from '../../shared/codingAgent';
 import { CodingAgentRegistry } from './codingAgentRegistry';
 import { CodingRoomRepository } from './codingRoomRepository';
+import type { CodingAgentDriver, CodingAgentSession } from './drivers/codingAgentDriver';
 import {
   createService,
   openCodingRoomDatabase,
@@ -35,16 +37,17 @@ test('creates workspace-scoped sessions with immutable agent and source bindings
     completeExternalWorkbenchRun: () => undefined,
   });
 
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Product',
     sourceFolders: [primaryRoot, sharedRoot],
     defaultProfileId: CodingAgentProfileId.Builtin,
   });
-  const snapshot = await service.createSession({
+  const snapshot = await service.startSession({
     workspaceId: workspace.id,
     sourceRoot: sharedRoot,
     profileId: 'builtin-zhiyuan-coding',
     title: 'Fix shared package',
+    prompt: 'Fix shared package',
   });
 
   expect(snapshot.room).toMatchObject({ id: workspace.id, name: 'Product' });
@@ -59,14 +62,77 @@ test('creates workspace-scoped sessions with immutable agent and source bindings
     profileId: 'builtin-zhiyuan-coding',
     sourceRoot: sharedRoot,
   });
-  expect(() =>
+  await expect(
     service.updateWorkspace({
       workspaceId: workspace.id,
       name: 'Renamed product',
       sourceFolders: [primaryRoot],
       defaultProfileId: CodingAgentProfileId.Builtin,
     }),
-  ).toThrow('cannot be removed');
+  ).rejects.toThrow('cannot be removed');
+});
+
+test('workspace edit rechecks ownership after probing its source directories', async () => {
+  const root = trackTempDirectory(mkdtempSync(path.join(tmpdir(), 'coding-edit-pending-')));
+  const repository = new CodingRoomRepository(openCodingRoomDatabase());
+  const service = createService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const input = {
+    name: 'Workspace',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  };
+  const [workspace] = await service.createWorkspace(input);
+  const pending = service.updateWorkspace({ ...input, workspaceId: workspace.id });
+  expect(service.deleteWorkspace(workspace.id)).toEqual([]);
+  await expect(pending).rejects.toThrow(CodingErrorMessage.WorkspaceNotFound);
+  expect(service.listWorkspaces()).toEqual([]);
+});
+
+test('keeps the previous active session when persisting a new session fails', async () => {
+  const db = openCodingRoomDatabase();
+  const root = trackTempDirectory(mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-rollback-')));
+  const repository = new CodingRoomRepository(db);
+  const service = createService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const [workspace] = await service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const request = {
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    prompt: 'Start work',
+  };
+  const previous = await service.startSession(request);
+  db.exec(`
+    CREATE TRIGGER fail_session_metadata BEFORE UPDATE OF config_options_json ON coding_agent_lanes
+    BEGIN
+      SELECT RAISE(ABORT, 'session metadata write failed');
+    END;
+  `);
+
+  await expect(service.startSession(request)).rejects.toThrow('session metadata write failed');
+
+  expect(repository.getRoomById(workspace.id)).toMatchObject({
+    activeMissionId: previous.room.activeMissionId,
+    activeLaneId: previous.room.activeLaneId,
+  });
+  expect(service.listWorkspaces()[0].sessions.map(session => session.id)).toEqual(
+    previous.lanes.map(lane => lane.id),
+  );
 });
 
 test('does not persist a draft session when its default agent model is unavailable', async () => {
@@ -83,7 +149,7 @@ test('does not persist a draft session when its default agent model is unavailab
       throw new Error('Configured model is unavailable.');
     },
   });
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Unavailable model',
     sourceFolders: [root],
     defaultProfileId: CodingAgentProfileId.Builtin,
@@ -100,6 +166,52 @@ test('does not persist a draft session when its default agent model is unavailab
 
   expect(service.listWorkspaces()[0].sessions).toEqual([]);
   expect(service.bootstrap(root).missions).toEqual([]);
+});
+
+test('checks workspace membership before starting a detected external agent', async () => {
+  const db = openCodingRoomDatabase();
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-acp-scope-'));
+  trackTempDirectory(root);
+  const registry = new CodingAgentRegistry();
+  const builtin = registry.get(CodingAgentProfileId.Builtin)!;
+  const profile = registry.registerExternal({
+    name: 'Detected ACP agent',
+    description: 'Test',
+    driverKind: CodingAgentDriverKind.Acp,
+    status: CodingAgentProfileStatus.Detected,
+    capabilities: builtin.capabilities,
+    authMethods: [],
+    command: execPath,
+    args: [],
+  });
+  const service = createService(new CodingRoomRepository(db), registry, {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const [workspace] = await service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: builtin.id,
+  });
+  const request = {
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: profile.id,
+    prompt: 'Run',
+  };
+
+  await expect(service.startSession({ ...request, workspaceId: 'missing' })).rejects.toThrow(
+    CodingErrorMessage.WorkspaceNotFound,
+  );
+  await expect(service.startSession({ ...request, sourceRoot: tmpdir() })).rejects.toThrow(
+    CodingErrorMessage.SourceFolderNotInWorkspace,
+  );
+  expect(registry.get(profile.id)?.status).toBe(CodingAgentProfileStatus.Detected);
+  expect(service.listWorkspaces()[0].sessions).toEqual([]);
+  await service.dispose();
 });
 
 test('does not persist a session before an external ACP session is established', async () => {
@@ -144,7 +256,7 @@ test('does not persist a session before an external ACP session is established',
     completeExternalWorkbenchRun: () => undefined,
   });
   const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Unavailable external agent',
     sourceFolders: [root],
     defaultProfileId: profile.id,
@@ -166,6 +278,7 @@ test('does not persist a session before an external ACP session is established',
 
 test('does not create a mission when the selected agent needs model configuration', async () => {
   const db = openCodingRoomDatabase();
+  const root = trackTempDirectory(mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-unconfigured-')));
   const service = createService(
     new CodingRoomRepository(db),
     new CodingAgentRegistry(undefined, () => false),
@@ -178,12 +291,20 @@ test('does not create a mission when the selected agent needs model configuratio
     },
   );
 
+  const [workspace] = await service.createWorkspace({
+    name: 'Unconfigured agent fixture',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
   await expect(
-    service.createMission({
-      workspaceRoot: '/workspace/project',
+    service.startSession({
+      workspaceId: workspace.id,
+      sourceRoot: root,
       profileId: 'builtin-zhiyuan-coding',
+      prompt: 'Begin work',
     }),
   ).rejects.toThrow('not ready');
+  expect(service.listWorkspaces()[0].sessions).toEqual([]);
 });
 
 test('rediscovers external agents on demand and returns the refreshed room snapshot', async () => {
@@ -222,12 +343,12 @@ test('deleteSession removes a collaborator lane but keeps the primary session', 
     completeExternalWorkbenchRun: () => undefined,
   });
 
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Product',
     sourceFolders: [root],
     defaultProfileId: CodingAgentProfileId.Builtin,
   });
-  const snapshot = await service.createSession({
+  const snapshot = await service.seedSession({
     workspaceId: workspace.id,
     sourceRoot: root,
     profileId: CodingAgentProfileId.Builtin,
@@ -266,12 +387,12 @@ test('deleteSession of the primary session removes the whole mission', async () 
     completeExternalWorkbenchRun: () => undefined,
   });
 
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Product',
     sourceFolders: [root],
     defaultProfileId: CodingAgentProfileId.Builtin,
   });
-  const snapshot = await service.createSession({
+  const snapshot = await service.seedSession({
     workspaceId: workspace.id,
     sourceRoot: root,
     profileId: CodingAgentProfileId.Builtin,
@@ -288,6 +409,95 @@ test('deleteSession of the primary session removes the whole mission', async () 
   expect(service.bootstrap(root).lanes).toHaveLength(0);
 });
 
+test.each(['session', 'workspace'] as const)(
+  'shutdown waits for the driver of a deleted %s',
+  async target => {
+    const db = openCodingRoomDatabase();
+    const root = trackTempDirectory(mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-retire-')));
+    const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+      startBuiltinSession: async () => undefined,
+      cancelBuiltinSession: async () => undefined,
+      getBuiltinWorkbenchLink: () => null,
+      beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+      completeExternalWorkbenchRun: () => undefined,
+    });
+    const [workspace] = await service.createWorkspace({
+      name: 'Product',
+      sourceFolders: [root],
+      defaultProfileId: CodingAgentProfileId.Builtin,
+    });
+    const {
+      lanes: [lane],
+    } = await service.seedSession({
+      workspaceId: workspace.id,
+      sourceRoot: root,
+      profileId: workspace.defaultProfileId,
+      title: 'Main task',
+    });
+    const release = Promise.withResolvers<void>();
+    const dispose = vi
+      .spyOn(service['room'].getDriver(lane), 'dispose')
+      .mockReturnValue(release.promise);
+
+    if (target === 'session') service.deleteSession(root, lane.id);
+    else service.deleteWorkspace(workspace.id);
+    expect(service.listWorkspaces().flatMap(item => item.sessions)).toEqual([]);
+    const stopped = vi.fn();
+    const shutdown = service.dispose().then(stopped);
+    try {
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(dispose).toHaveBeenCalledOnce();
+      expect(stopped).not.toHaveBeenCalled();
+    } finally {
+      release.resolve();
+      await shutdown;
+    }
+  },
+);
+
+test('shutdown closes a driver held before its lane is published', async () => {
+  const db = openCodingRoomDatabase();
+  const root = trackTempDirectory(mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-start-')));
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const [workspace] = await service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const session = Promise.withResolvers<CodingAgentSession>();
+  const driver = {
+    createSession: vi.fn(() => session.promise),
+    onSessionTitleChanged: () => () => {},
+    dispose: vi.fn(async () => session.reject(new Error('Agent stopped'))),
+  };
+  vi.spyOn(service['room'].driverFactory, 'create').mockReturnValue(
+    driver as unknown as CodingAgentDriver,
+  );
+  const starting = service.startSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: workspace.defaultProfileId,
+    prompt: 'Implement report',
+  });
+  const failure = starting.catch((error: unknown) => error);
+  try {
+    await vi.waitFor(() => expect(driver.createSession).toHaveBeenCalledOnce());
+    await service.dispose();
+    expect(driver.dispose).toHaveBeenCalledOnce();
+  } finally {
+    session.reject(new Error('Agent stopped'));
+    await failure;
+  }
+  expect(await failure).toMatchObject({ message: 'Coding Room is shutting down.' });
+  expect(service.listWorkspaces()[0].sessions).toEqual([]);
+});
+
 test('deleteSession refuses a running session', async () => {
   const db = openCodingRoomDatabase();
   const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-delete-'));
@@ -301,12 +511,12 @@ test('deleteSession refuses a running session', async () => {
     completeExternalWorkbenchRun: () => undefined,
   });
 
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Product',
     sourceFolders: [root],
     defaultProfileId: CodingAgentProfileId.Builtin,
   });
-  const snapshot = await service.createSession({
+  const snapshot = await service.seedSession({
     workspaceId: workspace.id,
     sourceRoot: root,
     profileId: CodingAgentProfileId.Builtin,
@@ -333,12 +543,12 @@ test('setLaneModelOverride persists the model and patches the live builtin sessi
     completeExternalWorkbenchRun: () => undefined,
   });
 
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Product',
     sourceFolders: [root],
     defaultProfileId: CodingAgentProfileId.Builtin,
   });
-  const snapshot = await service.createSession({
+  const snapshot = await service.seedSession({
     workspaceId: workspace.id,
     sourceRoot: root,
     profileId: CodingAgentProfileId.Builtin,
@@ -352,6 +562,11 @@ test('setLaneModelOverride persists the model and patches the live builtin sessi
   expect(patchBuiltinSession).toHaveBeenCalledWith(lane.localSessionId, {
     model: 'openai/gpt-5',
   });
+  patchBuiltinSession.mockRejectedValueOnce(new Error('Model scope rejected'));
+  await expect(service.setLaneModelOverride(root, lane.id, 'invalid/model')).rejects.toThrow(
+    'Model scope rejected',
+  );
+  expect(service.bootstrap(root).lanes[0].modelOverride).toBe('openai/gpt-5');
   await expect(service.setLaneModelOverride(root, 'missing-lane', 'x')).rejects.toThrow(
     /not found/i,
   );
@@ -392,12 +607,12 @@ test('setLaneModelOverride rejects non-builtin lanes', async () => {
   });
 
   const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
-  const [workspace] = service.createWorkspace({
+  const [workspace] = await service.createWorkspace({
     name: 'Product',
     sourceFolders: [root],
     defaultProfileId: profile.id,
   });
-  const snapshot = await service.createSession({
+  const snapshot = await service.seedSession({
     workspaceId: workspace.id,
     sourceRoot: root,
     profileId: profile.id,

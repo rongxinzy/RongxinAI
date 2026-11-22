@@ -68,8 +68,16 @@ export function WizardStepSelectPreset({
             >
               <ProviderAvatar name={item.name} providerKey={item.key} size="md" />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-foreground">{item.name}</div>
-                <div className="truncate text-xs text-muted-foreground">{item.shortDesc}</div>
+                <div className="truncate text-sm font-medium text-foreground">
+                  {item.key === 'custom'
+                    ? i18nService.t('providerWizardCustomCardTitle')
+                    : item.name}
+                </div>
+                <div className="truncate text-xs text-muted-foreground">
+                  {item.key === 'custom'
+                    ? i18nService.t('providerWizardCustomCardDesc')
+                    : item.shortDesc}
+                </div>
               </div>
             </button>
           ))}
@@ -135,8 +143,16 @@ export function WizardStepConfigureConnection({
             size="md"
           />
           <div>
-            <div className="text-sm font-medium text-foreground">{preset.name}</div>
-            <div className="text-xs text-muted-foreground">{preset.shortDesc}</div>
+            <div className="text-sm font-medium text-foreground">
+              {preset.key === 'custom'
+                ? i18nService.t('providerWizardCustomCardTitle')
+                : preset.name}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {preset.key === 'custom'
+                ? i18nService.t('providerWizardCustomCardDesc')
+                : preset.shortDesc}
+            </div>
           </div>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={onBackToPresets}>
@@ -154,54 +170,45 @@ export function WizardStepConfigureConnection({
         </label>
       )}
 
-      {preset.requiresKey && (
-        <div className="space-y-2">
-          <Label htmlFor="wizard-api-key">{i18nService.t('magpieProviderKey')}</Label>
-          <div className="flex gap-2">
-            <Input
-              ref={keyInputRef}
-              id="wizard-api-key"
-              type={showKey ? 'text' : 'password'}
-              value={apiKey}
-              onChange={e => onKeyChange(e.target.value)}
-              placeholder={i18nService.t('magpieProviderKeyPlaceholder')}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label={showKey ? 'Hide key' : 'Show key'}
-              onClick={onToggleShowKey}
-            >
-              {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={testing || !apiKey.trim()}
-              onClick={onTest}
-            >
-              {testing ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                i18nService.t('providerWizardTestFirst')
-              )}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {i18nService.t('providerWizardApiKeyNotice')}
-          </p>
-        </div>
-      )}
-
-      {!preset.requiresKey && (
-        <div className="flex items-center justify-between rounded-md border border-border px-3 py-2.5 text-sm">
-          <span className="text-muted-foreground">{i18nService.t('modelsZeroNoConfigNeeded')}</span>
-          <Button type="button" variant="outline" size="sm" disabled={testing} onClick={onTest}>
-            {testing ? i18nService.t('magpieTesting') : i18nService.t('providerWizardTestFirst')}
+      <div className="space-y-2">
+        <Label htmlFor="wizard-api-key">
+          {i18nService.t(preset.requiresKey ? 'magpieProviderKey' : 'providerWizardOptionalKey')}
+        </Label>
+        <div className="flex gap-2">
+          <Input
+            ref={keyInputRef}
+            id="wizard-api-key"
+            type={showKey ? 'text' : 'password'}
+            value={apiKey}
+            onChange={e => onKeyChange(e.target.value)}
+            placeholder={i18nService.t('magpieProviderKeyPlaceholder')}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label={showKey ? 'Hide key' : 'Show key'}
+            onClick={onToggleShowKey}
+          >
+            {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={testing || !baseUrl.trim() || (preset.requiresKey && !apiKey.trim())}
+            onClick={onTest}
+          >
+            {testing ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              i18nService.t('providerWizardTestFirst')
+            )}
           </Button>
         </div>
-      )}
+        <p className="text-xs text-muted-foreground">
+          {i18nService.t('providerWizardApiKeyNotice')}
+        </p>
+      </div>
 
       {testing && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -223,7 +230,10 @@ export function WizardStepConfigureConnection({
 
       {testError && <ProviderErrorBanner classified={testError} onAction={onErrorAction} />}
 
-      <details className="group rounded-lg border border-border px-3 py-2 text-sm">
+      <details
+        open={!preset.requiresKey || undefined}
+        className="group rounded-lg border border-border px-3 py-2 text-sm"
+      >
         <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-muted-foreground select-none hover:text-foreground">
           <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
           <span>{i18nService.t('providerEditMoreOptions')}</span>

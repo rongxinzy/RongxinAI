@@ -13,7 +13,7 @@ interface Workflow {
     {
       uses?: string;
       with?: Record<string, string | boolean>;
-      steps?: Array<{ uses?: string; run?: string }>;
+      steps?: Array<{ uses?: string; run?: string; with?: Record<string, string> }>;
     }
   >;
 }
@@ -49,15 +49,10 @@ test('enterprise and community share the release workflow, installer and accepta
   );
   const beforePackage = steps.slice(0, packageIndex);
   expect(packageIndex).toBeGreaterThan(0);
-  expect(beforePackage.some(step => step.uses === 'actions/setup-go@v6')).toBe(true);
   expect(beforePackage.some(step => step.uses === 'actions/setup-dotnet@v5')).toBe(true);
   expect(
-    beforePackage.some(
-      step =>
-        step.run?.includes('bun run magpie:build -- --target win32-x64') &&
-        step.run.includes('bun run magpie:verify -- --target win32-x64'),
-    ),
-  ).toBe(true);
+    beforePackage.find(step => step.uses === './.github/actions/prepare-magpie-runtime')?.with,
+  ).toEqual({ target: 'win32-x64' });
   expect(steps.some(step => step.uses === './.github/actions/verify-windows-package')).toBe(true);
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as {
     scripts: Record<string, string>;

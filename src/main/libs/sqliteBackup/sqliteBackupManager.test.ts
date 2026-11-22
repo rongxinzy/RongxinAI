@@ -20,15 +20,16 @@ vi.mock('./sqliteVerify', () => ({
   },
 }));
 vi.mock('../fileHasher', () => ({
-  sha256FileStream: async (filePath: string) => {
+  sha256FileStream: vi.fn(async (filePath: string) => {
     const hash = crypto.createHash('sha256');
     hash.update(fs.readFileSync(filePath));
     return hash.digest('hex');
-  },
+  }),
 }));
 import os from 'os';
 import path from 'path';
 import { afterEach, expect, test } from 'vitest';
+import { sha256FileStream } from '../fileHasher';
 
 import {
   SQLITE_BACKUP_ALWAYS_ON_STARTUP_ENV,
@@ -129,6 +130,54 @@ test('createBackup writes a snapshot and a manifest record', async () => {
   reopened.close();
 });
 
+test('shutdown releases SQLite after copying while the snapshot is still being published', async () => {
+  const manager = new SqliteBackupManager(makeTempDir());
+  const db = new Database(':memory:');
+  const entered = Promise.withResolvers<void>();
+  const proceed = Promise.withResolvers<void>();
+  const hashing = Promise.withResolvers<void>();
+  const publish = Promise.withResolvers<void>();
+  const hash = sha256FileStream;
+  const hashSnapshot = vi.mocked(hash).getMockImplementation()!;
+  vi.mocked(hash).mockImplementationOnce(async (...args) => {
+    hashing.resolve();
+    await publish.promise;
+    return hashSnapshot(...args);
+  });
+  const originalBackup = db.backup.bind(db);
+  vi.spyOn(db, 'backup').mockImplementation(async (...args) => {
+    entered.resolve();
+    await proceed.promise;
+    return originalBackup(...args);
+  });
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  try {
+    const starting = manager.startPeriodicBackupLoop(() => db);
+    await entered.promise;
+    const drained = vi.fn();
+    const stopping = manager.shutdown();
+    const released = stopping.sourceReleased.then(drained);
+    await Promise.resolve();
+    expect(drained).not.toHaveBeenCalled();
+    proceed.resolve();
+    await Promise.all([released, hashing.promise]);
+    expect(drained).toHaveBeenCalledOnce();
+    db.close();
+    expect(manager.readManifest().snapshots).toEqual([]);
+    publish.resolve();
+    await Promise.all([starting, stopping.finished]);
+    expect(manager.readManifest().snapshots).toHaveLength(1);
+    await manager.startPeriodicBackupLoop(() => db);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    proceed.resolve();
+    publish.resolve();
+    await manager.shutdown().finished;
+    vi.useRealTimers();
+    if (db.open) db.close();
+  }
+});
+
 test('createBackup rewrites the same backup file instead of creating a second snapshot file', async () => {
   const userDataPath = makeTempDir();
   const dbPath = path.join(userDataPath, 'source.sqlite');
@@ -178,6 +227,42 @@ test('createBackup removes a stale previous backup file after a successful publi
 
   expect(fs.existsSync(previousBackupPath)).toBe(false);
 });
+
+test.each(['hash', 'manifest'] as const)(
+  'a failed %s keeps the previous complete backup',
+  async failure => {
+    const manager = new SqliteBackupManager(makeTempDir());
+    const db = new Database(':memory:');
+    try {
+      db.exec("CREATE TABLE demo (value TEXT); INSERT INTO demo VALUES ('first');");
+      const input = { db, trigger: SqliteBackupTrigger.Periodic };
+      const previous = await manager.createBackup(input);
+      const paths = manager.getPaths();
+      const previousPath = path.join(paths.snapshotsDir, previous.fileName);
+      const firstBytes = fs.readFileSync(previousPath);
+      db.exec("UPDATE demo SET value = 'replacement'");
+
+      if (failure === 'hash')
+        vi.mocked(sha256FileStream).mockRejectedValueOnce(new Error('hash failed'));
+      const rename = fs.renameSync;
+      const publish = vi.spyOn(fs, 'renameSync').mockImplementation((source, destination) => {
+        if (failure === 'manifest' && destination === paths.manifestPath)
+          throw new Error('manifest failed');
+        rename(source, destination);
+      });
+      try {
+        await expect(manager.createBackup(input)).rejects.toThrow(`${failure} failed`);
+      } finally {
+        publish.mockRestore();
+      }
+      expect(manager.readManifest().snapshots).toEqual([previous]);
+      expect(fs.readFileSync(previousPath)).toEqual(firstBytes);
+      expect(fs.readdirSync(paths.snapshotsDir)).toEqual([previous.fileName]);
+    } finally {
+      db.close();
+    }
+  },
+);
 
 test('formatTimestampForLocalPath uses local timezone fields instead of UTC', () => {
   const sample = new Date(2026, 3, 20, 1, 2, 3, 45).getTime();

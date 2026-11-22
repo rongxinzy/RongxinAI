@@ -11,7 +11,6 @@ class FakeDb {
       im_conversation_id: string;
       platform: string;
       cowork_session_id: string;
-      transport_session_key: string | null;
       created_at: number;
       last_active_at: number;
     }
@@ -24,7 +23,6 @@ class FakeDb {
       { name: 'im_conversation_id' },
       { name: 'platform' },
       { name: 'cowork_session_id' },
-      { name: 'transport_session_key' },
       { name: 'created_at' },
       { name: 'last_active_at' },
     ];
@@ -60,21 +58,10 @@ class FakeDb {
             im_conversation_id: String(params[0]),
             platform: String(params[1]),
             cowork_session_id: String(params[2]),
-            transport_session_key: params[3] ? String(params[3]) : null,
-            created_at: Number(params[4]),
-            last_active_at: Number(params[5]),
+            created_at: Number(params[3]),
+            last_active_at: Number(params[4]),
           };
           this.mappings.set(this.mappingKey(row.im_conversation_id, row.platform), row);
-          this.writeCount++;
-          return;
-        }
-        if (sql.includes('UPDATE channel_session_mappings SET transport_session_key = ?')) {
-          const key = this.mappingKey(String(params[2]), String(params[3]));
-          const row = this.mappings.get(key);
-          if (row) {
-            row.transport_session_key = String(params[0]);
-            row.last_active_at = Number(params[1]);
-          }
           this.writeCount++;
           return;
         }
@@ -150,27 +137,6 @@ class FakeDb {
   }
 }
 
-test('IMStore persists conversation reply routes by platform and conversation ID', () => {
-  const db = new FakeDb();
-  const store = new IMStore(db as unknown as ConstructorParameters<typeof IMStore>[0]);
-
-  expect(store.getConversationReplyRoute('dingtalk', '__default__:conv-1')).toBe(null);
-
-  store.setConversationReplyRoute('dingtalk', '__default__:conv-1', {
-    channel: 'dingtalk-connector',
-    to: 'group:cid-42',
-    accountId: '__default__',
-  });
-
-  expect(store.getConversationReplyRoute('dingtalk', '__default__:conv-1')).toEqual({
-    channel: 'dingtalk-connector',
-    to: 'group:cid-42',
-    accountId: '__default__',
-  });
-  expect(store.getConversationReplyRoute('telegram', '__default__:conv-1')).toBe(null);
-  expect(db.writeCount >= 2).toBeTruthy();
-});
-
 test('IMStore persists cc-connect native session routes separately by account', () => {
   const db = new FakeDb();
   const store = new IMStore(db as unknown as ConstructorParameters<typeof IMStore>[0]);
@@ -185,36 +151,27 @@ test('IMStore persists cc-connect native session routes separately by account', 
   expect(store.getCcConnectSessionKey('telegram-a', 'telegram', '43')).toBe(null);
 });
 
-test('IMStore persists transport session keys in channel session mappings', () => {
-  const db = new FakeDb();
-  const store = new IMStore(db as unknown as ConstructorParameters<typeof IMStore>[0]);
-
-  store.createSessionMapping(
-    'bot-1:direct:user-1',
-    'weixin',
-    'cowork-1',
-    'weixin:bot-1:direct:user-1',
-  );
-
-  expect(store.getSessionMapping('bot-1:direct:user-1', 'weixin')).toMatchObject({
-    imConversationId: 'bot-1:direct:user-1',
-    platform: 'weixin',
-    coworkSessionId: 'cowork-1',
-    transportSessionKey: 'weixin:bot-1:direct:user-1',
+test('scheduled task delivery reads the current conversation and account from the mapping', () => {
+  const store = new IMStore(new FakeDb() as unknown as ConstructorParameters<typeof IMStore>[0]);
+  expect(store.getScheduledTaskDelivery('work')).toBeNull();
+  store.createSessionMapping('legacy', 'dingtalk', 'work');
+  expect(store.getScheduledTaskDelivery('work')).toEqual({
+    mode: 'announce',
+    channel: 'dingtalk',
+    to: 'legacy',
   });
-  expect(store.getSessionMappingByCoworkSessionId('cowork-1')?.transportSessionKey).toBe(
-    'weixin:bot-1:direct:user-1',
+  store.deleteSessionMapping('legacy', 'dingtalk');
+  store.createSessionMapping(
+    getCcConnectScopedConversationId('acct', 'native'),
+    'dingtalk',
+    'work',
   );
-
-  store.updateSessionTransportSessionKey(
-    'bot-1:direct:user-1',
-    'weixin',
-    'weixin:bot-1:direct:user-2',
-  );
-
-  expect(store.getSessionMapping('bot-1:direct:user-1', 'weixin')?.transportSessionKey).toBe(
-    'weixin:bot-1:direct:user-2',
-  );
+  expect(store.getScheduledTaskDelivery('work')).toEqual({
+    mode: 'announce',
+    channel: 'dingtalk',
+    to: 'native',
+    accountId: 'acct',
+  });
 });
 
 test('IMStore filters scoped conversations by complete channel account ID', () => {

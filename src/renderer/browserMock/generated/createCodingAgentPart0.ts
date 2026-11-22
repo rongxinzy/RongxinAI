@@ -29,12 +29,9 @@ export function createCodingAgentPart0(
   | 'getProfileAvailableCommands'
   | 'updatePendingMessage'
   | 'deletePendingMessage'
-  | 'previewHandoff'
   | 'previewLaneChanges'
   | 'getGitStatus'
   | 'getGitDiff'
-  | 'stageGitPaths'
-  | 'unstageGitPaths'
   | 'commitGitChanges'
   | 'commitAndPushGitChanges'
   | 'pushGitBranch'
@@ -42,7 +39,6 @@ export function createCodingAgentPart0(
   | 'createGitBranch'
   | 'createGitPullRequest'
   | 'startAuthTerminal'
-  | 'addLane'
   | 'addProfile'
   | 'applyLaneChanges'
   | 'authenticateProfile'
@@ -50,8 +46,11 @@ export function createCodingAgentPart0(
   | 'cancel'
   | 'cancelElicitation'
   | 'confirmSessionRecovery'
-  | 'createCollaborationPreset'
-  | 'createMission'
+  | 'discoverAgents'
+  | 'followUpPendingMessage'
+  | 'handoff'
+  | 'prepareLane'
+  | 'probeAgent'
 > {
   return {
     writeAuthTerminal: async _p0 => {
@@ -236,14 +235,6 @@ export function createCodingAgentPart0(
         success: true,
       };
     },
-    previewHandoff: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.previewHandoff');
-      return {
-        success: true,
-        content: {},
-      };
-    },
     previewLaneChanges: async _p0 => {
       void _p0;
       runtime.warnOnce('codingAgent.previewLaneChanges');
@@ -289,64 +280,6 @@ export function createCodingAgentPart0(
       runtime.warnOnce('codingAgent.getGitDiff');
       return {
         success: true,
-      };
-    },
-    stageGitPaths: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.stageGitPaths');
-      return {
-        success: true,
-        status: {
-          isRepository: false,
-          targetRoot: '',
-          repositoryRoot: '',
-          githubRepositoryUrl: '',
-          hasOrigin: false,
-          hasRemoteBranch: false,
-          defaultBranch: '',
-          branch: '',
-          localBranches: [],
-          head: '',
-          detached: false,
-          upstream: '',
-          ahead: 0,
-          behind: 0,
-          additions: 0,
-          deletions: 0,
-          files: [],
-          isIsolated: false,
-          isBusy: false,
-          canMutate: false,
-        },
-      };
-    },
-    unstageGitPaths: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.unstageGitPaths');
-      return {
-        success: true,
-        status: {
-          isRepository: false,
-          targetRoot: '',
-          repositoryRoot: '',
-          githubRepositoryUrl: '',
-          hasOrigin: false,
-          hasRemoteBranch: false,
-          defaultBranch: '',
-          branch: '',
-          localBranches: [],
-          head: '',
-          detached: false,
-          upstream: '',
-          ahead: 0,
-          behind: 0,
-          additions: 0,
-          deletions: 0,
-          files: [],
-          isIsolated: false,
-          isBusy: false,
-          canMutate: false,
-        },
       };
     },
     commitGitChanges: async _p0 => {
@@ -514,31 +447,6 @@ export function createCodingAgentPart0(
           profileId: '',
           methodId: '',
         },
-      };
-    },
-    addLane: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.addLane');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
       };
     },
     addProfile: async _p0 => {
@@ -716,9 +624,9 @@ export function createCodingAgentPart0(
         profiles: [],
       };
     },
-    createCollaborationPreset: async _p0 => {
+    discoverAgents: async _p0 => {
       void _p0;
-      runtime.warnOnce('codingAgent.createCollaborationPreset');
+      runtime.warnOnce('codingAgent.discoverAgents');
       return {
         success: true,
         snapshot: {
@@ -741,9 +649,84 @@ export function createCodingAgentPart0(
         profiles: [],
       };
     },
-    createMission: async _p0 => {
+    followUpPendingMessage: async _p0 => {
       void _p0;
-      runtime.warnOnce('codingAgent.createMission');
+      runtime.warnOnce('codingAgent.followUpPendingMessage');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    handoff: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.handoff');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    prepareLane: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.prepareLane');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    probeAgent: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.probeAgent');
       return {
         success: true,
         snapshot: {

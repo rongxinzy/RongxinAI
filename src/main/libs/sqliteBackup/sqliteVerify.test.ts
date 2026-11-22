@@ -6,7 +6,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import Database from 'better-sqlite3';
 
-import { sha256FileStream } from '../fileHasher';
+import { hashFileStream, sha256FileStream } from '../fileHasher';
 import { verifySqliteFile } from './sqliteVerify';
 
 const fixture = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'sqlite-verify-test-')));
@@ -83,6 +83,30 @@ test('the verify worker surfaces corruption instead of crashing', async () => {
   expect(outcome).not.toBe('ok');
 });
 
+test('worker verification reads uncheckpointed WAL and preserves a SQLite corruption code', async () => {
+  const walPath = path.join(fixture, 'wal.sqlite');
+  fs.copyFileSync(dbPath, walPath);
+  const options = { workerPath: workerFile('sqliteVerifyWorker.js') };
+  const db = new Database(walPath);
+  try {
+    db.pragma('journal_mode = WAL');
+    db.pragma('wal_autocheckpoint = 0');
+    db.pragma('user_version = 9');
+    expect(fs.statSync(`${walPath}-wal`).size).toBeGreaterThan(32);
+    await expect(verifySqliteFile(walPath, 'quick_check', options)).resolves.toMatchObject({
+      check: 'ok',
+      userVersion: 9,
+    });
+  } finally {
+    db.close();
+  }
+  const invalidPath = path.join(fixture, 'not-a-database.sqlite');
+  fs.writeFileSync(invalidPath, 'not a database');
+  await expect(verifySqliteFile(invalidPath, 'quick_check', options)).rejects.toMatchObject({
+    code: 'SQLITE_NOTADB',
+  });
+});
+
 test('the hash worker streams a file to the same digest as an in-process hash', async () => {
   const sample = path.join(fixture, 'sample.bin');
   fs.writeFileSync(sample, Buffer.alloc(1024 * 1024, 7));
@@ -93,6 +117,11 @@ test('the hash worker streams a file to the same digest as an in-process hash', 
       workerPath: path.join(compiled, 'main/libs/hashWorker.js'),
     }),
   ).resolves.toBe(expected);
+  await expect(
+    hashFileStream(sample, 'sha512', {
+      workerPath: path.join(compiled, 'main/libs/hashWorker.js'),
+    }),
+  ).resolves.toBe(crypto.createHash('sha512').update(fs.readFileSync(sample)).digest('base64'));
 
   await expect(sha256FileStream(path.join(fixture, 'missing.bin'))).rejects.toThrow(
     'size is invalid',

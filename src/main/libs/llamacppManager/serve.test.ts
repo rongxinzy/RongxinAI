@@ -1,47 +1,70 @@
-// Serve/runtime helper tests split from llamacppManager.test.ts (#1069).
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { createHash } from 'crypto';
 import { expect, test, vi } from 'vitest';
+import * as runtimePaths from '../llamacppRuntimePaths';
+import * as runtimeDevices from '../llamacppRuntimeDeviceProbe';
+import * as runtimeServe from '../llamacppServe';
 
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../../shared/llamacpp';
-import type { MarketplaceModel } from '../../../shared/marketplace';
 import {
   buildLlamaCppExecutableCandidates,
   buildLlamaCppPresetGlobalGpuSection,
   buildLlamaCppServeEnv,
   buildLlamaServerModelArgs,
   buildLlamaServerArgs,
-  chooseModelScopeInstallFile,
-  extractModelScopeFilePaths,
   filterLlamaCppServiceConfigByRuntimeCapabilities,
   isPathInside,
   LLAMACPP_PRESET_GLOBAL_GPU_KEYS,
   listLlamaCppRuntimeDevices,
   LlamaCppManager,
-  mergeLocalModels,
-  modelLaunchOptionsToPreset,
   parseLlamaCppHelpFlags,
   parseLlamaCppListDevicesOutput,
   replaceIniSectionKeys,
   resolveLlamaCppDeviceSelection,
   resolveLlamaCppRuntimeTargetPreference,
-  scanLocalGgufModels,
   selectLlamaCppRuntimeTarget,
-  shouldEnableLlamaCppModelsAutoload,
 } from '../llamacppManager';
-import { MarketplaceService } from '../marketplaceService';
 
 test('initializes the configured model library directory', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-model-library-'));
   const modelsDir = path.join(root, 'models');
 
   try {
-    const manager = new LlamaCppManager(() => ({ modelsDir }));
+    const manager = new LlamaCppManager(() => ({ modelsDir }), { resolveModel: vi.fn() });
 
     expect(manager.initializeModelsDir()).toBe(modelsDir);
     expect(fs.statSync(modelsDir).isDirectory()).toBe(true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('probes the newly resolved executable for both flags and devices after a backend change', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-capability-probe-'));
+  const first = path.join(root, 'first');
+  const next = path.join(root, 'next');
+  const manager = new LlamaCppManager(() => ({}), { resolveModel: vi.fn() });
+  using resolve = vi
+    .spyOn(runtimePaths, 'findLlamaCppExecutable')
+    .mockResolvedValueOnce(first)
+    .mockResolvedValueOnce(next);
+  using flags = vi
+    .spyOn(runtimeServe, 'listLlamaCppRuntimeHelpFlags')
+    .mockResolvedValue({ success: true, flags: [] });
+  using devices = vi
+    .spyOn(runtimeDevices, 'listLlamaCppRuntimeDevices')
+    .mockResolvedValue({ success: true, devices: [] });
+  try {
+    fs.writeFileSync(first, '');
+    fs.writeFileSync(next, '');
+    await expect(manager.getRuntimeCapabilities()).resolves.toMatchObject({
+      executablePath: first,
+    });
+    await expect(manager.getRuntimeCapabilities()).resolves.toMatchObject({ executablePath: next });
+    expect(resolve).toHaveBeenCalledTimes(2);
+    expect(flags).toHaveBeenLastCalledWith(expect.objectContaining({ executablePath: next }));
+    expect(devices).toHaveBeenLastCalledWith(expect.objectContaining({ executablePath: next }));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -308,28 +331,6 @@ test('buildLlamaServerModelArgs starts one loopback model without router flags',
   expect(args).not.toContain('--models-dir');
   expect(args).not.toContain('--models-preset');
   expect(args).not.toContain('--models-max');
-});
-
-test('shouldEnableLlamaCppModelsAutoload only allows single-model residency', () => {
-  expect(shouldEnableLlamaCppModelsAutoload(undefined)).toBe(false);
-  expect(shouldEnableLlamaCppModelsAutoload('')).toBe(false);
-  expect(shouldEnableLlamaCppModelsAutoload('0')).toBe(false);
-  expect(shouldEnableLlamaCppModelsAutoload('1')).toBe(true);
-  expect(shouldEnableLlamaCppModelsAutoload('2')).toBe(false);
-});
-
-test('uses the configured timeout for connection and load operations', () => {
-  const manager = new LlamaCppManager(() => ({
-    timeout: '900',
-  }));
-
-  expect(manager.getConnectionAndLoadTimeoutMs()).toBe(900_000);
-});
-
-test('uses the default timeout for connection and load operations when config is empty', () => {
-  const manager = new LlamaCppManager(() => ({}));
-
-  expect(manager.getConnectionAndLoadTimeoutMs()).toBe(120_000);
 });
 
 test('selectLlamaCppRuntimeTarget chooses fixed CUDA 12 on Windows NVIDIA auto mode', () => {

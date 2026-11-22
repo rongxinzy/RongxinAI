@@ -1,5 +1,13 @@
 export const SKILLS_DIR_NAME = 'SKILLs';
 export const SKILL_FILE_NAME = 'SKILL.md';
+export const SkillCatalogLimit = {
+  Roots: 128,
+  PathCharacters: 4096,
+  Candidates: 2048,
+  SourceEntries: 20_000,
+  FileBytes: 2 * 1024 * 1024,
+  ResultBytes: 32 * 1024 * 1024,
+} as const;
 export const SKILL_ICON_FILE_NAMES = [
   'icon.svg',
   'icon.png',

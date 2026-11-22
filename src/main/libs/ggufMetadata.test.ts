@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import { expect, test } from 'vitest';
 
-import { ggufSupportsThinkingToggle, readGgufBlockCount } from './ggufMetadata';
+import { ggufSupportsThinkingToggle, readGgufPlacementMetadata } from './ggufMetadata';
 
 const GgufValueType = {
   String: 8,
@@ -42,25 +42,51 @@ test('reads the architecture block_count (Qwen3-30B-A3B: 48 layers)', () => {
     'qwen3moe.block_count': [48, GgufValueType.Uint32],
   });
 
-  expect(readGgufBlockCount(filePath)).toBe(48);
+  expect(readGgufPlacementMetadata(filePath).blockCount).toBe(48);
 });
 
-test('readGgufBlockCount returns undefined without an architecture block_count', () => {
+test('placement metadata omits block_count when the file does not declare it', () => {
   const filePath = writeGgufMetadata({
     'tokenizer.chat_template': '{{ messages }}',
   });
 
-  expect(readGgufBlockCount(filePath)).toBeUndefined();
+  expect(readGgufPlacementMetadata(filePath).blockCount).toBeUndefined();
 });
 
-test('readGgufBlockCount returns undefined for invalid GGUF files', () => {
+test('placement metadata ignores invalid GGUF files', () => {
   const filePath = path.join(
     fs.mkdtempSync(path.join(os.tmpdir(), 'gguf-metadata-')),
     'invalid.gguf',
   );
   fs.writeFileSync(filePath, 'not a gguf');
 
-  expect(readGgufBlockCount(filePath)).toBeUndefined();
+  expect(readGgufPlacementMetadata(filePath)).toEqual({});
+});
+
+test('rejects a GGUF array that exceeds the metadata value budget before decoding it', () => {
+  const filePath = writeGgufMetadata({ 'tokenizer.chat_template': 'enable_thinking' });
+  try {
+    const template = fs.readFileSync(filePath).subarray(24);
+    const count = 2_000_001;
+    fs.writeFileSync(
+      filePath,
+      Buffer.concat([
+        writeUint32(0x46554747),
+        writeUint32(3),
+        writeUint64(0),
+        writeUint64(2),
+        writeString('tokenizer.fixture'),
+        writeUint32(9),
+        writeUint32(7),
+        writeUint64(count),
+        Buffer.alloc(count),
+        template,
+      ]),
+    );
+    expect(ggufSupportsThinkingToggle(filePath)).toBe(false);
+  } finally {
+    fs.rmSync(path.dirname(filePath), { recursive: true, force: true });
+  }
 });
 
 function writeGgufMetadata(metadata: Record<string, string>): string {

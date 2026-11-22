@@ -1,8 +1,5 @@
 import type Database from 'better-sqlite3';
-import {
-  initializeCompanionTaskAdmissions,
-  resolveCompanionTaskOwner,
-} from '../companion/taskOwnership';
+import { resolveCompanionTaskOwner } from '../companion/taskOwnership';
 
 import type { ProjectIdentity } from '../memory/projectIdentity';
 import { resolveProjectIdentity } from '../memory/projectIdentity';
@@ -11,7 +8,6 @@ import { ConversationHistoryRole, type ConversationHistoryRole as Role } from '.
 
 const DEFAULT_RESULT_LIMIT = 6;
 const MAX_RESULT_LIMIT = 12;
-const MAX_CANDIDATE_MULTIPLIER = 6;
 const MAX_SNIPPET_CHARACTERS = 600;
 
 interface HistoryRow {
@@ -20,7 +16,6 @@ interface HistoryRow {
   session_title: string;
   type: Role;
   content: string;
-  metadata: string | null;
   created_at: number;
 }
 
@@ -39,9 +34,7 @@ export class ConversationHistoryService {
   constructor(
     private readonly db: Database.Database,
     private readonly resolveIdentity: (cwd: string) => ProjectIdentity = resolveProjectIdentity,
-  ) {
-    initializeCompanionTaskAdmissions(db);
-  }
+  ) {}
 
   search(input: {
     workingDirectory: string;
@@ -57,16 +50,12 @@ export class ConversationHistoryService {
     if (projectDirectories.length === 0) return [];
     const limit = normalizeLimit(input.limit);
     const owner = input.sessionId ? resolveCompanionTaskOwner(this.db, input.sessionId) : null;
-    const exact = this.queryRows(projectDirectories, [query], limit, owner).filter(
-      row => !isThinkingMessage(row.metadata),
-    );
+    const exact = this.queryRows(projectDirectories, [query], limit, owner);
     const rows =
       exact.length > 0
         ? exact
-        : this.queryRows(projectDirectories, broadTerms(query), limit, owner).filter(
-            row => !isThinkingMessage(row.metadata),
-          );
-    return rows.slice(0, limit).map(row => ({
+        : this.queryRows(projectDirectories, broadTerms(query), limit, owner);
+    return rows.map(row => ({
       messageId: row.id,
       sessionId: row.session_id,
       sessionTitle: row.session_title,
@@ -105,7 +94,6 @@ export class ConversationHistoryService {
     const termPredicates = terms
       .map(() => "LOWER(m.content) LIKE LOWER(?) ESCAPE '\\'")
       .join(' OR ');
-    const candidateLimit = Math.min(limit * MAX_CANDIDATE_MULTIPLIER, MAX_RESULT_LIMIT * 10);
     const ownershipPredicate = owner
       ? `EXISTS (SELECT 1 FROM companion_task_admissions a
           WHERE a.session_id = s.id AND a.pet_id = ?)`
@@ -113,13 +101,14 @@ export class ConversationHistoryService {
     return this.db
       .prepare(
         `SELECT m.id, m.session_id, s.title AS session_title, m.type, m.content,
-                m.metadata, m.created_at
+                m.created_at
          FROM cowork_messages m
          INNER JOIN cowork_sessions s ON s.id = m.session_id
          WHERE s.cwd IN (${directoryPlaceholders})
            AND ${ownershipPredicate}
            AND m.type IN (?, ?)
            AND (${termPredicates})
+           AND (CASE WHEN json_valid(m.metadata) THEN json_type(m.metadata, '$.isThinking') END) IS NOT 'true'
          ORDER BY m.created_at DESC, COALESCE(m.sequence, m.created_at) DESC
          LIMIT ?`,
       )
@@ -129,7 +118,7 @@ export class ConversationHistoryService {
         ConversationHistoryRole.User,
         ConversationHistoryRole.Assistant,
         ...terms.map(term => `%${escapeLikePattern(term)}%`),
-        candidateLimit,
+        limit,
       ) as HistoryRow[];
   }
 }
@@ -150,16 +139,6 @@ function broadTerms(query: string): string[] {
         .filter(Boolean),
     ),
   ];
-}
-
-function isThinkingMessage(metadata: string | null): boolean {
-  if (!metadata) return false;
-  try {
-    const parsed = JSON.parse(metadata) as { isThinking?: unknown };
-    return parsed.isThinking === true;
-  } catch {
-    return false;
-  }
 }
 
 function escapeLikePattern(value: string): string {

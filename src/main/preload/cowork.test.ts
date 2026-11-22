@@ -43,8 +43,9 @@ describe('coworkApi contract invokers', () => {
     expect(invoke).toHaveBeenLastCalledWith('cowork:queue:enqueue', payload);
     expect(invoke.mock.calls[0]).toHaveLength(2);
 
-    await coworkApi.cowork.renameWorkspace('workspace-1', 'Renamed');
-    expect(invoke).toHaveBeenLastCalledWith('cowork:workspace:rename', 'workspace-1', 'Renamed');
+    const workspace = { id: 'workspace-1', name: 'Renamed' };
+    await coworkApi.cowork.updateWorkspace(workspace);
+    expect(invoke).toHaveBeenLastCalledWith('cowork:workspace:update', workspace);
   });
 
   test('workbenchTask invoke methods forward to the contract channels', async () => {
@@ -84,7 +85,6 @@ describe('coworkApi contract invokers', () => {
 
     expect(typeof coworkApi.cowork.onStreamRunState).toBe('function');
     expect(typeof coworkApi.cowork.onStreamUiEvent).toBe('function');
-    expect(typeof coworkApi.cowork.onSessionsChanged).toBe('function');
     expect(typeof coworkApi.workbenchTask.onChanged).toBe('function');
     expect(typeof coworkApi.todo.onChanged).toBe('function');
 

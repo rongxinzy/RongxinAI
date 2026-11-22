@@ -1,7 +1,7 @@
 import { parentPort } from 'node:worker_threads';
 
 import { scanSkillSecurity } from './skillSecurityScanner';
-import type { SkillSecurityReport } from './skillSecurityTypes';
+import type { SkillSecurityReport } from '../../../shared/skills/securityTypes';
 
 type ScanRequest = { skillDirs: string[] };
 type ScanResponse = { reports?: SkillSecurityReport[]; error?: string; runMs: number };

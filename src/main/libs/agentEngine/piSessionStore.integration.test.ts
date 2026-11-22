@@ -15,7 +15,6 @@ import path from 'path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
-  hasPersistedPiSession,
   invalidatePiSessionDir,
   openPersistentPiSessionManager,
   piSessionDirFor,
@@ -61,16 +60,27 @@ const toolResultMessage = () => ({
   timestamp: new Date().toISOString(),
 });
 
+const openSession = (sessionId: string, cwd = workspaceRoot) =>
+  openPersistentPiSessionManager(
+    SessionManager,
+    rootDir,
+    sessionId,
+    cwd,
+    new AbortController().signal,
+  );
+
 describe('piSessionStore with the real Pi SessionManager', () => {
-  it('round-trips structured messages (tool call + result) through a reopen', () => {
+  it('round-trips structured messages (tool call + result) through a reopen', async () => {
     const sessionId = '0ed4a4e6-1f2b-4c8f-9a3d-6c1f2e7b9d10';
 
-    const first = openPersistentPiSessionManager(SessionManager, rootDir, sessionId, workspaceRoot);
+    const first = await openSession(sessionId);
     expect(first.reusedFile).toBe(false);
     const manager = first.manager as InstanceType<typeof SessionManager>;
 
     // No conversation yet: Pi writes the file lazily, so nothing is on disk.
-    expect(hasPersistedPiSession(rootDir, sessionId)).toBe(false);
+    await expect(resolvePiSessionStoreFile(rootDir, sessionId)).resolves.toMatchObject({
+      sessionFile: null,
+    });
 
     manager.appendMessage(userMessage('List the files') as never);
     manager.appendMessage(assistantToolCall() as never);
@@ -85,15 +95,8 @@ describe('piSessionStore with the real Pi SessionManager', () => {
     } as never);
 
     // The first user message flushed the file.
-    expect(hasPersistedPiSession(rootDir, sessionId)).toBe(true);
-
     // Reopen through the same resolution the adapter uses on a rebuild.
-    const reopenedResolution = openPersistentPiSessionManager(
-      SessionManager,
-      rootDir,
-      sessionId,
-      workspaceRoot,
-    );
+    const reopenedResolution = await openSession(sessionId);
     expect(reopenedResolution.reusedFile).toBe(true);
     const reopened = reopenedResolution.manager as InstanceType<typeof SessionManager>;
 
@@ -129,55 +132,47 @@ describe('piSessionStore with the real Pi SessionManager', () => {
     expect(after.messages[4].content[0]).toMatchObject({ type: 'text', text: 'Now count them' });
   });
 
-  it('keeps the reopen in the workspace the rebuild runs under', () => {
+  it('keeps the reopen in the workspace the rebuild runs under', async () => {
     const sessionId = '22c9a1de-4c8f-4b1e-8f2a-9d3e4f5a6b7c';
-    const first = openPersistentPiSessionManager(SessionManager, rootDir, sessionId, workspaceRoot);
+    const first = await openSession(sessionId);
     (first.manager as InstanceType<typeof SessionManager>).appendMessage(
       userMessage('hello') as never,
     );
 
     const otherWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-session-store-ws2-'));
-    const reopened = openPersistentPiSessionManager(
-      SessionManager,
-      rootDir,
-      sessionId,
-      otherWorkspace,
-    );
+    const reopened = await openSession(sessionId, otherWorkspace);
     expect((reopened.manager as InstanceType<typeof SessionManager>).getCwd()).toBe(otherWorkspace);
     fs.rmSync(otherWorkspace, { recursive: true, force: true });
   });
 
-  it('starts fresh after invalidation, so the text fallback runs again', () => {
+  it('starts fresh after invalidation, so the text fallback runs again', async () => {
     const sessionId = '31d7c2ef-9a4b-4c5d-8e6f-0a1b2c3d4e5f';
-    const first = openPersistentPiSessionManager(SessionManager, rootDir, sessionId, workspaceRoot);
+    const first = await openSession(sessionId);
     (first.manager as InstanceType<typeof SessionManager>).appendMessage(
       userMessage('to be discarded') as never,
     );
-    expect(hasPersistedPiSession(rootDir, sessionId)).toBe(true);
+    expect((await resolvePiSessionStoreFile(rootDir, sessionId)).sessionFile).not.toBeNull();
 
-    invalidatePiSessionDir(rootDir, sessionId);
-    expect(hasPersistedPiSession(rootDir, sessionId)).toBe(false);
-
-    const afterInvalidation = resolvePiSessionStoreFile(rootDir, sessionId);
-    expect(afterInvalidation.sessionFile).toBeNull();
-    const next = openPersistentPiSessionManager(SessionManager, rootDir, sessionId, workspaceRoot);
+    await invalidatePiSessionDir(rootDir, sessionId);
+    const next = await openSession(sessionId);
     expect(next.reusedFile).toBe(false);
     expect(
       (next.manager as InstanceType<typeof SessionManager>).buildSessionContext().messages,
     ).toEqual([]);
   });
 
-  it('isolates sessions into one directory each', () => {
+  it('isolates sessions into one directory each', async () => {
     const left = '47e8d3fa-1b2c-4d3e-9f0a-1a2b3c4d5e6f';
     const right = '58f9e4ab-2c3d-4e4f-8a1b-2b3c4d5e6f7a';
     const leftDir = piSessionDirFor(rootDir, left);
     const rightDir = piSessionDirFor(rootDir, right);
     expect(leftDir).not.toBe(rightDir);
 
-    openPersistentPiSessionManager(SessionManager, rootDir, left, workspaceRoot);
-    invalidatePiSessionDir(rootDir, right);
+    await openSession(left);
+    await openSession(right);
+    await invalidatePiSessionDir(rootDir, right);
     // Invalidating one session never touches another.
-    expect(hasPersistedPiSession(rootDir, left)).toBe(false);
     expect(fs.existsSync(leftDir)).toBe(true);
+    expect(fs.existsSync(rightDir)).toBe(false);
   });
 });

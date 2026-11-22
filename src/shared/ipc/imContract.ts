@@ -14,13 +14,7 @@
 import { z } from 'zod';
 
 import { defineIpcContract } from './contract';
-import {
-  DingTalkInstallIpc,
-  FeishuInstallIpc,
-  ImIpc,
-  ImInstanceIpc,
-  WeixinInstallIpc,
-} from './channels';
+import { DingTalkInstallIpc, ImIpc, ImInstanceIpc, WeixinInstallIpc } from './channels';
 import { PlatformRegistry } from '../platform/constants';
 
 const PlatformSchema = z.enum(PlatformRegistry.platforms);
@@ -327,6 +321,26 @@ export const imContract = defineIpcContract({
     args: z.tuple([]),
     result: z.string(),
   },
+  dingtalkLoginStart: {
+    channel: DingTalkInstallIpc.Qrcode,
+    args: z.tuple([]),
+    result: z.object({
+      url: z.string(),
+      deviceCode: z.string(),
+      interval: z.number().optional(),
+      expireIn: z.number().optional(),
+    }),
+  },
+  dingtalkLoginPoll: {
+    channel: DingTalkInstallIpc.Poll,
+    args: z.tuple([z.object({ deviceCode: z.string() })]),
+    result: z.object({
+      done: z.boolean(),
+      clientId: z.string().optional(),
+      clientSecret: z.string().optional(),
+      error: z.string().optional(),
+    }),
+  },
   weixinLoginStart: {
     channel: WeixinInstallIpc.Start,
     args: z.tuple([]),
@@ -441,47 +455,5 @@ export const imInstanceContract = defineIpcContract({
     channel: ImInstanceIpc.discordSetConfig,
     args: instanceConfigSetArgs(DiscordConfigSchema.partial()),
     result: SuccessResultSchema,
-  },
-});
-
-export const feishuInstallContract = defineIpcContract({
-  verify: {
-    channel: FeishuInstallIpc.Verify,
-    args: z.tuple([z.object({ appId: z.string(), appSecret: z.string() })]),
-    result: z.object({
-      success: z.boolean(),
-      error: z.string().optional(),
-    }),
-  },
-});
-
-export const dingtalkInstallContract = defineIpcContract({
-  qrcode: {
-    channel: DingTalkInstallIpc.Qrcode,
-    args: z.tuple([]),
-    result: z.object({
-      url: z.string(),
-      deviceCode: z.string(),
-      interval: z.number().optional(),
-      expireIn: z.number().optional(),
-    }),
-  },
-  poll: {
-    channel: DingTalkInstallIpc.Poll,
-    args: z.tuple([z.object({ deviceCode: z.string() })]),
-    result: z.object({
-      done: z.boolean(),
-      clientId: z.string().optional(),
-      clientSecret: z.string().optional(),
-      error: z.string().optional(),
-    }),
-  },
-  verify: {
-    channel: DingTalkInstallIpc.Verify,
-    args: z.tuple([z.object({ clientId: z.string(), clientSecret: z.string() })]),
-    result: z.object({
-      success: z.boolean(),
-      error: z.string().optional(),
-    }),
   },
 });

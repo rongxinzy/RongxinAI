@@ -9,23 +9,17 @@ const KYLIN_ENV = Object.freeze({
   ZHIYUAN_DEFAULT_LOCALE: 'zh-CN',
   ZHIYUAN_UPDATE_VARIANT: 'cpu',
   ZHIYUAN_DISTRIBUTION: 'kylin-v11',
+  UPDATE_MANIFEST_KEY_ID: '',
+  UPDATE_MANIFEST_PUBLIC_KEY_BASE64: '',
 });
 
-function defaultRun(command, args, options = {}) {
+function defaultRun(command, args) {
   return spawnSync(command, args, {
     cwd: projectRoot,
-    env: { ...process.env, ...KYLIN_ENV, ...options.env },
+    env: { ...process.env, ...KYLIN_ENV },
     stdio: 'inherit',
     windowsHide: true,
   });
-}
-
-function runStep(run, command, args, options = {}) {
-  const result = run(command, args, options);
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(`${command} ${args.join(' ')} exited with code ${result.status ?? 'unknown'}`);
-  }
 }
 
 function buildKylin({ run = defaultRun, platform = process.platform, arch = process.arch } = {}) {
@@ -33,31 +27,12 @@ function buildKylin({ run = defaultRun, platform = process.platform, arch = proc
     throw new Error(`Kylin V11 packages require a linux-x64 host, got ${platform}-${arch}`);
   }
 
-  const steps = [
-    ['bun', ['run', 'channel:runtime:linux-x64']],
-    ['bun', ['run', 'engram:runtime:linux-x64']],
-    ['node', ['scripts/ensure-build-version.js']],
-    ['bun', ['run', 'sync:vendor-llamacpp-cpu']],
-    ['bun', ['run', 'prepare:inference-edition-runtime']],
-    ['bun', ['run', 'build']],
-    ['bun', ['run', 'build:skills']],
-    ['bun', ['run', 'rebuild:electron-native:linux-packaging']],
-    [
-      'bunx',
-      [
-        'electron-builder',
-        '--linux',
-        'rpm',
-        '--x64',
-        '--config',
-        'electron-builder.kylin.cjs',
-        '--publish',
-        'never',
-      ],
-    ],
-  ];
-
-  for (const [command, args] of steps) runStep(run, command, args);
+  const args = ['run', 'dist:linux:cpu', '--', '--x64', '--config', 'electron-builder.kylin.cjs'];
+  const result = run('bun', args);
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`bun ${args.join(' ')} exited with code ${result.status ?? 'unknown'}`);
+  }
 }
 
 if (require.main === module) {
@@ -69,4 +44,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { KYLIN_ENV, buildKylin, runStep };
+module.exports = { KYLIN_ENV, buildKylin };

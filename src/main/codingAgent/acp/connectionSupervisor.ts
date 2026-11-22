@@ -1,9 +1,10 @@
-import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 
 import { ACP_AUTH_REQUIRED_CODE, AcpErrorCode, AcpRequestError } from './protocol';
 import { CodingErrorDetailMessage, CodingErrorMessage } from '../../../shared/codingAgent';
 import { AcpRequestError as AcpResponseError } from './requestError';
 import { windowsBatchArguments } from './windowsBatchLaunch';
+import { terminateProcessTree } from '../../libs/ownedProcessStop';
 import {
   isInteractiveAuthenticationPrompt,
   passiveAgentEnvironment,
@@ -13,55 +14,7 @@ const ACP_REQUEST_TIMEOUT_MS = 5_000;
 const MAX_STDOUT_LINE_BYTES = 10 * 1024 * 1024; // 10 MB — session load replays can exceed 1 MB
 const MAX_RESTART_ATTEMPTS = 2;
 const RESTART_DELAY_MS = 250;
-/** Grace window for a killed agent process to exit before dispose() returns. */
-const DISPOSE_EXIT_TIMEOUT_MS = 2_000;
 const MAX_STDERR_CONTEXT_BYTES = 16 * 1024;
-
-type ProcessTreeChild = Pick<ChildProcessWithoutNullStreams, 'pid' | 'kill'>;
-
-interface ProcessTreeTerminationOptions {
-  platform?: NodeJS.Platform;
-  terminateWindowsTree?: (pid: number) => Promise<void>;
-}
-
-const terminateWindowsTree = async (pid: number): Promise<void> => {
-  await new Promise<void>((resolve, reject) => {
-    execFile('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, error =>
-      error ? reject(error) : resolve(),
-    );
-  });
-};
-
-const terminateChild = (child: ProcessTreeChild): void => {
-  try {
-    child.kill('SIGTERM');
-  } catch {
-    // The process may have exited between the PID check and the signal.
-  }
-};
-
-export const terminateProcessTree = async (
-  child: ProcessTreeChild,
-  options: ProcessTreeTerminationOptions = {},
-): Promise<void> => {
-  const pid = child.pid;
-  if (!pid) return;
-
-  if ((options.platform ?? process.platform) === 'win32') {
-    try {
-      await (options.terminateWindowsTree ?? terminateWindowsTree)(pid);
-    } catch {
-      terminateChild(child);
-    }
-    return;
-  }
-
-  try {
-    process.kill(-pid, 'SIGTERM');
-  } catch {
-    terminateChild(child);
-  }
-};
 
 export interface AcpConnectionLaunchOptions {
   executable: string;
@@ -114,7 +67,7 @@ export class AcpConnectionSupervisor {
   private stderrContext = '';
   private watchdogHoldCount = 0;
   private authenticationFailure: Error | null = null;
-  private authenticationTermination: Promise<void> | null = null;
+  private stopping: Promise<void> | null = null;
 
   get generation(): number {
     return this.connectionGeneration;
@@ -136,8 +89,7 @@ export class AcpConnectionSupervisor {
   }
 
   async start(options: AcpConnectionLaunchOptions): Promise<void> {
-    await this.authenticationTermination;
-    this.authenticationTermination = null;
+    if (this.stopping) await this.stopping;
     this.disposed = false;
     this.authenticationFailure = null;
     this.launchOptions = {
@@ -163,7 +115,7 @@ export class AcpConnectionSupervisor {
     ) {
       const staleChild = this.child;
       this.child = null;
-      await terminateProcessTree(staleChild);
+      await this.stopChild(staleChild);
     }
     if (this.child) return;
     this.restartAttempts = 0;
@@ -222,13 +174,13 @@ export class AcpConnectionSupervisor {
       this.failAll(
         new Error(`${CodingErrorDetailMessage.AcpAgentExited} (${code ?? signal ?? 'unknown'}).`),
       );
-      void terminateProcessTree(child).finally(() => this.scheduleRestart());
+      this.restartAfterStop(child);
     });
     child.once('error', error => {
       if (this.child !== child) return;
       this.child = null;
       this.failAll(error);
-      void terminateProcessTree(child).finally(() => this.scheduleRestart());
+      this.restartAfterStop(child);
     });
   }
 
@@ -339,29 +291,31 @@ export class AcpConnectionSupervisor {
     const child = this.child;
     this.child = null;
     this.failAll(new Error(CodingErrorMessage.AcpAgentConnectionDisposed));
-    if (!child) {
-      await this.authenticationTermination;
-      this.authenticationTermination = null;
-      return;
-    }
-    await terminateProcessTree(child);
-    if (child.exitCode !== null || child.signalCode !== null) return;
-    // Wait for the process to actually exit: on Windows the agent keeps its
-    // cwd (the workspace root) locked until it is gone.
-    await new Promise<void>(resolve => {
-      const timer = setTimeout(resolve, DISPOSE_EXIT_TIMEOUT_MS);
-      child.once('exit', () => {
-        clearTimeout(timer);
-        resolve();
-      });
+    if (child) await this.stopChild(child);
+    else await this.stopping;
+  }
+
+  private stopChild(child: ChildProcessWithoutNullStreams): Promise<void> {
+    const stopping = terminateProcessTree(child).finally(() => {
+      if (this.stopping === stopping) this.stopping = null;
     });
+    this.stopping = stopping;
+    return stopping;
+  }
+
+  private restartAfterStop(child: ChildProcessWithoutNullStreams): void {
+    void this.stopChild(child)
+      .then(() => this.scheduleRestart())
+      .catch(error => console.warn('[AcpConnection] Failed to stop the previous agent:', error));
   }
 
   private consumeStdout(chunk: string): void {
     this.stdoutBuffer += chunk;
     if (Buffer.byteLength(this.stdoutBuffer) > MAX_STDOUT_LINE_BYTES) {
       this.failAll(new Error(CodingErrorMessage.AcpOversizedMessage));
-      void this.dispose();
+      void this.dispose().catch(error =>
+        console.warn('[AcpConnection] Failed to stop the agent after oversized output:', error),
+      );
       return;
     }
     let newline = this.stdoutBuffer.indexOf('\n');
@@ -511,7 +465,14 @@ export class AcpConnectionSupervisor {
     const child = this.child;
     this.child = null;
     this.failAll(error);
-    if (child) this.authenticationTermination = terminateProcessTree(child);
+    if (child) {
+      void this.stopChild(child).catch(error =>
+        console.warn(
+          '[AcpConnection] Failed to stop the agent after an authentication prompt:',
+          error,
+        ),
+      );
+    }
     return true;
   }
 

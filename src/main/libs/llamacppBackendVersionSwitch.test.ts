@@ -1,82 +1,91 @@
 import { expect, test, vi } from 'vitest';
 
 import { LlamaCppBackendError } from '../../shared/llamacpp';
-import {
-  LlamaCppBackendSwitchServiceStatus,
-  prepareLlamaCppBackendVersionSwitch,
-  restartLlamaCppBackendVersionService,
-} from './llamacppBackendVersionSwitch';
+import type { LlamaCppModelDaemonStatus } from './llamacppModelDaemonProtocol';
+import { switchLlamaCppBackend } from './llamacppBackendVersionSwitch';
 
-test('allows switching a stopped service without querying models', async () => {
-  const listRunningModels = vi.fn(async () => []);
-  const stop = vi.fn(async () => ({
-    status: LlamaCppBackendSwitchServiceStatus.Stopped,
-    checkedAt: '2026-08-24T00:00:00.000Z',
-  }));
+const running = { status: 'running', checkedAt: '2026-08-24T00:00:00.000Z' } as const;
+const idle: LlamaCppModelDaemonStatus = {
+  status: running,
+  runningModels: [],
+  modelProcesses: [],
+  gatewayBaseUrl: null,
+};
 
-  await expect(
-    prepareLlamaCppBackendVersionSwitch({
-      serviceStatus: LlamaCppBackendSwitchServiceStatus.Stopped,
-      listRunningModels,
-      stop,
+function fixture(snapshot: LlamaCppModelDaemonStatus | null) {
+  const steps: string[] = [];
+  const runtime = {
+    reconnect: vi.fn(async () => snapshot),
+    stopService: vi.fn(async () => {
+      steps.push('stop');
     }),
-  ).resolves.toEqual({ success: true, restartService: false });
-  expect(listRunningModels).not.toHaveBeenCalled();
-  expect(stop).not.toHaveBeenCalled();
+    start: vi.fn(async () => {
+      steps.push('start');
+      return running;
+    }),
+  };
+  const input = {
+    runtime,
+    busy: vi.fn(() => false),
+    activate: () => {
+      steps.push('activate');
+    },
+    restore: () => {
+      steps.push('restore');
+    },
+  };
+  return { input, runtime, steps };
+}
+
+test('activates a backend for a stopped service without starting a process', async () => {
+  const { input, runtime, steps } = fixture(null);
+  await switchLlamaCppBackend(input);
+  expect(runtime.reconnect).toHaveBeenCalledExactlyOnceWith({ requireResponsive: true });
+  expect(steps).toEqual(['activate']);
 });
 
-test('blocks switching while the active service has a running model', async () => {
-  const stop = vi.fn();
+test.each([
+  { ...idle, runningModels: [{ name: 'qwen-local' }] },
+  { ...idle, modelProcesses: [{ modelName: 'starting', modelPath: '/fixture.gguf', port: 10000 }] },
+])('preserves the selected runtime while it owns model processes', async snapshot => {
+  const { input, steps } = fixture(snapshot);
+  await expect(switchLlamaCppBackend(input)).rejects.toThrow(
+    LlamaCppBackendError.SwitchRequiresStoppedService,
+  );
+  expect(steps).toEqual([]);
+});
 
-  await expect(
-    prepareLlamaCppBackendVersionSwitch({
-      serviceStatus: LlamaCppBackendSwitchServiceStatus.Running,
-      listRunningModels: async () => [{ name: 'qwen-local' }],
-      stop,
-    }),
-  ).resolves.toEqual({
-    success: false,
-    error: LlamaCppBackendError.SwitchRequiresStoppedService,
+test('stops an idle runtime before switching and restarts the same owner', async () => {
+  const { input, runtime, steps } = fixture(idle);
+  await switchLlamaCppBackend(input);
+  expect(steps).toEqual(['stop', 'activate', 'start']);
+  expect(runtime.stopService).toHaveBeenCalledExactlyOnceWith({ requireIdle: true });
+});
+
+test('restores the previous backend after the new runtime fails to start', async () => {
+  const { input, runtime, steps } = fixture(idle);
+  vi.spyOn(runtime, 'start').mockImplementationOnce(async () => {
+    steps.push('failed start');
+    throw new Error('startup failed');
   });
-  expect(stop).not.toHaveBeenCalled();
+  await expect(switchLlamaCppBackend(input)).rejects.toThrow('startup failed');
+  expect(steps).toEqual(['stop', 'activate', 'failed start', 'stop', 'restore', 'start']);
 });
 
-test('stops and restarts an active service with no running models before switching', async () => {
-  const stop = vi.fn(async () => ({
-    status: LlamaCppBackendSwitchServiceStatus.Stopped,
-    checkedAt: '2026-08-24T00:00:00.000Z',
-  }));
-
-  await expect(
-    prepareLlamaCppBackendVersionSwitch({
-      serviceStatus: LlamaCppBackendSwitchServiceStatus.Running,
-      listRunningModels: async () => [],
-      stop,
-    }),
-  ).resolves.toEqual({ success: true, restartService: true });
-  expect(stop).toHaveBeenCalledTimes(1);
-
-  await expect(
-    restartLlamaCppBackendVersionService({
-      start: async () => ({
-        status: LlamaCppBackendSwitchServiceStatus.Running,
-        checkedAt: '2026-08-24T00:00:00.000Z',
-      }),
-    }),
-  ).resolves.toEqual({ success: true });
+test('does not activate if the selected runtime cannot be inspected', async () => {
+  const { input, runtime, steps } = fixture(null);
+  runtime.reconnect.mockRejectedValue(new Error('request failed'));
+  await expect(switchLlamaCppBackend(input)).rejects.toThrow(
+    LlamaCppBackendError.SwitchRequiresStoppedService,
+  );
+  expect(steps).toEqual([]);
 });
 
-test('blocks switching when the running model state cannot be inspected', async () => {
-  await expect(
-    prepareLlamaCppBackendVersionSwitch({
-      serviceStatus: LlamaCppBackendSwitchServiceStatus.Running,
-      listRunningModels: async () => {
-        throw new Error('request failed');
-      },
-      stop: vi.fn(),
-    }),
-  ).resolves.toEqual({
-    success: false,
-    error: LlamaCppBackendError.SwitchRequiresStoppedService,
-  });
+test('does not activate while a model request is being admitted', async () => {
+  const { input, steps } = fixture(idle);
+  input.busy.mockReturnValue(true);
+  await expect(switchLlamaCppBackend(input)).rejects.toThrow(
+    LlamaCppBackendError.SwitchRequiresStoppedService,
+  );
+  expect(steps).toEqual([]);
 });

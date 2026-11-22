@@ -72,6 +72,22 @@ test('daily feature CI runs lint, typecheck, and parallel unit tests before its 
   expect(ci.jobs['ci-gate'].needs).toEqual(Object.values(BaselineJob));
 });
 
+test.each([
+  ['electron-verify.yml', 'verify', 'Verify Build Structure'],
+  ['memory-regression.yml', 'memory-leak', 'Run Electron memory regression check'],
+])('%s verifies the bundled application without a second Electron emit', (name, job, verify) => {
+  const steps = workflow(name).jobs[job].steps ?? [];
+  const checking = steps.findIndex(step => step.run === 'bun run typecheck:electron');
+  const build = steps.findIndex(step => step.run === 'bun run build');
+  const verification = steps.findIndex(step => step.name === verify);
+  expect(checking).toBeGreaterThanOrEqual(0);
+  expect(build).toBeGreaterThan(checking);
+  expect(verification).toBeGreaterThan(build);
+  expect(steps.map(step => step.run ?? '').join('\n')).not.toMatch(
+    /compile:electron|bun run build:vite/,
+  );
+});
+
 test.each([JobResult.Failure, JobResult.Cancelled, JobResult.Skipped, 'missing'])(
   'daily gate rejects a %s unit or lint result',
   result => {

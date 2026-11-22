@@ -5,9 +5,13 @@ import { TodoIpc, type TodoChangedEvent, type TodoListUpdateInput } from '../../
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { todoContract } from '../../shared/ipc/todoContract';
 import { TodoRepository } from './repository';
+import { TodoReminderScheduler } from './reminderScheduler';
 
-interface TodoIpcOptions {
-  onMutation?: () => void;
+let reminders: TodoReminderScheduler | undefined;
+
+export function stopTodoReminders(): void {
+  reminders?.stop();
+  reminders = undefined;
 }
 
 const broadcastChanged = (event: TodoChangedEvent): void => {
@@ -19,14 +23,14 @@ const broadcastChanged = (event: TodoChangedEvent): void => {
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-export function registerTodoIpcHandlers(
-  getDatabase: () => Database.Database,
-  options: TodoIpcOptions = {},
-): void {
-  const repository = new TodoRepository(getDatabase());
+export function registerTodoIpcHandlers(db: Database.Database): void {
+  const repository = new TodoRepository(db);
+  const scheduler = new TodoReminderScheduler(db);
+  reminders = scheduler;
+  scheduler.start();
   const notifyMutation = (event: TodoChangedEvent): void => {
     broadcastChanged(event);
-    options.onMutation?.();
+    scheduler.refresh();
   };
 
   handleIpcContract(todoContract, {

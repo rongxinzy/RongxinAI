@@ -1,29 +1,131 @@
-diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
---- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-+++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-@@ -482,7 +482,9 @@
-         if (!model || isVirtualModel(model) || !this._exceedsCompactionThreshold(model, projection)) {
-             return { ...context, messages: projection.messages };
-         }
+diff --git a/dist/core/agent-session.d.ts b/dist/core/agent-session.d.ts
+index 8b6a584..ca0bc7e 100644
+--- a/dist/core/agent-session.d.ts
++++ b/dist/core/agent-session.d.ts
+@@ -13,7 +13,7 @@
+  * Modes use this class and add their own I/O layer on top.
+  */
+ import { type Agent, type AgentEvent, type AgentMessage, type AgentState, type AgentTool, type StreamFn, type ThinkingLevel } from "@earendil-works/pi-agent-core";
+-import type { ImageContent, Model, TextContent } from "@earendil-works/pi-ai/compat";
++import type { ImageContent, Model, TextContent, UserMessage } from "@earendil-works/pi-ai/compat";
+ import { type BashResult } from "./bash-executor.ts";
+ import type { CacheWarmer, CacheWarmingStatus } from "./cache-warmer.ts";
+ import { type CompactionResult } from "./compaction/index.ts";
+@@ -595,6 +595,8 @@ export declare class AgentSession {
+      */
+     steer(text: string, images?: ImageContent[], options?: {
+         source?: InputSource;
++        /** Observe the same native message object later emitted at message_start. */
++        onQueued?: (message: UserMessage) => void;
+     }): Promise<QueuedInputDisposition>;
+     /**
+      * Queue a follow-up message to be processed after the agent finishes.
+@@ -606,6 +608,8 @@ export declare class AgentSession {
+      */
+     followUp(text: string, images?: ImageContent[], options?: {
+         source?: InputSource;
++        /** Observe the same native message object later emitted at message_start. */
++        onQueued?: (message: UserMessage) => void;
+     }): Promise<QueuedInputDisposition>;
+     /**
+      * Internal: Queue a steering message (already expanded, no extension command check).
+diff --git a/dist/core/agent-session.js b/dist/core/agent-session.js
+index d67feeb..246811d 100644
+--- a/dist/core/agent-session.js
++++ b/dist/core/agent-session.js
+@@ -25,7 +25,7 @@ import { normalizeToolResultImages } from "../utils/tool-result-images.js";
+ import { formatNoApiKeyFoundMessage, formatNoModelSelectedMessage } from "./auth-guidance.js";
+ import { executeBashWithOperations } from "./bash-executor.js";
+ import { generateBugReportSummary } from "./bug-report.js";
+-import { calculateContextTokens, collectEntriesForBranchSummary, compact, estimateContextTokens, estimateProjectedContextTokens, estimateTokens, generateBranchSummary, prepareCompaction, shouldCompact, } from "./compaction/index.js";
++import { calculateContextTokens, collectEntriesForBranchSummary, compact, estimateProjectedContextTokens, estimateTokens, generateBranchSummary, prepareCompaction, shouldCompact, } from "./compaction/index.js";
+ import { DEFAULT_THINKING_LEVEL, THINKING_LEVEL_OPTIONS } from "./defaults.js";
+ import { exportSessionToHtml } from "./export-html/index.js";
+ import { createToolHtmlRenderer } from "./export-html/tool-renderer.js";
+@@ -130,6 +130,7 @@ export class AgentSession {
+     _compactionAbortController = undefined;
+     _autoCompactionAbortController = undefined;
+     _overflowRecoveryAttempted = false;
++    _autoCompactionFailed = false;
+     // Branch summarization state
+     _branchSummaryAbortController = undefined;
+     // Retry state
+@@ -473,17 +474,7 @@ export class AgentSession {
+     _exceedsCompactionThreshold(model, projection) {
+         if (model.contextWindow <= 0)
+             return false;
+-        return shouldCompact(estimateProjectedContextTokens(projection, this.sessionManager.getBranch()).tokens, model.contextWindow, this.settingsManager.getCompactionSettings(this.model));
+-    }
+-    async _compactBeforeNextAssistantResponse(context) {
+-        const projection = this.sessionManager.buildSessionProjection();
+-        // A virtual selection is checked in prepareRequest, against the model the request is routed to.
+-        const model = this.model;
+-        if (!model || isVirtualModel(model) || !this._exceedsCompactionThreshold(model, projection)) {
+-            return { ...context, messages: projection.messages };
+-        }
 -        await this._runAutoCompaction("threshold", false);
-+        const result = await this._runAutoCompaction("threshold", false);
-+        if (result.status === "failed")
-+            throw new Error(result.errorMessage ?? "Auto-compaction cancelled");
-         return { ...context, messages: this.sessionManager.buildSessionProjection().messages };
+-        return { ...context, messages: this.sessionManager.buildSessionProjection().messages };
++        return shouldCompact(estimateProjectedContextTokens(projection).tokens, model.contextWindow, this.settingsManager.getCompactionSettings(this.model));
      }
      _installAgentRequestProjection() {
-@@ -533,7 +535,9 @@
-             // The route stands: the router already decided this request. The state entry does not change
-             // the projection.
-             if (this._exceedsCompactionThreshold(route.model, projection)) {
--                await this._runAutoCompaction("threshold", false);
-+                const result = await this._runAutoCompaction("threshold", false);
-+                if (result.status === "failed")
-+                    throw new Error(result.errorMessage ?? "Auto-compaction cancelled");
-                 ({ previous, context } = await prepare());
-             }
-             return { ...previous, context, model: route.model, thinkingLevel: route.thinkingLevel };
-@@ -899,7 +903,7 @@
+         const previousPrepareRequest = this.agent.prepareRequest;
+@@ -509,8 +500,16 @@ export class AgentSession {
+             let { previous, context, projection } = await prepare();
+             const model = previous?.model ?? this.agent.state.model;
+             const thinkingLevel = previous?.thinkingLevel ?? this.agent.state.thinkingLevel;
+-            if (!isVirtualModel(model))
++            if (!isVirtualModel(model)) {
++                // Check once after queued input and prompt/tool changes enter the canonical projection.
++                if (this._exceedsCompactionThreshold(model, projection)) {
++                    const result = await this._runAutoCompaction("threshold", false);
++                    if (result.status === "failed")
++                        throw new Error(result.errorMessage ?? "Auto-compaction cancelled");
++                    ({ previous, context } = await prepare());
++                }
+                 return { ...previous, context, model, thinkingLevel };
++            }
+             // The selection stays in agent state; only this request uses the routed model. A routing
+             // failure rejects, which ends the run with an error response. Only messages the user wrote
+             // start a turn; extension messages can follow them, e.g. from before_agent_start.
+@@ -592,7 +591,7 @@ export class AgentSession {
+                 ? async (_turn, signal) => await this.agent.prepareNextTurn?.(signal)
+                 : undefined);
+         this.agent.prepareNextTurnWithContext = async (turn, signal) => {
+-            const context = await this._compactBeforeNextAssistantResponse(turn.context);
++            const context = { ...turn.context, messages: this.sessionManager.buildSessionProjection().messages };
+             const previousSnapshot = await previousPrepareNextTurnWithContext?.({ ...turn, context }, signal);
+             const nextContext = previousSnapshot?.context ?? context;
+             const runOptions = this._runSystemPromptOptions ?? this._baseSystemPromptOptions;
+@@ -629,6 +628,19 @@ export class AgentSession {
+                 this._entryIdsByMessage.set(message, entry.sourceEntry.id);
+         }
+         this.agent.state.messages = projection.messages;
++        return projection.messages;
++    }
++    async _commitCompaction({ summary, firstKeptEntryId, tokensBefore, details, usage }, fromExtension, reason, willRetry, committedDrafts = []) {
++        const id = this.sessionManager.appendCompaction(summary, firstKeptEntryId, tokensBefore, details, fromExtension, usage);
++        const messages = this._refreshFinalizedContext();
++        for (const entry of committedDrafts)
++            this._emit({ type: "entry_appended", entry });
++        const estimatedTokensAfter = estimateMessagesTokens(messages);
++        const compactionEntry = this.sessionManager.getEntry(id);
++        if (this._extensionRunner && compactionEntry?.type === "compaction") {
++            await this._extensionRunner.emit({ type: "session_compact", compactionEntry, fromExtension, reason, willRetry });
++        }
++        return { summary, firstKeptEntryId, tokensBefore, estimatedTokensAfter, usage, details };
+     }
+     _applyBoundaryDrafts(manager, drafts) {
+         const appended = [];
+@@ -645,7 +657,7 @@ export class AgentSession {
+                     entryId = manager.appendContextEdit(draft.targetId, draft.replacement);
+                     break;
+                 case "compaction": {
+-                    const tokensBefore = estimateProjectedContextTokens(manager.buildSessionProjection(), manager.getBranch()).tokens;
++                    const tokensBefore = estimateProjectedContextTokens(manager.buildSessionProjection()).tokens;
+                     entryId = manager.appendCompaction(draft.summary, draft.firstKeptEntryId, tokensBefore, draft.details, true, draft.usage);
+                     break;
+                 }
+@@ -899,7 +911,7 @@ export class AgentSession {
       * found in the projected context, so the pair stays together whether the attempt comes from
       * the current run or a resumed session. An unpaired result fails the next request (#11227).
       */
@@ -32,7 +134,7 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-sessio
          const toolCallIds = new Set(message.content.flatMap((block) => (block.type === "toolCall" ? [block.id] : [])));
          // A context edit replaces the projected copy, so match it by source entry as well.
          const entryId = this._findPersistedMessageEntryId(message);
-@@ -918,16 +922,11 @@
+@@ -918,15 +930,10 @@ export class AgentSession {
          if (unresolvedProjectedTarget) {
              throw new Error("Cannot persist recovery omission because a projected message has no source entry");
          }
@@ -46,24 +148,177 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-sessio
 -        }
 -        this._refreshFinalizedContext();
 +        return targetIds.flatMap((targetId) => targetId ? [{ type: "context_edit", targetId, replacement: null }] : []);
-     }
++    }
 +    _omitRecoveryAttempt(message) {
 +        this._commitBoundaryDrafts(this._recoveryOmissionDrafts(message));
-+    }
+     }
      /** Find the last assistant message in agent state (including aborted ones) */
      _findLastAssistantMessage() {
-         const messages = this.agent.state.messages;
-@@ -2015,6 +2014,9 @@
-         let images;
-         if (typeof content === "string") {
-             text = content;
-+        }
-+        else if (content == null || typeof content[Symbol.iterator] !== "function") {
-+            text = "";
+@@ -1487,6 +1494,10 @@ export class AgentSession {
+     async _startRun(trigger, onStarted) {
+         this._isAgentRunActive = true;
+         this._agentRunAbortRequested = false;
++        this._autoCompactionFailed = false;
++        // Explicit user/custom runs get a fresh recovery allowance before the
++        // pre-prompt check; message_start occurs too late to unlock a failed run.
++        this._overflowRecoveryAttempted = false;
+         let messages;
+         try {
+             messages = await this._prepareRun(trigger);
+@@ -1518,7 +1529,7 @@ export class AgentSession {
+                     await this.agent.continue();
+                     continue;
+                 }
+-                if (this._agentRunAbortRequested || !(await this._runBeforeSettleBoundary()))
++                if (this._autoCompactionFailed || this._agentRunAbortRequested || !(await this._runBeforeSettleBoundary()))
+                     break;
+                 if (this._agentRunAbortRequested)
+                     break;
+@@ -1595,6 +1606,10 @@ export class AgentSession {
+     async _handlePostAgentRun() {
+         const message = this._lastAssistantMessage;
+         this._lastAssistantMessage = undefined;
++        // A failed preparation already emitted its cause. Do not interpret the
++        // resulting assistant error as a fresh overflow and repeat the same summary.
++        if (this._autoCompactionFailed)
++            return false;
+         if (this._agentRunAbortRequested) {
+             this._finishCancelledRetry();
+             return false;
+@@ -1833,7 +1848,7 @@ export class AgentSession {
+             return text; // Return original on error
+         }
+     }
+-    async _queueUserInput(text, images, behavior, source) {
++    async _queueUserInput(text, images, behavior, source, onQueued) {
+         if (text.startsWith("/")) {
+             this._throwIfExtensionCommand(text);
+         }
+@@ -1843,10 +1858,10 @@ export class AgentSession {
+         let expandedText = this._expandSkillCommand(processedInput.text);
+         expandedText = expandPromptTemplate(expandedText, [...this.promptTemplates]);
+         if (behavior === "steer") {
+-            await this._queueSteer(expandedText, processedInput.images);
++            await this._queueSteer(expandedText, processedInput.images, onQueued);
          }
          else {
-             const textParts = [];
-@@ -2502,8 +2504,15 @@
+-            await this._queueFollowUp(expandedText, processedInput.images);
++            await this._queueFollowUp(expandedText, processedInput.images, onQueued);
+         }
+         return "queued";
+     }
+@@ -1860,7 +1875,7 @@ export class AgentSession {
+      * @throws Error if text is an extension command
+      */
+     async steer(text, images, options) {
+-        return this._queueUserInput(text, images, "steer", options?.source ?? "interactive");
++        return this._queueUserInput(text, images, "steer", options?.source ?? "interactive", options?.onQueued);
+     }
+     /**
+      * Queue a follow-up message to be processed after the agent finishes.
+@@ -1871,19 +1886,20 @@ export class AgentSession {
+      * @throws Error if text is an extension command
+      */
+     async followUp(text, images, options) {
+-        return this._queueUserInput(text, images, "followUp", options?.source ?? "interactive");
++        return this._queueUserInput(text, images, "followUp", options?.source ?? "interactive", options?.onQueued);
+     }
+     /**
+      * Internal: Queue a steering message (already expanded, no extension command check).
+      */
+-    async _queueSteer(text, images) {
+-        this._steeringMessages.push(text);
+-        this._emitQueueUpdate();
++    async _queueSteer(text, images, onQueued) {
+         const content = [{ type: "text", text }];
+         if (images) {
+             content.push(...images);
+         }
+         const message = { role: "user", content, timestamp: Date.now() };
++        onQueued?.(message);
++        this._steeringMessages.push(text);
++        this._emitQueueUpdate();
+         if (images?.length)
+             this._queuedMessagesWithImages.add(message);
+         this.agent.steer(message);
+@@ -1891,14 +1907,15 @@ export class AgentSession {
+     /**
+      * Internal: Queue a follow-up message (already expanded, no extension command check).
+      */
+-    async _queueFollowUp(text, images) {
+-        this._followUpMessages.push(text);
+-        this._emitQueueUpdate();
++    async _queueFollowUp(text, images, onQueued) {
+         const content = [{ type: "text", text }];
+         if (images) {
+             content.push(...images);
+         }
+         const message = { role: "user", content, timestamp: Date.now() };
++        onQueued?.(message);
++        this._followUpMessages.push(text);
++        this._emitQueueUpdate();
+         if (images?.length)
+             this._queuedMessagesWithImages.add(message);
+         this.agent.followUp(message);
+@@ -2365,54 +2382,12 @@ export class AgentSession {
+                     fromExtension = true;
+                 }
+             }
+-            let summary;
+-            let firstKeptEntryId;
+-            let tokensBefore;
+-            let usage;
+-            let details;
+-            if (extensionCompaction) {
+-                // Extension provided compaction content
+-                summary = extensionCompaction.summary;
+-                firstKeptEntryId = extensionCompaction.firstKeptEntryId;
+-                tokensBefore = extensionCompaction.tokensBefore;
+-                usage = extensionCompaction.usage;
+-                details = extensionCompaction.details;
+-            }
+-            else {
+-                // Shared default summary generator, also used by automatic compaction.
+-                const result = await this._runDefaultCompaction(preparation, model, customInstructions, this._compactionAbortController.signal, "manual");
+-                summary = result.summary;
+-                firstKeptEntryId = result.firstKeptEntryId;
+-                tokensBefore = result.tokensBefore;
+-                usage = result.usage;
+-                details = result.details;
+-            }
++            const compaction = extensionCompaction ??
++                await this._runDefaultCompaction(preparation, model, customInstructions, this._compactionAbortController.signal, "manual");
+             if (this._compactionAbortController.signal.aborted) {
+                 throw new Error("Compaction cancelled");
+             }
+-            this.sessionManager.appendCompaction(summary, firstKeptEntryId, tokensBefore, details, fromExtension, usage);
+-            const newEntries = this.sessionManager.getEntries();
+-            this._refreshFinalizedContext();
+-            const estimatedTokensAfter = estimateMessagesTokens(this.sessionManager.buildSessionProjection().messages);
+-            // Get the saved compaction entry for the extension event
+-            const savedCompactionEntry = newEntries.find((e) => e.type === "compaction" && e.summary === summary);
+-            if (this._extensionRunner && savedCompactionEntry) {
+-                await this._extensionRunner.emit({
+-                    type: "session_compact",
+-                    compactionEntry: savedCompactionEntry,
+-                    fromExtension,
+-                    reason: "manual",
+-                    willRetry: false,
+-                });
+-            }
+-            const compactionResult = {
+-                summary,
+-                firstKeptEntryId,
+-                tokensBefore,
+-                estimatedTokensAfter,
+-                usage,
+-                details,
+-            };
++            const compactionResult = await this._commitCompaction(compaction, fromExtension, "manual", false);
+             // compaction_end listeners may submit queued prompts, so expose idle state before notifying them.
+             this._clearManualCompactionState();
+             this._emit({
+@@ -2502,8 +2477,15 @@ export class AgentSession {
          // Skip compaction checks if this assistant message is older than the latest
          // compaction boundary. This prevents a stale pre-compaction usage/error
          // from retriggering compaction on the first prompt after compaction.
@@ -81,7 +336,7 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-sessio
          if (assistantIsFromBeforeCompaction) {
              return false;
          }
-@@ -2511,12 +2520,9 @@
+@@ -2511,12 +2493,9 @@ export class AgentSession {
          // A length stop is recoverable when output ended below the model's original desired limit,
          // independent of the configured context size or any context-clamped provider request limit.
          const currentProjection = this.sessionManager.buildSessionProjection();
@@ -94,18 +349,24 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-sessio
          const entriesAfterAssistant = assistantIndex >= 0 ? branch.slice(assistantIndex + 1) : [];
          const hasPostAssistantContextEdit = entriesAfterAssistant.some((entry) => entry.type === "context_edit");
          const latestAssistantEdit = entriesAfterAssistant
-@@ -2536,7 +2542,8 @@
+@@ -2536,7 +2515,10 @@ export class AgentSession {
              // Case 2: the response completed successfully. Compact, but do not retry because
              // agent.continue() cannot continue from a completed assistant response.
              if (!willRetry) {
 -                return await this._runAutoCompaction("overflow", false);
 +                const result = await this._runAutoCompaction("overflow", false);
++                if (result.status === "failed" && !skipAbortedCheck)
++                    throw new Error(result.errorMessage ?? "Auto-compaction cancelled");
 +                return result.status === "compacted" && result.willContinue;
              }
              if (this._overflowRecoveryAttempted) {
                  const errorMessage = contextOverflow
-@@ -2559,12 +2566,17 @@
+@@ -2557,50 +2539,37 @@ export class AgentSession {
+                     willRetry: false,
+                     fromExtension: false,
                  });
++                if (!skipAbortedCheck)
++                    throw new Error(errorMessage);
                  return false;
              }
 -            // Persistently omit the selected final attempt before post-run recovery compaction.
@@ -117,27 +378,65 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-sessio
 +            // Failed/cancelled summaries must leave both the transcript and retry allowance intact.
 +            const result = await this._runAutoCompaction("overflow", willRetry, {
 +                drafts: this._recoveryOmissionDrafts(assistantMessage),
-+                tokensBefore: Math.max(estimateProjectedContextTokens(currentProjection, branch).tokens, explicitOverflow ? contextWindow : 0),
++                tokensBefore: Math.max(estimateProjectedContextTokens(currentProjection).tokens, explicitOverflow ? contextWindow : 0),
 +            });
 +            const retry = result.status === "compacted" && result.willContinue;
++            if (result.status === "failed" && !skipAbortedCheck)
++                throw new Error(result.errorMessage ?? "Auto-compaction cancelled");
 +            if (retry) {
 +                this._overflowRecoveryAttempted = true;
                  this._failedResponse = assistantMessage;
 +            }
              return retry;
          }
-         // Case 3: threshold compaction without retry.
-@@ -2600,7 +2612,8 @@
-             contextTokens = directContextTokens;
-         }
+-        // Case 3: threshold compaction without retry.
+-        // For error messages or all-zero usage messages, estimate from the last valid response.
+-        // This ensures sessions that hit persistent API errors (e.g. 529) or malformed zero-usage
+-        // responses can still compact and do not reset context accounting.
+-        let contextTokens;
+-        const projection = currentProjection;
+-        const hasContextEdits = projection.entries.some((entry) => entry.sourceEntry.type === "context_edit");
++        // Case 3: threshold compaction without retry. When the response has no
++        // usable usage, the session projection already excludes stale estimates.
+         const directContextTokens = assistantMessage.usage ? calculateContextTokens(assistantMessage.usage) : 0;
+-        if (hasContextEdits) {
+-            contextTokens = estimateProjectedContextTokens(projection, branch).tokens;
+-        }
+-        else if (assistantMessage.stopReason === "error" || directContextTokens === 0) {
+-            const messages = this.agent.state.messages;
+-            const estimate = estimateContextTokens(messages);
+-            // Without provider usage, estimate.tokens is the pure message-size estimate.
+-            // Only usage-backed estimates need the stale pre-compaction check.
+-            if (estimate.lastUsageIndex !== null) {
+-                // Verify the usage source is post-compaction. Kept pre-compaction messages
+-                // have stale usage reflecting the old (larger) context and would falsely
+-                // trigger compaction right after one just finished.
+-                const usageMsg = messages[estimate.lastUsageIndex];
+-                if (compactionEntry &&
+-                    usageMsg.role === "assistant" &&
+-                    usageMsg.timestamp <= new Date(compactionEntry.timestamp).getTime()) {
+-                    return false;
+-                }
+-            }
+-            contextTokens = estimate.tokens;
+-        }
+-        else {
+-            contextTokens = directContextTokens;
+-        }
++        const contextTokens = assistantUsageMatchesProjection &&
++            assistantMessage.stopReason !== "error" && directContextTokens > 0
++            ? directContextTokens
++            : estimateProjectedContextTokens(currentProjection).tokens;
          if (shouldCompact(contextTokens, contextWindow, settings)) {
 -            return await this._runAutoCompaction("threshold", false);
 +            const result = await this._runAutoCompaction("threshold", false);
++            if (result.status === "failed" && !skipAbortedCheck)
++                throw new Error(result.errorMessage ?? "Auto-compaction cancelled");
 +            return result.status === "compacted" && result.willContinue;
          }
          return false;
      }
-@@ -2612,9 +2625,9 @@
+@@ -2612,9 +2581,9 @@ export class AgentSession {
       *
       * @param reason Automatic trigger selected by `_checkCompaction()`
       * @param willRetry Whether to continue the interrupted turn after overflow compaction
@@ -149,18 +448,18 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-sessio
          const model = this.model;
          const settings = this.settingsManager.getCompactionSettings(model);
          let abortController;
-@@ -2623,18 +2636,22 @@
+@@ -2623,18 +2592,22 @@ export class AgentSession {
          let cancelledByExtension = false;
          try {
              if (!model) {
 -                return false;
-+                throw new Error(formatNoModelSelectedMessage());
-             }
+-            }
 -            const pathEntries = this.sessionManager.getBranch();
 -            const preparation = prepareCompaction(pathEntries, settings);
 -            if (!preparation) {
 -                return false;
--            }
++                throw new Error(formatNoModelSelectedMessage());
+             }
              abortController = new AbortController();
              this._autoCompactionAbortController = abortController;
              started = true;
@@ -178,11 +477,60 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-sessio
              let extensionCompaction;
              if (this._extensionRunner.hasHandlers("session_before_compact")) {
                  const extensionResult = (await this._extensionRunner.emit({
-@@ -2679,9 +2696,19 @@
-                 details = compactResult.details;
+@@ -2656,68 +2629,33 @@ export class AgentSession {
+                 }
              }
              abortController.signal.throwIfAborted();
+-            let summary;
+-            let firstKeptEntryId;
+-            let tokensBefore;
+-            let usage;
+-            let details;
+-            if (extensionCompaction) {
+-                // Extension provided compaction content
+-                summary = extensionCompaction.summary;
+-                firstKeptEntryId = extensionCompaction.firstKeptEntryId;
+-                tokensBefore = extensionCompaction.tokensBefore;
+-                usage = extensionCompaction.usage;
+-                details = extensionCompaction.details;
+-            }
+-            else {
+-                // Shared default summary generator, also used by manual compaction.
+-                const compactResult = await this._runDefaultCompaction(preparation, model, undefined, abortController.signal, reason);
+-                summary = compactResult.summary;
+-                firstKeptEntryId = compactResult.firstKeptEntryId;
+-                tokensBefore = compactResult.tokensBefore;
+-                usage = compactResult.usage;
+-                details = compactResult.details;
+-            }
++            const compaction = extensionCompaction ??
++                await this._runDefaultCompaction(preparation, model, undefined, abortController.signal, reason);
+             abortController.signal.throwIfAborted();
+-            this.sessionManager.appendCompaction(summary, firstKeptEntryId, tokensBefore, details, fromExtension, usage);
+-            const newEntries = this.sessionManager.getEntries();
+-            this._refreshFinalizedContext();
+-            const estimatedTokensAfter = estimateMessagesTokens(this.sessionManager.buildSessionProjection().messages);
+-            // Get the saved compaction entry for the extension event
+-            const savedCompactionEntry = newEntries.find((e) => e.type === "compaction" && e.summary === summary);
+-            if (this._extensionRunner && savedCompactionEntry) {
+-                await this._extensionRunner.emit({
+-                    type: "session_compact",
+-                    compactionEntry: savedCompactionEntry,
+-                    fromExtension,
+-                    reason,
+-                    willRetry,
+-                });
+-            }
+-            const result = {
+-                summary,
+-                firstKeptEntryId,
+-                tokensBefore,
+-                estimatedTokensAfter,
+-                usage,
+-                details,
+-            };
 +            const committedDrafts = recovery ? this._applyBoundaryDrafts(this.sessionManager, recovery.drafts) : [];
++            let { firstKeptEntryId } = compaction;
 +            if (recovery && recovery.drafts.length > 0) {
 +                const previewIndex = pathEntries
 +                    .slice(-recovery.drafts.length)
@@ -190,17 +538,7 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-sessio
 +                if (previewIndex >= 0)
 +                    firstKeptEntryId = committedDrafts[previewIndex].id;
 +            }
-             this.sessionManager.appendCompaction(summary, firstKeptEntryId, tokensBefore, details, fromExtension, usage);
-             const newEntries = this.sessionManager.getEntries();
-             this._refreshFinalizedContext();
-+            for (const entry of committedDrafts)
-+                this._emit({ type: "entry_appended", entry });
-             const estimatedTokensAfter = estimateMessagesTokens(this.sessionManager.buildSessionProjection().messages);
-             // Get the saved compaction entry for the extension event
-             const savedCompactionEntry = newEntries.find((e) => e.type === "compaction" && e.summary === summary);
-@@ -2703,21 +2730,19 @@
-                 details,
-             };
++            const result = await this._commitCompaction({ ...compaction, firstKeptEntryId }, fromExtension, reason, willRetry, committedDrafts);
              this._emit({ type: "compaction_end", reason, result, aborted: false, willRetry });
 -            if (willRetry)
 -                return true;
@@ -226,48 +564,437 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-sessio
                  this._emit({
                      type: "compaction_end",
                      reason,
-@@ -2734,7 +2759,7 @@
+@@ -2734,7 +2672,8 @@ export class AgentSession {
                      fromExtension,
                  });
              }
 -            return false;
-+            return { status: "failed", errorMessage, aborted };
++            this._autoCompactionFailed = true;
++            return { status: "failed", errorMessage };
          }
          finally {
              if (this._autoCompactionAbortController === abortController) {
-@@ -3704,12 +3729,14 @@
-                 return false;
-             const msg = m;
-             // Skip aborted messages with no content
--            if (msg.stopReason === "aborted" && msg.content.length === 0)
-+            if (msg.stopReason === "aborted" && (!msg.content || msg.content.length === 0))
-                 return false;
-             return true;
-         });
-         if (!lastAssistant)
-             return undefined;
-+        if (!lastAssistant.content || typeof lastAssistant.content[Symbol.iterator] !== "function")
-+            return undefined;
-         let text = "";
-         for (const content of lastAssistant.content) {
-             if (content.type === "text") {
-diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.d.ts b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.d.ts
---- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.d.ts
-+++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.d.ts
-@@ -384,6 +384,7 @@
-      * found in the projected context, so the pair stays together whether the attempt comes from
-      * the current run or a resumed session. An unpaired result fails the next request (#11227).
-      */
-+    private _recoveryOmissionDrafts;
-     private _omitRecoveryAttempt;
-     /** Find the last assistant message in agent state (including aborted ones) */
-     private _findLastAssistantMessage;
-@@ -786,7 +787,7 @@
-      *
-      * @param reason Automatic trigger selected by `_checkCompaction()`
-      * @param willRetry Whether to continue the interrupted turn after overflow compaction
--     * @returns Whether the post-run loop should call `agent.continue()`
-+     * @returns A successful compaction and continuation decision, or an explicit failure
-      */
-     private _runAutoCompaction;
-     /**
+@@ -3615,23 +3554,9 @@ export class AgentSession {
+         // We can only trust usage from an assistant that responded after the latest compaction.
+         // If no such assistant exists, context token count is unknown until the next LLM response.
+         const projection = this.sessionManager.buildSessionProjection();
+-        const branch = this.sessionManager.getBranch();
+-        const latestCompaction = getLatestCompactionEntry(branch);
+-        if (latestCompaction) {
+-            const projectedAssistants = new Set(projection.entries.flatMap((entry) => entry.messages.some((message) => message.role === "assistant" &&
+-                message.stopReason !== "aborted" &&
+-                message.stopReason !== "error" &&
+-                calculateContextTokens(message.usage) > 0)
+-                ? [entry.sourceEntry.id]
+-                : []));
+-            const compactionIndex = branch.findIndex((entry) => entry.id === latestCompaction.id);
+-            const hasPostCompactionUsage = branch
+-                .slice(compactionIndex + 1)
+-                .some((entry) => projectedAssistants.has(entry.id));
+-            if (!hasPostCompactionUsage)
+-                return { tokens: null, contextWindow, percent: null };
+-        }
+-        const estimate = estimateProjectedContextTokens(projection, branch);
++        const estimate = estimateProjectedContextTokens(projection);
++        if (projection.entries[0]?.sourceEntry.type === "compaction" && estimate.lastUsageIndex === null)
++            return { tokens: null, contextWindow, percent: null };
+         const percent = (estimate.tokens / contextWindow) * 100;
+         return {
+             tokens: estimate.tokens,
+diff --git a/dist/core/compaction/compaction.js b/dist/core/compaction/compaction.js
+index 9b1a409..4ec2d3c 100644
+--- a/dist/core/compaction/compaction.js
++++ b/dist/core/compaction/compaction.js
+@@ -5,9 +5,10 @@
+  * and after compaction the session is reloaded.
+  */
+ import { contentText, getCurrentSystemMessage, normalizeContext, retryAssistantCall, uuidv7, } from "@earendil-works/pi-ai";
+-import { completeSimple } from "@earendil-works/pi-ai/compat";
++import { clampMaxTokensToContext } from "@earendil-works/pi-ai/api/simple-options";
++import { completeSimple, isContextOverflow } from "@earendil-works/pi-ai/compat";
+ import { convertToLlm } from "../messages.js";
+-import { buildSessionProjection, sessionEntryToContextMessages, } from "../session-manager.js";
++import { buildSessionProjection, normalizeSessionMessageContent, sessionEntryToContextMessages, } from "../session-manager.js";
+ import { combineUsage } from "../usage-totals.js";
+ import { computeFileLists, createFileOps, extractFileOpsFromMessage, formatFileOperations, SUMMARIZATION_SYSTEM_PROMPT, serializeConversation, } from "./utils.js";
+ /**
+@@ -108,11 +109,16 @@
+  * If there are messages after the last usage, estimate their tokens with estimateTokens.
+  */
+ export function estimateContextTokens(messages) {
++    return estimateContextTokenUsage(messages, false);
++}
++function estimateContextTokenUsage(messages, useEffectiveSystem) {
+     const usageInfo = getLastAssistantUsageInfo(messages);
+     if (!usageInfo) {
+-        let estimated = 0;
++        const system = useEffectiveSystem ? getCurrentSystemMessage(messages) : undefined;
++        let estimated = system ? estimateTokens(system) : 0;
+         for (const message of messages) {
+-            estimated += estimateTokens(message);
++            if (!useEffectiveSystem || message.role !== "system")
++                estimated += estimateTokens(message);
+         }
+         return {
+             tokens: estimated,
+@@ -133,39 +139,9 @@
+         lastUsageIndex: usageInfo.index,
+     };
+ }
+-/** Estimate projected context without trusting usage captured before a later edit or compaction. */
+-export function estimateProjectedContextTokens(projection, branchEntries) {
+-    const estimate = estimateContextTokens(projection.messages);
+-    if (estimate.lastUsageIndex !== null) {
+-        let projectedMessageIndex = 0;
+-        let usageEntryId;
+-        for (const entry of projection.entries) {
+-            const nextMessageIndex = projectedMessageIndex + entry.messages.length;
+-            if (estimate.lastUsageIndex < nextMessageIndex) {
+-                usageEntryId = entry.sourceEntry.id;
+-                break;
+-            }
+-            projectedMessageIndex = nextMessageIndex;
+-        }
+-        const usageEntryIndex = usageEntryId ? branchEntries.findIndex((entry) => entry.id === usageEntryId) : -1;
+-        let latestInvalidatingEntryIndex = -1;
+-        for (let i = branchEntries.length - 1; i >= 0; i--) {
+-            const entry = branchEntries[i];
+-            if (entry.type === "context_edit" || entry.type === "compaction") {
+-                latestInvalidatingEntryIndex = i;
+-                break;
+-            }
+-        }
+-        if (usageEntryIndex > latestInvalidatingEntryIndex)
+-            return estimate;
+-    }
+-    const currentSystem = getCurrentSystemMessage(projection.messages);
+-    let tokens = currentSystem ? estimateTokens(currentSystem) : 0;
+-    for (const message of projection.messages) {
+-        if (message.role !== "system")
+-            tokens += estimateTokens(message);
+-    }
+-    return { tokens, usageTokens: 0, trailingTokens: tokens, lastUsageIndex: null };
++// The session projection already invalidates usage from before its latest boundary.
++export function estimateProjectedContextTokens(projection) {
++    return estimateContextTokenUsage(projection.messages, true);
+ }
+ /**
+  * Check if compaction should trigger based on context usage.
+@@ -183,6 +159,9 @@
+     if (typeof content === "string") {
+         return content.length;
+     }
++    if (content == null || typeof content[Symbol.iterator] !== "function") {
++        return 0;
++    }
+     let chars = 0;
+     for (const block of content) {
+         if (block.type === "text" && block.text) {
+@@ -196,7 +175,7 @@
+ }
+ /**
+  * Estimate token count for a message using chars/4 heuristic.
+- * This is conservative (overestimates tokens).
++ * This is only a size heuristic; non-Latin text can use substantially more tokens.
+  */
+ export function estimateTokens(message) {
+     let chars = 0;
+@@ -220,7 +199,7 @@
+         }
+         case "assistant": {
+             const assistant = message;
+-            for (const block of assistant.content) {
++            for (const block of normalizeSessionMessageContent(assistant).content) {
+                 if (block.type === "text") {
+                     chars += block.text.length;
+                 }
+@@ -509,6 +488,79 @@
+         ],
+     });
+ }
++/** Keep every source span, validate each intermediate result, and account for every summary call. */
++async function completeBoundedSummary(model, source, buildContext, complete, signal, label = "Summarization") {
++    let usage;
++    // Only successful summaries may be merged. In particular, a truncated checkpoint
++    // must never replace the original transcript, even when it contains usable text.
++    const summarize = async (text, part = false) => {
++        signal?.throwIfAborted();
++        const prefix = part
++            ? "This is a contiguous excerpt or ordered partial summaries. It may start or end inside a message. Summarize only the information present.\n\n"
++            : "";
++        const context = buildContext(`${prefix}${text}`);
++        let available;
++        try {
++            available = clampMaxTokensToContext(model, buildContext(prefix), Number.MAX_SAFE_INTEGER);
++        }
++        catch {
++            throw new Error("Summary instructions leave no room for source text in the model context");
++        }
++        let fits = true;
++        try {
++            // Reuse the transport's estimate and safety margin. Leave room for a useful
++            // summary, but account for fixed instructions before dividing the remaining
++            // space between source text and output on small windows.
++            const minimumOutput = Math.min(model.maxTokens, 4096, Math.max(1, Math.floor(available / 2)));
++            fits = clampMaxTokensToContext(model, context, model.maxTokens) >= minimumOutput;
++        }
++        catch {
++            fits = false;
++        }
++        if (fits) {
++            const response = await complete(context);
++            usage = usage ? combineUsage(usage, response.usage) : response.usage;
++            signal?.throwIfAborted();
++            if (!isContextOverflow(response)) {
++                const failure = getSummarizationFailure(response, label);
++                if (failure)
++                    throw new Error(failure);
++                if (response.content.some((block) => block.type === "toolCall"))
++                    throw new Error(`${label} attempted to call a tool`);
++                if (response.stopReason !== "stop")
++                    throw new Error(`${label} failed: ${response.stopReason}`);
++                if (!contentText(response.content).trim())
++                    throw new Error(`${label} returned an empty summary`);
++                return response;
++            }
++            // A provider may count CJK or other content higher than our estimate.
++            // Split this rejected input instead of retrying the same oversized request.
++        }
++        let middle = Math.floor(text.length / 2);
++        // Prefer a nearby record or word boundary so identifiers are not needlessly
++        // split between summaries. Keep both halves substantial for bounded recursion.
++        let boundary = text.lastIndexOf("\n", middle - 1);
++        if (boundary < Math.floor(middle / 2)) boundary = text.lastIndexOf(" ", middle - 1);
++        if (boundary >= Math.floor(middle / 2)) middle = boundary + 1;
++        // Do not split a UTF-16 surrogate pair, including when text is a single code point.
++        const before = text.charCodeAt(middle - 1);
++        const after = text.charCodeAt(middle);
++        if (before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff)
++            middle--;
++        if (middle <= 0 || middle >= text.length)
++            throw new Error("Summary instructions leave no room for source text in the model context");
++        const left = await summarize(text.slice(0, middle), true);
++        const right = await summarize(text.slice(middle), true);
++        const merged = `<earlier-summary>\n${contentText(left.content)}\n</earlier-summary>\n<later-summary>\n${contentText(right.content)}\n</later-summary>`;
++        // A model that copies/expands its input must not cause an unbounded reduction loop.
++        if (merged.length >= text.length)
++            throw new Error("Summarization did not reduce the oversized history");
++        return summarize(merged, true);
++    };
++    const result = await summarize(source);
++    return { ...result, usage: usage ?? result.usage };
++}
++
+ /** Generate or update a conversation summary and return its provider usage. */
+ export async function generateSummaryWithUsage(currentMessages, model, 
+ // Unused. Kept for existing callers; summaries use the model's output limit (#9512).
+@@ -527,16 +579,8 @@
+     if (previousSummary) {
+         promptText += `<previous-summary>\n${previousSummary}\n</previous-summary>\n\n`;
+     }
+-    promptText += basePrompt;
+     const completionOptions = createSummarizationOptions(model, apiKey, headers, env, signal, thinkingLevel, sessionId);
+-    const response = await completeSummarization(model, buildSummarizationContext(promptText), completionOptions, streamFn, retry, callbacks);
+-    const failure = getSummarizationFailure(response, "Summarization");
+-    if (failure) {
+-        throw new Error(failure);
+-    }
+-    if (response.content.some((block) => block.type === "toolCall")) {
+-        throw new Error("Summarization attempted to call a tool");
+-    }
++    const response = await completeBoundedSummary(model, promptText.trimEnd(), (text) => buildSummarizationContext(`${text}\n\n${basePrompt}`), (context) => completeSummarization(model, context, completionOptions, streamFn, retry, callbacks), signal);
+     const textContent = contentText(response.content);
+     return { text: textContent, usage: response.usage };
+ }
+@@ -606,7 +650,7 @@
+         isSplitTurn: !startsTurn && turnStartIndex !== -1,
+     };
+ }
+-export function prepareCompaction(pathEntries, settings) {
++export function prepareCompaction(pathEntries, settings, options) {
+     if (pathEntries.length > 0 && pathEntries[pathEntries.length - 1].type === "compaction") {
+         return undefined;
+     }
+@@ -624,8 +668,23 @@
+         boundaryStart = prevCompactionIndex + 1;
+     }
+     const boundaryEnd = projectedEntries.length;
+-    const tokensBefore = estimateProjectedContextTokens(projection, pathEntries).tokens;
+-    const cutPoint = findProjectedCutPoint(projectedEntries, boundaryStart, boundaryEnd, settings.keepRecentTokens);
++    // Triggering and cutting must use the same units. Provider usage can be several
++    // times the character estimate (CJK, images, tool schemas). Calibrate the retained
++    // tail against that usage instead of treating a 63K context as 13K of text.
++    // Recovery supplies the pre-edit pressure: omitting a truncated attempt invalidates
++    // its usage anchor but does not make the preceding conversation small.
++    const tokensBefore = options?.tokensBefore ?? estimateProjectedContextTokens(projection).tokens;
++    const estimatedTokens = projection.messages.reduce((sum, message) => sum + estimateTokens(message), 0);
++    const tokenScale = Math.max(1, tokensBefore / Math.max(1, estimatedTokens));
++    let cutPoint = findProjectedCutPoint(projectedEntries, boundaryStart, boundaryEnd, settings.keepRecentTokens / tokenScale);
++    if (options?.force &&
++        !projectedEntries
++            .slice(boundaryStart, cutPoint.firstKeptEntryIndex)
++            .some((entry) => getMessagesFromProjectedEntryForCompaction(entry).length > 0)) {
++        // keepRecentTokens is a preference, not permission to skip required compaction.
++        // A zero budget selects the newest safe boundary, keeping tool pairs together.
++        cutPoint = findProjectedCutPoint(projectedEntries, boundaryStart, boundaryEnd, 0);
++    }
+     const firstKeptEntry = projectedEntries[cutPoint.firstKeptEntryIndex]?.sourceEntry;
+     if (!firstKeptEntry?.id)
+         return undefined;
+@@ -729,18 +788,12 @@
+ async function generateTurnPrefixSummary(messages, model, apiKey, headers, env, signal, thinkingLevel, streamFn, retry, callbacks, sessionId, customInstructions) {
+     const llmMessages = convertToLlm(messages);
+     const conversationText = serializeConversation(llmMessages);
+-    let promptText = `# Conversation\n${conversationText}\n\n# Instructions\n${TURN_PREFIX_SUMMARIZATION_PROMPT}`;
++    let instructions = TURN_PREFIX_SUMMARIZATION_PROMPT;
+     if (customInstructions) {
+-        promptText = `${promptText}\n\nAdditional focus: ${customInstructions}`;
+-    }
+-    const response = await completeSummarization(model, buildSummarizationContext(promptText), createSummarizationOptions(model, apiKey, headers, env, signal, thinkingLevel, sessionId), streamFn, retry, callbacks);
+-    const failure = getSummarizationFailure(response, "Turn prefix summarization");
+-    if (failure) {
+-        throw new Error(failure);
+-    }
+-    if (response.content.some((block) => block.type === "toolCall")) {
+-        throw new Error("Turn prefix summarization attempted to call a tool");
+-    }
++        instructions = `${instructions}\n\nAdditional focus: ${customInstructions}`;
++    }
++    const completionOptions = createSummarizationOptions(model, apiKey, headers, env, signal, thinkingLevel, sessionId);
++    const response = await completeBoundedSummary(model, conversationText, (text) => buildSummarizationContext(`# Conversation\n${text}\n\n# Instructions\n${instructions}`), (context) => completeSummarization(model, context, completionOptions, streamFn, retry, callbacks), signal, "Turn prefix summarization");
+     return {
+         text: contentText(response.content),
+         usage: response.usage,
+diff --git a/dist/core/session-manager.js b/dist/core/session-manager.js
+index 7ee0501..94e8410 100644
+--- a/dist/core/session-manager.js
++++ b/dist/core/session-manager.js
+@@ -168,13 +168,7 @@ export function sessionEntryToContextMessages(entry) {
+         const message = entry.message;
+         // Session files are parsed without validation; old versions, forks, or
+         // hand-edited files can contain messages with null/missing content.
+-        if (message.role === "system" && message.content == null)
+-            return [{ ...message, content: "" }];
+-        if ((message.role === "user" || message.role === "assistant" || message.role === "toolResult") &&
+-            message.content == null) {
+-            return [{ ...message, content: [] }];
+-        }
+-        return [message];
++        return [normalizeSessionMessageContent(message)];
+     }
+     if (entry.type === "custom_message") {
+         return [
+@@ -199,20 +193,13 @@ export function sessionEntryToContextMessages(entry) {
+  * compaction entry. Older summarized entries are omitted.
+  */
+ export function buildContextEntries(entries, leafId, byId) {
+-    const path = buildSessionPath(entries, leafId, byId);
+-    let compaction = null;
+-    for (const entry of path) {
+-        if (entry.type === "compaction") {
+-            compaction = entry;
+-        }
+-    }
+-    if (!compaction) {
+-        return path;
+-    }
+-    const compactionIdx = path.findIndex((entry) => entry.id === compaction.id);
+-    if (compactionIdx < 0) {
++    return selectContextEntries(buildSessionPath(entries, leafId, byId));
++}
++function selectContextEntries(path) {
++    const compactionIdx = path.findLastIndex((entry) => entry.type === "compaction");
++    if (compactionIdx < 0)
+         return path;
+-    }
++    const compaction = path[compactionIdx];
+     const contextEntries = [compaction];
+     let foundFirstKept = false;
+     for (let i = 0; i < compactionIdx; i++) {
+@@ -232,6 +219,17 @@ export function buildContextEntries(entries, leafId, byId) {
+  * If leafId is provided, walks from that entry to root.
+  * Handles compaction and branch summaries along the path.
+  */
++export function normalizeSessionMessageContent(message) {
++    if (message.role === "assistant" && !Array.isArray(message.content)) {
++        const content = typeof message.content === "string" ? [{ type: "text", text: message.content }] : [];
++        return { ...message, content };
++    }
++    if (message.role === "system" && message.content == null)
++        return { ...message, content: "" };
++    if ((message.role === "user" || message.role === "toolResult") && message.content == null)
++        return { ...message, content: [] };
++    return message;
++}
+ /** Project one entry into model-visible messages, applying its latest context edit if any. */
+ export function projectContextEntry(entry, edit) {
+     const messages = sessionEntryToContextMessages(entry);
+@@ -250,14 +248,23 @@ export function projectContextEntry(entry, edit) {
+         const content = (message.role === "assistant" || message.role === "toolResult") && typeof replacement.content === "string"
+             ? [{ type: "text", text: replacement.content }]
+             : replacement.content;
+-        return { ...message, content };
++        return normalizeSessionMessageContent({ ...message, content });
+     });
+ }
+ /** Build provenance-preserving, compaction-aware model context. */
+ export function buildSessionProjection(entries, leafId, byId) {
+     const path = buildSessionPath(entries, leafId, byId);
+     const { thinkingLevel, model } = getSessionContextSettings(path);
+-    const contextEntries = buildContextEntries(entries, leafId, byId);
++    const contextEntries = selectContextEntries(path);
++    // Provider-side output budgeting sees only messages, not session entry IDs. Do
++    // not let it reuse usage from the old projection after an edit or compaction,
++    // even when the boundary and retained response have identical timestamps.
++    // Raw entries keep the original usage for billing, history and diagnostics.
++    const boundary = path.findLastIndex((entry) => entry.type === "context_edit" || entry.type === "compaction");
++    // The suffix after the last boundary keeps its original order in the projection.
++    const firstFreshEntry = path[boundary + 1];
++    const staleCount = boundary < 0 ? 0
++        : firstFreshEntry ? contextEntries.indexOf(firstFreshEntry) : contextEntries.length;
+     const edits = new Map();
+     for (const entry of contextEntries) {
+         if (entry.type === "context_edit")
+@@ -272,6 +279,18 @@ export function buildSessionProjection(entries, leafId, byId) {
+             ? []
+             : projectContextEntry(sourceEntry, edits.get(sourceEntry.id)),
+     }));
++    for (let i = 0; i < staleCount; i++) {
++        const entry = projectedEntries[i];
++        const source = entry.sourceEntry;
++        if (source.type !== "message" || source.message.role !== "assistant")
++            continue;
++        entry.messages = entry.messages.map((message) => message.role === "assistant"
++            ? {
++                ...message,
++                usage: { ...message.usage, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 },
++            }
++            : message);
++    }
+     return {
+         entries: projectedEntries,
+         messages: projectedEntries.flatMap((entry) => entry.messages),
+diff --git a/dist/core/settings-manager.js b/dist/core/settings-manager.js
+index 1a02347..46da92b 100644
+--- a/dist/core/settings-manager.js
++++ b/dist/core/settings-manager.js
+@@ -666,7 +666,18 @@ export class SettingsManager {
+         if (override !== undefined && (typeof override !== "number" || !Number.isSafeInteger(override) || override < 0)) {
+             throw new Error(`Invalid compaction.modelOverrides["${modelKey}"].${field} setting: ${String(override)}. Expected a non-negative safe integer.`);
+         }
+-        return override ?? ordinary ?? DEFAULT_COMPACTION_TOKEN_SETTINGS[field];
++        if (override !== undefined)
++            return override;
++        if (ordinary !== undefined)
++            return ordinary;
++        const defaultTokens = DEFAULT_COMPACTION_TOKEN_SETTINGS[field];
++        // Native defaults must fit local models too. Resolve at read time so switching
++        // models or reloading settings cannot retain a previous model's host-side cap.
++        const window = model?.contextWindow;
++        if (window === undefined || window <= 0)
++            return defaultTokens;
++        const fraction = field === "reserveTokens" ? 0.25 : 0.5;
++        return Math.min(defaultTokens, Math.max(1, Math.floor(window * fraction)));
+     }
+     getCompactionReserveTokens(model) {
+         return this.getCompactionTokenSetting("reserveTokens", model);

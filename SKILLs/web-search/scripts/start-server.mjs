@@ -3,20 +3,21 @@
  * Start Web Search Bridge Server (cross-platform Node.js).
  */
 
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_SERVER_URL, stopStandaloneBridge } from '../server/standaloneControl.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_DIR = path.dirname(__dirname);
-const PID_FILE = path.join(PROJECT_DIR, '.server.pid');
 const LOG_FILE = path.join(PROJECT_DIR, '.server.log');
 const SERVER_ENTRY = path.join(PROJECT_DIR, 'dist', 'server', 'index.js');
+const LOCAL_COMPILER = path.join(PROJECT_DIR, 'node_modules', 'typescript', 'bin', 'tsc');
 const FORCE_REPAIR = process.env.WEB_SEARCH_FORCE_REPAIR === '1';
-const SERVER_PORT = 8923;
-const DEFAULT_SERVER_URL = 'http://127.0.0.1:8923';
+const SERVER_PORT = Number(new URL(DEFAULT_SERVER_URL).port);
 const SERVER_URL = process.env.WEB_SEARCH_SERVER || DEFAULT_SERVER_URL;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -38,23 +39,13 @@ function getNodeRuntime() {
   };
 }
 
-function isProcessRunning(pid) {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error && typeof error === 'object' && error.code === 'EPERM';
-  }
-}
-
 async function isBridgeServerHealthyAt(baseUrl) {
   const url = `${baseUrl.replace(/\/$/, '')}/api/health`;
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(1200) });
     if (!response.ok) return false;
-    const text = await response.text();
-    return text.includes('"success":true');
+    const health = await response.json();
+    return health.success === true && health.data?.status === 'healthy';
   } catch {
     return false;
   }
@@ -123,7 +114,10 @@ function verifyIconvRuntime(runtime) {
 }
 
 function isServerBuildOutdated() {
-  if (!fs.existsSync(SERVER_ENTRY)) return true;
+  if (
+    !fs.existsSync(SERVER_ENTRY) ||
+    !fs.existsSync(path.join(path.dirname(SERVER_ENTRY), 'standaloneControl.cjs'))
+  ) return true;
 
   let distMtimeMs = 0;
   try {
@@ -136,6 +130,7 @@ function isServerBuildOutdated() {
     return true;
   }
 
+  if (!fs.existsSync(LOCAL_COMPILER)) return false;
   const serverDir = path.join(PROJECT_DIR, 'server');
   if (!fs.existsSync(serverDir)) return false;
 
@@ -147,7 +142,7 @@ function isServerBuildOutdated() {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         stack.push(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith('.ts')) {
+      } else if (entry.isFile() && /\.(ts|cjs)$/.test(entry.name)) {
         if (fs.statSync(fullPath).mtimeMs > distMtimeMs) {
           return true;
         }
@@ -157,55 +152,14 @@ function isServerBuildOutdated() {
   return false;
 }
 
-function findListeningPidsOnPort(port) {
-  try {
-    if (process.platform === 'win32') {
-      const output = execFileSync('netstat', ['-ano', '-p', 'tcp'], { encoding: 'utf8' });
-      const pids = new Set();
-      for (const line of output.split(/\r?\n/)) {
-        if (!line.includes('LISTENING')) continue;
-        const parts = line.trim().split(/\s+/);
-        if (parts.length >= 5 && parts[1]?.endsWith(`:${port}`)) {
-          const pid = Number.parseInt(parts[4], 10);
-          if (Number.isInteger(pid) && pid > 0) pids.add(pid);
-        }
-      }
-      return [...pids];
-    }
-    const output = execFileSync('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN'], {
-      encoding: 'utf8',
-    });
-    return output
-      .split(/\s+/)
-      .map((item) => Number.parseInt(item, 10))
-      .filter((pid) => Number.isInteger(pid) && pid > 0);
-  } catch {
-    return [];
-  }
-}
-
-async function killListenersOnServerPort() {
-  const pids = findListeningPidsOnPort(SERVER_PORT);
-  if (pids.length === 0) return;
-
-  console.log(`Force-repair enabled, stopping listeners on port ${SERVER_PORT}: ${pids.join(' ')}`);
-  for (const pid of pids) {
-    try {
-      process.kill(pid, 'SIGTERM');
-    } catch {
-      // Ignore already exited processes.
-    }
-  }
-  await sleep(1000);
-  for (const pid of pids) {
-    if (isProcessRunning(pid)) {
-      try {
-        process.kill(pid, 'SIGKILL');
-      } catch {
-        // Ignore already exited processes.
-      }
-    }
-  }
+function localPortAvailable() {
+  return new Promise(resolve => {
+    const socket = net.createConnection({ host: '127.0.0.1', port: SERVER_PORT });
+    socket.setTimeout(1000, () => socket.destroy());
+    socket.on('connect', () => socket.destroy());
+    socket.on('error', error => resolve(error.code === 'ECONNREFUSED'));
+    socket.on('close', () => resolve(false));
+  });
 }
 
 async function main() {
@@ -219,36 +173,11 @@ async function main() {
     }
   }
 
-  if (fs.existsSync(PID_FILE)) {
-    const existingPid = Number.parseInt(fs.readFileSync(PID_FILE, 'utf8').trim(), 10);
-    if (isProcessRunning(existingPid)) {
-      if (FORCE_REPAIR) {
-        console.log(`Force-repair enabled, stopping existing Bridge Server (PID: ${existingPid})...`);
-        try {
-          process.kill(existingPid, 'SIGTERM');
-        } catch {
-          // Ignore
-        }
-        await sleep(1000);
-        if (isProcessRunning(existingPid)) {
-          try {
-            process.kill(existingPid, 'SIGKILL');
-          } catch {
-            // Ignore
-          }
-        }
-        fs.rmSync(PID_FILE, { force: true });
-      } else {
-        console.log(`✓ Bridge Server is already running (PID: ${existingPid})`);
-        return 0;
-      }
-    } else {
-      fs.rmSync(PID_FILE, { force: true });
-    }
-  }
+  if (FORCE_REPAIR) await stopStandaloneBridge(PROJECT_DIR);
 
-  if (FORCE_REPAIR) {
-    await killListenersOnServerPort();
+  if (!(await localPortAvailable())) {
+    console.error(`✗ Bridge Server port ${SERVER_PORT} is occupied. Stop the owning application before repairing the runtime.`);
+    return 1;
   }
 
   console.log('Starting Bridge Server...');
@@ -286,7 +215,7 @@ async function main() {
   }
 
   if (isServerBuildOutdated()) {
-    if (!ensureNpmAvailable()) return 1;
+    if (!ensureNpmAvailable() || (!fs.existsSync(LOCAL_COMPILER) && !installDependencies())) return 1;
     console.log('Compiling TypeScript (dist missing/outdated)...');
     const buildResult = spawnSync(getNpmCommand(), ['run', 'build'], {
       cwd: PROJECT_DIR,
@@ -308,38 +237,22 @@ async function main() {
   });
   fs.closeSync(logFd);
 
-  if (!child.pid) {
-    console.error('✗ Failed to spawn Bridge Server process');
-    return 1;
-  }
-
-  fs.writeFileSync(PID_FILE, `${child.pid}\n`, 'utf8');
+  child.on('error', error => console.error('✗ Bridge Server process failed:', error.message));
   child.unref();
 
-  await sleep(2000);
-
-  if (isProcessRunning(child.pid)) {
-    console.log(`✓ Bridge Server started successfully (PID: ${child.pid})`);
-    console.log(`  Health check: ${DEFAULT_SERVER_URL}/api/health`);
-    if (SERVER_URL !== DEFAULT_SERVER_URL) {
-      console.log(`  Requested endpoint: ${SERVER_URL.replace(/\/$/, '')}/api/health`);
+  const deadline = Date.now() + 5000;
+  do {
+    if (await isBridgeServerHealthyAt(DEFAULT_SERVER_URL)) {
+      console.log(`✓ Bridge Server is healthy at ${DEFAULT_SERVER_URL}/api/health`);
+      console.log(`  Logs: ${LOG_FILE}`);
+      return 0;
     }
-    console.log(`  Logs: ${LOG_FILE}`);
-    return 0;
-  }
+    if (!child.pid || child.exitCode !== null || child.signalCode !== null) break;
+    await sleep(150);
+  } while (Date.now() < deadline);
 
-  const healthyUrl = await detectHealthyBridgeServer();
-  if (healthyUrl) {
-    console.log(
-      `✓ Bridge Server is already running (detected via health endpoint: ${healthyUrl.replace(/\/$/, '')}/api/health)`,
-    );
-    fs.rmSync(PID_FILE, { force: true });
-    return 0;
-  }
-
-  console.error('✗ Failed to start Bridge Server');
-  console.error(`  Check logs: ${LOG_FILE}`);
-  fs.rmSync(PID_FILE, { force: true });
+  if (child.exitCode === null && child.signalCode === null) child.kill();
+  console.error(`✗ Failed to start Bridge Server. Check logs: ${LOG_FILE}`);
   return 1;
 }
 

@@ -1,7 +1,7 @@
 import {
   hasRichMessageContent,
   loadRichMessageResponse,
-} from '../../shared/components/ai-elements/richMessageResponseLoader';
+} from '../components/ai-elements/richMessageResponseLoader';
 import type { CoworkSession } from '../types/cowork';
 
 /** Loads the rich Markdown pipeline before a historical session reaches the DOM. */

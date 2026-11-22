@@ -7,10 +7,84 @@ import {
   CodingEventKind,
   CodingLaneStatus,
 } from '../../shared/codingAgent';
-import { AcpSessionUpdateKind } from './acp/protocol';
+import { ACP_AUTH_REQUIRED_CODE, AcpSessionUpdateKind } from './acp/protocol';
 import { CodingAgentRegistry } from './codingAgentRegistry';
 import { CodingRoomRepository } from './codingRoomRepository';
 import { createService, openCodingRoomDatabase } from './codingRoomServiceTestHarness';
+
+test.each([false, true])(
+  'checks a detected ACP profile in its first user turn (auth required: %s)',
+  async needsAuth => {
+    const db = openCodingRoomDatabase();
+    const registry = new CodingAgentRegistry();
+    const builtin = registry.list().find(profile => profile.isBuiltin)!;
+    const authMethod = { id: 'login', name: 'Log in' };
+    const profile = registry.registerExternal({
+      name: 'Test ACP',
+      description: 'Test',
+      driverKind: CodingAgentDriverKind.Acp,
+      status: CodingAgentProfileStatus.Detected,
+      capabilities: builtin.capabilities,
+      authMethods: [],
+      command: execPath,
+      args: [
+        '-e',
+        `
+      const lines = require('node:readline').createInterface({ input: process.stdin });
+      const send = message => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\\n');
+      lines.on('line', line => {
+        const {id, method, params} = JSON.parse(line);
+        if (method === 'initialize') send({ id, result: { protocolVersion: 1, authMethods: [${JSON.stringify(authMethod)}] } });
+        if (method === 'session/new') send({ id, result: { sessionId: 'first-session' } });
+        if (method !== 'session/prompt') return;
+        if (params.prompt[0].text !== 'First user task') process.exit(1);
+        if (${needsAuth}) {
+          send({ id, error: { code: ${ACP_AUTH_REQUIRED_CODE}, message: 'Sign in' } });
+          return;
+        }
+        send({ method: 'session/update', params: { sessionId: 'first-session', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Done' } } } });
+        send({ id, result: { stopReason: 'end_turn' } });
+      });
+    `,
+      ],
+    });
+    const service = createService(new CodingRoomRepository(db), registry, {
+      startBuiltinSession: async () => undefined,
+      cancelBuiltinSession: async () => undefined,
+      getBuiltinWorkbenchLink: () => null,
+      beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+      completeExternalWorkbenchRun: () => undefined,
+    });
+    const sourceRoot = process.cwd();
+    const [workspace] = await service.createWorkspace({
+      name: 'Product',
+      sourceFolders: [sourceRoot],
+      defaultProfileId: builtin.id,
+    });
+    try {
+      const started = await service.startSession({
+        workspaceId: workspace.id,
+        sourceRoot,
+        profileId: profile.id,
+        prompt: 'First user task',
+      });
+      await vi.waitFor(() => {
+        const lane = service
+          .bootstrap(sourceRoot)
+          .lanes.find(item => item.id === started.lanes[0].id);
+        expect(lane?.status).toBe(
+          needsAuth ? CodingLaneStatus.NeedsAuth : CodingLaneStatus.Completed,
+        );
+      });
+      expect(registry.get(profile.id)).toMatchObject({
+        status: needsAuth ? CodingAgentProfileStatus.NeedsAuth : CodingAgentProfileStatus.Ready,
+        authMethods: [authMethod],
+      });
+    } finally {
+      await service.dispose();
+    }
+  },
+);
 
 test('requires explicit confirmation before sending a recovery summary to a replacement ACP session', async () => {
   const db = openCodingRoomDatabase();
@@ -48,7 +122,7 @@ test('requires explicit confirmation before sending a recovery summary to a repl
   });
   const workspaceRoot = process.cwd();
   const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
-  const created = await service.createMission({ workspaceRoot, profileId: profile.id });
+  const created = await service.seedSession({ workspaceRoot, profileId: profile.id });
   const lane = created.lanes[0];
   new CodingRoomRepository(db).updateLaneRemoteSession(lane.id, 'unavailable-session');
 
@@ -111,7 +185,7 @@ test('prepares a new ACP lane and projects its dynamic commands before the first
   });
   const workspaceRoot = process.cwd();
   const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
-  const created = await service.createMission({ workspaceRoot, profileId: profile.id });
+  const created = await service.seedSession({ workspaceRoot, profileId: profile.id });
 
   const prepared = await service.prepareLane(workspaceRoot, created.lanes[0].id);
 
@@ -162,7 +236,7 @@ test('dispose waits for an in-flight turn to record its failure', async () => {
   });
   const workspaceRoot = process.cwd();
   const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
-  const created = await service.createMission({ workspaceRoot, profileId: profile.id });
+  const created = await service.seedSession({ workspaceRoot, profileId: profile.id });
   const lane = created.lanes[0];
 
   await service.prompt(workspaceRoot, { laneId: lane.id, prompt: 'Keep working silently.' });
@@ -215,7 +289,7 @@ test('a turn settling after the test body does not touch a closed database', asy
   });
   const workspaceRoot = process.cwd();
   const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
-  const created = await service.createMission({ workspaceRoot, profileId: profile.id });
+  const created = await service.seedSession({ workspaceRoot, profileId: profile.id });
 
   await service.prompt(workspaceRoot, {
     laneId: created.lanes[0].id,

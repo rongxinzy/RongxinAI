@@ -36,10 +36,6 @@ type LegacyCompatibleCoworkApi = {
     name?: string;
     isHidden?: boolean;
   }) => Promise<{ success: boolean; workspace?: Workspace }>;
-  renameWorkspace?: (
-    id: string,
-    name: string,
-  ) => Promise<{ success: boolean; workspace?: Workspace }>;
   updateWorkspace?: (options: {
     id: string;
     name?: string;
@@ -261,57 +257,9 @@ class WorkspaceService {
     await localStore.removeItem(CURRENT_WORKSPACE_KEY);
   }
 
-  async renameWorkspace(workspaceId: string, name: string): Promise<Workspace | null> {
-    const cowork = getCompatibleCoworkApi();
-    if (!this.workspaceApiAvailable || typeof cowork?.renameWorkspace !== 'function') return null;
-
-    const result = await cowork.renameWorkspace(workspaceId, name);
-    const renamedWorkspace = result.success ? result.workspace : undefined;
-    if (!renamedWorkspace) return null;
-
-    const { currentWorkspaceId, workspaces } = store.getState().workspace;
-    const originalWorkspace = workspaces.find(item => item.id === workspaceId);
-    const nextRenamedWorkspace = {
-      ...renamedWorkspace,
-      pinned: originalWorkspace?.pinned ?? false,
-    };
-    const originalIndex = workspaces.findIndex(item => item.id === workspaceId);
-    const workspacesWithoutRenamed = workspaces.filter(
-      item => item.id !== workspaceId && item.id !== renamedWorkspace.id,
-    );
-    const insertionIndex =
-      originalIndex < 0
-        ? workspacesWithoutRenamed.length
-        : workspaces.slice(0, originalIndex).filter(item => item.id !== renamedWorkspace.id).length;
-    const nextWorkspaces = [
-      ...workspacesWithoutRenamed.slice(0, insertionIndex),
-      nextRenamedWorkspace,
-      ...workspacesWithoutRenamed.slice(insertionIndex),
-    ];
-
-    if (workspaceId !== renamedWorkspace.id) {
-      const pinnedIds = (await localStore.getItem<string[]>(PINNED_WORKSPACES_KEY)) ?? [];
-      const nextPinnedIds = pinnedIds.filter(
-        id => id !== workspaceId && id !== renamedWorkspace.id,
-      );
-      if (originalWorkspace?.pinned) nextPinnedIds.push(renamedWorkspace.id);
-      await localStore.setItem(PINNED_WORKSPACES_KEY, nextPinnedIds);
-    }
-
-    if (currentWorkspaceId === workspaceId) {
-      // Keep the replacement ID selected before replacing the list so no
-      // workspace switch runs and the open session remains intact.
-      store.dispatch(setCurrentWorkspaceId(renamedWorkspace.id));
-      await localStore.setItem(CURRENT_WORKSPACE_KEY, renamedWorkspace.id);
-    }
-    store.dispatch(setWorkspaces(nextWorkspaces));
-    return nextRenamedWorkspace;
-  }
-
   /**
    * Updates an existing workspace: display name, primary path (sessions are
-   * migrated to the new path), and/or attached folders. Mirrors the
-   * rename/replace id-migration bookkeeping of `renameWorkspace`.
+   * migrated to the new path), and/or attached folders.
    */
   async updateWorkspace(options: {
     id: string;

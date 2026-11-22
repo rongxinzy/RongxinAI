@@ -1,4 +1,4 @@
-/** MCP server IPC: CRUD, OAuth authorization, import/export and bridge refresh. */
+/** MCP server IPC: CRUD, OAuth authorization and import/export. */
 import fs from 'fs';
 import path from 'path';
 
@@ -12,13 +12,14 @@ import {
   getLocalFeishuCliCommand,
 } from '../appBootstrap/feishuConnector';
 import { MCP_OAUTH_STORE_PREFIX, McpOAuthManager } from '../libs/mcpOAuthManager';
+import { t } from '../i18n';
 import { exportMcpConfig, importMcpConfig } from '../libs/mcpConfigCodec';
 import {
   validateMcpServerConfig,
   validateStoredMcpServerConfig,
 } from '../libs/mcpCommandValidation';
 import { probeMcpConnection } from '../libs/mcpConnectionProbe';
-import { loadBundledMcpMarketplace } from '../mcpMarketplace';
+import { readMcpMarketplaceAsync } from '../workbenchTask/artifactWorkerPool';
 import {
   hasVerifiedAgentTools,
   OfficialIntegrationId,
@@ -35,11 +36,41 @@ import type { McpServerFormData } from '../mcpStore';
 export interface McpIpcDeps {
   getMcpStore: () => McpStore;
   getStore: () => SqliteStore;
-  getActiveMcpAuthorizations: () => Map<string, AbortController> | undefined;
-  setActiveMcpAuthorizations: (value: Map<string, AbortController> | undefined) => void;
+  onConfigurationChanged: () => void;
 }
 
-export const registerMcpIpc = (deps: McpIpcDeps): void => {
+export const registerMcpIpc = (deps: McpIpcDeps): (() => Promise<void>) => {
+  const refresh = () => refreshMcpBridge(deps.onConfigurationChanged);
+  const marketplaceAbort = new AbortController();
+  let marketplace: ReturnType<typeof readMcpMarketplaceAsync> | undefined;
+  const getMarketplace = () => {
+    marketplaceAbort.signal.throwIfAborted();
+    if (marketplace) return marketplace;
+    const roots = [
+      ...new Set(
+        [process.resourcesPath, app.getAppPath(), process.cwd()]
+          .filter(Boolean)
+          .map(root => path.join(root, 'MCPs')),
+      ),
+    ];
+    return (marketplace = readMcpMarketplaceAsync(roots, marketplaceAbort.signal).catch(error => {
+      marketplace = undefined;
+      throw error;
+    }));
+  };
+  const activeAuthorizations = new Map<
+    string | symbol,
+    { registryId?: string; cancellation: AbortController; settled: Promise<void> }
+  >();
+  const isAuthorizing = (registryId?: string): boolean =>
+    Boolean(
+      registryId &&
+      [...activeAuthorizations.values()].some(active => active.registryId === registryId),
+    );
+  const cancel = (controller: AbortController) => {
+    controller.abort(new Error('MCP authorization was cancelled'));
+  };
+  let closing = false;
   handleIpcContract(mcpContract, {
     list: () => {
       try {
@@ -60,13 +91,13 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
         if (validationError) {
           return { success: false, error: validationError };
         }
+        if (isAuthorizing(data.registryId))
+          return { success: false, error: t('mcpIntegrationOperationBusy') };
 
         deps.getMcpStore().createServer(data as McpServerFormData);
         const servers = deps.getMcpStore().listServers();
         // Trigger async MCP bridge refresh (don't await — let UI show DB result immediately)
-        refreshMcpBridge().catch(err =>
-          console.error('[McpBridge] background refresh error:', err),
-        );
+        refresh().catch(err => console.error('[McpBridge] background refresh error:', err));
         return { success: true, servers };
       } catch (error) {
         return {
@@ -103,12 +134,13 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
         if (validationError) {
           return { success: false, error: validationError };
         }
+        if (isAuthorizing(existing.registryId) || isAuthorizing(data.registryId)) {
+          return { success: false, error: t('mcpIntegrationOperationBusy') };
+        }
 
         deps.getMcpStore().updateServer(id, data as Partial<McpServerFormData>);
         const servers = deps.getMcpStore().listServers();
-        refreshMcpBridge().catch(err =>
-          console.error('[McpBridge] background refresh error:', err),
-        );
+        refresh().catch(err => console.error('[McpBridge] background refresh error:', err));
         return { success: true, servers };
       } catch (error) {
         return {
@@ -135,11 +167,16 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
 
     delete: async (_event, id) => {
       try {
-        const existing = deps.getMcpStore().getServer(id);
+        const store = deps.getMcpStore();
+        const existing = store.getServer(id);
         if (!existing) {
           return { success: false, error: 'MCP server not found' };
         }
-        if (existing.registryId === FEISHU_MCP_REGISTRY_ID) {
+        const { registryId } = existing;
+        if (isAuthorizing(registryId))
+          return { success: false, error: t('mcpIntegrationOperationBusy') };
+        const ownsRegistry = registryId && store.getRegistryOwner(registryId)?.id === id;
+        if (ownsRegistry && registryId === FEISHU_MCP_REGISTRY_ID) {
           const uninstallStatus = await getMcpIntegrationRuntime().run(
             OfficialIntegrationId.Feishu,
             IntegrationOperation.Uninstall,
@@ -148,19 +185,12 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
             return { success: false, error: uninstallStatus.error };
           }
         }
-        deps.getMcpStore().deleteServer(id);
-        // OAuth sessions are keyed by the registry id during authorization,
-        // while the installed server row has its own random database id. Clear
-        // both keys so uninstall actually unlinks this App's authorization.
-        const oauthKeys = new Set([id, existing.registryId].filter(Boolean));
-        for (const oauthKey of oauthKeys) {
-          deps.getStore().delete(`${MCP_OAUTH_STORE_PREFIX}${oauthKey}`);
-          new McpCredentialVault(deps.getStore()).deleteValue(
-            `${MCP_OAUTH_STORE_PREFIX}${oauthKey}`,
-          );
-        }
-        const servers = deps.getMcpStore().listServers();
-        const refreshResult = await refreshMcpBridge();
+        store.deleteServer(id);
+        const vault = new McpCredentialVault(deps.getStore());
+        if (id !== registryId) vault.deleteValue(`${MCP_OAUTH_STORE_PREFIX}${id}`);
+        if (ownsRegistry) vault.deleteValue(`${MCP_OAUTH_STORE_PREFIX}${registryId}`);
+        const servers = store.listServers();
+        const refreshResult = await refresh();
         if (refreshResult.error) {
           console.error('[McpBridge] refresh after uninstall failed:', refreshResult.error);
         }
@@ -200,9 +230,7 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
 
         deps.getMcpStore().setEnabled(options.id, options.enabled);
         const servers = deps.getMcpStore().listServers();
-        refreshMcpBridge().catch(err =>
-          console.error('[McpBridge] background refresh error:', err),
-        );
+        refresh().catch(err => console.error('[McpBridge] background refresh error:', err));
         return { success: true, servers };
       } catch (error) {
         return {
@@ -216,9 +244,8 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
       try {
         // The bundled registry is permissive (`Record<string, unknown>` rows);
         // the renderer projects known fields off each server object.
-        const data = loadBundledMcpMarketplace(app.getAppPath(), process.resourcesPath) as z.infer<
-          typeof mcpContract.fetchMarketplace.result
-        >['data'];
+        const { catalog } = await getMarketplace();
+        const data = catalog as z.infer<typeof mcpContract.fetchMarketplace.result>['data'];
         return { success: true, data };
       } catch (error) {
         return {
@@ -230,38 +257,12 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
 
     loadIcon: async (_event, iconPath) => {
       try {
-        const marketplace = loadBundledMcpMarketplace(app.getAppPath(), process.resourcesPath);
-        if (
-          !marketplace.servers.some(
-            server => (server as { iconPath?: string }).iconPath === iconPath,
-          )
-        ) {
-          return { success: false, error: 'MCP icon is not registered' };
-        }
-        const roots = [
-          path.join(process.resourcesPath, 'MCPs'),
-          path.join(app.getAppPath(), 'MCPs'),
-          path.join(process.cwd(), 'MCPs'),
-        ];
-        for (const root of roots) {
-          const filePath = path.resolve(root, iconPath);
-          if (!filePath.startsWith(`${root}${path.sep}`) || !fs.existsSync(filePath)) continue;
-          const extension = path.extname(filePath).toLowerCase();
-          const mimeType =
-            extension === '.png'
-              ? 'image/png'
-              : extension === '.jpg' || extension === '.jpeg'
-                ? 'image/jpeg'
-                : extension === '.svg'
-                  ? 'image/svg+xml'
-                  : null;
-          if (!mimeType) return { success: false, error: 'Unsupported MCP icon format' };
-          return {
-            success: true,
-            data: `data:${mimeType};base64,${fs.readFileSync(filePath).toString('base64')}`,
-          };
-        }
-        return { success: false, error: 'MCP icon was not found' };
+        const { icons } = await getMarketplace();
+        const icon = icons.get(iconPath);
+        if (!icon) return { success: false, error: 'MCP icon is not registered' };
+        return 'data' in icon
+          ? { success: true, data: icon.data }
+          : { success: false, error: icon.error };
       } catch (error) {
         return {
           success: false,
@@ -320,7 +321,7 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
           if (validationError) return { success: false, error: validationError };
         }
         for (const server of servers) deps.getMcpStore().createServer(server);
-        const refreshed = await refreshMcpBridge();
+        const refreshed = await refresh();
         return {
           success: !refreshed.error,
           servers: deps.getMcpStore().listServers(),
@@ -352,7 +353,7 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
           if (validationError) return { success: false, error: validationError };
         }
         for (const server of servers) deps.getMcpStore().createServer(server);
-        const refreshed = await refreshMcpBridge();
+        const refreshed = await refresh();
         return {
           success: !refreshed.error,
           servers: deps.getMcpStore().listServers(),
@@ -367,7 +368,8 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
     },
 
     cancelAuthorize: (_event, requestId) => {
-      deps.getActiveMcpAuthorizations().get(requestId)?.abort();
+      const active = activeAuthorizations.get(requestId);
+      if (active) cancel(active.cancellation);
       return { success: true };
     },
 
@@ -393,27 +395,28 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
 
     authorize: async (_event, rawData) => {
       const { authorizationRequestId, ...data } = rawData;
-      const cancellation = authorizationRequestId ? new AbortController() : null;
-      if (authorizationRequestId && cancellation) {
-        deps.getActiveMcpAuthorizations().set(authorizationRequestId, cancellation);
+      if (closing) return { success: false, error: t('mcpAuthorizationShuttingDown') };
+      const key = authorizationRequestId || Symbol();
+      if (activeAuthorizations.has(key) || isAuthorizing(data.registryId)) {
+        return { success: false, error: t('mcpIntegrationOperationBusy') };
       }
-      const ensureNotCancelled = () => {
-        if (cancellation?.signal.aborted) throw new Error('MCP authorization was cancelled');
-      };
+      const cancellation = new AbortController();
+      const settled = Promise.withResolvers<void>();
+      activeAuthorizations.set(key, {
+        registryId: data.registryId,
+        cancellation,
+        settled: settled.promise,
+      });
       try {
-        ensureNotCancelled();
         if (data.registryId === FEISHU_MCP_REGISTRY_ID) {
           const status = await getMcpIntegrationRuntime().run(
             OfficialIntegrationId.Feishu,
             IntegrationOperation.Authenticate,
-            cancellation?.signal,
+            cancellation.signal,
           );
+          cancellation.signal.throwIfAborted();
           if (status.error) throw new Error(status.error);
-          ensureNotCancelled();
-          const existingFeishu = deps
-            .getMcpStore()
-            .listServers()
-            .find(server => server.registryId === FEISHU_MCP_REGISTRY_ID);
+          const existingFeishu = deps.getMcpStore().getRegistryOwner(FEISHU_MCP_REGISTRY_ID);
           if (!existingFeishu) {
             deps.getMcpStore().createServer({
               name: data.name,
@@ -427,35 +430,52 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
             });
           }
           const servers = deps.getMcpStore().listServers();
-          const refreshResult = await refreshMcpBridge();
+          const refreshResult = await refresh();
           if (refreshResult.error) {
             console.error('[McpBridge] Feishu refresh error:', refreshResult.error);
           }
           return { success: true, servers, refreshError: refreshResult.error };
         }
         const validationError = await validateMcpServerConfig(data as McpServerFormData);
+        cancellation.signal.throwIfAborted();
         if (validationError) return { success: false, error: validationError };
         if (!data.registryId || !data.url)
           return { success: false, error: 'Official MCP configuration is incomplete' };
 
+        const store = deps.getMcpStore();
+        const existing = store.getRegistryOwner(data.registryId);
+        if (existing && (existing.transportType === 'stdio' || existing.url !== data.url)) {
+          return { success: false, error: t('mcpAuthorizationEndpointMismatch') };
+        }
+        if (!existing && store.listServers().some(server => server.name === data.name)) {
+          return { success: false, error: t('mcpServerNameExists') };
+        }
         const accessToken = await new McpOAuthManager(deps.getStore()).authorize(
           data.registryId,
           data.url,
-          cancellation?.signal,
+          cancellation.signal,
         );
-        ensureNotCancelled();
+        cancellation.signal.throwIfAborted();
         if (!accessToken)
           return { success: false, error: 'OAuth authorization did not return an access token' };
 
-        deps.getMcpStore().createServer({
-          ...(data as McpServerFormData),
-          isBuiltIn: true,
-          headers: { ...data.headers, Authorization: `Bearer ${accessToken}` },
-        });
-        const servers = deps.getMcpStore().listServers();
-        refreshMcpBridge().catch(err =>
-          console.error('[McpBridge] background refresh error:', err),
+        const current = store.getRegistryOwner(data.registryId);
+        if (current?.id !== existing?.id) {
+          return { success: false, error: t('mcpIntegrationOperationBusy') };
+        }
+        if (current && (current.transportType === 'stdio' || current.url !== data.url)) {
+          return { success: false, error: t('mcpAuthorizationEndpointMismatch') };
+        }
+        const headers = Object.fromEntries(
+          Object.entries((current ? current.headers : data.headers) ?? {}).filter(
+            ([name]) => name.toLowerCase() !== 'authorization',
+          ),
         );
+        headers.Authorization = `Bearer ${accessToken}`;
+        if (current) store.updateServer(current.id, { headers });
+        else store.createServer({ ...data, isBuiltIn: true, headers });
+        const servers = store.listServers();
+        refresh().catch(err => console.error('[McpBridge] background refresh error:', err));
         return { success: true, servers };
       } catch (error) {
         return {
@@ -463,23 +483,16 @@ export const registerMcpIpc = (deps: McpIpcDeps): void => {
           error: error instanceof Error ? error.message : 'Failed to authorize MCP server',
         };
       } finally {
-        if (authorizationRequestId)
-          deps.getActiveMcpAuthorizations().delete(authorizationRequestId);
-      }
-    },
-
-    // Explicit bridge refresh — renderer can await this for loading state
-    refreshBridge: async () => {
-      try {
-        const result = await refreshMcpBridge();
-        return { success: true, tools: result.tools, error: result.error };
-      } catch (error) {
-        return {
-          success: false,
-          tools: 0,
-          error: error instanceof Error ? error.message : 'Failed to refresh MCP bridge',
-        };
+        activeAuthorizations.delete(key);
+        settled.resolve();
       }
     },
   });
+  return async () => {
+    closing = true;
+    marketplaceAbort.abort();
+    const pending = [...activeAuthorizations.values()];
+    for (const active of pending) cancel(active.cancellation);
+    await Promise.all(pending.map(active => active.settled));
+  };
 };

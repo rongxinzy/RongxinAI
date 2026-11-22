@@ -3,7 +3,7 @@ import type {
   ModelPickerLabels,
 } from '@shared/components/model-picker/ModelPicker';
 import type { Model } from '../../store/slices/modelSlice';
-import { ModelCapabilityStatus } from '../../../shared/providers';
+import { isLocalProviderName, ModelCapabilityStatus } from '../../../shared/providers';
 import { i18nService } from '../i18n';
 
 interface DerivedModelCapabilities {
@@ -93,14 +93,6 @@ export function recordRecentModelId(modelId: string): void {
   }
 }
 
-function isLocalModelEntry(model: Pick<Model, 'id' | 'providerKey'>): boolean {
-  return (
-    model.providerKey === 'llamacpp' ||
-    model.providerKey === 'ollama' ||
-    model.id.startsWith('ollama/')
-  );
-}
-
 function isGroupModelEntry(model: Pick<Model, 'id'>): boolean {
   return model.id.startsWith('group/');
 }
@@ -113,7 +105,7 @@ export function toModelPickerItem(model: Model): ModelPickerItem {
     providerLabel: model.provider || model.providerKey || '',
     providerKey: model.providerKey || (isGroupModelEntry(model) ? 'group' : undefined),
     providerBaseUrl: model.providerBaseUrl,
-    isLocal: isLocalModelEntry(model),
+    isLocal: isLocalProviderName(model.providerKey),
     isGroup: isGroupModelEntry(model),
     vision: caps.vision,
     reasoning: caps.reasoning,

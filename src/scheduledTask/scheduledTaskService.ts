@@ -23,12 +23,9 @@ export interface ScheduledTaskService {
     filter?: RunFilter,
   ): Promise<ScheduledTaskRun[]>;
   listDeliveries(runId: string): Promise<ScheduledTaskDeliveryRecord[]>;
-  countRuns(taskId: string): Promise<number>;
   listAllRuns(
     limit?: number,
     offset?: number,
     filter?: RunFilter,
   ): Promise<ScheduledTaskRunWithName[]>;
-  getJobNameSync(jobId: string): string | null;
-  hasRunningJobs(): boolean;
 }

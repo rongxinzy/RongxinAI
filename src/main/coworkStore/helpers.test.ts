@@ -7,7 +7,6 @@ import { expect, test } from 'vitest';
 import { CoworkPermissionMode } from '../../shared/cowork/constants';
 import {
   extractConversationSearchTerms,
-  normalizeMessageTimestamp,
   normalizePermissionMode,
   parseBooleanConfig,
   parseEmbeddingVectorWeight,
@@ -89,14 +88,4 @@ test('parseTimeToMs returns epoch millis for valid dates and null otherwise', ()
   expect(parseTimeToMs('2024-01-02T03:04:05.000Z')).toBe(
     new Date('2024-01-02T03:04:05.000Z').getTime(),
   );
-});
-
-test('normalizeMessageTimestamp only accepts finite positive numbers', () => {
-  expect(normalizeMessageTimestamp(123.5)).toBe(123.5);
-  expect(normalizeMessageTimestamp(0)).toBeNull();
-  expect(normalizeMessageTimestamp(-1)).toBeNull();
-  expect(normalizeMessageTimestamp(Number.NaN)).toBeNull();
-  expect(normalizeMessageTimestamp(Number.POSITIVE_INFINITY)).toBeNull();
-  expect(normalizeMessageTimestamp('1700000000000')).toBeNull();
-  expect(normalizeMessageTimestamp(null)).toBeNull();
 });

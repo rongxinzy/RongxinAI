@@ -1,21 +1,9 @@
-import { mkdir } from 'fs/promises';
-import path from 'path';
 import { spawn } from 'child_process';
 
 import { CodingErrorMessage } from '../../shared/codingAgent';
 
 const MAX_DIFF_PREVIEW_BYTES = 256 * 1024;
 const DIFF_TRUNCATION_MARKER = '\n\n[Diff preview truncated]\n';
-
-const runGit = async (cwd: string, args: string[]): Promise<void> => {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn('git', args, { cwd, shell: false, stdio: 'ignore' });
-    child.once('error', reject);
-    child.once('exit', code =>
-      code === 0 ? resolve() : reject(new Error(`git ${args[0]} failed with exit code ${code}.`)),
-    );
-  });
-};
 
 const readGit = async (cwd: string, args: string[]): Promise<string> => {
   return await new Promise<string>((resolve, reject) => {
@@ -44,8 +32,8 @@ const readGitPatch = async (cwd: string, args: string[]): Promise<string> => {
     child.stdout.on('data', chunk => (output += chunk));
     child.stderr.on('data', chunk => (stderr += chunk));
     child.once('error', reject);
-    child.once('exit', code =>
-      code === 0 || code === 1
+    child.once('close', code =>
+      code === 0 || (code === 1 && args.includes('--no-index'))
         ? resolve(output)
         : reject(new Error(stderr.trim() || `git ${args[0]} failed with exit code ${code}.`)),
     );
@@ -84,33 +72,14 @@ export class GitWorktreeConflictError extends Error {
   }
 }
 
-/** Creates application-managed, lane-specific Git worktrees from one immutable baseline. */
+/** Read and apply changes from existing coding worktrees. */
 export class GitWorktreeService {
-  constructor(private readonly rootDirectory: string) {}
-
-  async create(input: {
-    repositoryRoot: string;
-    baseline: string;
-    laneId: string;
-  }): Promise<string> {
-    const target = path.join(this.rootDirectory, input.laneId);
-    await mkdir(this.rootDirectory, { recursive: true });
-    await runGit(input.repositoryRoot, ['worktree', 'add', '--detach', target, input.baseline]);
-    return target;
-  }
-
-  async createAtHead(input: { repositoryRoot: string; laneId: string }): Promise<string> {
-    const repositoryRoot = await readGit(input.repositoryRoot, ['rev-parse', '--show-toplevel']);
-    const baseline = await GitWorktreeService.getBaseline(repositoryRoot);
-    return await this.create({ repositoryRoot, baseline, laneId: input.laneId });
-  }
-
   static async getBaseline(repositoryRoot: string): Promise<string> {
     return await readGit(repositoryRoot, ['rev-parse', 'HEAD']);
   }
 
   async getWorktreeDiff(worktreeRoot: string): Promise<string> {
-    const trackedPatch = await readGit(worktreeRoot, ['diff', '--binary', 'HEAD']);
+    const trackedPatch = await readGitPatch(worktreeRoot, ['diff', '--binary', 'HEAD']);
     const untrackedPatch = await Promise.all(
       (await listUntrackedFiles(worktreeRoot)).map(file =>
         readGitPatch(worktreeRoot, ['diff', '--no-index', '--binary', '--', '/dev/null', file]),
@@ -147,9 +116,5 @@ export class GitWorktreeService {
       );
     }
     await applyGitPatch(workspaceRoot, patch, false);
-  }
-
-  async remove(repositoryRoot: string, worktreePath: string): Promise<void> {
-    await runGit(repositoryRoot, ['worktree', 'remove', '--force', worktreePath]);
   }
 }

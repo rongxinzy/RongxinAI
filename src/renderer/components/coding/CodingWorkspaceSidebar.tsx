@@ -9,7 +9,7 @@ import {
 import { cn } from '@shared/lib/utils';
 import { Ellipsis, Folder, Settings2, Trash2 } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type Ref, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 import {
   CodingLaneStatus,
@@ -33,7 +33,6 @@ import {
   SidebarAnimatedMessageCirclePlusIcon,
   type SidebarAnimatedMessageCirclePlusIconHandle,
 } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
-import { CodingUiEvent, type CodingCreateSessionEventDetail } from './constants';
 import { CodingWorkspaceDialog } from './CodingWorkspaceDialog';
 import { resolveReadyDefaultProfileId } from './codingSessionDraft';
 
@@ -53,9 +52,16 @@ export interface CodingSidebarSelection {
   draft: CodingSessionDraft | null;
 }
 
+export interface CodingWorkspaceSidebarHandle {
+  openCreateWorkspace: () => void;
+}
+
 interface CodingWorkspaceSidebarProps {
+  ref?: Ref<CodingWorkspaceSidebarHandle>;
   selection: CodingSidebarSelection;
   onSelectionChange: (selection: CodingSidebarSelection) => void;
+  onCreateSession: (workspace: CodingWorkspaceSummary, profileId?: string) => void;
+  onManageAgents: () => void;
 }
 
 const statusClassName: Record<CodingLaneStatus, string> = {
@@ -72,8 +78,11 @@ const statusClassName: Record<CodingLaneStatus, string> = {
 const SESSIONS_TRANSITION_MS = 200;
 
 export const CodingWorkspaceSidebar = ({
+  ref,
   selection,
   onSelectionChange,
+  onCreateSession,
+  onManageAgents,
 }: CodingWorkspaceSidebarProps) => {
   const [workspaces, setWorkspaces] = useState<CodingWorkspaceSummary[]>([]);
   const [profiles, setProfiles] = useState<CodingAgentProfile[]>([]);
@@ -167,27 +176,16 @@ export const CodingWorkspaceSidebar = ({
     };
   }, [invalidateRefresh, refresh, selection.workspaceRoot]);
 
-  // The workbench empty state offers the same "Add workspace" entry as the
-  // sidebar header; the dialog lives here so both entry points share one form.
-  useEffect(() => {
-    const handleOpenWorkspaceDialog = () => {
-      setError(null);
-      setEditingWorkspace(null);
-      setWorkspaceDialogOpen(true);
-    };
-    window.addEventListener(CodingUiEvent.OpenWorkspaceDialog, handleOpenWorkspaceDialog);
-    return () =>
-      window.removeEventListener(CodingUiEvent.OpenWorkspaceDialog, handleOpenWorkspaceDialog);
+  const openCreateWorkspace = useCallback(() => {
+    setError(null);
+    setEditingWorkspace(null);
+    setWorkspaceDialogOpen(true);
   }, []);
+  useImperativeHandle(ref, () => ({ openCreateWorkspace }), [openCreateWorkspace]);
 
   const startSession = (workspace: CodingWorkspaceSummary, profileId?: string) => {
     setExpandedIds(current => new Set(current).add(workspace.id));
-    const detail: CodingCreateSessionEventDetail = profileId
-      ? { workspace, profileId }
-      : { workspace };
-    window.dispatchEvent(
-      new CustomEvent<CodingCreateSessionEventDetail>(CodingUiEvent.CreateSession, { detail }),
-    );
+    onCreateSession(workspace, profileId);
   };
 
   const saveWorkspace = async (input: {
@@ -220,17 +218,15 @@ export const CodingWorkspaceSidebar = ({
         draft: null,
       });
       // 新建工作区时默认 Agent 已在对话框里选定：可用就直接进入会话草稿；
-      // 不可用则提示并退回选择框。等 selection 落稳再执行，避免被 selectionKey 变化打断。
+      // 不可用则提示并退回选择框。
       if (wasCreate) {
         const readyProfileId = resolveReadyDefaultProfileId(profiles, saved.defaultProfileId);
-        window.setTimeout(() => {
-          startSession(saved, readyProfileId ?? undefined);
-          if (!readyProfileId) {
-            showAppToast(i18nService.t('codingWorkspaceDefaultAgentUnavailable'), {
-              isError: true,
-            });
-          }
-        }, 0);
+        startSession(saved, readyProfileId ?? undefined);
+        if (!readyProfileId) {
+          showAppToast(i18nService.t('codingWorkspaceDefaultAgentUnavailable'), {
+            isError: true,
+          });
+        }
       }
     }
     setEditingWorkspace(null);
@@ -290,7 +286,7 @@ export const CodingWorkspaceSidebar = ({
             className="theme-action-faint"
             aria-label={i18nService.t('codingAgentManageAgents')}
             title={i18nService.t('codingAgentManageAgents')}
-            onClick={() => window.dispatchEvent(new CustomEvent(CodingUiEvent.ManageAgents))}
+            onClick={onManageAgents}
           >
             <Settings2 />
           </Button>
@@ -304,11 +300,7 @@ export const CodingWorkspaceSidebar = ({
               if (!prefersReducedMotion) addWorkspaceIconRef.current?.startAnimation();
             }}
             onMouseLeave={() => addWorkspaceIconRef.current?.stopAnimation()}
-            onClick={() => {
-              setError(null);
-              setEditingWorkspace(null);
-              setWorkspaceDialogOpen(true);
-            }}
+            onClick={openCreateWorkspace}
           >
             <AnimatedFolderPlusIcon ref={addWorkspaceIconRef} />
           </Button>
@@ -319,7 +311,7 @@ export const CodingWorkspaceSidebar = ({
           <button
             type="button"
             className="theme-native-workspace-action w-full px-2 py-8 text-center"
-            onClick={() => setWorkspaceDialogOpen(true)}
+            onClick={openCreateWorkspace}
           >
             <Folder className="mx-auto mb-2 size-8 opacity-50" />
             {i18nService.t('codingWorkspaceEmpty')}

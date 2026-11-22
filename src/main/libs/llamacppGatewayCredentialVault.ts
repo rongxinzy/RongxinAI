@@ -42,6 +42,11 @@ export class LlamaCppGatewayCredentialVault {
     return lanToken;
   }
 
+  readControlToken(): string | undefined {
+    return this.vault.getValue<LlamaCppGatewayCredentials>(LLAMACPP_GATEWAY_CREDENTIAL_KEY)
+      ?.controlToken;
+  }
+
   ensureControlToken(): string {
     const credentials = this.vault.getValue<LlamaCppGatewayCredentials>(
       LLAMACPP_GATEWAY_CREDENTIAL_KEY,

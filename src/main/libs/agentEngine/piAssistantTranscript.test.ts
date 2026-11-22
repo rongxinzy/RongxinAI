@@ -31,7 +31,7 @@ describe('PiAssistantTranscript', () => {
   beforeEach(() => {
     storeUpdates = [];
     transcript = new PiAssistantTranscript({
-      getStore: () =>
+      getMessageStore: () =>
         ({
           addMessage: (_sessionId: string, message: { id: string; content: string }) => message,
           updateMessage: (_sessionId: string, messageId: string, patch: { content?: string }) => {
@@ -66,7 +66,7 @@ describe('PiAssistantTranscript', () => {
       const updateMessage = vi.fn();
       const emitMessageUpdate = vi.fn();
       const local = new PiAssistantTranscript({
-        getStore: () =>
+        getMessageStore: () =>
           ({
             addMessage: (_sessionId: string, message: { id: string }) => message,
             getMessage: () => ({ content: 'final body', metadata: { isFinal: true } }),
@@ -113,7 +113,7 @@ describe('PiAssistantTranscript', () => {
     const runCloseIdle = (row: typeof whitespaceRow, active: ActivePiSession): void => {
       const updateMessage = vi.fn();
       const local = new PiAssistantTranscript({
-        getStore: () =>
+        getMessageStore: () =>
           ({
             getMessage: (_sessionId: string, messageId: string) =>
               messageId === row.id ? row : null,
@@ -160,7 +160,7 @@ describe('PiAssistantTranscript', () => {
     active.thinkingMessageId = thinkingRow.id;
     active.thinkingText = 'thought body';
     const local = new PiAssistantTranscript({
-      getStore: () =>
+      getMessageStore: () =>
         ({
           getMessage: (_sessionId: string, messageId: string) =>
             messageId === thinkingRow.id ? thinkingRow : null,
@@ -191,7 +191,7 @@ describe('PiAssistantTranscript', () => {
     active.thinkingMessageId = 'msg-think';
 
     const local = new PiAssistantTranscript({
-      getStore: () =>
+      getMessageStore: () =>
         ({
           getMessage: () => null,
           updateMessage,
@@ -225,7 +225,7 @@ describe('PiAssistantTranscript', () => {
     const active = baseActive();
     active.assistantMessageId = row.id;
     const local = new PiAssistantTranscript({
-      getStore: () =>
+      getMessageStore: () =>
         ({
           getMessage: (_sessionId: string, messageId: string) =>
             messageId === row.id ? row : null,
@@ -255,7 +255,7 @@ describe('PiAssistantTranscript', () => {
     active.assistantMessageId = row.id;
     active.answerText = 'only in active.answerText';
     const local = new PiAssistantTranscript({
-      getStore: () =>
+      getMessageStore: () =>
         ({
           getMessage: (_sessionId: string, messageId: string) =>
             messageId === row.id ? row : null,
@@ -292,7 +292,7 @@ describe('PiAssistantTranscript', () => {
     const active = baseActive();
     active.assistantMessageId = row.id;
     const local = new PiAssistantTranscript({
-      getStore: () =>
+      getMessageStore: () =>
         ({
           getMessage: (_sessionId: string, messageId: string) =>
             messageId === row.id ? row : null,
@@ -323,7 +323,7 @@ describe('PiAssistantTranscript', () => {
     active.assistantMessageId = row.id;
     active.retryPriorAnswer = 'partial from prior attempt';
     const local = new PiAssistantTranscript({
-      getStore: () =>
+      getMessageStore: () =>
         ({
           getMessage: (_sessionId: string, messageId: string) =>
             messageId === row.id ? row : null,
@@ -351,7 +351,7 @@ describe('PiAssistantTranscript', () => {
     const active = baseActive();
     active.assistantMessageId = row.id;
     const local = new PiAssistantTranscript({
-      getStore: () =>
+      getMessageStore: () =>
         ({
           getMessage: (_sessionId: string, messageId: string) =>
             messageId === row.id ? row : null,
@@ -385,7 +385,7 @@ describe('PiAssistantTranscript', () => {
     const active = baseActive();
     active.assistantMessageId = row.id;
     const local = new PiAssistantTranscript({
-      getStore: () =>
+      getMessageStore: () =>
         ({
           getMessage: (_sessionId: string, messageId: string) =>
             messageId === row.id ? row : null,
@@ -416,7 +416,7 @@ describe('PiAssistantTranscript', () => {
     const active = baseActive();
     active.assistantMessageId = emptyRow.id;
     const local = new PiAssistantTranscript({
-      getStore: () =>
+      getMessageStore: () =>
         ({
           getMessage: (_sessionId: string, messageId: string) =>
             messageId === emptyRow.id ? emptyRow : null,
@@ -498,7 +498,7 @@ describe('PiAssistantTranscript', () => {
     const emitMessageUpdate = vi.fn();
     const active = baseActive();
     const local = new PiAssistantTranscript({
-      getStore: () => null,
+      getMessageStore: () => null,
       emitMessage: vi.fn(),
       emitMessageUpdate,
       emitMessageRemoved: vi.fn(),
@@ -535,7 +535,7 @@ describe('PiAssistantTranscript', () => {
     };
 
     const local = new PiAssistantTranscript({
-      getStore: () =>
+      getMessageStore: () =>
         ({
           getMessage: (_sessionId: string, messageId: string) =>
             messageId === row.id ? row : null,

@@ -1,13 +1,6 @@
-import {
-  ChannelInboxStatus,
-  type ChannelInboxEvent,
-  type ChannelInboxStore,
-} from './channelInboxStore';
+import type { ChannelInboxEvent, ChannelInboxStore } from './channelInboxStore';
 
-type ChannelInbox = Pick<
-  ChannelInboxStore,
-  'claim' | 'markProcessing' | 'complete' | 'fail' | 'recoverInterrupted'
->;
+type ChannelInbox = Pick<ChannelInboxStore, 'completedResult' | 'complete'>;
 
 export class ChannelTurnCoordinator {
   private readonly activeEvents = new Map<string, Promise<string>>();
@@ -22,7 +15,6 @@ export class ChannelTurnCoordinator {
     if (!Number.isInteger(maxConcurrency) || maxConcurrency < 1) {
       throw new Error('Channel turn concurrency must be a positive integer');
     }
-    this.store.recoverInterrupted();
   }
 
   run(
@@ -33,9 +25,8 @@ export class ChannelTurnCoordinator {
     const eventKey = JSON.stringify([event.platform, event.accountId, event.messageId]);
     const existing = this.activeEvents.get(eventKey);
     if (existing) return existing;
-    const claimed = this.store.claim(event);
-    if (claimed.status === ChannelInboxStatus.Completed && claimed.result)
-      return Promise.resolve(claimed.result);
+    const cached = this.store.completedResult(event);
+    if (cached) return Promise.resolve(cached);
 
     const conversationKey = JSON.stringify([event.platform, event.accountId, event.conversationId]);
     const previous = this.conversationTails.get(conversationKey) ?? Promise.resolve();
@@ -44,19 +35,11 @@ export class ChannelTurnCoordinator {
       .then(async (): Promise<string> => {
         if (signal?.aborted) throw new Error('Channel turn was cancelled before execution');
         await this.acquire();
-        if (signal?.aborted) {
-          this.release();
-          throw new Error('Channel turn was cancelled before execution');
-        }
-        this.store.markProcessing(event);
         try {
+          if (signal?.aborted) throw new Error('Channel turn was cancelled before execution');
           const result = await execute();
           if (!result.trim()) throw new Error('Channel Pi turn returned an empty result');
-          this.store.complete(event, result);
-          return result;
-        } catch (error) {
-          this.store.fail(event, error instanceof Error ? error.message : String(error));
-          throw error;
+          return this.store.complete(event, result);
         } finally {
           this.release();
         }

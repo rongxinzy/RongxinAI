@@ -9,8 +9,7 @@ afterEach(() => {
 
 function stubManager() {
   return {
-    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
-    start: vi.fn(),
+    start: async () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
   } as never;
 }
 

@@ -9,12 +9,12 @@ import { spawn } from 'child_process';
 
 import { app, shell } from 'electron';
 
-import { mcpRuntime } from './mcpRuntimeState';
 import { applyApplicationRuntimeEnv } from '../libs/coworkUtil';
 import { getFeishuCliRoot, getFeishuConnectorSkillsRoot } from '../libs/feishuConnectorPaths';
 import { getFeishuCliLauncherPath, writeFeishuCliLauncher } from '../libs/feishuCliLauncher';
 import { installDownloadedFeishuCli } from '../libs/feishuCliDownloader';
 import { McpIntegrationRuntime } from '../libs/mcpIntegrationRuntime';
+import { terminateProcessTree } from '../libs/ownedProcessStop';
 import {
   OfficialIntegrationId,
   OfficialIntegrationManifests,
@@ -41,44 +41,45 @@ const runFeishuCliCommand = async (
   command: string,
   args: string[],
   cwd?: string,
-  timeoutMs = FEISHU_CLI_TIMEOUT_MS,
   signal?: AbortSignal,
+  timeoutMs = FEISHU_CLI_TIMEOUT_MS,
 ): Promise<string> => {
+  signal?.throwIfAborted();
   const env: Record<string, string | undefined> = { ...process.env };
   // Keep the Agent process environment consistent with the app-managed
   // connector binary directory.
   await applyApplicationRuntimeEnv(env, { includePackageMirrors: true });
+  signal?.throwIfAborted();
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      detached: process.platform !== 'win32',
       cwd,
-      shell: process.platform === 'win32' && command.toLowerCase().endsWith('.cmd'),
       env,
     });
     const outputChunks: Buffer[] = [];
     let settled = false;
-    let timer: NodeJS.Timeout | null = null;
-    const abort = () => {
-      if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
-      child.kill();
-      reject(new Error('MCP authorization was cancelled'));
+    const finish = () => {
+      signal?.removeEventListener('abort', abort);
+      clearTimeout(timer);
     };
-    if (signal?.aborted) {
-      abort();
-      return;
-    }
-    signal?.addEventListener('abort', abort, { once: true });
-    const finish = () => signal?.removeEventListener('abort', abort);
-    timer = setTimeout(() => {
+    const cancel = (reason: Error) => {
       if (settled) return;
       settled = true;
       finish();
-      child.kill();
-      reject(new Error(`Feishu CLI command timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
+      void terminateProcessTree(child).then(
+        () => reject(reason),
+        error =>
+          reject(new Error(`${reason.message}. Failed to stop the Feishu CLI.`, { cause: error })),
+      );
+    };
+    const abort = () => cancel(new Error('MCP authorization was cancelled'));
+    const timer = setTimeout(
+      () => cancel(new Error(`Feishu CLI command timed out after ${timeoutMs}ms`)),
+      timeoutMs,
+    );
+    signal?.addEventListener('abort', abort, { once: true });
     child.stdout.on('data', chunk =>
       outputChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)),
     );
@@ -89,14 +90,12 @@ const runFeishuCliCommand = async (
       if (settled) return;
       settled = true;
       finish();
-      if (timer) clearTimeout(timer);
       reject(error);
     });
     child.once('close', code => {
       if (settled) return;
       settled = true;
       finish();
-      if (timer) clearTimeout(timer);
       const output = decodeFeishuCliOutput(outputChunks).trim();
       if (code === 0) {
         resolve(output);
@@ -107,10 +106,6 @@ const runFeishuCliCommand = async (
   });
 };
 
-const findFeishuCliCommand = async (): Promise<string | null> => {
-  return getLocalFeishuCliCommand();
-};
-
 const installFeishuCli = async (): Promise<void> => {
   await installDownloadedFeishuCli(app.getPath('userData'));
   await writeFeishuCliLauncher(app.getPath('userData'));
@@ -119,39 +114,47 @@ const installFeishuCli = async (): Promise<void> => {
   await applyApplicationRuntimeEnv(process.env as Record<string, string | undefined>);
 };
 
-const verifyFeishuCli = async (command: string): Promise<void> => {
-  await runFeishuCliCommand(command, ['--version'], getCurrentFeishuCliRoot());
+const verifyFeishuCli = async (command: string, signal?: AbortSignal): Promise<void> => {
+  await runFeishuCliCommand(command, ['--version'], getCurrentFeishuCliRoot(), signal);
 };
 
-const prepareFeishuCli = async (): Promise<void> => {
-  let cliCommand = await findFeishuCliCommand();
+const prepareFeishuCli = async (signal?: AbortSignal): Promise<void> => {
+  let cliCommand = getLocalFeishuCliCommand();
   const cliRoot = getCurrentFeishuCliRoot();
   await fs.promises.mkdir(cliRoot, { recursive: true });
+  signal?.throwIfAborted();
   if (cliCommand) {
     try {
-      await verifyFeishuCli(cliCommand);
+      await verifyFeishuCli(cliCommand, signal);
     } catch (error) {
+      signal?.throwIfAborted();
       console.warn('[Feishu] CLI health check failed, reinstalling the pinned version:', error);
-      await installFeishuCli();
-      cliCommand = await findFeishuCliCommand();
+      cliCommand = null;
     }
-  } else {
-    await installFeishuCli();
-    cliCommand = await findFeishuCliCommand();
   }
-  if (!cliCommand) throw new Error('Feishu CLI installation did not provide lark-cli');
-  await verifyFeishuCli(cliCommand);
+  if (!cliCommand) {
+    await installFeishuCli();
+    cliCommand = getLocalFeishuCliCommand();
+    if (!cliCommand) throw new Error('Feishu CLI installation did not provide lark-cli');
+    await verifyFeishuCli(cliCommand, signal);
+  }
 
   try {
-    await runFeishuCliCommand(cliCommand, ['config', 'show'], cliRoot);
+    await runFeishuCliCommand(cliCommand, ['config', 'show'], cliRoot, signal);
   } catch {
-    await runFeishuCliCommand(cliCommand, ['config', 'init', '--new', '--lang', 'en'], cliRoot);
+    await runFeishuCliCommand(
+      cliCommand,
+      ['config', 'init', '--new', '--lang', 'en'],
+      cliRoot,
+      signal,
+    );
   }
 };
 
 const authorizeFeishuCli = async (signal?: AbortSignal): Promise<void> => {
-  await prepareFeishuCli();
-  const cliCommand = await findFeishuCliCommand();
+  await prepareFeishuCli(signal);
+  signal?.throwIfAborted();
+  const cliCommand = getLocalFeishuCliCommand();
   if (!cliCommand) throw new Error('Feishu CLI installation did not provide lark-cli');
   const cliRoot = getCurrentFeishuCliRoot();
 
@@ -159,7 +162,6 @@ const authorizeFeishuCli = async (signal?: AbortSignal): Promise<void> => {
     cliCommand,
     ['auth', 'login', '--recommend', '--no-wait', '--json'],
     cliRoot,
-    FEISHU_CLI_TIMEOUT_MS,
     signal,
   );
   let authPayload: { device_code?: string; verification_url?: string } | null = null;
@@ -177,19 +179,20 @@ const authorizeFeishuCli = async (signal?: AbortSignal): Promise<void> => {
   if (!authPayload?.device_code || !authPayload.verification_url) {
     throw new Error('Feishu CLI did not return a browser authorization URL');
   }
+  signal?.throwIfAborted();
   await shell.openExternal(authPayload.verification_url);
   await runFeishuCliCommand(
     cliCommand,
     ['auth', 'login', '--device-code', authPayload.device_code, '--json'],
     cliRoot,
-    FEISHU_CLI_AUTH_TIMEOUT_MS,
     signal,
+    FEISHU_CLI_AUTH_TIMEOUT_MS,
   );
-  await runFeishuCliCommand(cliCommand, ['auth', 'status'], cliRoot, FEISHU_CLI_TIMEOUT_MS, signal);
+  await runFeishuCliCommand(cliCommand, ['auth', 'status'], cliRoot, signal);
 };
 
 const logoutFeishuCli = async (): Promise<void> => {
-  const cliCommand = await findFeishuCliCommand();
+  const cliCommand = getLocalFeishuCliCommand();
   if (!cliCommand) return;
 
   await runFeishuCliCommand(cliCommand, ['auth', 'logout'], getCurrentFeishuCliRoot());
@@ -231,11 +234,11 @@ const removeFeishuSkills = async (): Promise<void> => {
 };
 
 const verifyFeishuConnector = async (signal?: AbortSignal): Promise<void> => {
-  const cliCommand = await findFeishuCliCommand();
+  const cliCommand = getLocalFeishuCliCommand();
   if (!cliCommand) throw new Error('Feishu CLI is not installed.');
   const cliRoot = getCurrentFeishuCliRoot();
-  await verifyFeishuCli(cliCommand);
-  await runFeishuCliCommand(cliCommand, ['auth', 'status'], cliRoot, FEISHU_CLI_TIMEOUT_MS, signal);
+  await verifyFeishuCli(cliCommand, signal);
+  await runFeishuCliCommand(cliCommand, ['auth', 'status'], cliRoot, signal);
 };
 
 const repairFeishuConnector = async (): Promise<void> => {
@@ -245,14 +248,17 @@ const repairFeishuConnector = async (): Promise<void> => {
   await prepareFeishuCli();
 };
 
+let integrationRuntime: McpIntegrationRuntime | undefined;
+
 export const getMcpIntegrationRuntime = (): McpIntegrationRuntime => {
-  if (mcpRuntime.integrationRuntime) return mcpRuntime.integrationRuntime;
+  if (integrationRuntime) return integrationRuntime;
   const runtime = new McpIntegrationRuntime();
   runtime.register({
     manifest: OfficialIntegrationManifests[OfficialIntegrationId.Feishu],
-    provision: () => prepareFeishuCli(),
+    provision: prepareFeishuCli,
     authenticate: async signal => {
       await authorizeFeishuCli(signal);
+      signal?.throwIfAborted();
       await installFeishuSkills();
     },
     verify: signal => verifyFeishuConnector(signal),
@@ -265,6 +271,6 @@ export const getMcpIntegrationRuntime = (): McpIntegrationRuntime => {
       }
     },
   });
-  mcpRuntime.integrationRuntime = runtime;
+  integrationRuntime = runtime;
   return runtime;
 };

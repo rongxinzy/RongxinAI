@@ -281,6 +281,18 @@ export function ModelsPage({
     }
   };
 
+  const handleOrganizationConnection = async (next: AISphereSnapshot) => {
+    setOrgSnapshot(next);
+    if (
+      next.status === AISphereStatus.Ready &&
+      !isStarting &&
+      (!running || status?.enabled === false)
+    ) {
+      await retryStart();
+    }
+    await refreshAll();
+  };
+
   return (
     <div className="space-y-8">
       {(isStarting || startError) && !running && (
@@ -306,8 +318,7 @@ export function ModelsPage({
           snapshot={orgSnapshot}
           onRefresh={async () => {
             const next = await window.electron.managedProviders.aisphereRefresh();
-            setOrgSnapshot(next);
-            await refreshMagpieModels();
+            await handleOrganizationConnection(next);
           }}
           onDisconnect={handleDisconnectOrg}
         />
@@ -431,10 +442,7 @@ export function ModelsPage({
         open={orgDialogOpen}
         onOpenChange={setOrgDialogOpen}
         initialAddress={orgSnapshot?.address ?? ''}
-        onConnected={next => {
-          setOrgSnapshot(next);
-          void refreshAll();
-        }}
+        onConnected={next => void handleOrganizationConnection(next)}
       />
 
       <DestructiveConfirmDialog

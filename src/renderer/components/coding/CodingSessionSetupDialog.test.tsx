@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { render, screen } from '@testing-library/react';
-import { expect, test } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 
 import {
   CodingAgentDriverKind,
@@ -62,4 +63,34 @@ test('preselects the workspace default when that Agent is ready', () => {
 
   expect(screen.getByRole('combobox', { name: '选择 Agent' })).toHaveTextContent('OpenCode');
   expect(screen.getByRole('button', { name: '确认' })).toBeEnabled();
+});
+
+test('lets the user explicitly pick a detected ACP agent for a new session', async () => {
+  const onSubmit = vi.fn();
+  render(
+    <CodingSessionSetupDialog
+      workspace={workspace}
+      profiles={[
+        { ...profiles[0], status: CodingAgentProfileStatus.Detected },
+        {
+          ...profiles[0],
+          id: 'untrusted',
+          name: 'Untrusted',
+          status: CodingAgentProfileStatus.Untrusted,
+        },
+      ]}
+      onCancel={() => {}}
+      onManageAgents={() => {}}
+      onSubmit={onSubmit}
+    />,
+  );
+
+  const user = userEvent.setup();
+  const confirm = screen.getByRole('button', { name: '确认' });
+  expect(confirm).toBeDisabled();
+  await user.click(screen.getByRole('combobox', { name: '选择 Agent' }));
+  expect(screen.queryByRole('option', { name: 'Untrusted' })).toBeNull();
+  await user.click(await screen.findByRole('option', { name: 'OpenCode' }));
+  await user.click(confirm);
+  expect(onSubmit).toHaveBeenCalledWith({ profileId: 'opencode', sourceRoot: '/workspace' });
 });

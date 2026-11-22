@@ -18,7 +18,7 @@ export function generateComponentCSS(components: ComponentAppearances, scope: st
   validateComponentAppearances(components);
   const rules: string[] = [];
   const externalRules: string[] = [];
-  // Scope-derived names isolate static/default and live theme stylesheets.
+  // Scope-derived names isolate the bundled rules and preview overrides.
   let hash = 2166136261;
   for (const char of scope) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
   const motionName = (name: string) => `zy-component-${name}-${(hash >>> 0).toString(36)}`;

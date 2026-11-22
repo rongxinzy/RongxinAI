@@ -15,7 +15,6 @@ import {
   emitAssistantError,
   streamText,
 } from './helpers/streamingAuditHelpers';
-import { adapter } from '../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
 import { describe, expect, it } from 'vitest';
 
 describe('streaming audit pipeline', () => {
@@ -53,7 +52,7 @@ describe('streaming audit pipeline', () => {
       harness.emitPi(builder.turnStart());
       harness.emitPi(builder.messageStart());
       streamText(harness, builder, 0, text);
-      adapter.stopSession(sessionId);
+      harness.runtime.stopSession(sessionId);
       harness.emitPi(builder.messageEnd('aborted'));
       harness.emitPi(builder.turnEnd());
       harness.emitPi(builder.agentEnd());

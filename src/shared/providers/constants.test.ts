@@ -18,9 +18,9 @@ describe('ProviderName constants', () => {
 });
 
 describe('ProviderRegistry', () => {
-  test('providerIds returns 18 providers (no custom or legacy server)', () => {
+  test('providerIds returns 17 providers (no custom or legacy server)', () => {
     const ids = ProviderRegistry.providerIds;
-    expect(ids.length).toBe(18);
+    expect(ids.length).toBe(17);
     expect(ids).toContain(ProviderName.Zhiyuan);
     expect(ids).not.toContain(ProviderName.Custom);
     expect(ids).not.toContain('zhiyuan-server');
@@ -394,14 +394,14 @@ describe('ProviderRegistry', () => {
     expect(ProviderRegistry.supportsCodingPlan('unknown')).toBe(false);
   });
 
-  test('idsByRegion china returns 12 providers', () => {
+  test('idsByRegion china returns 11 providers', () => {
     const china = ProviderRegistry.idsByRegion('china');
-    expect(china.length).toBe(12);
+    expect(china.length).toBe(11);
     expect(china).toContain(ProviderName.Zhiyuan);
     expect(china).toContain(ProviderName.DeepSeek);
     expect(china).toContain(ProviderName.Qianfan);
     expect(china).toContain(ProviderName.LlamaCpp);
-    expect(china).toContain(ProviderName.Ollama);
+    expect(china).not.toContain('ollama');
     expect(china).not.toContain(ProviderName.OpenAI);
   });
 
@@ -458,10 +458,9 @@ describe('ProviderRegistry', () => {
     expect(en[2]).toBe(ProviderName.Gemini);
   });
 
-  test('idsForEnLocale puts local providers at end', () => {
+  test('idsForEnLocale puts the built-in local provider at the end', () => {
     const en = ProviderRegistry.idsForEnLocale();
-    expect(en[en.length - 2]).toBe(ProviderName.LlamaCpp);
-    expect(en[en.length - 1]).toBe(ProviderName.Ollama);
+    expect(en.at(-1)).toBe(ProviderName.LlamaCpp);
     expect(en).not.toContain(ProviderName.Custom);
   });
 
@@ -549,9 +548,6 @@ describe('ProviderRegistry', () => {
       expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Qwen, 'anthropic')).toBe(
         'https://dashscope.aliyuncs.com/apps/anthropic',
       );
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Ollama, 'anthropic')).toBe(
-        'http://localhost:11434',
-      );
     });
 
     test('returns openai url for providers with switchableBaseUrls', () => {
@@ -569,9 +565,6 @@ describe('ProviderRegistry', () => {
       );
       expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Qwen, 'openai')).toBe(
         'https://dashscope.aliyuncs.com/compatible-mode/v1',
-      );
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Ollama, 'openai')).toBe(
-        'http://localhost:11434/v1',
       );
     });
 

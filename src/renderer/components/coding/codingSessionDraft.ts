@@ -1,9 +1,19 @@
 import {
+  CodingAgentDriverKind,
   CodingAgentProfileStatus,
   type CodingAgentProfile,
   type CodingWorkspaceSummary,
 } from '../../../shared/codingAgent';
 import type { CodingSidebarSelection } from './CodingWorkspaceSidebar';
+
+export function canStartCodingSession(profile: CodingAgentProfile | null): boolean {
+  return Boolean(
+    profile &&
+    (profile.status === CodingAgentProfileStatus.Ready ||
+      (profile.driverKind === CodingAgentDriverKind.Acp &&
+        profile.status === CodingAgentProfileStatus.Detected)),
+  );
+}
 
 /** Source folder a new session starts in when the user did not pick one. */
 export function resolveDefaultSessionSourceRoot(workspace: CodingWorkspaceSummary): string {

@@ -5,7 +5,6 @@ export * from './kvCacheTypes';
 export * from './launchValidation';
 export * from './modelDownloadUrls';
 export * from './modelMemoryEstimate';
-export * from './runtimeDownloadSources';
 export * from './agentEligibility';
 export * from './serviceConfigSchema';
 export * from './types';

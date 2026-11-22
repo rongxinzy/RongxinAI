@@ -184,16 +184,6 @@ export const CONSOLIDATED_PROVIDER_PRESETS: readonly ConsolidatedProviderPreset[
     requiresKey: true,
   },
   {
-    key: 'ollama',
-    name: 'Ollama（本机部署）',
-    labelKey: 'magpiePresetOllama',
-    shortDesc: 'http://127.0.0.1:11434',
-    api: 'openai-completions',
-    baseUrl: 'http://127.0.0.1:11434/v1',
-    defaultModels: 'qwen2.5-coder:7b, llama3.3:latest',
-    requiresKey: false,
-  },
-  {
     key: 'custom',
     name: '自定义服务商',
     labelKey: 'providerWizardCustomCardTitle',
@@ -201,7 +191,7 @@ export const CONSOLIDATED_PROVIDER_PRESETS: readonly ConsolidatedProviderPreset[
     api: 'openai-completions',
     baseUrl: '',
     defaultModels: '',
-    requiresKey: true,
+    requiresKey: false,
   },
 ];
 

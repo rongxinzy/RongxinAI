@@ -1,5 +1,6 @@
 import type {
   CodingAgentAvailableCommand,
+  CodingAgentAuthMethod,
   CodingAgentCapabilities,
   CodingAgentConfigOption,
   CodingPromptAttachment,
@@ -29,6 +30,10 @@ export interface CodingAgentDriver {
   /** ACP drivers use this to invalidate sessions after their child process restarts. */
   isConnectionRunning?(): boolean;
   getConnectionGeneration?(): number;
+  getProfileMetadata?(): {
+    capabilities: CodingAgentCapabilities;
+    authMethods: CodingAgentAuthMethod[];
+  };
   getCapabilities(): Promise<CodingAgentCapabilities>;
   getAuthState(): Promise<CodingAgentAuthState>;
   authenticate(request: CodingAgentAuthRequest): Promise<void>;
@@ -48,20 +53,25 @@ export interface CodingAgentDriver {
     prompt: string;
     attachments?: CodingPromptAttachment[];
     modelOverride?: string | null;
+    isCurrentTurn?: () => boolean;
   }): AsyncIterable<Omit<CodingEvent, 'id' | 'laneId' | 'sequence' | 'createdAt'>>;
   cancel(sessionId: string): Promise<void>;
   respondToPermission(response: CodingPermissionResponse): Promise<void>;
   /** Options a session of this driver would start with (built-in driver only). */
   getDefaultConfigOptions?(): CodingAgentConfigOption[];
   /** Commands a session of this driver would start with (built-in driver only). */
-  getDefaultAvailableCommands?(): CodingAgentAvailableCommand[];
+  getDefaultAvailableCommands?():
+    | Promise<CodingAgentAvailableCommand[]>
+    | CodingAgentAvailableCommand[];
   setConfigOption(
     sessionId: string,
     configId: string,
     value: string | boolean,
   ): Promise<CodingAgentConfigOption[]>;
   getSessionConfigOptions(sessionId: string): CodingAgentConfigOption[];
-  getSessionAvailableCommands(sessionId: string): CodingAgentAvailableCommand[];
+  getSessionAvailableCommands(
+    sessionId: string,
+  ): Promise<CodingAgentAvailableCommand[]> | CodingAgentAvailableCommand[];
   onAvailableCommandsChanged(
     listener: (sessionId: string, commands: CodingAgentAvailableCommand[]) => void,
   ): () => void;

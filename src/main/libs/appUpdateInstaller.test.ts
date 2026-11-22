@@ -14,6 +14,7 @@ import { readInstallResult } from './appUpdateInstallReceipt';
 import { installWindowsNsis } from './appUpdateInstaller';
 
 afterEach(async () => {
+  vi.useRealTimers();
   vi.clearAllMocks();
   if (mocks.root) await fs.promises.rm(mocks.root, { recursive: true, force: true });
 });
@@ -31,9 +32,12 @@ test('confirms the Windows helper started before quitting and records the target
     return child;
   });
 
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   await installWindowsNsis(installer, '2026.7.2');
+  vi.advanceTimersByTime(20_000);
 
   expect(mocks.quit).toHaveBeenCalledOnce();
+  expect(mocks.exit).not.toHaveBeenCalled();
   expect(mocks.spawn).toHaveBeenCalledWith('wscript.exe', [expect.stringMatching(/\.vbs$/)], {
     detached: true,
     stdio: 'ignore',
@@ -51,6 +55,13 @@ test('confirms the Windows helper started before quitting and records the target
   expect(script).toContain('$installerStart.UseShellExecute = $false');
   expect(script).toContain('[System.Diagnostics.Process]::Start($installerStart)');
   expect(script).toContain('Wait-Process -Id $appPid -Timeout 120');
+  expect(script).toContain(
+    'if (Get-Process -Id $appPid -ErrorAction SilentlyContinue) { throw "Application did not exit before update install" }',
+  );
+  expect(script.indexOf('$appExited = $true')).toBeLessThan(
+    script.indexOf('[System.Diagnostics.Process]::Start($installerStart)'),
+  );
+  expect(script).toContain('if (-not $appExited) { return }\r\nif (Test-Path $appPath)');
   expect(script).not.toContain('Start-Sleep');
   // A bare $null binds as an empty path and throws; [NullString]::Value is the
   // documented way to ask .NET for "no backup file".

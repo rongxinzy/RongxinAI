@@ -10,7 +10,7 @@ test('run snapshot read returns tracker state without side-channel content pushe
   const handler = vi.spyOn(ipcMain, 'handle');
   const sends: Array<[string, unknown]> = [];
   try {
-    bindCoworkRunBridge(runtime as unknown as PiRuntimeAdapter, vi.fn());
+    bindCoworkRunBridge(runtime as unknown as PiRuntimeAdapter, vi.fn(), vi.fn());
     const snapshotHandler = handler.mock.calls.find(
       ([channel]) => channel === CoworkSessionIpc.RunSnapshot,
     )![1];

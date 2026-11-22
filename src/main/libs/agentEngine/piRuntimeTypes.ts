@@ -5,9 +5,18 @@ import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessageQueue';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 import type { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
+import type { WorkbenchRunReservation } from '../../workbenchTask/taskService';
 import type { PiPlanEntry } from './piPlanTool';
 import type { PiRunProgressEvent } from './piRunState';
 import type { UIMessageChunk } from 'ai';
+
+const COMPANION_CHAT_SESSION_PREFIX = 'companion-chat-';
+
+export const piCompanionChatSessionId = (petId: string): string =>
+  `${COMPANION_CHAT_SESSION_PREFIX}${petId}`;
+
+export const isPiCompanionChatSession = (sessionId: string): boolean =>
+  sessionId.startsWith(COMPANION_CHAT_SESSION_PREFIX);
 
 /**
  * Pi-native workbench runtime types (issue #225).
@@ -39,7 +48,11 @@ export interface PiPermissionRequest {
 }
 
 export interface PiRuntimeEvents {
-  executionEvent: (sessionId: string, event: PiRunProgressEvent) => void;
+  executionEvent: (
+    sessionId: string,
+    event: PiRunProgressEvent,
+    workbenchRunId: string | null,
+  ) => void;
   started: (sessionId: string) => void;
   message: (sessionId: string, message: CoworkMessage) => void;
   messageRemoved: (sessionId: string, messageId: string) => void;
@@ -142,12 +155,13 @@ export type PiStartOptions = {
   thinkingLevel?: PiThinkingLevel;
   /** Internal observer for this submission's native settlement or explicit stop. */
   onSettled?: (result: PiSubmissionResult) => void;
-  /** Internal: run already created by an explicit Resume/Retry action. */
-  _workbenchRunId?: string;
-  _workbenchTaskId?: string;
+  /** Stable Workbench identity assigned before an admitted task launches. */
+  workbenchReservation?: WorkbenchRunReservation;
 };
 
 export type PiContinueOptions = {
+  /** Internal-only admission for the private companion conversation namespace. */
+  companionChat?: true;
   systemPrompt?: string;
   /** Execution skill set for this turn (user selection plus expert preset). */
   skillIds?: string[];
@@ -186,9 +200,6 @@ export type PiContinueOptions = {
   unattended?: boolean;
   scheduledTaskRun?: PiStartOptions['scheduledTaskRun'];
   onSettled?: PiStartOptions['onSettled'];
-  /** Internal: run already created by an explicit Resume/Retry action. */
-  _workbenchRunId?: string;
-  _workbenchTaskId?: string;
   /** Internal: do not persist a synthetic Resume/Retry prompt as a user message. */
   _skipUserMessage?: boolean;
 };
@@ -205,7 +216,7 @@ export interface PiRuntime {
   startSession(sessionId: string, prompt: string, options?: PiStartOptions): Promise<void>;
   continueSession(sessionId: string, prompt: string, options?: PiContinueOptions): Promise<void>;
   patchSession?(sessionId: string, patch: PiSessionPatch): Promise<void>;
-  stopSession(sessionId: string): void;
+  stopSession(sessionId: string, options?: Pick<PiContinueOptions, 'companionChat'>): void;
   stopAllSessions(): void;
   respondToPermission(requestId: string, result: PiPermissionResult): void;
   isSessionActive(sessionId: string): boolean;
@@ -224,28 +235,11 @@ export interface PiRuntime {
     imageAttachments?: PiImageAttachment[],
     fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>,
     skillIds?: string[],
-  ): { success: boolean; item?: CoworkPendingMessage; error?: string };
+  ): Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
   steerInput(sessionId: string, text: string): Promise<{ success: boolean; error?: string }>;
   getSessionConfirmationMode(sessionId: string): 'modal' | 'text' | null;
-  /**
-   * Declares which sessions consume non-final full-text `messageUpdate` events
-   * (IM mirrors, coding lanes); returns an unregister function. Optional so
-   * test doubles can omit it — without any resolver the adapter keeps emitting.
-   */
-  registerStreamingTextInterestResolver?(resolver: (sessionId: string) => boolean): () => void;
-  /**
-   * Resolves the delivery scheduled tasks created in a session default to
-   * (IM chats announce back to their conversation); returns an unregister
-   * function. Optional so test doubles can omit it.
-   *
-   * Single slot: a later registration silently replaces the earlier one. Only
-   * one component (the IM cowork handler) owns the slot today; if a second
-   * owner ever appears, switch this to a resolver set.
-   */
-  setScheduledTaskDeliveryResolver?(
-    resolver: (
-      sessionId: string,
-    ) => import('../../../scheduledTask/types').ScheduledTaskDelivery | null,
-  ): () => void;
+  getLiveStreamTexts(
+    sessionId: string,
+  ): Array<{ messageId: string; content: string; metadata: Record<string, unknown> }>;
   onSessionDeleted?(sessionId: string): void;
 }

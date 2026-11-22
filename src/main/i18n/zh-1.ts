@@ -3,6 +3,7 @@ export const zhMain1 = {
   webSearchInvalidInput: '搜索词或结果数量无效。',
   webSearchInvalidResponse: '搜索服务返回了无效或过大的结果。',
   webSearchRequestFailed: '搜索请求失败（HTTP {status}）。',
+  webSearchConnectionFailed: '无法连接搜索服务。',
   workbenchDeliveryHashFailed: '最终交付物内容校验失败。',
   workbenchDeliveryNotReady: '结果尚未达到交付条件，不能人工验收。',
   workbenchDeliverablesRequireAcceptance: '有 {count} 个最终交付物需要人工验收。',
@@ -59,6 +60,7 @@ export const zhMain1 = {
 
   // Session titles (created by ChannelSessionSync)
   coworkDefaultSessionTitle: '新对话',
+  coworkTaskWorkspaceChanged: '任务文件夹已变更，请选择文件夹后重新提交。',
   codingAgentDefaultMissionTitle: '新建编程任务',
   codingAgentSessionRecovery: '上一个 Agent 会话无法恢复，已将交接摘要发送到新会话。',
   codingAgentNextStageFailed:
@@ -68,6 +70,10 @@ export const zhMain1 = {
   codingAgentConfigPermissionMode: '权限模式',
   codingAgentConfigPlanMode: '规划模式',
   mcpIntegrationOperationBusy: 'MCP 集成正在执行其他操作，请稍后重试。',
+  mcpAuthorizationShuttingDown: '应用正在退出，无法开始 MCP 授权。',
+  mcpRegistryAlreadyInstalled: '此市场 MCP 服务已安装。',
+  mcpServerNameExists: '同名 MCP 服务已存在。',
+  mcpAuthorizationEndpointMismatch: '已安装的 MCP 服务使用了不同的地址。',
   codingAgentPlanModeExecute: '直接执行',
   codingAgentPlanModePlan: '仅规划（只读）',
   codingAgentPermissionModeAsk: '每次询问',
@@ -123,6 +129,7 @@ export const zhMain1 = {
   codingAgentElicitationCancelledByUser: '用户取消了此问题。',
   codingAgentElicitationCancelledBySessionStop: '会话已停止，因此取消了此问题。',
   codingAgentElicitationCancelledByRestart: '应用已重启，因此取消了此问题。',
+  coworkToolInterruptedByRestart: '应用重启中断了工具调用。',
   codingAgentElicitationPromptBlocked: '请先回答或取消当前问题，再发送新消息。',
   codingAgentElicitationResponseRequired: '请输入问题的回答。',
   codingAgentElicitationNoLongerPending: '该问题已不再等待回答。',
@@ -157,6 +164,7 @@ export const zhMain1 = {
   coworkErrorInputTooLong: '输入内容过长，超出模型上下文限制。',
   coworkErrorCouldNotProcessPdf: '无法处理 PDF 文件。',
   coworkErrorModelNotFound: '请求的模型不存在或不可用。',
+  coworkErrorModelTextUnsupported: '所选模型不支持文字对话。',
   coworkErrorGatewayStartFailed: '网关启动失败，建议重启应用后再试。',
   coworkErrorGatewayDisconnected: 'AI 引擎连接中断，请重试。',
   coworkErrorServiceRestart: 'AI 引擎正在重启，请稍后重试。',

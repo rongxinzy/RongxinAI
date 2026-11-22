@@ -21,9 +21,6 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
     onModelLaunchLogWindowTargetChanged: _p0 => {
       return runtime.subscribe('llamacpp.onModelLaunchLogWindowTargetChanged', _p0);
     },
-    onPullProgress: _p0 => {
-      return runtime.subscribe('llamacpp.onPullProgress', _p0);
-    },
     status: async () => {
       runtime.warnOnce('llamacpp.status');
       return {
@@ -79,19 +76,6 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
         },
       };
     },
-    listRuntimeDevices: async _p0 => {
-      void _p0;
-      runtime.warnOnce('llamacpp.listRuntimeDevices');
-      return {
-        success: true,
-        backend: {
-          version: '0.0.0-preview',
-          backend: '',
-          versionBackend: '',
-        },
-        devices: [],
-      };
-    },
     listBackends: async () => {
       runtime.warnOnce('llamacpp.listBackends');
       return {
@@ -103,38 +87,6 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
           versionBackend: '',
         },
         recommended: {
-          version: '0.0.0-preview',
-          backend: '',
-          versionBackend: '',
-        },
-      };
-    },
-    getBackendDownloadSize: async _p0 => {
-      void _p0;
-      runtime.warnOnce('llamacpp.getBackendDownloadSize');
-      return {
-        success: true,
-      };
-    },
-    getBackendSelection: async () => {
-      runtime.warnOnce('llamacpp.getBackendSelection');
-      return {
-        version: '0.0.0-preview',
-        backend: '',
-        versionBackend: '',
-      };
-    },
-    setBackendSelection: async _p0 => {
-      void _p0;
-      runtime.warnOnce('llamacpp.setBackendSelection');
-      return {
-        success: true,
-        cancelled: false,
-        plan: {
-          kind: 'ready',
-          executablePath: '',
-        },
-        backend: {
           version: '0.0.0-preview',
           backend: '',
           versionBackend: '',
@@ -175,18 +127,6 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
           backend: '',
           versionBackend: '',
         },
-      };
-    },
-    getRuntimeCapabilities: async () => {
-      runtime.warnOnce('llamacpp.getRuntimeCapabilities');
-      return {
-        success: true,
-        flags: [],
-        deviceProbeSucceeded: false,
-        devices: [],
-        backendKinds: [],
-        gpuDeviceCount: 0,
-        supports: {},
       };
     },
     importRuntime: async () => {
@@ -262,9 +202,6 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
       runtime.warnOnce('llamacpp.listRunningModels');
       return [];
     },
-    refreshRunningModelBindings: async () => {
-      runtime.warnOnce('llamacpp.refreshRunningModelBindings');
-    },
     importModelFiles: async _p0 => {
       void _p0;
       runtime.warnOnce('llamacpp.importModelFiles');
@@ -279,14 +216,6 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
       runtime.warnOnce('llamacpp.deleteModel');
       return {
         success: true,
-      };
-    },
-    showModel: async _p0 => {
-      void _p0;
-      runtime.warnOnce('llamacpp.showModel');
-      return {
-        name: 'Preview',
-        args: [],
       };
     },
     getModelPreferences: async () => {

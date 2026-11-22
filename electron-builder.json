@@ -149,7 +149,6 @@
     "category": "public.app-category.productivity",
     "hardenedRuntime": true,
     "sign": "scripts/sign-magpie-macos.cjs",
-    "x64ArchFiles": "**/magpie/darwin-*/magpie",
     "gatekeeperAssess": false,
     "entitlements": "build/entitlements.mac.plist",
     "entitlementsInherit": "build/entitlements.mac.plist",
@@ -271,7 +270,10 @@
   },
   "deb": {
     "compression": "gz",
-    "fpm": ["--before-install=scripts/linux-before-install.sh"]
+    "fpm": [
+      "--before-install=scripts/linux-before-install.sh",
+      "--depends=libasound2t64 | libasound2"
+    ]
   },
   "linux": {
     "target": ["AppImage", "deb"],

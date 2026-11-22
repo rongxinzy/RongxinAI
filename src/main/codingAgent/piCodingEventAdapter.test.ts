@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import {
   CodingEventKind,
@@ -9,9 +9,49 @@ import {
   CoworkToolActivityEventType,
   CoworkToolActivityPhase,
 } from '../../shared/cowork/toolActivity';
-import { normalizePiMessage, normalizePiToolActivity } from './piCodingEventAdapter';
+import { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
+import {
+  bindCodingRoomPiEvents,
+  normalizePiMessage,
+  normalizePiToolActivity,
+} from './piCodingEventAdapter';
 
 describe('Pi coding event adapter', () => {
+  test('tracks only the bound lane and releases its Pi subscriptions at disposal', () => {
+    const runtime = new PiRuntimeAdapter();
+    const lane = 'coding-lane';
+    const other = 'cowork-session';
+    const room = {
+      isBuiltinLaneSession: (id: string) => id === lane,
+      recordBuiltinEvent: vi.fn(),
+      recordBuiltinElicitation: vi.fn(),
+      recordBuiltinInterruption: vi.fn(),
+    };
+    const detach = bindCodingRoomPiEvents(runtime, room);
+    expect(runtime.hasStreamingTextSubscribers(lane)).toBe(true);
+    expect(runtime.hasStreamingTextSubscribers(other)).toBe(false);
+    runtime.emit('messageUpdate', other, 'text-id', 'A Cowork update');
+    runtime.emit('messageUpdate', lane, 'text-id', 'A lane update');
+    runtime.emit('complete', lane);
+    expect(room.recordBuiltinEvent.mock.calls).toEqual([
+      [
+        lane,
+        CodingEventKind.MessageDelta,
+        {
+          messageId: 'text-id',
+          content: 'A lane update',
+          streamUpdateMode: CodingStreamUpdateMode.Replace,
+        },
+      ],
+      [lane, CodingEventKind.TurnComplete, {}],
+    ]);
+    detach();
+    expect(runtime.hasStreamingTextSubscribers(lane)).toBe(false);
+    expect(runtime.eventNames()).toEqual([]);
+    runtime.emit('complete', lane);
+    expect(room.recordBuiltinEvent).toHaveBeenCalledTimes(2);
+  });
+
   test('maps tool messages to durable tool call events', () => {
     expect(
       normalizePiMessage({

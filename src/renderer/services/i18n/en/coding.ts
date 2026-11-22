@@ -238,8 +238,7 @@ export const enCoding: Record<string, string> = {
   codingAgentAdapterVersion: 'Connection adapter version: {version}',
   codingAgentLocalConfigHelp:
     'This panel does not change tool settings. Configure the model and account in the tool, then check again.',
-  codingAgentProbeRequired:
-    'This local agent has not been checked yet. It will be checked automatically when you send.',
+  codingAgentProbeRequired: 'This local agent’s connection has not been verified.',
   codingAgentAuthenticate: 'Sign in',
   codingAgentApprovePermission: 'Allow this action',
   codingAgentPermissionAllowOnce: 'Allow once',
@@ -353,6 +352,7 @@ export const enCoding: Record<string, string> = {
     'The selected coding agent is not ready. Finish its configuration or sign-in first.',
   codingErrorProfileNotTrustable: 'This coding agent cannot be marked as trusted.',
   codingErrorProfileNotAuthenticatable: 'This coding agent does not need external sign-in.',
+  codingErrorRoomShuttingDown: 'Coding Room is shutting down.',
   codingErrorProfileNotProbeable:
     'This coding agent cannot be checked right now. Verify its status.',
   codingErrorProfileNameRequired: 'Enter a name for the coding agent.',
@@ -415,9 +415,6 @@ export const enCoding: Record<string, string> = {
     'This session is still running. Send again after the current turn finishes.',
   codingErrorRecoveryNotRequired: 'This session does not need recovery confirmation.',
   codingErrorHandoffSameMission: 'Handoff only works between sessions in the same coding task.',
-  codingErrorMissionNotFound: 'The coding task no longer exists.',
-  codingErrorMissionNoImplementation: 'This coding task has no implementation session.',
-  codingErrorRuntimeIsolatedUnsupported: 'The coding runtime cannot create an isolated workspace.',
   codingErrorCollaboratorPreviewIsolatedOnly:
     'Only an isolated collaborator worktree can preview changes.',
   codingErrorCollaboratorApplyIsolatedOnly:

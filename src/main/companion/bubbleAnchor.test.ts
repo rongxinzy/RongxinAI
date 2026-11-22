@@ -33,10 +33,9 @@ test('explicit first-show activation follows real movement without a native show
   vi.useFakeTimers();
   const bubble = new FakeWindow();
   const pet = new FakeWindow();
-  const visibility = vi.fn();
   const anchor = anchorCompanionBubble(
     native(bubble),
-    { getPetWindow: () => native(pet), onBubbleVisibility: visibility },
+    { getPetWindow: () => native(pet), hideWindow: bubble.hide },
     vi.fn(),
   );
   anchor.activate();
@@ -47,7 +46,6 @@ test('explicit first-show activation follows real movement without a native show
   vi.advanceTimersByTime(16);
   expect(bubble.bounds).toEqual({ x: 456, y: 232, width: 480, height: 400 });
   expect(bubble.focus).not.toHaveBeenCalled();
-  expect(visibility.mock.calls).toEqual([[true]]);
   bubble.emit('closed');
   expect(pet.listenerCount('move')).toBe(0);
 });
@@ -56,23 +54,20 @@ test('activation deduplicates bindings, rebinds a newly available pet and cancel
   vi.useFakeTimers();
   const bubble = new FakeWindow();
   let pet: FakeWindow | null = null;
-  const visibility = vi.fn();
   const anchor = anchorCompanionBubble(
     native(bubble),
-    { getPetWindow: () => pet && native(pet), onBubbleVisibility: visibility },
+    { getPetWindow: () => pet && native(pet), hideWindow: bubble.hide },
     vi.fn(),
   );
   anchor.activate();
   pet = new FakeWindow();
   anchor.activate();
   anchor.activate();
-  bubble.emit('show');
   expect(pet.listenerCount('move')).toBe(1);
   pet.emit('move');
   pet.emit('resize');
   expect(vi.getTimerCount()).toBe(1);
   anchor.deactivate();
-  bubble.emit('hide');
   expect(vi.getTimerCount()).toBe(0);
   expect(pet.listenerCount('move')).toBe(0);
   expect(pet.listenerCount('hide')).toBe(0);
@@ -80,7 +75,6 @@ test('activation deduplicates bindings, rebinds a newly available pet and cancel
   expect(pet.listenerCount('move')).toBe(1);
   bubble.emit('closed');
   expect(pet.listenerCount('move')).toBe(0);
-  expect(visibility.mock.calls.at(-1)).toEqual([false]);
 });
 
 test('unchanged pet bounds do not repeatedly reposition the transparent bubble', () => {
@@ -89,7 +83,7 @@ test('unchanged pet bounds do not repeatedly reposition the transparent bubble',
   const pet = new FakeWindow();
   const anchor = anchorCompanionBubble(
     native(bubble),
-    { getPetWindow: () => native(pet) },
+    { getPetWindow: () => native(pet), hideWindow: bubble.hide },
     vi.fn(),
   );
   anchor.activate();

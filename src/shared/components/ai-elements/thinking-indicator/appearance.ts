@@ -26,8 +26,9 @@ export function subscribeIndicatorAppearance(listener: () => void): () => void {
       attributes: true,
       attributeFilter: ['class', 'data-theme', 'style'],
     });
-    // ThemeManager and Vite replace stylesheet text without remounting controls.
-    observer.observe(document.head, { childList: true, characterData: true, subtree: true });
+    if (import.meta.env.DEV) {
+      observer.observe(document.head, { childList: true, characterData: true, subtree: true });
+    }
   }
   return () => {
     listeners.delete(listener);

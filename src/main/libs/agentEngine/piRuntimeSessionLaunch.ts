@@ -1,7 +1,7 @@
 /**
  * Session launch for the Pi runtime adapter.
  *
- * Extracted from PiRuntimeAdapter.startSession: creates the Pi AgentSession
+ * Creates the Pi AgentSession
  * for a Cowork turn — resource state, model resolution, settings overrides,
  * custom tools, workbench run bookkeeping, event subscription, and dispatch
  * of the initial (history- and memory-augmented) prompt.
@@ -9,7 +9,7 @@
 
 import { observeWorkbench } from '../../workbenchTask/observe';
 
-import { randomUUID } from 'crypto';
+import path from 'node:path';
 
 import { classifyCoworkError } from '../../../common/coworkError';
 import { normalizeSingleExpertIds } from '../../../shared/cowork/sessionExperts';
@@ -28,14 +28,9 @@ import {
 } from '../../../shared/workbenchTask';
 import { isLocalProviderName, ModelCapabilityStatus } from '../../../shared/providers';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
-import type { CoworkMessage } from '../../coworkStore';
 import { t } from '../../i18n';
 import { resolveProjectMemoryContextForPiPrompt } from '../../memory/piRuntimeProjectMemoryPrompt';
 import { applyApplicationRuntimeEnv } from '../coworkUtil';
-import {
-  assertLlamaCppWorkModeContext,
-  assertWorkModeContextWindow,
-} from '../llamacppWorkModeContextGuard';
 import { PiAgentEventType } from './piStreamConstants';
 import { resolvePiSkillRoots } from './piSkillRoots';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
@@ -47,24 +42,26 @@ import { collectImagePathReferences } from './piImageInputFallback';
 import { DEFAULT_PI_LOCAL_MAX_TOKENS, resolvePiModel } from './piMagpiePiModel';
 import { PiSkillRuntimeCapabilitiesToolName } from './piSkillRuntimeCapabilitiesTool';
 import { PiSkillScriptToolName } from './piSkillScriptTool';
-import { createPiSettingsManager, resolvePiSessionModel } from './piRuntimeSettingsOverrides';
+import { createPiSettingsManager } from './piRuntimeSettingsOverrides';
 import { resolveExpertPresetSkillDirs, resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
-import { openPersistentPiSessionManager } from './piSessionStore';
+import { openPersistentPiSessionManager, PI_COMPANION_SESSIONS_ROOT_DIR } from './piSessionStore';
 import { buildPiSessionCustomTools } from './piRuntimeSessionCustomTools';
 import {
   getPiModules,
   normalizeSkillIds,
+  persistPiUserMessage,
   preparePiPrompt,
   sendPiPrompt,
   type ActivePiSession,
   type InitializingPiSession,
   type PiEvent,
   type PiResourceState,
+  type PiSession,
 } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
 import { ArtifactRecorder } from '../../artifactLedger/artifactRecorder';
-import type { PiStartOptions } from './piRuntimeTypes';
+import { isPiCompanionChatSession, type PiStartOptions } from './piRuntimeTypes';
 
 // Pi's bash tool inherits the main-process environment. Initialize the
 // application-managed runtime once so later session creation cannot duplicate
@@ -77,110 +74,123 @@ export async function startPiRuntimeSession(
   prompt: string,
   options: PiStartOptions = {},
 ): Promise<void> {
-  assertCoworkSubmissionContent({ prompt, imageAttachments: options.imageAttachments });
-  host.evictIdleSessions();
-  const expertIds = normalizeSingleExpertIds(options.expertIds);
-
-  if (
-    host.isSessionRunning(sessionId) &&
-    (options.onSettled ||
-      host.activeSessions.get(sessionId)?.onSettled ||
-      host.initializingSessions.get(sessionId)?.onSettled)
-  ) {
-    throw new Error('A Pi run is already active in this session.');
-  }
-  if (host.activeSessions.has(sessionId) || host.initializingSessions.has(sessionId)) {
-    host.stopActiveSession(sessionId, 'The session was replaced by a new run.');
-  }
-
+  const companionChat = isPiCompanionChatSession(sessionId);
+  const sessionMode = companionChat ? CoworkSessionMode.Chat : options.sessionMode;
+  const confirmationMode = companionChat ? 'text' : (options.confirmationMode ?? 'modal');
   const abortController = new AbortController();
   const initialization: InitializingPiSession = {
     abortController,
     generation: Symbol(sessionId),
     onSettled: options.onSettled,
+    workbenchRunId: options.workbenchReservation?.runId,
   };
-  host.initializingSessions.set(sessionId, initialization);
   const isCurrentInitialization = (): boolean =>
     host.initializingSessions.get(sessionId)?.generation === initialization.generation &&
     !abortController.signal.aborted;
 
-  let workbenchRunId: string | null = null;
   let activeSession: ActivePiSession | null = null;
+  let unregisteredSession: PiSession | undefined;
+  let nativeAcquisition: PromiseWithResolvers<void> | undefined;
 
   try {
+    assertCoworkSubmissionContent({ prompt, imageAttachments: options.imageAttachments });
+    if (!companionChat) {
+      const capture = host.waitForPriorArtifactCapture(sessionId);
+      if (capture) await capture;
+    }
+    host.evictIdleSessions();
+    const expertIds = normalizeSingleExpertIds(options.expertIds);
+
+    if (
+      host.isSessionRunning(sessionId) &&
+      (options.onSettled ||
+        host.activeSessions.get(sessionId)?.onSettled ||
+        host.initializingSessions.get(sessionId)?.onSettled)
+    ) {
+      throw new Error('A Pi run is already active in this session.');
+    }
+    if (host.activeSessions.has(sessionId) || host.initializingSessions.has(sessionId)) {
+      host.stopActiveSession(sessionId, 'The session was replaced by a new run.');
+    }
+
+    host.initializingSessions.set(sessionId, initialization);
+    const priorStop = host.waitForNativeSessionStop(sessionId);
+    if (priorStop) await priorStop;
+    if (!isCurrentInitialization()) return;
     const pi = await getPiModules();
     if (!isCurrentInitialization()) return;
 
-    // Emit user message to UI (unless the caller already did).
-    // Must persist via store.addMessage() — the CoworkStore is the source of
-    // truth for messages; emit alone delivers to the in-memory Redux state
-    // but never writes to SQLite, causing the prompt to vanish on session switch.
-    if (!options.skipInitialUserMessage) {
-      const storedImages = host.persistImageAttachments(sessionId, options.imageAttachments);
-      // The transcript shows what the user attached to this input, never the
-      // session's execution set (which also carries the expert preset bundle).
-      // A caller that passes nothing attaches nothing.
-      const attachedSkillIds = options.attachedSkillIds;
-      const userMsg: CoworkMessage = {
-        id: randomUUID(),
-        type: 'user',
-        content: prompt,
-        timestamp: Date.now(),
-        metadata:
-          attachedSkillIds?.length ||
-          expertIds.length ||
-          storedImages?.length ||
-          options.fileAttachments?.length
-            ? {
-                ...(attachedSkillIds?.length ? { skillIds: attachedSkillIds } : {}),
-                ...(expertIds.length
-                  ? {
-                      experts: (
-                        host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false })
-                          ?.experts ?? []
-                      )
-                        .filter(expert => expertIds.includes(expert.expertId))
-                        .map(expert => ({
-                          expertId: expert.expertId,
-                          expertName: expert.expertName,
-                          presetId: expert.packageId,
-                        })),
-                    }
-                  : {}),
-                ...(storedImages?.length ? { imageAttachments: storedImages } : {}),
-                ...(options.fileAttachments?.length
-                  ? { fileAttachments: options.fileAttachments }
-                  : {}),
-              }
-            : undefined,
-      };
-      const store = host.getStore();
-      const persisted = store ? store.addMessage(sessionId, userMsg) : userMsg;
-      host.emit('message', sessionId, persisted);
+    const selectedExpertId = expertIds[0];
+    const expertSession = selectedExpertId
+      ? host
+          .getStore(sessionId)
+          ?.getSessionExperts(sessionId)
+          .find(row => row.expertId === selectedExpertId)
+      : undefined;
+    const turnExperts = expertSession
+      ? [
+          {
+            expertId: expertSession.expertId,
+            expertName: expertSession.expertName,
+            presetId: expertSession.packageId,
+          },
+        ]
+      : [];
+
+    let imageAttachments = options.imageAttachments;
+    if (!companionChat && !options.skipInitialUserMessage) {
+      imageAttachments = imageAttachments?.length
+        ? await host.persistImageAttachments(
+            sessionId,
+            imageAttachments,
+            abortController.signal,
+            isCurrentInitialization,
+          )
+        : undefined;
+      if (!isCurrentInitialization()) return;
+      assertCoworkSubmissionContent({ prompt, imageAttachments });
+      persistPiUserMessage(host, sessionId, prompt, {
+        skillIds: options.attachedSkillIds,
+        imageAttachments,
+        fileAttachments: options.fileAttachments,
+        experts: expertIds.length ? turnExperts : undefined,
+      });
     }
 
-    const workspaceRoot = options.workspaceRoot || process.cwd();
+    const workspaceRoot = companionChat
+      ? path.parse(process.cwd()).root
+      : options.workspaceRoot || process.cwd();
     // Pi's built-in shell tools snapshot process.env when they execute. Give
     // that snapshot the same app-managed Node/npm, Python, and uv
     // PATH configuration used by direct Skill execution.
-    if (!hasAppliedApplicationRuntimeEnv) {
+    if (!companionChat && !hasAppliedApplicationRuntimeEnv) {
       await applyApplicationRuntimeEnv(process.env as Record<string, string | undefined>);
       hasAppliedApplicationRuntimeEnv = true;
     }
     const sessionOptions: Record<string, unknown> = { cwd: workspaceRoot };
-    // Pi's session manager keeps the structured transcript (tool calls,
-    // results, images, thinking) in a per-Cowork-session JSONL. Rebuilds
-    // Reopen any persisted Pi JSONL session file so Pi owns structured history.
+    // Rebuilds reopen only the native history owned by this SQLite row.
     const piSessionStoreRoot = host.getPiSessionStoreRoot();
+    const historyStore = piSessionStoreRoot ? host.getStore(sessionId) : null;
+    const piHistoryKey = historyStore ? historyStore.getPiHistoryKey(sessionId) : null;
     const historyRestoreStartedAt = Date.now();
     let restoredNativeHistory = false;
-    if (piSessionStoreRoot && pi.SessionManager?.create && pi.SessionManager?.open) {
-      const persisted = openPersistentPiSessionManager(
+    if (
+      piSessionStoreRoot &&
+      piHistoryKey !== undefined &&
+      pi.SessionManager?.create &&
+      pi.SessionManager?.open
+    ) {
+      const persisted = await openPersistentPiSessionManager(
         pi.SessionManager,
-        piSessionStoreRoot,
+        companionChat
+          ? path.join(piSessionStoreRoot, PI_COMPANION_SESSIONS_ROOT_DIR)
+          : piSessionStoreRoot,
         sessionId,
         workspaceRoot,
+        abortController.signal,
+        piHistoryKey,
       );
+      if (!isCurrentInitialization()) return;
       sessionOptions.sessionManager = persisted.manager;
       restoredNativeHistory = persisted.reusedFile;
     } else if (pi.SessionManager?.inMemory) {
@@ -192,84 +202,69 @@ export async function startPiRuntimeSession(
     // pi's formatSkillsForPrompt — no manual injection here to avoid
     // duplicating the skills section.
     const basePrompt = options.systemPrompt?.trim() || '';
-    const expertStore = host.getStore();
-    const expertSession =
-      options.expertIds?.length && expertStore
-        ? expertStore
-            .getSession(sessionId, 0, { includeArtifacts: false })
-            ?.experts?.find(e => options.expertIds!.includes(e.expertId))
-        : null;
     // Experts bind skills as part of their definition; load them alongside
     // the caller's picks without changing sessions that have no expert.
     const effectiveSkillIds = expertSession?.skillIds?.length
       ? normalizeSkillIds([...(options.skillIds ?? []), ...expertSession.skillIds])
       : normalizeSkillIds(options.skillIds);
-    const chatMode = options.sessionMode === CoworkSessionMode.Chat;
+    const chatMode = sessionMode === CoworkSessionMode.Chat;
     const resourceState: PiResourceState = {
+      companionChat: companionChat || undefined,
       systemPrompt: basePrompt,
       skillIds: effectiveSkillIds,
       maxOutputTokens: DEFAULT_PI_LOCAL_MAX_TOKENS,
-      fileToolsEnabled: options.confirmationMode !== 'text',
+      fileToolsEnabled: confirmationMode !== 'text',
       unattended: options.unattended === true,
       chatMode,
-      expertSkillDirs: resolveExpertPresetSkillDirs(options.expertIds, agentId =>
-        host.getStore()?.getAgent(agentId),
+      expertSkillDirs: resolveExpertPresetSkillDirs(expertIds, agentId =>
+        host.getStore(sessionId)?.getAgent(agentId),
       ),
       skillRoots: {},
     };
-    resourceState.skillRoots = resolvePiSkillRoots(
-      resourceState.skillIds,
-      resolveZhiyuanSkillDirs(),
-      resourceState.expertSkillDirs,
-    );
+    if (!companionChat) {
+      resourceState.skillRoots = resolvePiSkillRoots(
+        resourceState.skillIds,
+        resolveZhiyuanSkillDirs(),
+        resourceState.expertSkillDirs,
+      );
+    }
 
     const workflowKind = chatMode ? WorkbenchContractKind.Chat : WorkbenchContractKind.GenericWork;
-    if (!chatMode) {
-      workbenchRunId =
-        observeWorkbench(
+    const workbenchRunId = chatMode
+      ? null
+      : (observeWorkbench(
           sessionId,
           () =>
-            host.getWorkbenchTaskService()?.beginRun({
+            host.getWorkbenchTaskService(sessionId)?.beginRun({
               sessionId,
               goal: prompt,
               contract: { kind: workflowKind },
               trigger: WorkbenchRunTrigger.Message,
-              preparedRunId: options._workbenchRunId,
-              preparedTaskId: options._workbenchTaskId,
+              reservation: options.workbenchReservation,
             }).run.id,
-        ) ?? null;
-    }
+        ) ?? null);
+    if (workbenchRunId) initialization.workbenchRunId = workbenchRunId;
 
     // Pi's createAgentSession does not accept a systemPrompt option. Its
     // default resource loader supplies the Pi Coding Assistant identity,
     // so override that loader per session to keep expert contexts isolated.
     // Resolve model early — needed by both MCP proxy and subagent tool
-    const resolvedModel = await resolvePiModel(pi, options.modelOverride, undefined, {
-      conversationId: sessionId,
-      workload:
-        options.sessionMode === CoworkSessionMode.Chat
-          ? ZhiyuanModelPoolWorkload.Chat
-          : ZhiyuanModelPoolWorkload.Work,
-    });
+    const resolvedModel = await resolvePiModel(
+      pi,
+      host.modelService,
+      options.modelOverride,
+      undefined,
+      {
+        conversationId: sessionId,
+        workload: chatMode ? ZhiyuanModelPoolWorkload.Chat : ZhiyuanModelPoolWorkload.Work,
+        requirePublishedModel: companionChat && Boolean(options.modelOverride),
+      },
+    );
     if (!isCurrentInitialization()) return;
     const modelId =
       typeof resolvedModel.model.id === 'string'
         ? resolvedModel.model.id
         : options.modelOverride || 'unknown';
-    if (options.sessionMode === CoworkSessionMode.Work) {
-      assertLlamaCppWorkModeContext({
-        providerName: resolvedModel.providerName,
-        modelId,
-      });
-      assertWorkModeContextWindow({
-        providerName: resolvedModel.providerName,
-        modelId,
-        contextWindow:
-          typeof resolvedModel.model.contextWindow === 'number'
-            ? resolvedModel.model.contextWindow
-            : undefined,
-      });
-    }
     const reasoning = resolvedModel.model.reasoning;
     const harnessModelProfile: HarnessModelProfileInput = {
       provider: resolvedModel.providerName,
@@ -280,27 +275,30 @@ export async function startPiRuntimeSession(
       harnessVersion: HarnessVersion,
     };
     observeWorkbench(sessionId, () => {
-      const workbenchForContext = host.getWorkbenchTaskService();
+      const workbenchForContext = host.getWorkbenchTaskService(sessionId);
       if (workbenchRunId && workbenchForContext) {
-        workbenchForContext.updateRunContext(workbenchRunId, {
-          model: harnessModelProfile.model,
-          provider: harnessModelProfile.provider,
-          reasoningProfile: harnessModelProfile.reasoningProfile,
-          workspaceRoot,
-          skillIds: resourceState.skillIds ?? [],
-        });
-        workbenchForContext.measurement?.recordModelProfile(workbenchRunId, harnessModelProfile);
+        workbenchForContext.updateRunContext(
+          workbenchRunId,
+          {
+            model: harnessModelProfile.model,
+            provider: harnessModelProfile.provider,
+            reasoningProfile: harnessModelProfile.reasoningProfile,
+            workspaceRoot,
+            skillIds: resourceState.skillIds ?? [],
+          },
+          { workflowKind, harnessVersion: HarnessVersion },
+        );
       }
     });
     const recordActivation = (event: HarnessActivationEvent): void => {
       const currentRunId = host.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId;
       if (!currentRunId) return;
       observeWorkbench(sessionId, () => {
-        host.getWorkbenchTaskService()?.measurement?.recordActivation(currentRunId, event);
+        host.getWorkbenchTaskService(sessionId)?.measurement?.recordActivation(currentRunId, event);
       });
     };
     if (
-      options.sessionMode === CoworkSessionMode.Work &&
+      sessionMode === CoworkSessionMode.Work &&
       isLocalProviderName(resolvedModel.providerName) &&
       resolvedModel.capabilities?.toolCalling !== ModelCapabilityStatus.Supported
     ) {
@@ -311,7 +309,7 @@ export async function startPiRuntimeSession(
       );
     }
     resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
-    const sessionModel = resolvePiSessionModel(resolvedModel.model, resourceState.chatMode);
+    const sessionModel = resolvedModel.model;
     sessionOptions.model = sessionModel;
     const effectiveThinkingLevel =
       options.thinkingLevel ??
@@ -320,14 +318,12 @@ export async function startPiRuntimeSession(
       // Pi clamps the level to what the resolved model actually supports.
       sessionOptions.thinkingLevel = effectiveThinkingLevel;
     }
-    if (resolvedModel.modelRuntime) {
-      sessionOptions.modelRuntime = resolvedModel.modelRuntime;
-    }
+    sessionOptions.modelRuntime = resolvedModel.modelRuntime;
 
     console.debug(`[PiRuntime] loading isolated resources for session ${sessionId}`);
     const settingsManager = createPiSettingsManager(pi, workspaceRoot);
     const codemodeEnabled =
-      options.codemode === true && !resourceState.chatMode && options.confirmationMode !== 'text';
+      options.codemode === true && !resourceState.chatMode && confirmationMode !== 'text';
     const expertMcpIds = Array.isArray(expertSession?.capabilityPolicy?.mcpIds)
       ? (expertSession.capabilityPolicy.mcpIds as string[])
       : [];
@@ -360,25 +356,30 @@ export async function startPiRuntimeSession(
       sessionOptions.settingsManager = settingsManager;
     }
 
-    const { customTools } = buildPiSessionCustomTools(host, {
-      pi,
-      sessionId,
-      options,
-      resourceState,
-      resolvedModel,
-      workspaceRoot,
-      workbenchRunId,
-      expertIds,
-      abortSignal: abortController.signal,
-      recordActivation,
-    });
+    const customTools = companionChat
+      ? []
+      : (
+          await buildPiSessionCustomTools(host, {
+            pi,
+            sessionId,
+            options,
+            resourceState,
+            resolvedModel,
+            workspaceRoot,
+            workbenchRunId,
+            expertIds,
+            abortSignal: abortController.signal,
+            recordActivation,
+          })
+        ).customTools;
+    if (!isCurrentInitialization()) return;
 
     if (customTools.length > 0) {
       sessionOptions.customTools = customTools;
     }
 
     // Chat mode: disable all built-in tools for direct LLM access
-    if (options.confirmationMode === 'text') {
+    if (confirmationMode === 'text') {
       sessionOptions.noTools = 'all';
     } else {
       const readOnlyWorkspace = options.planMode === true || options.readOnlyWorkspace === true;
@@ -411,8 +412,14 @@ export async function startPiRuntimeSession(
 
     const piSessionCreateStartedAt = Date.now();
     console.debug(`[PiRuntime] creating agent session for ${sessionId}`);
+    nativeAcquisition = Promise.withResolvers<void>();
+    initialization.nativeAcquisition = nativeAcquisition.promise;
+    void nativeAcquisition.promise.catch(error => {
+      console.warn(`[PiRuntime] Failed to dispose an unregistered session ${sessionId}:`, error);
+    });
     const result = await pi.createAgentSession(sessionOptions);
-    const session = result.session;
+    const session = (unregisteredSession = result.session);
+    if (!isCurrentInitialization()) return;
     if (restoredNativeHistory) {
       agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
         source: 'jsonl',
@@ -430,11 +437,7 @@ export async function startPiRuntimeSession(
       await session.bindExtensions({});
     }
     const piSessionCreatedAt = Date.now();
-    if (!isCurrentInitialization()) {
-      void session.abort();
-      session.dispose?.();
-      return;
-    }
+    if (!isCurrentInitialization()) return;
 
     const active: ActivePiSession = {
       sessionId,
@@ -442,7 +445,8 @@ export async function startPiRuntimeSession(
       abortController,
       model: sessionModel,
       modelRuntime: resolvedModel.modelRuntime,
-      modelRequestOptions: resolvedModel.requestOptions,
+      isCurrentModelRoute: resolvedModel.isCurrentModelRoute,
+      revalidateModelScope: resolvedModel.revalidateModelScope,
       codemodeEnabled,
       capabilities: {
         toolCalling: ModelCapabilityStatus.Unknown,
@@ -458,15 +462,7 @@ export async function startPiRuntimeSession(
       requestedModelOverride: options.modelOverride,
       requestedSkillIds: resourceState.skillIds,
       requestedExpertIds: expertIds,
-      turnExperts: (
-        host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false })?.experts ?? []
-      )
-        .filter(expert => expertIds.includes(expert.expertId))
-        .map(expert => ({
-          expertId: expert.expertId,
-          expertName: expert.expertName,
-          presetId: expert.packageId,
-        })),
+      turnExperts,
       resourceState,
       assistantMessageId: null,
       thinkingMessageId: null,
@@ -485,7 +481,7 @@ export async function startPiRuntimeSession(
       piSessionCreatedAt,
       agentStartedAt: null,
       startupLatencyRecorded: false,
-      confirmationMode: options.confirmationMode || 'modal',
+      confirmationMode,
       unsubscribe: () => {},
       aborted: false,
       toolResultMessageIdByCallId: new Map(),
@@ -529,7 +525,7 @@ export async function startPiRuntimeSession(
             host.memoryInjectionDedup.reset(sessionId);
           }
         },
-        event => host.emit('executionEvent', sessionId, event),
+        event => host.emit('executionEvent', sessionId, event, active.workbenchRunId),
         event => host.turnEvents.handlePiEvent(sessionId, active, event),
       ],
       abortController.signal,
@@ -549,12 +545,13 @@ export async function startPiRuntimeSession(
 
     if (!isCurrentInitialization()) {
       active.unsubscribe();
-      void session.abort();
-      session.dispose?.();
       return;
     }
     host.activeSessions.set(sessionId, active);
-    const projectMemoryService = host.getProjectMemoryService();
+    unregisteredSession = undefined;
+    nativeAcquisition.resolve();
+    nativeAcquisition = undefined;
+    const projectMemoryService = companionChat ? null : host.getProjectMemoryService();
     if (projectMemoryService && typeof projectMemoryService.registerSession === 'function') {
       void projectMemoryService
         .registerSession(sessionId, active.workspaceRoot)
@@ -572,48 +569,61 @@ export async function startPiRuntimeSession(
     // A fresh Pi transcript never contains an earlier memory block, so the
     // per-session dedup fingerprint must restart with it.
     host.memoryInjectionDedup.reset(sessionId);
+    const submissionToken = active.submissionToken;
+    const isCurrentTurn = () =>
+      host.activeSessions.get(sessionId) === active &&
+      active.submissionToken === submissionToken &&
+      !abortController.signal.aborted;
     const projectMemoryContext = await resolveProjectMemoryContextForPiPrompt({
       chatMode: resourceState.chatMode,
-      projectMemoryService: host.getProjectMemoryService(),
+      projectMemoryService,
       workspaceRoot,
       sessionId,
       userPrompt: prompt,
       signal: abortController.signal,
     });
-    if (host.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
+    if (!isCurrentTurn()) return;
     active.pendingTurnMemory = { userPrompt: prompt, context: projectMemoryContext };
 
-    // The user may stop the session while the execution-mode question is
-    // open. Do not revive an aborted Pi turn when that question resolves.
-    if (abortController.signal.aborted) return;
-
-    console.debug(`[PiRuntime] dispatching initial prompt for session ${sessionId}`);
-    const initialImagePrompt = preparePiPrompt(
+    const preparation = preparePiPrompt(
       prompt,
-      options.imageAttachments,
+      imageAttachments,
       host.recovery.imageInputVerdictForActive(active),
-      host.getOcrCommandFor(),
+      companionChat ? undefined : host.getOcrCommandFor(),
       collectImagePathReferences(options.fileAttachments),
+      abortController.signal,
     );
+    const initialImagePrompt = preparation instanceof Promise ? await preparation : preparation;
+    if (!isCurrentTurn()) return;
+    console.debug(`[PiRuntime] dispatching initial prompt for session ${sessionId}`);
     host.recovery.reportOmittedImages(sessionId, initialImagePrompt);
     await sendPiPrompt(session, initialImagePrompt, undefined);
   } catch (error) {
+    const cancelled = abortController.signal.aborted;
+    const ownsActiveSession = activeSession && host.activeSessions.get(sessionId) === activeSession;
+    const reportError = isCurrentInitialization() || ownsActiveSession;
     // A stopped turn can immediately restart from the first queued follow-up.
     // Its eventual abort rejection must not delete that replacement session.
-    if (activeSession && host.activeSessions.get(sessionId) === activeSession) {
+    if (ownsActiveSession) {
+      activeSession.artifactRecorder?.dispose();
+      host.stopNativeSession(sessionId, activeSession);
       host.memoryInjectionDedup.reset(sessionId);
       host.activeSessions.delete(sessionId);
     }
     // The stop path already reported cancellation. This promise can finish
     // after a replacement starts under the same session ID.
-    if (abortController.signal.aborted) return;
+    if (cancelled) return;
     const message = error instanceof Error ? error.message : String(error);
-    observeWorkbench(sessionId, () =>
-      host.getWorkbenchTaskService()?.failRun(sessionId, { message }),
-    );
-    host.emit('error', sessionId, classifyCoworkError(message));
+    host.recovery.failWorkbenchRun(sessionId, initialization.workbenchRunId, message);
+    if (reportError) host.recovery.reportSessionError(sessionId, classifyCoworkError(message));
     throw error;
   } finally {
+    try {
+      unregisteredSession?.dispose?.();
+      nativeAcquisition?.resolve();
+    } catch (error) {
+      nativeAcquisition?.reject(error);
+    }
     if (host.initializingSessions.get(sessionId)?.generation === initialization.generation) {
       host.initializingSessions.delete(sessionId);
     }

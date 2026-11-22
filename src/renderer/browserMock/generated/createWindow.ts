@@ -12,24 +12,20 @@ export function createWindow(runtime: BrowserMockRuntime): Window['electron']['w
     close: () => {
       runtime.warnOnce('window.close');
     },
-    isMaximized: async () => {
-      runtime.warnOnce('window.isMaximized');
-      return false;
-    },
     showSystemMenu: _p0 => {
       void _p0;
       runtime.warnOnce('window.showSystemMenu');
     },
-    toggleDevTools: async () => {
-      runtime.warnOnce('window.toggleDevTools');
+    onStateChanged: _p0 => {
+      return runtime.subscribe('window.onStateChanged', _p0);
+    },
+    isMaximized: async () => {
+      runtime.warnOnce('window.isMaximized');
       return false;
     },
     openDevTools: async () => {
       runtime.warnOnce('window.openDevTools');
       return false;
-    },
-    onStateChanged: _p0 => {
-      return runtime.subscribe('window.onStateChanged', _p0);
     },
   };
 }
