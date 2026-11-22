@@ -6,7 +6,7 @@ import {
   type Model,
   type TranscriptContext,
 } from '@earendil-works/pi-ai';
-import { isContextOverflow } from '@earendil-works/pi-ai/compat';
+import { anthropicMessagesApi, isContextOverflow } from '@earendil-works/pi-ai/compat';
 import { estimateContextTokens } from '@earendil-works/pi-ai/utils/estimate';
 import {
   clampMagpieMaxTokensToContext,
@@ -86,6 +86,7 @@ test('wrapMagpieNativeApi handles undefined mocks and prevents 1-token futile re
   const innerStreamSimple = vi.fn((model, _context, options) => {
     const s = createAssistantMessageEventStream();
     expect(model.contextWindow).toBe(0);
+    expect(model.maxTokens).toBe(options?.maxTokens);
     expect(options?.maxTokens).toBeGreaterThan(100);
     s.push({
       type: 'error',
@@ -150,4 +151,62 @@ test('wrapMagpieNativeApi rewrites 5xx llama.cpp overflow fetch responses to 400
     .result();
   expect(capturedStatuses).toEqual([400, 502]);
   expect(isContextOverflow(result, 32768)).toBe(true);
+});
+
+test('wrapMagpieNativeApi keeps anthropic-messages reasoning request max_tokens within safeMaxTokens on small windows', async () => {
+  const capturedBodies: Array<{ max_tokens?: number; thinking?: { budget_tokens?: number } }> = [];
+  const captureFetch = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+    capturedBodies.push(
+      JSON.parse(String(init?.body ?? '{}')) as {
+        max_tokens?: number;
+        thinking?: { budget_tokens?: number };
+      },
+    );
+    return new Response(JSON.stringify({ error: { message: 'stopped in test' } }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' },
+    });
+  });
+
+  const wrapped = wrapMagpieNativeApi(anthropicMessagesApi(), createAssistantMessageEventStream);
+  const anthropicModel: Model<'anthropic-messages'> = {
+    id: 'claude-small-window',
+    name: 'Claude Small Window',
+    api: 'anthropic-messages',
+    provider: 'magpie',
+    baseUrl: 'http://127.0.0.1:8080',
+    input: ['text'],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    reasoning: true,
+    contextWindow: 4096,
+    maxTokens: 4096,
+  };
+
+  // Case 1 (PR #1487 review repro): 2,500 estimated input tokens -> safeMaxTokens = 981.
+  const tightContext = makeContext('a'.repeat(8750));
+  expect(estimateContextTokens(tightContext).tokens).toBe(2500);
+  expect(
+    clampMagpieMaxTokensToContext(anthropicModel, tightContext, anthropicModel.maxTokens),
+  ).toBe(981);
+  await wrapped
+    .streamSimple(anthropicModel, tightContext, {
+      apiKey: 'test-key',
+      reasoning: 'medium',
+      fetch: captureFetch as unknown as typeof fetch,
+    })
+    .result();
+  expect(capturedBodies[0]?.max_tokens).toBe(981);
+
+  // Case 2: 1,000 estimated input tokens -> safeMaxTokens = 2481, thinking budget clamped to 1457 (< 2481).
+  const mediumContext = makeContext('a'.repeat(3500));
+  expect(estimateContextTokens(mediumContext).tokens).toBe(1000);
+  await wrapped
+    .streamSimple(anthropicModel, mediumContext, {
+      apiKey: 'test-key',
+      reasoning: 'medium',
+      fetch: captureFetch as unknown as typeof fetch,
+    })
+    .result();
+  expect(capturedBodies[1]?.max_tokens).toBe(2481);
+  expect(capturedBodies[1]?.thinking?.budget_tokens).toBe(1457);
 });

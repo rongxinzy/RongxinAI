@@ -404,7 +404,9 @@ export function wrapMagpieNativeApi<TApi extends MagpieNativeApiSurface>(
         requestedMaxTokens,
       );
       const bypassUpstreamFixedReserve = model.contextWindow > 0 && upstreamClamped < safeMaxTokens;
-      const upstreamModel = bypassUpstreamFixedReserve ? { ...model, contextWindow: 0 } : model;
+      const upstreamModel = bypassUpstreamFixedReserve
+        ? { ...model, contextWindow: 0, maxTokens: safeMaxTokens }
+        : model;
       const guardedFetch = wrapFetchWithOverflowNormalization(options?.fetch);
       const upstreamOptions = {
         ...options,
