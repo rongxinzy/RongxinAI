@@ -593,7 +593,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                     setInspectorModel(model);
                     setInspectorInitialTab(ModelInspectorTab.Logs);
                   }}
-                  showRegisteredModelsTitle={false}
                 />
               </LayeredTabsContent>
               <LayeredTabsContent

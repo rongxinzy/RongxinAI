@@ -36,14 +36,11 @@ vi.mock('../../services/scheduledTask', () => ({
 }));
 vi.mock('../../services/cowork', () => ({ coworkService: {} }));
 vi.mock('../PageHeader', () => ({
-  default: ({ tabs }: { tabs: ReactNode }) => createElement('header', null, tabs),
+  default: ({ tabs, actions }: { tabs: ReactNode; actions: ReactNode }) =>
+    createElement('header', null, tabs, actions),
 }));
 vi.mock('./TaskList', () => ({ default: () => null }));
 vi.mock('./AllRunsHistory', () => ({ default: () => null }));
-vi.mock('./TaskTemplateGallery', () => ({
-  default: ({ onCustom }: { onCustom: () => void }) =>
-    createElement('button', { onClick: onCustom }, 'custom'),
-}));
 
 beforeEach(() => {
   mocks.state.workspace.currentWorkspaceId = 'current';
@@ -69,7 +66,7 @@ test('a parked sidebar request opens the real form with the requested folder', a
 test('an already mounted view consumes new requests and does not leak the folder into custom creation', async () => {
   const user = userEvent.setup();
   render(createElement(ScheduledTasksView));
-  await screen.findByRole('tab', { name: 'scheduledTasksNewTab' });
+  await screen.findByRole('tab', { name: 'scheduledTasksTabTasks' });
   act(() => requestScheduledTaskCreate({ workspaceId: 'requested' }));
   await waitFor(() =>
     expect(screen.getByRole('combobox', { name: /scheduledTasksFormWorkspace/ })).toHaveTextContent(
@@ -86,8 +83,7 @@ test('an already mounted view consumes new requests and does not leak the folder
   );
   await user.click(screen.getByRole('button', { name: 'cancel' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  await user.click(screen.getByRole('tab', { name: 'scheduledTasksNewTab' }));
-  await user.click(screen.getByRole('button', { name: 'custom' }));
+  await user.click(screen.getByRole('button', { name: 'scheduledTasksNewTask' }));
   await waitFor(() =>
     expect(screen.getByRole('combobox', { name: /scheduledTasksFormWorkspace/ })).toHaveTextContent(
       'current',

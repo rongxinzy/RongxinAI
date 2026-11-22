@@ -2,13 +2,11 @@ import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { AlertCircle, CalendarClock, CheckCircle2, ChevronDown, MessageSquare } from 'lucide-react';
-import { motion, useReducedMotion } from 'motion/react';
+import { AlertCircle, Check, ChevronDown } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { ActivitySource, ActivityStatus } from '../../../shared/activity/constants';
-import { PlatformRegistry, type Platform } from '../../../shared/platform';
-import { imPlatformLogo } from '../../assets/imLogos';
+import { Separator } from '@shared/components/ui/separator';
 import { i18nService } from '../../services/i18n';
 // 2026/09/23 活动失败行复用对话侧的 JSON message 提取，避免直接展示原始 payload
 import { extractUserFacingErrorMessage } from '../../services/coworkTerminalError';
@@ -19,8 +17,6 @@ import { formatActivityClockTime, formatActivityError, formatActivityTime } from
 
 interface ActivityRunRowProps {
   run: ActivityRun;
-  /** Play the entrance spring — reserved for runs arriving while the feed is open. */
-  animateEntrance: boolean;
   currentTime?: number;
 }
 
@@ -35,8 +31,7 @@ const sourceLabel = (run: ActivityRun): string => {
   return run.platform ? i18nService.t(run.platform) : i18nService.t('activityTriggerChannel');
 };
 
-const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, currentTime }) => {
-  const prefersReducedMotion = useReducedMotion();
+const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, currentTime }) => {
   const [bodyExpanded, setBodyExpanded] = useState(false);
   const [isBodyOverflowing, setIsBodyOverflowing] = useState(false);
   const bodyTextRef = useRef<HTMLDivElement>(null);
@@ -51,13 +46,6 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, c
     : run.replyPreview?.trim() || '';
   const hasBody = bodyText.length > 0;
   const hasExpandableBody = hasBody && isBodyOverflowing;
-  const TriggerIcon = run.source === ActivitySource.ScheduledTask ? CalendarClock : MessageSquare;
-  const platform =
-    run.source === ActivitySource.Channel &&
-    PlatformRegistry.platforms.includes(run.platform as Platform)
-      ? (run.platform as Platform)
-      : null;
-
   useEffect(() => {
     if (!hasBody) {
       setIsBodyOverflowing(false);
@@ -95,151 +83,59 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, c
     });
   };
 
-  const row = (
-    <div className="theme-surface-activity-row group relative flex flex-col p-4 transition-colors duration-200">
-      {/* Top Header Row */}
-      <div className="flex items-start gap-3.5 min-w-0">
-        {/* Icon Tile */}
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-surface-raised text-muted-foreground">
-          {platform ? (
-            <img
-              src={imPlatformLogo(platform)}
-              alt={i18nService.t(platform)}
-              className="size-5 rounded object-contain"
-            />
-          ) : (
-            <TriggerIcon className="size-4" />
-          )}
-        </div>
-
-        {/* Title and Meta Information */}
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="truncate text-sm font-semibold text-foreground">
-              {sourceLabel(run)}
-            </span>
-            <Badge variant="secondary" className="shrink-0 font-normal">
-              {run.source === ActivitySource.ScheduledTask
-                ? i18nService.t('activityTriggerCron')
-                : i18nService.t('activityTriggerChannel')}
-            </Badge>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>{formatActivityClockTime(run.updatedAt)}</span>
-            <span className="text-muted-foreground/40">·</span>
-            <span>{formatActivityTime(run.updatedAt, currentTime)}</span>
-          </div>
-        </div>
-
-        {/* Status Badge & Actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          <Badge
-            variant="outline"
-            className={cn(
-              'gap-1.5 font-medium',
-              isRunning && 'border-primary/30 bg-primary/10 text-primary',
-              isFailed && 'border-destructive/30 bg-destructive/10 text-destructive',
-              !isRunning && !isFailed && 'border-success/30 bg-success/10 text-success',
-            )}
-          >
-            {isRunning ? (
-              <Spinner className="size-3 text-primary" />
-            ) : isFailed ? (
-              <AlertCircle className="size-3 text-destructive" />
-            ) : (
-              <CheckCircle2 className="size-3 text-success" />
-            )}
-            <span>
-              {i18nService.t(
-                isRunning
-                  ? 'activityStatusRunning'
-                  : isFailed
-                    ? 'activityStatusFailed'
-                    : 'activityStatusCompleted',
-              )}
-            </span>
-          </Badge>
-
-          {hasExpandableBody && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-7 text-muted-foreground hover:text-foreground"
-              onClick={toggleBodyExpanded}
-              aria-expanded={bodyExpanded}
-              aria-label={
-                bodyExpanded ? i18nService.t('activityCollapse') : i18nService.t('activityExpand')
-              }
-            >
-              <ChevronDown
-                className={cn(
-                  'size-4 transition-transform duration-200 ease-out',
-                  bodyExpanded && 'rotate-180',
-                )}
-              />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Body / Result Preview Box */}
-      {hasBody && (
-        <div
-          className={cn(
-            'mt-3 rounded-lg border border-border/50 bg-muted/20 px-3.5 py-2.5 transition-colors',
-            hasExpandableBody && 'cursor-pointer hover:bg-muted/30',
-          )}
-          onClick={hasExpandableBody ? toggleBodyExpanded : undefined}
+  return (
+    <>
+      <div className="grid grid-cols-[7ch_minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-1 py-3">
+        <time
+          className="theme-control-caption-muted tabular-nums"
+          dateTime={new Date(run.updatedAt).toISOString()}
+          title={formatActivityTime(run.updatedAt, currentTime)}
         >
-          <div
-            ref={bodyTextRef}
-            className={cn(
-              'min-w-0 overflow-hidden text-xs leading-relaxed transition-[max-height] duration-200 ease-out motion-reduce:transition-none',
-              bodyExpanded ? 'max-h-96 overflow-y-auto' : 'max-h-12',
-            )}
-            onClick={event => {
-              if ((event.target as HTMLElement).closest('a, button')) {
-                event.stopPropagation();
-              }
-            }}
-          >
-            <StaticMarkdownContent
-              content={bodyText}
-              className={compactMarkdownClass(isFailed ? 'destructive' : 'muted')}
-            />
-          </div>
-
-          {hasExpandableBody && (
-            <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>
-                {bodyExpanded ? i18nService.t('activityCollapse') : i18nService.t('activityExpand')}
-              </span>
-              <ChevronDown
-                className={cn(
-                  'size-3.5 transition-transform duration-200 ease-out',
-                  bodyExpanded && 'rotate-180',
-                )}
+          {formatActivityClockTime(run.updatedAt)}
+        </time>
+        <span className="theme-heading truncate" title={sourceLabel(run)}>
+          {sourceLabel(run)}
+        </span>
+        <Badge variant="ghost" className="gap-1">
+          {isRunning ? <Spinner /> : isFailed ? <AlertCircle /> : <Check />}
+          {i18nService.t(
+            isRunning
+              ? 'activityStatusRunning'
+              : isFailed
+                ? 'activityStatusFailed'
+                : 'activityStatusCompleted',
+          )}
+        </Badge>
+        {hasBody && (
+          <div className="col-start-2 col-end-4 min-w-0">
+            <div
+              ref={bodyTextRef}
+              className={cn(
+                'overflow-hidden',
+                bodyExpanded ? 'max-h-96 overflow-y-auto' : 'max-h-12',
+              )}
+            >
+              <StaticMarkdownContent
+                content={bodyText}
+                className={compactMarkdownClass(isFailed ? 'destructive' : 'muted')}
               />
             </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-
-  if (prefersReducedMotion) {
-    return row;
-  }
-  return (
-    <motion.div
-      initial={animateEntrance ? { opacity: 0, y: -8 } : false}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-    >
-      {row}
-    </motion.div>
+            {hasExpandableBody && (
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-expanded={bodyExpanded}
+                onClick={toggleBodyExpanded}
+              >
+                {i18nService.t(bodyExpanded ? 'activityCollapse' : 'activityExpand')}
+                <ChevronDown className={cn(bodyExpanded && 'rotate-180')} />
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+      <Separator />
+    </>
   );
 };
 

@@ -87,6 +87,7 @@ export function ComposerToolbar({
   const contextUsage = contextMessage?.metadata?.contextUsage;
   const isPlusToolbar = !remoteManaged;
   const isWorkVariant = showFolderSelector || showPermissionModeSelector;
+  const compactPermission = isCompactToolbar && Boolean(config.sessionId);
   return (
     <PromptInputFooter className="flex-nowrap">
       <PromptInputTools
@@ -153,7 +154,7 @@ export function ComposerToolbar({
         )}
         {isPlusToolbar && (
           <>
-            {!isCompactToolbar && isWorkVariant && (
+            {!compactPermission && isWorkVariant && (
               <PermissionModeMenu
                 value={permissionMode ?? DEFAULT_COWORK_PERMISSION_MODE}
                 onChange={mode => onPermissionModeChange?.(mode)}
@@ -178,7 +179,7 @@ export function ComposerToolbar({
           </>
         )}
       </PromptInputTools>
-      {isPlusToolbar && (showModelSelector || (isCompactToolbar && isWorkVariant)) && (
+      {isPlusToolbar && (showModelSelector || (compactPermission && isWorkVariant)) && (
         <div className="flex min-w-0 shrink-0 items-center gap-1.5">
           {showModelSelector && (
             <>
@@ -207,7 +208,7 @@ export function ComposerToolbar({
               />
             </>
           )}
-          {isCompactToolbar && isWorkVariant && (
+          {compactPermission && isWorkVariant && (
             <PermissionModeMenu
               value={permissionMode ?? DEFAULT_COWORK_PERMISSION_MODE}
               onChange={mode => onPermissionModeChange?.(mode)}

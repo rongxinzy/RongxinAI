@@ -1,5 +1,4 @@
 import { Button } from '@shared/components/ui/button';
-import { CardDescription, CardTitle } from '@shared/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -74,25 +73,29 @@ export function MarketplaceModelCardView({
   const capabilities = getMarketplaceCapabilityTags(model);
   const { icon: FitIcon, tone } = fitPresentation[model.fit?.status ?? 'unknown'];
 
+  const actionLabel = i18nService.t(
+    isDownloadActive
+      ? 'marketplaceDownloadInProgress'
+      : installable
+        ? 'marketplaceInstall'
+        : 'marketplaceVerifyAndInstall',
+  );
   return (
     <MarketplaceCardLayout
-      header={
-        <>
-          <span
-            aria-hidden="true"
-            className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-          >
+      name={
+        <div className="flex min-w-0 items-center gap-3">
+          <span aria-hidden="true" className="theme-control-muted shrink-0">
             <MarketplaceModelIcon name={displayName} />
           </span>
-          <div className="min-w-0 flex-1">
-            <CardTitle className="theme-market-card-title">
+          <div className="min-w-0">
+            <div className="theme-heading flex min-w-0 items-center gap-1.5">
               {model.detailUrl ? (
                 <a
                   href={model.detailUrl}
                   target="_blank"
                   rel="noreferrer"
                   title={displayName}
-                  className="theme-surface-market-link line-clamp-2 break-all"
+                  className="theme-surface-market-link truncate"
                   onClick={event => {
                     event.preventDefault();
                     onOpenModel();
@@ -101,95 +104,94 @@ export function MarketplaceModelCardView({
                   {displayName}
                 </a>
               ) : (
-                <span className="line-clamp-2 break-all" title={displayName}>
+                <span className="truncate" title={displayName}>
                   {displayName}
                 </span>
               )}
-            </CardTitle>
-            <CardDescription className="theme-market-card-description mt-1 flex min-w-0 items-center gap-1.5">
-              <span className="truncate" title={publisher ?? undefined}>
-                {publisher
-                  ? `${i18nService.t('marketplacePublisherLabel')}${publisher}`
-                  : MARKETPLACE_GGUF_FORMAT}
-              </span>
-              {model.metadataStatus === 'verified' ? (
-                <BadgeCheck className="size-3.5 shrink-0" aria-hidden="true" />
-              ) : null}
-            </CardDescription>
-          </div>
-          <MarketplaceModelDetails model={model} details={details} />
-        </>
-      }
-      footer={
-        <>
-          {variants.length > 0 ? (
-            <div className="min-w-0 flex-1 basis-40">
-              <Select
-                value={selectedVariant?.id ?? ''}
-                onValueChange={value => {
-                  if (value) onSelectVariant(value);
-                }}
-              >
-                <SelectTrigger
-                  aria-label={i18nService.t('marketplaceSelectQuantization')}
-                  className="w-full min-w-0"
-                >
-                  <SelectValue className="min-w-0 truncate">
-                    {selectedVariant ? variantLabel(selectedVariant) : MARKETPLACE_GGUF_FORMAT}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent
-                  side="bottom"
-                  sideOffset={4}
-                  alignItemWithTrigger={false}
-                  data-marketplace-model-select="true"
-                  className="max-h-40"
-                >
-                  <SelectGroup>
-                    {variants.map(variant => (
-                      <SelectItem key={variant.id} value={variant.id}>
-                        {variantLabel(variant)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              {model.metadataStatus === 'verified' && (
+                <BadgeCheck
+                  className="theme-control-muted size-3.5 shrink-0"
+                  aria-label={publisher ?? undefined}
+                />
+              )}
             </div>
-          ) : null}
-          <Button
-            type="button"
-            variant={isDownloadActive ? 'secondary' : 'outline'}
-            className="ml-auto min-w-20"
-            disabled={!isDownloadActive && loading}
-            onClick={isDownloadActive ? onOpenDownload : onInstall}
-          >
-            <Download data-icon="inline-start" />
-            {isDownloadActive
-              ? i18nService.t('marketplaceDownloadInProgress')
-              : installable
-                ? i18nService.t('marketplaceInstall')
-                : i18nService.t('marketplaceVerifyAndInstall')}
-          </Button>
-        </>
+            <div
+              className="theme-control-caption-muted mt-1 truncate"
+              title={[publisher, model.description, ...capabilities.map(capabilityLabel)]
+                .filter(Boolean)
+                .join(' · ')}
+            >
+              {model.description ||
+                [publisher, ...capabilities.map(capabilityLabel)].filter(Boolean).join(' · ')}
+            </div>
+          </div>
+        </div>
       }
-    >
-      {model.description ? (
-        <p
-          className="line-clamp-2 w-full text-sm leading-relaxed text-muted-foreground"
-          title={model.description}
-        >
-          {model.description}
-        </p>
-      ) : null}
-      <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-2">
-        <p className="min-h-5 break-words text-xs leading-5 text-muted-foreground">
-          {[MARKETPLACE_GGUF_FORMAT, ...capabilities.map(capabilityLabel)].join(' · ')}
-        </p>
-        <div className={cn('flex min-h-5 items-center gap-1.5 text-xs', tone)}>
+      quantization={
+        variants.length > 1 ? (
+          <Select
+            value={selectedVariant?.id ?? ''}
+            onValueChange={value => {
+              if (value) onSelectVariant(value);
+            }}
+          >
+            <SelectTrigger
+              aria-label={i18nService.t('marketplaceSelectQuantization')}
+              className="w-full min-w-0"
+            >
+              <SelectValue className="min-w-0 truncate">
+                {selectedVariant
+                  ? (selectedVariant.quantization ?? MARKETPLACE_GGUF_FORMAT)
+                  : MARKETPLACE_GGUF_FORMAT}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent
+              side="bottom"
+              sideOffset={4}
+              alignItemWithTrigger={false}
+              data-marketplace-model-select="true"
+              className="max-h-40"
+            >
+              <SelectGroup>
+                {variants.map(variant => (
+                  <SelectItem key={variant.id} value={variant.id}>
+                    {variantLabel(variant)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        ) : selectedVariant ? (
+          <span className="theme-control-caption-muted" title={variantLabel(selectedVariant)}>
+            {selectedVariant.quantization ?? MARKETPLACE_GGUF_FORMAT}
+          </span>
+        ) : (
+          '—'
+        )
+      }
+      size={selectedVariant?.totalSizeBytes ? formatBytes(selectedVariant.totalSizeBytes) : '—'}
+      fit={
+        <div className={cn('theme-control-caption flex items-center gap-1', tone)}>
           <FitIcon className="size-3.5 shrink-0" aria-hidden="true" />
           <span>{marketplaceFitLabel(model.fit?.status)}</span>
         </div>
-      </div>
-    </MarketplaceCardLayout>
+      }
+      actions={
+        <>
+          <MarketplaceModelDetails model={model} details={details} />
+          <Button
+            type="button"
+            size="icon"
+            variant={isDownloadActive ? 'secondary' : 'ghost'}
+            title={actionLabel}
+            disabled={!isDownloadActive && loading}
+            onClick={isDownloadActive ? onOpenDownload : onInstall}
+          >
+            <Download />
+            <span className="sr-only">{actionLabel}</span>
+          </Button>
+        </>
+      }
+    />
   );
 }

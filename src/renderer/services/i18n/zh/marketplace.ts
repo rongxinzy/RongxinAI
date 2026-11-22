@@ -62,6 +62,7 @@ export const zhMarketplace: Record<string, string> = {
   marketplaceRepoLabel: '仓库',
   marketplaceDetails: '详细信息',
   marketplacePublisherLabel: '发布者：',
+  marketplaceDownloadSize: '下载大小',
   marketplaceModelSizeLabel: '模型大小',
   marketplaceRecommendedQuantizationLabel: '推荐量化',
   marketplaceFormatLabel: '格式',

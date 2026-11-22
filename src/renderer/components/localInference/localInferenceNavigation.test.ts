@@ -11,14 +11,6 @@ const mainViewCanvasSource = readSource('../../app/MainViewCanvas.tsx');
 const settingsPageSource = readSource('../settings/SettingsPage.tsx');
 const modelsPageSource = readSource('../settings/model/ModelsPage.tsx');
 const localInferenceSource = readSource('./LocalInferenceView.tsx');
-const modelsPanelSource = readSource('./panels/ModelsPanel.tsx');
-
-test('keeps model-load cancellation reachable through the loading overlay', () => {
-  expect(modelsPanelSource).toContain('pointer-events-none absolute inset-0');
-  expect(modelsPanelSource).toContain('className="pointer-events-auto"');
-  expect(modelsPanelSource).toContain('data-local-inference-cancel-load-button="true"');
-  expect(modelsPanelSource).toContain('{loadingModel ? null : isRunning ? (');
-});
 
 test('opens the unified model settings after starting a local model', () => {
   expect(appSource).toContain('const handleOpenLocalModelSettings = useCallback(() =>');

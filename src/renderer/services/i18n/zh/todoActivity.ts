@@ -5,6 +5,7 @@ export const zhTodoActivity: Record<string, string> = {
   activityHeroDesc: '渠道消息与定时任务的每一次运行',
   activityTriggerChannel: '渠道消息',
   activityTriggerCron: '定时任务',
+  activityAllStatuses: '全部状态',
   activityFilterAll: '全部',
   activityStatusRunning: '进行中',
   activityStatusCompleted: '成功',

@@ -1,35 +1,59 @@
-import { Card, CardContent, CardFooter, CardHeader } from '@shared/components/ui/card';
+import { Separator } from '@shared/components/ui/separator';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import type { ReactNode } from 'react';
+import { i18nService } from '../../../services/i18n';
 
-/** Shared geometry for loaded cards and placeholders; no model or service state. */
+const columns =
+  'grid items-center gap-x-4 gap-y-2 py-4 grid-cols-[minmax(0,1fr)_auto] @min-[43rem]/marketplace:grid-cols-[minmax(0,1fr)_7rem_5rem_6rem_4.5rem]';
+
+export function MarketplaceListHeader() {
+  return (
+    <div className={`theme-control-caption-muted ${columns} hidden @min-[43rem]/marketplace:grid`}>
+      {[
+        'model',
+        'localInferenceQuantization',
+        'marketplaceDownloadSize',
+        'marketplaceFitLabel',
+      ].map(label => (
+        <span key={label}>{i18nService.t(label)}</span>
+      ))}
+    </div>
+  );
+}
+
 export function MarketplaceCardLayout({
-  header,
-  children,
-  footer,
+  name,
+  quantization,
+  size,
+  fit,
+  actions,
   loading = false,
 }: {
-  header: ReactNode;
-  children: ReactNode;
-  footer: ReactNode;
+  name: ReactNode;
+  quantization: ReactNode;
+  size: ReactNode;
+  fit: ReactNode;
+  actions: ReactNode;
   loading?: boolean;
 }) {
   return (
-    <Card
+    <div
       data-marketplace-model-card={loading ? undefined : 'true'}
       aria-hidden={loading || undefined}
-      className="theme-market-card h-full min-w-0 gap-4"
     >
-      <CardHeader className="theme-control-sizing-20 theme-market-card-header flex min-w-0 flex-row items-start gap-3">
-        {header}
-      </CardHeader>
-      <CardContent className="theme-market-card-content flex min-w-0 flex-col gap-2">
-        {children}
-      </CardContent>
-      <CardFooter className="theme-market-card-footer mt-auto flex min-w-0 flex-wrap items-center gap-2">
-        {footer}
-      </CardFooter>
-    </Card>
+      <div className={columns}>
+        <div className="min-w-0">{name}</div>
+        <div className="flex items-center gap-3 @min-[43rem]/marketplace:contents">
+          <div className="min-w-0">{quantization}</div>
+          <span className="theme-control-caption-muted whitespace-nowrap tabular-nums">{size}</span>
+        </div>
+        <div className="justify-self-end @min-[43rem]/marketplace:justify-self-start">{fit}</div>
+        <div className="col-start-2 row-start-1 flex items-center justify-end @min-[43rem]/marketplace:col-auto @min-[43rem]/marketplace:row-auto">
+          {actions}
+        </div>
+      </div>
+      <Separator />
+    </div>
   );
 }
 
@@ -37,28 +61,11 @@ export function MarketplaceModelCardSkeleton() {
   return (
     <MarketplaceCardLayout
       loading
-      header={
-        <>
-          <Skeleton className="theme-scene-market-loading shrink-0" />
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-4 w-24" />
-          </div>
-          <Skeleton className="size-8 shrink-0" />
-        </>
-      }
-      footer={
-        <>
-          <Skeleton className="h-8 min-w-0 flex-1" />
-          <Skeleton className="h-8 w-24 shrink-0" />
-        </>
-      }
-    >
-      <Skeleton className="h-4 w-full" />
-      <div className="flex w-full items-center justify-between gap-2">
-        <Skeleton className="h-4 w-28" />
-        <Skeleton className="h-4 w-20" />
-      </div>
-    </MarketplaceCardLayout>
+      name={<Skeleton className="h-5 w-3/4" />}
+      quantization={<Skeleton className="h-6 w-20" />}
+      size={<Skeleton className="h-4 w-12" />}
+      fit={<Skeleton className="h-4 w-16" />}
+      actions={<Skeleton className="size-7" />}
+    />
   );
 }

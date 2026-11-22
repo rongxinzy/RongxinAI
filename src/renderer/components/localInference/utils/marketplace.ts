@@ -332,7 +332,7 @@ export function groupMarketplaceVariants(
   }
   const variants: MarketplaceVariant[] = standalone.map(file => ({
     id: file.path,
-    quantization: extractQuantization(file.path),
+    quantization: extractQuantization(file.path) ?? (file.quantization?.trim() || null),
     files: [file],
     totalSizeBytes: file.sizeBytes ?? 0,
     isSplit: false,
@@ -344,7 +344,7 @@ export function groupMarketplaceVariants(
     );
     variants.push({
       id: key,
-      quantization: extractQuantization(key.split('/').at(-1) ?? key),
+      quantization: extractQuantization(key) ?? (sorted[0]?.quantization?.trim() || null),
       files: sorted,
       totalSizeBytes: group.reduce((sum, file) => sum + (file.sizeBytes ?? 0), 0),
       isSplit: true,

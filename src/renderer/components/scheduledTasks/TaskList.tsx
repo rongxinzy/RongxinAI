@@ -1,7 +1,8 @@
 import { Alert, AlertDescription, AlertTitle } from '@shared/components/ui/alert';
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { Card } from '@shared/components/ui/card';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@shared/components/ui/empty';
+import { Separator } from '@shared/components/ui/separator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,15 +12,7 @@ import {
 import { Switch } from '@shared/components/ui/switch';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import {
-  CalendarClock,
-  CircleAlert,
-  EllipsisVertical,
-  Folder,
-  MessageCirclePlus,
-  Plus,
-  RefreshCw,
-} from 'lucide-react';
+import { CircleAlert, EllipsisVertical, RefreshCw } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -28,10 +21,8 @@ import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
 import { getLastPathSegment } from '../../utils/path';
-import { TASK_TEMPLATES, type TaskTemplateValues } from './TaskTemplateGallery';
 import {
   formatDuration,
-  formatNextRunRelative,
   formatScheduleLabel,
   getStatusLabelKey,
   getStatusTextClass,
@@ -85,13 +76,13 @@ function useDeliveryFailure(task: ScheduledTask): string | null {
   return failure;
 }
 
+const taskRowLayout =
+  'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 py-3 @min-[44rem]:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_5rem]';
 const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRequestEdit }) => {
   const isRunning = task.state.runningAtMs !== null;
   const displayStatus = isRunning ? 'running' : task.state.lastStatus;
   const statusLabel = i18nService.t(getStatusLabelKey(displayStatus));
-  const nextRunLabel = task.enabled
-    ? formatNextRunRelative(computeNextRunAtMs(task.schedule, Date.now()))
-    : null;
+  const nextRun = task.enabled ? computeNextRunAtMs(task.schedule, Date.now()) : null;
   const deliveryFailure = useDeliveryFailure(task);
 
   const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
@@ -105,46 +96,42 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
   const displayText = task.description || promptPreview;
 
   return (
-    <Card className="theme-page-task-list-card-1 flex flex-col gap-2 p-3 transition-colors">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="size-8 rounded-lg bg-surface-raised flex items-center justify-center shrink-0 text-muted-foreground">
-          <CalendarClock className="size-4" />
+    <>
+      <div className={taskRowLayout}>
+        <div className="min-w-0">
+          <div className="theme-heading truncate" title={task.name}>
+            {task.name}
+          </div>
+          {displayText && (
+            <div className="theme-control-caption-muted truncate" title={displayText}>
+              {displayText}
+            </div>
+          )}
+          {workspaceName && (
+            <div className="theme-control-caption-muted truncate">{workspaceName}</div>
+          )}
         </div>
-
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              className={cn(
-                'truncate text-sm font-medium',
-                task.enabled
-                  ? 'theme-page-task-list-card-title-variant-1'
-                  : 'theme-page-task-list-card-title-variant-2',
-              )}
-            >
-              {task.name}
+        <div className="col-span-full min-w-0 break-words @min-[44rem]:col-span-1">
+          {formatScheduleLabel(task.schedule)}
+        </div>
+        <div className="theme-control-caption-muted tabular-nums">
+          <span className="@min-[44rem]:hidden">{i18nService.t('scheduledTasksNextRun')} · </span>
+          {nextRun === null
+            ? '—'
+            : new Date(nextRun).toLocaleString(i18nService.getLanguage(), {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-1 @min-[44rem]:justify-start">
+          <span className={getStatusTextClass(displayStatus)}>{statusLabel}</span>
+          {task.state.lastDurationMs !== null && (
+            <span className="theme-control-caption-muted">
+              {formatDuration(task.state.lastDurationMs)}
             </span>
-            {workspaceName && (
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground shrink-0 rounded px-1.5 py-0.5 bg-muted/60">
-                <Folder className="size-3" />
-                <span className="truncate max-w-[120px]">{workspaceName}</span>
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-mono">{formatScheduleLabel(task.schedule)}</span>
-            {nextRunLabel && <span>· {nextRunLabel}</span>}
-            {task.state.lastDurationMs !== null && (
-              <span>· {formatDuration(task.state.lastDurationMs)}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <Badge className={getStatusTextClass(displayStatus)} variant="outline">
-            {statusLabel}
-          </Badge>
-
+          )}
           {deliveryFailure !== null && (
             <Badge
               variant="outline"
@@ -154,20 +141,15 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
               {i18nService.t('scheduledTasksDeliveryFailed')}
             </Badge>
           )}
-
-          <div
-            onClick={e => e.stopPropagation()}
-            onPointerDown={e => e.stopPropagation()}
-            onMouseDown={e => e.stopPropagation()}
-            className="shrink-0"
-          >
-            <Switch
-              checked={task.enabled}
-              onCheckedChange={(checked: boolean) => {
-                void scheduledTaskService.toggleTask(task.id, checked);
-              }}
-            />
-          </div>
+        </div>
+        <div className="col-start-2 row-start-1 flex items-center justify-end gap-1 @min-[44rem]:col-auto @min-[44rem]:row-auto">
+          <Switch
+            aria-label={i18nService.t('scheduledTasksToggleTask').replace('{name}', task.name)}
+            checked={task.enabled}
+            onCheckedChange={(checked: boolean) => {
+              void scheduledTaskService.toggleTask(task.id, checked);
+            }}
+          />
 
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -222,10 +204,8 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
         </div>
       </div>
 
-      {displayText && (
-        <p className="text-xs text-muted-foreground line-clamp-1 pl-11 pr-2">{displayText}</p>
-      )}
-    </Card>
+      <Separator />
+    </>
   );
 };
 
@@ -234,18 +214,9 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
 interface TaskListProps {
   onRequestDelete: (taskId: string, taskName: string) => void;
   onRequestEdit: (taskId: string) => void;
-  onCreateTask?: () => void;
-  onCreateByChat?: () => void;
-  onSelectTemplate?: (values: TaskTemplateValues) => void;
 }
 
-const TaskList: React.FC<TaskListProps> = ({
-  onRequestDelete,
-  onRequestEdit,
-  onCreateTask,
-  onCreateByChat,
-  onSelectTemplate,
-}) => {
+const TaskList: React.FC<TaskListProps> = ({ onRequestDelete, onRequestEdit }) => {
   const tasks = useSelector((state: RootState) => state.scheduledTask.tasks);
   const loading = useSelector((state: RootState) => state.scheduledTask.loading);
   const listError = useSelector((state: RootState) => state.scheduledTask.listError);
@@ -275,91 +246,34 @@ const TaskList: React.FC<TaskListProps> = ({
 
   if (tasks.length === 0 && !listError) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-        <div className="size-10 rounded-xl bg-surface-raised flex items-center justify-center text-muted-foreground mb-3">
-          <CalendarClock className="size-5" />
-        </div>
-        <h3 className="text-base font-semibold text-foreground mb-1">
-          {i18nService.t('scheduledTasksEmptyState')}
-        </h3>
-        <p className="text-sm text-muted-foreground max-w-md mb-5">
-          {i18nService.t('scheduledTasksEmptyHint')}
-        </p>
-
-        <div className="flex flex-wrap items-center justify-center gap-2.5 mb-8">
-          {onCreateTask && (
-            <Button type="button" size="sm" onClick={onCreateTask} className="gap-1.5">
-              <Plus className="size-4" />
-              <span>{i18nService.t('scheduledTasksNewTask')}</span>
-            </Button>
-          )}
-          {onCreateByChat && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onCreateByChat}
-              className="gap-1.5"
-            >
-              <MessageCirclePlus className="size-4" />
-              <span>{i18nService.t('scheduledTasksCreateByChat')}</span>
-            </Button>
-          )}
-        </div>
-
-        {onSelectTemplate && (
-          <div className="w-full max-w-xl text-left border-t border-border-subtle pt-6">
-            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-              {i18nService.t('taskTemplateSectionTitle')}
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {TASK_TEMPLATES.map(tpl => (
-                <button
-                  type="button"
-                  key={tpl.id}
-                  onClick={() =>
-                    onSelectTemplate({
-                      name: i18nService.t(tpl.nameKey as Parameters<typeof i18nService.t>[0]),
-                      description: i18nService.t(
-                        tpl.descKey as Parameters<typeof i18nService.t>[0],
-                      ),
-                      schedule: tpl.schedule,
-                      promptText: i18nService.t(
-                        tpl.promptTextKey as Parameters<typeof i18nService.t>[0],
-                      ),
-                    })
-                  }
-                  className="group flex flex-col justify-between p-3 rounded-lg border border-border bg-card hover:bg-surface-raised cursor-pointer text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <div className="flex items-start gap-2.5 mb-2">
-                    <div className="size-7 rounded-md bg-surface-raised flex items-center justify-center text-muted-foreground shrink-0 group-hover:text-foreground">
-                      <tpl.icon className="size-3.5" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-medium text-foreground truncate">
-                        {i18nService.t(tpl.nameKey as Parameters<typeof i18nService.t>[0])}
-                      </div>
-                      <div className="text-xs text-muted-foreground line-clamp-1">
-                        {i18nService.t(tpl.descKey as Parameters<typeof i18nService.t>[0])}
-                      </div>
-                    </div>
-                  </div>
-                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <CalendarClock className="size-3" />
-                    {i18nService.t(tpl.scheduleLabelKey as Parameters<typeof i18nService.t>[0])}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyTitle>{i18nService.t('scheduledTasksEmptyState')}</EmptyTitle>
+          <EmptyDescription>{i18nService.t('scheduledTasksEmptyHint')}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="@container">
       {loadErrorAlert}
+      {tasks.length > 0 && (
+        <div
+          className={cn(taskRowLayout, 'theme-control-caption-muted hidden @min-[44rem]:grid')}
+          aria-hidden="true"
+        >
+          {[
+            'scheduledTasksFormName',
+            'scheduledTasksSchedule',
+            'scheduledTasksNextRun',
+            'scheduledTasksStatus',
+            'scheduledTasksEnabled',
+          ].map(key => (
+            <span key={key}>{i18nService.t(key)}</span>
+          ))}
+        </div>
+      )}
       {tasks.map(task => (
         <TaskListItem
           key={task.id}

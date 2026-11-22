@@ -65,6 +65,7 @@ export const enMarketplace: Record<string, string> = {
   marketplaceRepoLabel: 'Repository',
   marketplaceDetails: 'Details',
   marketplacePublisherLabel: 'Publisher:',
+  marketplaceDownloadSize: 'Download size',
   marketplaceModelSizeLabel: 'Model Size',
   marketplaceRecommendedQuantizationLabel: 'Recommended Quantization',
   marketplaceFormatLabel: 'Format',

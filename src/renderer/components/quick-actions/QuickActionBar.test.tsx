@@ -10,7 +10,7 @@ afterEach(cleanup);
 
 const mockActions = [
   {
-    id: 'slides',
+    id: 'pptx',
     label: '制作幻灯片',
     icon: 'Presentation',
     color: '#000000',
@@ -18,7 +18,7 @@ const mockActions = [
     prompts: [],
   },
   {
-    id: 'data',
+    id: 'data-analysis',
     label: '分析数据',
     icon: 'ChartColumn',
     color: '#000000',
@@ -46,7 +46,7 @@ test('renders quick action buttons and calls onActionSelect', async () => {
   expect(screen.getByRole('button', { name: '搭建网站' })).toBeDefined();
 
   await user.click(screen.getByRole('button', { name: '制作幻灯片' }));
-  expect(onSelect).toHaveBeenCalledWith('slides');
+  expect(onSelect).toHaveBeenCalledWith('pptx');
 });
 
 test('returns null when actions is empty', () => {
@@ -54,12 +54,14 @@ test('returns null when actions is empty', () => {
   expect(container.firstChild).toBeNull();
 });
 
-test('applies single-line desktop centering flex layout classes', () => {
-  const { container } = render(<QuickActionBar actions={mockActions} onActionSelect={vi.fn()} />);
-  const gridContainer = container.querySelector('.grid');
-  expect(gridContainer).not.toBeNull();
-  expect(gridContainer?.className).toContain('xl:flex');
-  expect(gridContainer?.className).toContain('xl:items-center');
-  expect(gridContainer?.className).toContain('xl:justify-center');
-  expect(gridContainer?.className).not.toContain('@4xl');
+test('opens the remaining actions from the suggestions menu', async () => {
+  const user = userEvent.setup();
+  const onSelect = vi.fn();
+  const actions = [...mockActions, { ...mockActions[0], id: 'docs', label: '撰写文档' }];
+  render(<QuickActionBar actions={actions} onActionSelect={onSelect} />);
+  expect(screen.getByRole('button', { name: '撰写文档' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: '搭建网站' })).toBeNull();
+  await user.click(screen.getByRole('button', { name: /更多建议|More suggestions/ }));
+  await user.click(await screen.findByRole('menuitem', { name: '搭建网站' }));
+  expect(onSelect).toHaveBeenCalledWith('web');
 });
