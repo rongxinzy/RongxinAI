@@ -140,7 +140,9 @@ describe('parseExpertPackage', () => {
         dbPath: path.join(userData, 'zhiyuan.sqlite'),
         shouldUpdate,
       });
-      expect(read.mock.calls.filter(([file]) => file === fs.realpathSync(manifest))).toHaveLength(1);
+      expect(read.mock.calls.filter(([file]) => file === fs.realpathSync(manifest))).toHaveLength(
+        1,
+      );
       expect(shouldUpdate).toHaveBeenCalledExactlyOnceWith(pluginJson.name);
       expect(pluginJson.version).toBe('2.0.0');
       expect(fs.readFileSync(installedSkill, 'utf-8')).toBe(fs.readFileSync(shippedSkill, 'utf-8'));

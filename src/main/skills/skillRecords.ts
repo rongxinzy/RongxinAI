@@ -110,7 +110,7 @@ const getSkillIconDataUrl = (iconPath: string): string | undefined => {
   }
 };
 
-export function parseSkillDir(
+function parseSkillDir(
   dir: string,
   state: SkillStateMap,
   defaults: Record<string, SkillDefaultConfig>,

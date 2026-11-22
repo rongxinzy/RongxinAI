@@ -10,7 +10,8 @@ import { ProjectMemoryService } from './memory/projectMemoryService';
 import { MemoryRepository } from './memory/repository';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from './workbenchTask/schema';
-import { WorkbenchRunTrigger } from '../shared/workbenchTask';
+import { WorkbenchContractKind, WorkbenchRunTrigger } from '../shared/workbenchTask';
+import { HarnessVersion } from '../shared/harness';
 
 let harness: ReturnType<typeof createCoworkStoreHarness>;
 let im: IMStore;
@@ -134,7 +135,22 @@ test.each([
 ])('restores the workspace graph when %s rejects the transaction', async (table, operation) => {
   const { db, store } = harness;
   const { workspace, first, second } = arrangeWorkspace();
-  const { task, run } = workbench.beginRun({ sessionId: first.id, goal: 'Preserve this run' });
+  const { task, run } = workbench.beginRun(
+    { sessionId: first.id, goal: 'Preserve this run' },
+    {
+      context: {
+        model: 'fixture/model',
+        provider: 'fixture',
+        reasoningProfile: 'default',
+        workspaceRoot: workspace.path,
+        skillIds: [],
+      },
+      profile: {
+        workflowKind: WorkbenchContractKind.GenericWork,
+        harnessVersion: HarnessVersion,
+      },
+    },
+  );
   workbench.settleObservedRun({ sessionId: first.id, runId: run.id });
   const changed = vi.fn();
   workbench.on('changed', changed);

@@ -27,7 +27,7 @@ interface McpPresentation {
   en?: McpPresentationLocale;
 }
 
-export interface BundledMcpMarketplace {
+interface BundledMcpMarketplace {
   categories: Array<{ id: string; name_zh: string; name_en: string }>;
   servers: Array<Record<string, unknown>>;
 }

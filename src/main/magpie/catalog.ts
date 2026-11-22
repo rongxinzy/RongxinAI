@@ -9,7 +9,7 @@ export function magpieImageInput(model: MagpieModel): ModelCapabilityStatus {
     : ModelCapabilityStatus.Unsupported;
 }
 
-export const MAGPIE_CONVERSATION_ENDPOINTS: ReadonlySet<string> = new Set([
+const MAGPIE_CONVERSATION_ENDPOINTS: ReadonlySet<string> = new Set([
   '/v1/chat/completions',
   '/v1/responses',
   '/v1/messages',

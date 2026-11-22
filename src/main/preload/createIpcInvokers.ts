@@ -8,7 +8,11 @@
  * the contract via `IpcContractChannels<typeof contract>`.
  */
 import { ipcRenderer } from 'electron';
-import type { IpcContractChannels, IpcEventApi, IpcEventDefinition } from '../../shared/ipc/contract';
+import type {
+  IpcContractChannels,
+  IpcEventApi,
+  IpcEventDefinition,
+} from '../../shared/ipc/contract';
 
 export function createIpcInvokers<Channels extends Record<string, string>>(
   channels: Channels,
@@ -21,9 +25,9 @@ export function createIpcInvokers<Channels extends Record<string, string>>(
   return invokers;
 }
 
-export function createIpcEventSenders<Contract extends Readonly<Record<string, IpcEventDefinition>>>(
-  channels: IpcContractChannels<Contract>,
-): IpcEventApi<Contract> {
+export function createIpcEventSenders<
+  Contract extends Readonly<Record<string, IpcEventDefinition>>,
+>(channels: IpcContractChannels<Contract>): IpcEventApi<Contract> {
   return Object.fromEntries(
     Object.entries<string>(channels).map(([name, channel]) => [
       name,

@@ -8,7 +8,7 @@ import type {
 } from '../../shared/cowork/constants';
 import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
 
-export type CoworkSessionStatus = 'idle' | 'running' | 'completed' | 'error';
+type CoworkSessionStatus = 'idle' | 'running' | 'completed' | 'error';
 export type CoworkMessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system';
 
 export type AgentSource = 'custom' | 'preset' | 'expert-package' | 'expert-package-member';

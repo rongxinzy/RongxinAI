@@ -1,4 +1,3 @@
-export { buildAnthropicMessagesUrl } from './apiUrl';
 export type { ModelCapabilities } from './constants';
 export {
   ApiFormat,

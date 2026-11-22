@@ -172,6 +172,14 @@ describe('SkillWatcher recursive watching', () => {
     const second = makeRootDir();
     let roots = [first];
     const watchSpy = vi.spyOn(fs, 'watch');
+    const recursiveWatchCallsFor = (target: string) =>
+      watchSpy.mock.calls.filter(
+        ([root, options]) =>
+          root === target &&
+          typeof options === 'object' &&
+          options !== null &&
+          (options as fs.WatchOptions).recursive === true,
+      );
     const watcher = new SkillWatcher(() => roots);
     try {
       watcher.startWatching();
@@ -179,12 +187,12 @@ describe('SkillWatcher recursive watching', () => {
       roots = [first, second];
       watcher.startWatching();
       expect(closeFirst).not.toHaveBeenCalled();
-      expect(watchSpy.mock.calls.filter(([root]) => root === first)).toHaveLength(1);
-      expect(watchSpy.mock.calls.filter(([root]) => root === second)).toHaveLength(1);
+      expect(recursiveWatchCallsFor(first)).toHaveLength(1);
+      expect(recursiveWatchCallsFor(second)).toHaveLength(1);
       roots = [second];
       watcher.startWatching();
       expect(closeFirst).toHaveBeenCalledOnce();
-      expect(watchSpy.mock.calls.filter(([root]) => root === second)).toHaveLength(1);
+      expect(recursiveWatchCallsFor(second)).toHaveLength(1);
     } finally {
       watcher.stopWatching();
     }

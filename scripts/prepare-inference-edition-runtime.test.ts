@@ -1,13 +1,9 @@
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 
-const require = createRequire(import.meta.url);
-const { copyRuntimeTree } = require('./prepare-inference-edition-runtime.cjs') as {
-  copyRuntimeTree: (sourceRoot: string, targetRoot: string) => void;
-};
+import { copyRuntimeTree } from './prepare-inference-edition-runtime.cjs';
 
 const roots: string[] = [];
 

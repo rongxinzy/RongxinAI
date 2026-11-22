@@ -368,10 +368,6 @@ export interface CodingGitDiffInput extends CodingGitTargetInput {
   scope: CodingGitDiffScope;
 }
 
-export interface CodingGitPathActionInput extends CodingGitTargetInput {
-  paths: string[];
-}
-
 export interface CodingWorkspaceFileInput extends CodingGitTargetInput {
   /** A path relative to the selected coding source root. */
   path?: string;

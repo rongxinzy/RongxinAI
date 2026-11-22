@@ -243,7 +243,7 @@ async function transferModelFile(
   }
 }
 
-export async function assertValidGgufFile(filePath: string): Promise<void> {
+async function assertValidGgufFile(filePath: string): Promise<void> {
   const file = await fs.promises.open(filePath, 'r');
   try {
     const header = Buffer.alloc(8);

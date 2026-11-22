@@ -97,7 +97,7 @@ export interface IpcEventDefinition<Args extends z.ZodTuple = z.ZodTuple> {
   readonly args: Args;
 }
 
-export type IpcEventSender<Definition extends IpcEventDefinition> = (
+type IpcEventSender<Definition extends IpcEventDefinition> = (
   ...args: z.input<Definition['args']>
 ) => void;
 

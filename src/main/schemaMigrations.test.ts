@@ -62,9 +62,10 @@ test('fresh database: schema initializes, versions recorded, migrations do not r
   const store = await SqliteStore.create(userDataPath);
   const db = store.getDatabase();
 
-  for (const scope of ['workbench-task', 'coding-agent', 'todo']) {
+  for (const scope of ['coding-agent', 'todo']) {
     expect(scopeRow(db, scope)?.version).toBe(1);
   }
+  expect(scopeRow(db, 'workbench-task')?.version).toBe(2);
   expect(scopeRow(db, 'core')?.version).toBe(3);
   expect(columnNames(db, 'cowork_sessions').has('pi_history_key')).toBe(true);
   expect(columnNames(db, 'cowork_messages').has('sequence')).toBe(true);
@@ -351,10 +352,11 @@ test('legacy workbench task database: run columns added and version recorded', (
 
     const runColumns = columnNames(db, 'workbench_runs');
     expect(runColumns.has('context_json')).toBe(true);
+    expect(runColumns.has('terminal_after_sequence')).toBe(true);
     expect(runColumns.has('final_answer_json')).toBe(false);
     expect(db.prepare('SELECT COUNT(*) AS c FROM workbench_runs').get()).toEqual({ c: 1 });
 
-    expect(scopeRow(db, 'workbench-task')?.version).toBe(1);
+    expect(scopeRow(db, 'workbench-task')?.version).toBe(2);
     const versionRow = scopeRow(db, 'workbench-task');
 
     initializeWorkbenchTaskSchema(db);

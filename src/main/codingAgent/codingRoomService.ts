@@ -50,9 +50,6 @@ import { CodingRoomTurnExecution } from './codingRoom/turnExecution';
 import { CodingRoomWorkspaces } from './codingRoom/workspaces';
 import { prepareCodingSession } from './codingSessionStartup';
 
-/** @knipignore Kept importable from the historical codingRoomService path. */
-export type { CodingRoomRuntime } from './codingRoom/runtimeContract';
-
 /** Owns the Coding Room API and publishes events for its collaborators. */
 export class CodingRoomService extends EventEmitter {
   private readonly authTerminals = new AuthTerminalService();

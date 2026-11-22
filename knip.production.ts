@@ -39,7 +39,6 @@ const config: KnipConfig = {
         'src/main/magpie/catalogWorker.ts!',
         'src/main/libs/hashWorker.ts!',
         'src/main/libs/sqliteBackup/sqliteVerifyWorker.ts!',
-        'src/main/libs/appUpdateHashWorker.ts!',
         'src/main/documentReader/documentWorker.ts!',
         'src/main/libs/skillSecurity/skillSecurityScanWorker.ts!',
         'src/main/pythonRuntime/runner.ts!',
@@ -65,6 +64,7 @@ const config: KnipConfig = {
     ...baseConfig.ignoreIssues,
     // Test infrastructure whose naming (*.testHarness.ts, __tests__/*.ts,
     // fixtures.ts) production mode does not recognize as test files.
+    'src/main/appBootstrap/appLifecycle.testHarness.ts': ['files'],
     'src/main/codingAgent/codingRoomServiceTestHarness.ts': ['files'],
     'src/main/coworkStore/coworkStore.testHarness.ts': ['files'],
     'src/main/libs/agentEngine/piRuntimeAdapter.testHarness.ts': ['files'],

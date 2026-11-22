@@ -12,7 +12,10 @@ import type {
 } from '../../shared/llamacpp';
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import { isPathInside } from './llamacppModelCatalog';
-import { LlamaCppRuntimeTargetId, resolveLlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
+import {
+  LlamaCppRuntimeTargetId,
+  resolveLlamaCppRuntimeTargetId,
+} from './llamacppRuntimeConstants';
 import { usesBundledLlamaCppRuntime } from './inferenceEditionPolicy';
 import { readBundledLlamaCppRuntimeManifest } from './llamacppBundledRuntime';
 import { resolveBundledEditionRuntime } from './llamacppBundledRuntimeSelection';

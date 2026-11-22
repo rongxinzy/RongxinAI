@@ -427,10 +427,6 @@ function showMenu(): void {
   });
 }
 
-export function isDesktopPetWindow(window: BrowserWindow): boolean {
-  return window === pet;
-}
-
 export function getDesktopPetWindow(): BrowserWindow | null {
   return visible && pet && !pet.isDestroyed() ? pet : null;
 }
