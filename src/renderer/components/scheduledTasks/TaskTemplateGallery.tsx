@@ -13,7 +13,7 @@ export interface TaskTemplateValues {
   promptText: string;
 }
 
-export interface TaskTemplate {
+interface TaskTemplate {
   id: string;
   icon: React.ComponentType<{ className?: string }>;
   nameKey: string;
@@ -23,7 +23,7 @@ export interface TaskTemplate {
   schedule: { kind: 'cron'; expr: string };
 }
 
-export const TASK_TEMPLATES: TaskTemplate[] = [
+const TASK_TEMPLATES: TaskTemplate[] = [
   {
     id: 'finance-news',
     icon: TrendingUp,

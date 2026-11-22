@@ -256,34 +256,6 @@ export function formatDuration(ms: number | null): string {
   return `${Math.round(ms / 60_000)}m`;
 }
 
-/**
- * Format a future timestamp as a relative "time until" string.
- * e.g. "5 分钟后" / "2 小时后" / "3 天后" (zh) or "in 5 min" / "in 2 h" / "in 3 d" (en)
- * Returns null if nextRunAtMs is null or in the past.
- */
-export function formatNextRunRelative(nextRunAtMs: number | null): string | null {
-  if (nextRunAtMs === null) return null;
-  const diffMs = nextRunAtMs - Date.now();
-  if (diffMs <= 0) return null;
-
-  if (diffMs < 60_000) {
-    return i18nService.t('scheduledTasksNextRunSoon');
-  }
-  if (diffMs < 3_600_000) {
-    return tpl(i18nService.t('scheduledTasksNextRunMinutes'), {
-      n: String(Math.round(diffMs / 60_000)),
-    });
-  }
-  if (diffMs < 86_400_000) {
-    return tpl(i18nService.t('scheduledTasksNextRunHours'), {
-      n: String(Math.round(diffMs / 3_600_000)),
-    });
-  }
-  return tpl(i18nService.t('scheduledTasksNextRunDays'), {
-    n: String(Math.round(diffMs / 86_400_000)),
-  });
-}
-
 export type PlanType = 'once' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'cron' | 'advanced';
 
 export interface PlanInfo {
