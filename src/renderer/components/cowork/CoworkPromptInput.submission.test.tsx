@@ -49,7 +49,10 @@ vi.mock('react-redux', () => ({
   useStore: () => ({ getState: () => fixture.state }),
 }));
 vi.mock('../../services/config', () => ({
-  configService: { getConfig: () => ({ shortcuts: { sendMessage: 'Enter' } }) },
+  configService: {
+    getConfig: () => ({ shortcuts: { sendMessage: 'Enter' } }),
+    subscribe: () => () => {},
+  },
 }));
 vi.mock('../../services/skill', () => ({
   skillService: { loadSkills: async () => [], onSkillsChanged: () => () => {} },

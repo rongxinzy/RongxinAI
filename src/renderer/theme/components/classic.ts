@@ -1,9 +1,12 @@
+import { classicChoiceAndTabsAppearances } from './classic-choice-and-tabs';
 import { classicConditionalControls } from './classic-conditional-controls';
 import { classicControlVariantsAppearances } from './classic-control-modifiers';
 import { classicControlsAppearances } from './classic-buttons';
+import { classicMiscAndPartsAppearances } from './classic-misc-and-parts';
 import { classicOverlaysAndDisplayAppearances } from './classic-extra-overlays';
 import { classicPageControls } from './classic-page-controls';
 import { classicScenesAppearances } from './classic-scenes';
+import { classicSettingsAndProductAppearances } from './classic-settings-and-product';
 import { classicSurfacesAppearances } from './classic-surfaces';
 import { conversationAppearances } from './conversation';
 import type { ComponentAppearance, ComponentAppearances } from './contract';
@@ -203,9 +206,12 @@ export function classicComponentAppearances(): ComponentAppearances {
     ...logoLoadingAppearances(),
     ...codingSidebarAppearances(),
     ...classicControlsAppearances(),
+    ...classicChoiceAndTabsAppearances(),
     ...classicSurfacesAppearances(),
     ...classicOverlaysAndDisplayAppearances(),
+    ...classicMiscAndPartsAppearances(),
     ...classicControlVariantsAppearances(),
+    ...classicSettingsAndProductAppearances(),
     ...classicPageControls(),
     ...classicConditionalControls(),
     'input-group': recipe({
