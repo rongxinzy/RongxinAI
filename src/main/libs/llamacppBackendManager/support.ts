@@ -312,7 +312,7 @@ export async function downloadArchive(
       await pipeline(
         async function* () {
           for (const partPath of partPaths) {
-            yield* fs.createReadStream(partPath, { signal });
+            yield* fs.createReadStream(partPath);
           }
         },
         fs.createWriteStream(stagedPath),
