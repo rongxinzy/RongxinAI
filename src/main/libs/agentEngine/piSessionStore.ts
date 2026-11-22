@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto';
 import fs from 'fs';
 import path from 'path';
 import { removeSessionDirectory } from '../../removeSessionDirectory';
+import { installPiSessionManagerGuards } from './piBoundedCompaction';
 
 /** Directory under the injected root holding every session's Pi JSONL. */
 export const PI_SESSIONS_ROOT_DIR = 'pi-sessions';
@@ -118,13 +119,17 @@ export async function openPersistentPiSessionManager(
   );
   signal.throwIfAborted();
   if (sessionFile) {
+    const manager = SessionManager.open(sessionFile, sessionDir, workspaceRoot);
+    installPiSessionManagerGuards(manager);
     return {
-      manager: SessionManager.open(sessionFile, sessionDir, workspaceRoot),
+      manager,
       reusedFile: true,
     };
   }
+  const manager = SessionManager.create(workspaceRoot, sessionDir);
+  installPiSessionManagerGuards(manager);
   return {
-    manager: SessionManager.create(workspaceRoot, sessionDir),
+    manager,
     reusedFile: false,
   };
 }

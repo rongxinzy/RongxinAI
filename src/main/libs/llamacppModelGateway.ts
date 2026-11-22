@@ -5,6 +5,9 @@ const GATEWAY_HOST = '127.0.0.1';
 const DEFAULT_GATEWAY_PORT = 8080;
 const GATEWAY_PATH_PREFIX = '/v1/';
 const MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
+const LLAMA_CPP_EXCEEDED_PATTERN = /context size has been exceeded/i;
+const PI_LLAMA_CPP_OVERFLOW_PATTERN = /exceeds the available context size/i;
+const PI_LLAMA_CPP_OVERFLOW_HINT = 'exceeds the available context size';
 
 export type LlamaCppGatewayModelLease = {
   baseUrl: string;
@@ -170,25 +173,109 @@ async function forwardRequest(
       body: body.length > 0 ? new Uint8Array(body) : undefined,
       signal: controller.signal,
     });
+    if (!upstreamResponse.ok) {
+      const errorText = await upstreamResponse.text();
+      const normalized = normalizeLlamaCppOverflowBody(errorText);
+      const isLlamaOverflow = normalized !== errorText;
+      response.statusCode =
+        isLlamaOverflow && upstreamResponse.status >= 500 ? 400 : upstreamResponse.status;
+      upstreamResponse.headers.forEach((value, key) => {
+        const lower = key.toLowerCase();
+        if (
+          lower === 'transfer-encoding' ||
+          (isLlamaOverflow && (lower === 'content-length' || lower === 'content-encoding'))
+        ) {
+          return;
+        }
+        response.setHeader(key, value);
+      });
+      response.end(normalized);
+      return;
+    }
     response.statusCode = upstreamResponse.status;
+    const isSse =
+      upstreamResponse.headers.get('content-type')?.includes('text/event-stream') ?? false;
     upstreamResponse.headers.forEach((value, key) => {
-      if (key !== 'transfer-encoding') response.setHeader(key, value);
+      const lower = key.toLowerCase();
+      if (lower === 'transfer-encoding' || (isSse && lower === 'content-length')) return;
+      response.setHeader(key, value);
     });
     if (!upstreamResponse.body) {
       response.end();
       return;
     }
     const reader = upstreamResponse.body.getReader();
+    const decoder = isSse ? new TextDecoder() : null;
     while (!response.writableEnded) {
       const { done, value } = await reader.read();
       if (done) break;
-      response.write(Buffer.from(value));
+      if (decoder) {
+        const text = decoder.decode(value, { stream: true });
+        if (text) {
+          response.write(normalizeLlamaCppSseChunk(text));
+        }
+      } else {
+        response.write(Buffer.from(value));
+      }
+    }
+    if (decoder) {
+      const trailing = decoder.decode();
+      if (trailing && !response.writableEnded) {
+        response.write(normalizeLlamaCppSseChunk(trailing));
+      }
     }
     response.end();
   } finally {
     request.removeListener('aborted', abort);
     response.removeListener('close', abort);
   }
+}
+
+export function normalizeLlamaCppOverflowMessage(message: string): string {
+  if (!LLAMA_CPP_EXCEEDED_PATTERN.test(message) || PI_LLAMA_CPP_OVERFLOW_PATTERN.test(message)) {
+    return message;
+  }
+  return `${message} (${PI_LLAMA_CPP_OVERFLOW_HINT})`;
+}
+
+export function normalizeLlamaCppOverflowBody(bodyText: string): string {
+  if (!LLAMA_CPP_EXCEEDED_PATTERN.test(bodyText) || PI_LLAMA_CPP_OVERFLOW_PATTERN.test(bodyText)) {
+    return bodyText;
+  }
+  try {
+    const parsed = JSON.parse(bodyText) as { error?: { message?: unknown }; message?: unknown };
+    if (parsed && typeof parsed === 'object') {
+      if (
+        parsed.error &&
+        typeof parsed.error === 'object' &&
+        typeof parsed.error.message === 'string'
+      ) {
+        parsed.error.message = normalizeLlamaCppOverflowMessage(parsed.error.message);
+        return JSON.stringify(parsed);
+      }
+      if (typeof parsed.message === 'string') {
+        parsed.message = normalizeLlamaCppOverflowMessage(parsed.message);
+        return JSON.stringify(parsed);
+      }
+    }
+  } catch {
+    // Plain-text error bodies fall through to direct normalization below.
+  }
+  return normalizeLlamaCppOverflowMessage(bodyText);
+}
+
+function normalizeLlamaCppSseChunk(chunk: string): string {
+  if (!LLAMA_CPP_EXCEEDED_PATTERN.test(chunk) || PI_LLAMA_CPP_OVERFLOW_PATTERN.test(chunk)) {
+    return chunk;
+  }
+  return chunk
+    .split('\n')
+    .map(line =>
+      line.startsWith('data:') && LLAMA_CPP_EXCEEDED_PATTERN.test(line)
+        ? `data: ${normalizeLlamaCppOverflowBody(line.slice(5).trimStart())}`
+        : normalizeLlamaCppOverflowBody(line),
+    )
+    .join('\n');
 }
 
 function copyRequestHeaders(headers: http.IncomingHttpHeaders): Record<string, string> {

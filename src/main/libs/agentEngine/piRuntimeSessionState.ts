@@ -96,9 +96,11 @@ type PiQueueOptions = Parameters<AgentSession['steer']>[2] & {
 /** Minimal type for the Pi AgentSession — only the methods used by this adapter. */
 export interface PiSession {
   readonly messages?: readonly unknown[];
+  readonly thinkingLevel?: string;
   readonly agent?: {
     steer(message: NonNullable<PiEvent['message']>): void;
     followUp(message: NonNullable<PiEvent['message']>): void;
+    streamFunction?: (...args: unknown[]) => unknown;
   };
   prompt(text: string, options?: { streamingBehavior?: 'steer' | 'followUp' }): Promise<void>;
   sendUserMessage?(
@@ -287,6 +289,8 @@ export interface ActivePiSession {
   /** Event-time artifact capture for this session (null in chat mode or when
    * the host exposes no ledger). */
   artifactRecorder: ArtifactRecorder | null;
+  sessionManager?: unknown;
+  lastCompactionError?: Error;
   settingsManager: PiSettingsManager | null;
   approvalMode: WorkbenchApprovalMode;
   unattended: boolean;
@@ -365,6 +369,12 @@ export interface PiSettingsManager {
   }): void;
   getShellPath?(): string | undefined;
   setHttpIdleTimeoutMs?(timeoutMs: number): void;
+  getCompactionSettings?(model?: unknown): {
+    enabled: boolean;
+    reserveTokens: number;
+    keepRecentTokens: number;
+  };
+  getRetrySettings?(): unknown;
 }
 
 export interface PiResourceState {

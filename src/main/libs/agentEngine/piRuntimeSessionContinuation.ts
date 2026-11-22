@@ -19,6 +19,7 @@ import { HarnessVersion } from '../../../shared/harness';
 import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
 import { WorkbenchContractKind, WorkbenchRunTrigger } from '../../../shared/workbenchTask';
 import { resolveProjectMemoryContextForPiPrompt } from '../../memory/piRuntimeProjectMemoryPrompt';
+import { compactPiSessionIfOversizedBeforePrompt } from './piBoundedCompaction';
 import { collectImagePathReferences } from './piImageInputFallback';
 import { resolvePiModel } from './piMagpiePiModel';
 import { resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
@@ -345,6 +346,16 @@ export async function continuePiRuntimeSession(
       signal,
     );
     const continuedImagePrompt = preparation instanceof Promise ? await preparation : preparation;
+    if (!isCurrentTurn()) return;
+    await compactPiSessionIfOversizedBeforePrompt({
+      session: active.piSession,
+      sessionManager: active.sessionManager,
+      settingsManager: active.settingsManager,
+      model: active.model,
+      promptText:
+        typeof continuedImagePrompt.content === 'string' ? continuedImagePrompt.content : prompt,
+      active,
+    });
     if (!isCurrentTurn()) return;
     host.recovery.reportOmittedImages(sessionId, continuedImagePrompt);
     await sendPiPrompt(active.piSession, continuedImagePrompt);
