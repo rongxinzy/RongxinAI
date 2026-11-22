@@ -13,10 +13,17 @@ function preferences(value: Partial<AppConfig> | null): AppConfig {
 export class ConfigService {
   private config: AppConfig = { ...defaultConfig };
   private pending: Promise<unknown> = Promise.resolve();
+  private readonly listeners = new Set<() => void>();
   private enqueue<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.pending.then(operation, operation);
     this.pending = result.catch(() => undefined);
     return result;
+  }
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
   async init(): Promise<void> {
     await this.reload();
@@ -42,7 +49,9 @@ export class ConfigService {
       // Preserve unrelated historical storage without exposing it as live config.
       await localStore.setItem(CONFIG_KEYS.APP_CONFIG, { ...stored, ...next });
       this.config = next;
-      window.dispatchEvent(new CustomEvent('config-updated'));
+      for (const listener of this.listeners) {
+        listener();
+      }
     });
   }
 }

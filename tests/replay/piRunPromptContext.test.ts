@@ -162,7 +162,7 @@ test(
             // Apply pressure only after recall starts, so native compaction runs
             // between receipt of the unchanged fact and before_agent_start.
             settings?.applyOverrides({
-              compaction: { reserveTokens: 29_000, keepRecentTokens: 300 },
+              compaction: { reserveTokens: 29_000, keepRecentTokens: 50 },
             });
           }
           return projectFact(revisedFact);

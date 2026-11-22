@@ -9,15 +9,7 @@ const modules = ['better-sqlite3', 'node-pty'];
 const local = process.env.CI !== 'true';
 const backup = local ? fs.mkdtempSync(path.join(os.tmpdir(), 'unit-native-original-')) : null;
 const fingerprint = crypto.createHash('sha256');
-for (const file of [
-  'bun.lock',
-  'scripts/ensure-node-native.cjs',
-  ...fs
-    .readdirSync(path.join(root, 'patches'), { recursive: true, withFileTypes: true })
-    .filter(entry => entry.isFile())
-    .map(entry => path.relative(root, path.join(entry.parentPath, entry.name)))
-    .sort(),
-]) {
+for (const file of ['bun.lock', 'scripts/ensure-node-native.cjs']) {
   const source = path.join(root, file);
   if (fs.existsSync(source)) fingerprint.update(file).update(fs.readFileSync(source));
 }

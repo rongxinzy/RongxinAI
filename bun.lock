@@ -146,10 +146,6 @@
     "utf-8-validate",
     "bufferutil",
   ],
-  "patchedDependencies": {
-    "@earendil-works/pi-ai@1.5.2": "patches/@earendil-works%2Fpi-ai@1.5.2.patch",
-    "@earendil-works/pi-coding-agent@1.5.2": "patches/@earendil-works+pi-coding-agent+1.5.2+001+recovery.patch",
-  },
   "overrides": {
     "@electron/osx-sign": {
       "isbinaryfile": "^5.0.0",

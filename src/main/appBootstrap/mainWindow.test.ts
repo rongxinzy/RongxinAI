@@ -125,7 +125,7 @@ vi.mock('./windowManagement', () => ({
   getDisplayWorkAreas: () => [],
   scheduleReload: mocks.scheduleReload,
 }));
-vi.mock('../appIpc', () => ({
+vi.mock('../ipcHandlers/app', () => ({
   openDevToolsWindow: mocks.openDevToolsWindow,
   toggleDevToolsForSender: mocks.toggleDevToolsForSender,
 }));

@@ -89,9 +89,17 @@ export function persistPiUserMessage(
   host.emit('message', sessionId, store ? store.messages.addMessage(sessionId, message) : message);
 }
 
+type PiQueueOptions = Parameters<AgentSession['steer']>[2] & {
+  onQueued?: (message: NonNullable<PiEvent['message']>) => void;
+};
+
 /** Minimal type for the Pi AgentSession — only the methods used by this adapter. */
 export interface PiSession {
   readonly messages?: readonly unknown[];
+  readonly agent?: {
+    steer(message: NonNullable<PiEvent['message']>): void;
+    followUp(message: NonNullable<PiEvent['message']>): void;
+  };
   prompt(text: string, options?: { streamingBehavior?: 'steer' | 'followUp' }): Promise<void>;
   sendUserMessage?(
     content:
@@ -99,8 +107,16 @@ export interface PiSession {
       | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>,
     options?: { deliverAs?: 'steer' | 'followUp' },
   ): Promise<void>;
-  steer: AgentSession['steer'];
-  followUp: AgentSession['followUp'];
+  steer(
+    text: string,
+    images?: Parameters<AgentSession['steer']>[1],
+    options?: PiQueueOptions,
+  ): ReturnType<AgentSession['steer']>;
+  followUp(
+    text: string,
+    images?: Parameters<AgentSession['followUp']>[1],
+    options?: PiQueueOptions,
+  ): ReturnType<AgentSession['followUp']>;
   abort(): Promise<void>;
   abortBash(): void;
   dispose?(): void;

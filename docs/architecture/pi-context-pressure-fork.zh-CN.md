@@ -1,4 +1,6 @@
-# Pi 上下文压力修复
+# Pi 上下文压力修复（历史归档）
+
+> **状态更新（2026-11-22）：** 仓库已移除 `patches/` 与 `package.json` 中的 `patchedDependencies`，切回使用未打补丁的官方 `@earendil-works/pi-*` `1.5.2`。下方记录保留作历史背景参考。
 
 ## 来源与接入
 

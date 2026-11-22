@@ -1,46 +1,169 @@
-import { classicAppearancePreview } from './classic-appearance-preview';
-import { logoLoadingAppearances } from './logo-loading';
-import { codingSidebarAppearances } from './coding-sidebar';
-import { classicScenes } from './classic-scenes';
-import { classicSidebar } from './classic-sidebar';
-import { classicFields } from './classic-fields';
-import { classicMisc } from './classic-misc';
-import { classicDisplay } from './classic-display';
-import { classicChoiceControls } from './classic-choice-controls';
-import { classicSupplementaryControls } from './classic-supplementary-controls';
-import { classicTabs } from './classic-tabs';
-import { classicMessageSurfaces } from './classic-message-surfaces';
-import { conversationAppearances } from './conversation';
-import { classicPromptActions } from './classic-prompt-actions';
-import { classicControlPieces } from './classic-control-pieces';
-import { classicControlSizing } from './classic-control-sizing';
-import { classicEditorControls } from './classic-editor-controls';
-import { classicInteractiveSurfaces } from './classic-interactive-surfaces';
-import { classicNativeControls } from './classic-native-controls';
-import { classicModalEffects } from './classic-modal-effects';
-import { classicSharedCompositions } from './classic-shared-compositions';
-import { classicLocalControls } from './classic-local-controls';
-import { classicCompositionControls } from './classic-composition-controls';
-import { classicPartControls } from './classic-part-controls';
+import { classicChoiceAndTabsAppearances } from './classic-choice-and-tabs';
 import { classicConditionalControls } from './classic-conditional-controls';
+import { classicControlVariantsAppearances } from './classic-control-modifiers';
+import { classicControlsAppearances } from './classic-buttons';
+import { classicMiscAndPartsAppearances } from './classic-misc-and-parts';
+import { classicOverlaysAndDisplayAppearances } from './classic-extra-overlays';
 import { classicPageControls } from './classic-page-controls';
-import { classicControlModifiers } from './classic-control-modifiers';
-import { classicSettingsControls } from './classic-settings-controls';
-import { classicProductControls } from './classic-product-controls';
-import { classicExtraOverlays } from './classic-extra-overlays';
-import { classicMenu } from './classic-menu';
-import { classicCommand } from './classic-command';
-import { recipe } from './recipe';
-import { classicSurfaces } from './classic-surfaces';
-import { classicBadges } from './classic-badges';
-import { classicSelect } from './classic-select';
-import { classicButtons } from './classic-buttons';
-import { classicCodingDiff } from './classic-coding-diff';
-import { runIndicatorAppearances } from './run-indicator';
-import { chatToolAppearances } from './chat-tool';
-import { shellSidebarAppearances } from './shell-sidebar';
-import { homeStudioAppearances } from './home-studio';
+import { classicScenesAppearances } from './classic-scenes';
+import { classicSettingsAndProductAppearances } from './classic-settings-and-product';
+import { classicSurfacesAppearances } from './classic-surfaces';
+import { conversationAppearances } from './conversation';
 import type { ComponentAppearance, ComponentAppearances } from './contract';
+import { recipe } from './recipe';
+import { shellSidebarAppearances } from './shell-sidebar';
+
+function runIndicatorAppearances() {
+  return {
+    'run-indicator': recipe({
+      base: {
+        height: '2rem',
+        'padding-inline': '0.5rem',
+        'font-size': 'var(--zy-component-text-xs)',
+        'line-height': '1',
+        color: 'var(--muted-foreground)',
+      },
+    }),
+    'run-indicator-icon': recipe({ base: { width: '0.75rem', height: '0.75rem' } }),
+    'run-indicator-elapsed': recipe({ base: { 'font-variant-numeric': 'tabular-nums' } }),
+  };
+}
+
+/** Content loading uses the theme's primary color for the entire mark. */
+function logoLoadingAppearances() {
+  return {
+    'logo-loading-mark': recipe({
+      base: { width: '8rem', height: 'auto', color: 'var(--primary)' },
+    }),
+    'logo-loading-dot': recipe({
+      base: {
+        opacity: '1',
+        'animation-name': 'component-motion',
+        'animation-duration': '1.2s',
+        'animation-timing-function': 'ease-out',
+        'animation-iteration-count': 'infinite',
+        'animation-direction': 'alternate',
+      },
+      motionStart: { opacity: '1' },
+      motionEnd: { opacity: '0.35' },
+    }),
+    'logo-loading-label': recipe({
+      base: {
+        color: 'var(--muted-foreground)',
+        'font-size': '0.875rem',
+        'line-height': '1.5',
+      },
+    }),
+  };
+}
+
+function codingSidebarAppearances() {
+  return {
+    'coding-session-agent': recipe({
+      base: {
+        width: 'min(30%, 6.5rem)',
+        'font-size': 'var(--zy-component-text-xs)',
+        'font-weight': 'var(--zy-component-font-weight-normal)',
+        color: 'var(--muted-foreground)',
+      },
+    }),
+  };
+}
+
+/** Compact transcript activity, inherited by every registered theme. */
+function chatToolAppearances() {
+  return {
+    'chat-tool': recipe({
+      base: { 'border-width': '0px', 'background-color': 'transparent', 'box-shadow': 'none' },
+    }),
+    'chat-tool-trigger': recipe({
+      base: {
+        'min-height': '2rem',
+        'padding-inline': '0.5rem',
+        'padding-block': '0.25rem',
+        'border-radius': 'var(--zy-style-radius-lg)',
+        color: 'var(--muted-foreground)',
+        'text-align': 'left',
+        'transition-property': 'color, background-color',
+        'transition-duration': '120ms',
+        'transition-timing-function': 'cubic-bezier(0.2, 0, 0, 1)',
+      },
+      hover: { 'background-color': 'var(--accent)', color: 'var(--foreground)' },
+      focus: {
+        'outline-style': 'solid',
+        'outline-width': '2px',
+        'outline-color': 'var(--ring)',
+        'outline-offset': '1px',
+      },
+      disabled: { opacity: '0.5' },
+    }),
+    'chat-tool-icon': recipe({
+      base: { width: '1rem', height: '1rem', color: 'var(--zy-text-muted)' },
+    }),
+    'chat-tool-title': recipe({
+      base: {
+        'font-size': 'var(--zy-component-text-sm)',
+        'font-weight': 'var(--zy-component-font-weight-medium)',
+        color: 'var(--foreground)',
+      },
+    }),
+    'chat-tool-summary': recipe({
+      base: {
+        'font-size': 'var(--zy-component-text-xs)',
+        'font-family': 'var(--zy-style-font-mono)',
+        color: 'var(--zy-text-muted)',
+      },
+    }),
+    'chat-tool-status': recipe({
+      base: {
+        '--zy-control-icon-size': '0.875rem',
+        height: 'auto',
+        padding: '0px',
+        'border-width': '0px',
+        'border-radius': '0px',
+        'background-color': 'transparent',
+        'box-shadow': 'none',
+        'font-size': 'var(--zy-component-text-xs)',
+        'font-variant-numeric': 'tabular-nums',
+        color: 'var(--zy-text-muted)',
+        'font-weight': 'var(--zy-component-font-weight-normal)',
+      },
+    }),
+    'chat-tool-warning': recipe({ base: { color: 'var(--zy-warning)' } }),
+    'chat-tool-error': recipe({ base: { color: 'var(--destructive)' } }),
+    'chat-tool-chevron': recipe({
+      base: {
+        width: '1rem',
+        height: '1rem',
+        color: 'var(--zy-text-muted)',
+        rotate: '0deg',
+        'transition-property': 'rotate, color',
+        'transition-duration': '120ms',
+        'transition-timing-function': 'cubic-bezier(0.2, 0, 0, 1)',
+      },
+    }),
+    'chat-tool-chevron-open': recipe({ base: { rotate: '180deg' } }),
+    'chat-tool-content': recipe({
+      base: {
+        'padding-left': '1rem',
+        'padding-top': '0.375rem',
+        'padding-bottom': '0.5rem',
+        'border-left-width': '1px',
+        'border-style': 'solid',
+        'border-left-color': 'var(--zy-border)',
+        color: 'var(--foreground)',
+      },
+    }),
+    'chat-tool-label': recipe({
+      base: {
+        'font-size': 'var(--zy-component-text-xs)',
+        'font-weight': 'var(--zy-component-font-weight-normal)',
+        color: 'var(--muted-foreground)',
+      },
+    }),
+    'chat-tool-output-error': recipe({ base: { color: 'var(--destructive)' } }),
+  };
+}
 
 /** Codex appearance recipes are package data, never imported by React controls. */
 export function classicComponentAppearances(): ComponentAppearances {
@@ -82,21 +205,15 @@ export function classicComponentAppearances(): ComponentAppearances {
     ...runIndicatorAppearances(),
     ...logoLoadingAppearances(),
     ...codingSidebarAppearances(),
-    ...classicButtons(),
-    ...classicCodingDiff(),
-    ...classicSurfaces(),
-    ...classicCommand(),
-    ...classicMenu(),
-    ...classicExtraOverlays(),
-    ...classicProductControls(),
-    ...classicSettingsControls(),
-    ...classicControlModifiers(),
-    ...classicPartControls(),
-    ...classicCompositionControls(),
+    ...classicControlsAppearances(),
+    ...classicChoiceAndTabsAppearances(),
+    ...classicSurfacesAppearances(),
+    ...classicOverlaysAndDisplayAppearances(),
+    ...classicMiscAndPartsAppearances(),
+    ...classicControlVariantsAppearances(),
+    ...classicSettingsAndProductAppearances(),
     ...classicPageControls(),
     ...classicConditionalControls(),
-    ...classicBadges(),
-    ...classicSelect(),
     'input-group': recipe({
       base: {
         ...field.base,
@@ -162,29 +279,10 @@ export function classicComponentAppearances(): ComponentAppearances {
       },
       wide: { 'font-size': 'var(--zy-component-text-sm)' },
     }),
-    ...classicSharedCompositions(),
-    ...classicLocalControls(),
-    ...classicModalEffects(),
-    ...classicNativeControls(),
-    ...classicInteractiveSurfaces(),
-    ...classicEditorControls(),
-    ...classicControlSizing(),
-    ...classicControlPieces(),
-    ...classicPromptActions(),
-    ...classicMessageSurfaces(),
     ...conversationAppearances(),
-    ...classicTabs(),
-    ...classicSupplementaryControls(),
-    ...classicChoiceControls(),
-    ...classicDisplay(),
-    ...classicMisc(),
-    ...classicFields(),
-    ...classicSidebar(),
-    ...classicScenes(),
+    ...classicScenesAppearances(),
     ...chatToolAppearances(),
     ...shellSidebarAppearances(),
-    ...classicAppearancePreview(),
-    ...homeStudioAppearances(),
 
     // Quiet Studio composition hooks are supplied by the active theme package.
     'shell-main-panel': recipe({}),

@@ -1,13 +1,5 @@
 /**
- * Regression guard for the pi-ai overflow-pattern patch
- * (patches/@earendil-works+pi-ai+1.5.2.patch).
- *
- * llama.cpp reports context overflow with (at least) two message variants.
- * pi-ai's OVERFLOW_PATTERNS only matched "exceeds the available context
- * size"; the mid-stream SSE error frame variant "Context size has been
- * exceeded." fell through, so the SDK never ran overflow compaction and
- * the whole run died. If the patch is lost (e.g. an upgrade drops
- * patches/), this test fails.
+ * Regression guard for official @earendil-works/pi-ai overflow detection.
  */
 
 import { test, expect } from 'vitest';
@@ -27,13 +19,7 @@ const buildMessage = (errorMessage: string): OverflowMessage =>
     model: 'Qwen3.6-35B-A3B',
   }) as OverflowMessage;
 
-test('recognizes the llama.cpp mid-stream overflow variant', () => {
-  expect(isContextOverflow(buildMessage('500 "Context size has been exceeded."'), 262_144)).toBe(
-    true,
-  );
-});
-
-test('still recognizes the classic llama.cpp overflow message', () => {
+test('recognizes the classic llama.cpp overflow message', () => {
   expect(
     isContextOverflow(
       buildMessage('the request exceeds the available context size, try increasing it'),

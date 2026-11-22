@@ -17,7 +17,7 @@ import {
   resolveCoworkStartExperts,
   resolveCoworkStartWorkspace,
   type CoworkSessionIpcDeps,
-} from '../coworkIpc/sessionStart';
+} from '../ipcHandlers/cowork/sessionStart';
 import type { MagpieModelService } from '../magpie/modelService';
 import { companionInstructions } from './personas';
 import { CompanionAttachments } from './attachments';

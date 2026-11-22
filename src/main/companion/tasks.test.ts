@@ -23,7 +23,7 @@ import {
   WorkbenchRunEventType,
   WorkbenchRunTrigger,
 } from '../../shared/workbenchTask';
-import type { CoworkSessionIpcDeps } from '../coworkIpc/sessionStart';
+import type { CoworkSessionIpcDeps } from '../ipcHandlers/cowork/sessionStart';
 import type { PiStartOptions } from '../libs/agentEngine/piRuntimeTypes';
 import { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 

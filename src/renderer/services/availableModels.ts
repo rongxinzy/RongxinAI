@@ -12,7 +12,7 @@ import { ModelCapabilityStatus } from '../../shared/providers';
 import { store } from '../store';
 import { setModelCatalog, type Model } from '../store/slices/modelSlice';
 
-export const LLAMACPP_RUNNING_MODELS_CHANGED_EVENT = 'llamacpp:running-models-changed';
+const runningModelsChangedListeners = new Set<() => void>();
 let catalogRequest = 0;
 let selectionRequest = 0;
 /** Agent eligibility of the running local models, keyed by the name the GPU provider registers. */
@@ -108,6 +108,14 @@ export async function selectMagpieDefaultModel(id: string): Promise<MagpieModelC
   }
   return catalog;
 }
+export function subscribeLlamaCppRunningModelsChanged(listener: () => void): () => void {
+  runningModelsChangedListeners.add(listener);
+  return () => {
+    runningModelsChangedListeners.delete(listener);
+  };
+}
 export function notifyLlamaCppRunningModelsChanged(): void {
-  window.dispatchEvent(new CustomEvent(LLAMACPP_RUNNING_MODELS_CHANGED_EVENT));
+  for (const listener of runningModelsChangedListeners) {
+    listener();
+  }
 }

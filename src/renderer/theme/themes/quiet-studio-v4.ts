@@ -1,6 +1,6 @@
 import type { ComponentAppearances } from '../components/contract';
 import { recipe } from '../components/recipe';
-import { sidebarTaskAppearances } from '../components/sidebar-task';
+import { sidebarTaskAppearances } from '../components/shell-sidebar';
 
 /**
  * v4.0 Quiet Studio appearance overrides.

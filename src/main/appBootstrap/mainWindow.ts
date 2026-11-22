@@ -7,7 +7,7 @@ import { app, nativeImage, shell, BrowserWindow } from 'electron';
 import { DEV_SERVER_URL, isDev, isLinuxRendererSmoke, isMac } from './appEnv';
 import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { PRELOAD_PATH, applyWindowsWindowIcon } from './windowBranding';
-import { openDevToolsWindow, toggleDevToolsForSender } from '../appIpc';
+import { openDevToolsWindow, toggleDevToolsForSender } from '../ipcHandlers/app';
 import { isWecomAuthUrl } from './windowSecurity';
 import { logAppQuitContextOnce } from './appLifecycle';
 import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';

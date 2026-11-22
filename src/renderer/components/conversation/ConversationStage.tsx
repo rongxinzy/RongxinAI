@@ -273,19 +273,6 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
   };
 
   useEffect(() => {
-    const handleNewSession = () => {
-      const shouldClear = !displayedSessionId;
-      dispatch(clearCurrentSession());
-      dispatch(clearSelection());
-      dispatch(requestPromptFocus({ draftKey: PromptDraftKey.Home, clear: shouldClear }));
-    };
-    window.addEventListener('cowork:shortcut:new-session', handleNewSession);
-    return () => {
-      window.removeEventListener('cowork:shortcut:new-session', handleNewSession);
-    };
-  }, [dispatch, displayedSessionId]);
-
-  useEffect(() => {
     if (!currentSession || !isStreaming) return;
     const runningSessionId = currentSession.id;
     let lastFocusTime = 0;

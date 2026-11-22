@@ -1,6 +1,18 @@
-import { runIndicatorSelectors } from '../run-indicator';
-import { LOGO_LOADING_SELECTORS } from '../logo-loading-contract';
-import { CODING_SIDEBAR_SELECTORS } from '../coding-sidebar-contract';
+const LOGO_LOADING_SELECTORS = {
+  'logo-loading-mark': '.theme-logo-loading-mark',
+  'logo-loading-dot': '.theme-logo-loading-dot',
+  'logo-loading-label': '.theme-logo-loading-label',
+} as const;
+
+const CODING_SIDEBAR_SELECTORS = {
+  'coding-session-agent': '.theme-coding-session-agent',
+} as const;
+
+const runIndicatorSelectors = {
+  'run-indicator': '.theme-run-indicator',
+  'run-indicator-icon': '.theme-run-indicator .theme-spinner',
+  'run-indicator-elapsed': '.theme-run-indicator-elapsed',
+};
 
 /** Core control and surface hooks: primitives, data display, fields and scenes. */
 export const CORE_SELECTORS = {

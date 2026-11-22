@@ -21,26 +21,26 @@ import {
   registerCommunityAuthBootstrap,
   registerCommunityAuthIpc,
 } from './appBootstrap/communityAuth';
-import { registerAppIpc } from './appIpc';
+import { registerAppIpc } from './ipcHandlers/app';
 import { registerSkillsIpc } from './skills/ipc';
 import { registerWorkspaceIpc } from './appBootstrap/workspaceIpc';
 import { setupMagpieRuntime } from './appBootstrap/magpieRuntime';
 import { createLocalInferenceRuntime } from './appBootstrap/localInferenceRuntime';
-import { registerCoworkQueueIpc } from './coworkIpc/queue';
-import { registerCoreIpc } from './appSystemIpc/core';
-import { registerManagedProvidersIpc } from './appSystemIpc/managedProviders';
-import { registerAppUpdateIpc } from './appUpdateIpc';
+import { registerCoworkQueueIpc } from './ipcHandlers/cowork/queue';
+import { registerCoreIpc } from './ipcHandlers/appSystem/core';
+import { registerManagedProvidersIpc } from './ipcHandlers/appSystem/managedProviders';
+import { registerAppUpdateIpc } from './ipcHandlers/appUpdate';
 import { createCodingRoomRuntime } from './appBootstrap/codingRoomRuntime';
-import { registerIntegrationsIpc } from './integrationsIpc';
-import { registerMcpIpc } from './mcpIpc';
-import { registerProjectIpc } from './projectIpc';
-import { registerPermissionsIpc } from './permissionsIpc';
-import { registerDialogIpc } from './dialogIpc';
-import { registerCoworkSessionIpc } from './coworkIpc/session';
-import { registerCoworkSessionAdminIpc } from './coworkIpc/sessionAdmin';
+import { registerIntegrationsIpc } from './ipcHandlers/integrations';
+import { registerMcpIpc } from './ipcHandlers/mcp';
+import { registerProjectIpc } from './ipcHandlers/project';
+import { registerPermissionsIpc } from './ipcHandlers/permissions';
+import { registerDialogIpc } from './ipcHandlers/dialog';
+import { registerCoworkSessionIpc } from './ipcHandlers/cowork/session';
+import { registerCoworkSessionAdminIpc } from './ipcHandlers/cowork/sessionAdmin';
 import { registerArtifactIpc } from './artifactLedger/artifactIpc';
-import { registerCoworkConfigIpc } from './coworkIpc/config';
-import { registerAgentIpc } from './agentIpc';
+import { registerCoworkConfigIpc } from './ipcHandlers/cowork/config';
+import { registerAgentIpc } from './ipcHandlers/agent';
 import { registerScheduledTaskIpc } from '../scheduledTask/ipc';
 import {
   getActivityService,
@@ -80,8 +80,8 @@ import {
 } from './appBootstrap/ccConnectRuntime';
 import { showSystemMenu } from './appBootstrap/windowManagement';
 import { resolveDefaultAgentModelRef } from './appBootstrap/defaultAgentModel';
-import { registerImGatewayIpc } from './imIpc/gateway';
-import { registerImInstanceIpc } from './imIpc/instance';
+import { registerImGatewayIpc } from './ipcHandlers/im/gateway';
+import { registerImInstanceIpc } from './ipcHandlers/im/instance';
 import { registerAppLifecycleHandlers } from './appBootstrap/appLifecycle';
 import { initApp } from './appBootstrap/initApp';
 import { AppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
