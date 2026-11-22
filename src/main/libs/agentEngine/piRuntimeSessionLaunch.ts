@@ -39,6 +39,10 @@ import { createPiTranslatorState } from './piTranslate/piTranslateUiMessageChunk
 import { PiEventProjection } from './piEventProjection';
 import { ToolActivityTracker } from './toolActivity';
 import { collectImagePathReferences } from './piImageInputFallback';
+import {
+  compactPiSessionIfOversizedBeforePrompt,
+  installPiSessionManagerGuards,
+} from './piBoundedCompaction';
 import { DEFAULT_PI_LOCAL_MAX_TOKENS, resolvePiModel } from './piMagpiePiModel';
 import { PiSkillRuntimeCapabilitiesToolName } from './piSkillRuntimeCapabilitiesTool';
 import { PiSkillScriptToolName } from './piSkillScriptTool';
@@ -194,7 +198,9 @@ export async function startPiRuntimeSession(
       sessionOptions.sessionManager = persisted.manager;
       restoredNativeHistory = persisted.reusedFile;
     } else if (pi.SessionManager?.inMemory) {
-      sessionOptions.sessionManager = pi.SessionManager.inMemory(workspaceRoot);
+      const memoryManager = pi.SessionManager.inMemory(workspaceRoot);
+      installPiSessionManagerGuards(memoryManager);
+      sessionOptions.sessionManager = memoryManager;
     }
 
     // System prompt — user config only. Skills are discovered and appended
@@ -321,7 +327,11 @@ export async function startPiRuntimeSession(
     sessionOptions.modelRuntime = resolvedModel.modelRuntime;
 
     console.debug(`[PiRuntime] loading isolated resources for session ${sessionId}`);
-    const settingsManager = createPiSettingsManager(pi, workspaceRoot);
+    const settingsManager = createPiSettingsManager(
+      pi,
+      workspaceRoot,
+      () => sessionOptions.sessionManager,
+    );
     const codemodeEnabled =
       options.codemode === true && !resourceState.chatMode && confirmationMode !== 'text';
     const expertMcpIds = Array.isArray(expertSession?.capabilityPolicy?.mcpIds)
@@ -505,6 +515,7 @@ export async function startPiRuntimeSession(
         workspaceRoot,
         resourceState,
       ),
+      sessionManager: sessionOptions.sessionManager,
       settingsManager,
       approvalMode: options.approvalMode ?? WorkbenchApprovalMode.Ask,
       unattended: resourceState.unattended,
@@ -594,6 +605,16 @@ export async function startPiRuntimeSession(
       abortController.signal,
     );
     const initialImagePrompt = preparation instanceof Promise ? await preparation : preparation;
+    if (!isCurrentTurn()) return;
+    await compactPiSessionIfOversizedBeforePrompt({
+      session,
+      sessionManager: sessionOptions.sessionManager,
+      settingsManager,
+      model: sessionModel,
+      promptText:
+        typeof initialImagePrompt.content === 'string' ? initialImagePrompt.content : prompt,
+      active,
+    });
     if (!isCurrentTurn()) return;
     console.debug(`[PiRuntime] dispatching initial prompt for session ${sessionId}`);
     host.recovery.reportOmittedImages(sessionId, initialImagePrompt);

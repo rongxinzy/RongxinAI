@@ -233,6 +233,98 @@ describe('PiRuntimeAdapter', () => {
 
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
     });
+
+    it('isolates concurrent followUp callbacks across async handled commands without misattribution', async () => {
+      const persisted: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
+      const agentFollowUpCalls: Array<{ role: string; content: string }> = [];
+      let listener:
+        | ((event: { type: string; message?: { role: string; content: string } }) => void)
+        | null = null;
+      const msg2 = { role: 'user', content: 'real user message' };
+      const localAdapter = createTestPiRuntime({
+        coworkStore: {
+          messages: {
+            addMessage: (_sessionId: string, message: unknown) => {
+              persisted.push(message as { content: string; metadata?: Record<string, unknown> });
+              return message;
+            },
+            updateMessage: vi.fn(),
+          },
+          getSession: () => ({ messages: [], experts: [] }),
+          updateSession: vi.fn(),
+          appendSessionSkills: vi.fn(),
+          listSessionArtifacts: vi.fn(),
+        } as unknown as CoworkStore,
+      });
+      try {
+        mockSession.subscribe.mockImplementation(
+          (
+            callback: (event: {
+              type: string;
+              message?: { role: string; content: string };
+            }) => void,
+          ) => {
+            listener = callback;
+            return () => {};
+          },
+        );
+        const mockAgent = {
+          steer: vi.fn(),
+          followUp: (message: { role: string; content: string }) => {
+            agentFollowUpCalls.push(message);
+          },
+        };
+        mockSession.followUp.mockImplementation(async (text: string) => {
+          if (text.startsWith('/mycmd')) {
+            await new Promise(resolve => setTimeout(resolve, 25));
+            return 'handled' as const;
+          }
+          mockAgent.followUp(msg2);
+          return 'queued' as const;
+        });
+
+        await localAdapter.startSession('race-session', 'Start', { sessionMode: 'work' });
+        const active = localAdapter.activeSessions.get('race-session')!;
+        (active.piSession as unknown as { agent: typeof mockAgent }).agent = mockAgent;
+
+        const r1 = await localAdapter.enqueuePendingMessage(
+          'race-session',
+          '/mycmd',
+          undefined,
+          undefined,
+          ['skill-a'],
+        );
+        const r2 = await localAdapter.enqueuePendingMessage(
+          'race-session',
+          'real user message',
+          undefined,
+          undefined,
+          ['skill-b'],
+        );
+        expect(r1.success).toBe(true);
+        expect(r2.success).toBe(true);
+
+        listener!({ type: 'message_start', message: msg2 });
+        await new Promise(resolve => setTimeout(resolve, 40));
+
+        expect(agentFollowUpCalls).toHaveLength(1);
+        expect(persisted).toMatchObject([
+          { type: 'user', content: 'Start' },
+          {
+            type: 'user',
+            content: 'real user message',
+            metadata: { skillIds: ['skill-b'], queueDelivery: 'followUp' },
+          },
+        ]);
+        expect(persisted[0]?.metadata).toBeUndefined();
+        const remaining = localAdapter.listPendingMessages('race-session');
+        expect(remaining.some(item => item.text === 'real user message')).toBe(false);
+        expect(remaining).toHaveLength(1);
+        expect(remaining[0]?.status).toBe('failed');
+      } finally {
+        localAdapter.stopAllSessions();
+      }
+    });
   });
 
   describe('run completion on agent_settled', () => {

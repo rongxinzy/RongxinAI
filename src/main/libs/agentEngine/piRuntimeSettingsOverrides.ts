@@ -1,5 +1,6 @@
 /** In-memory Pi settings plus application transport and platform tool defaults. */
 
+import { installPiCompactionSettingsGuard } from './piBoundedCompaction';
 import { applyPiEmbeddedHttpIdleTimeout } from './piHttpIdleTimeout';
 import { type PiModules, type PiSettingsManager } from './piRuntimeSessionState';
 
@@ -14,7 +15,11 @@ export function applyPiPlatformToolOverrides(
   });
 }
 
-export function createPiSettingsManager(pi: PiModules, cwd: string): PiSettingsManager | null {
+export function createPiSettingsManager(
+  pi: PiModules,
+  cwd: string,
+  getSessionManager?: () => unknown,
+): PiSettingsManager | null {
   if (!pi.SettingsManager) return null;
   // Cowork owns its runtime configuration. Loading Pi's user/project settings here can
   // trigger package installation or third-party extensions that differ between machines.
@@ -22,5 +27,6 @@ export function createPiSettingsManager(pi: PiModules, cwd: string): PiSettingsM
     pi.SettingsManager.inMemory?.() ?? pi.SettingsManager.create(cwd, pi.getAgentDir());
   applyPiEmbeddedHttpIdleTimeout(settingsManager);
   applyPiPlatformToolOverrides(settingsManager);
+  installPiCompactionSettingsGuard(settingsManager, getSessionManager);
   return settingsManager;
 }

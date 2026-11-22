@@ -14,8 +14,17 @@ export function handlePiCompactionEvent(
     return true;
   }
   if (event.type !== PiAgentEventType.CompactionEnd) return false;
-  if (event.errorMessage) {
-    console.warn(`[PiRuntime] compaction failed for session ${sessionId}: ${event.errorMessage}`);
+  let deferredError: string | undefined;
+  if (event.reason !== PiCompactionReason.Manual) {
+    if (!event.errorMessage && event.aborted && active.lastCompactionError) {
+      deferredError = active.lastCompactionError.message;
+    }
+    active.lastCompactionError = undefined;
+  }
+  const errorMessage = event.errorMessage ?? deferredError;
+  const aborted = deferredError ? false : Boolean(event.aborted);
+  if (errorMessage) {
+    console.warn(`[PiRuntime] compaction failed for session ${sessionId}: ${errorMessage}`);
     // Defer the error to normal settlement. No prompt, abort, or retry is
     // injected here; a successful native continuation can still clear it.
     // A maintenance failure after a valid final response does not undo work
@@ -23,18 +32,18 @@ export function handlePiCompactionEvent(
     const unfinished =
       !active.lastAssistantMessage || !isPiFinalResponse(active.lastAssistantMessage);
     if (
-      !event.aborted &&
+      !aborted &&
       event.reason !== PiCompactionReason.Manual &&
       !active.errorSurfaced &&
       unfinished
     ) {
       active.pendingError = {
-        message: event.errorMessage,
-        classified: classifyCoworkError(event.errorMessage),
+        message: errorMessage,
+        classified: classifyCoworkError(errorMessage),
       };
       active.turnFailed = true;
     }
-  } else if (event.aborted) {
+  } else if (aborted) {
     console.log(`[PiRuntime] compaction cancelled for session ${sessionId}`);
   } else if (event.result) {
     // The SDK event crosses an untyped module boundary. Read only scalar

@@ -2,6 +2,7 @@ export const PiExtensionEventType = {
   ToolCall: 'tool_call',
   ToolResult: 'tool_result',
   BeforeAgentStart: 'before_agent_start',
+  SessionBeforeCompact: 'session_before_compact',
 } as const;
 
 interface PiToolCallEvent {
@@ -56,6 +57,26 @@ interface PiToolCallEventResult {
   reason: string;
 }
 
+interface PiSessionBeforeCompactEvent {
+  type: 'session_before_compact';
+  preparation: import('@earendil-works/pi-coding-agent').SessionBeforeCompactEvent['preparation'];
+  customInstructions?: string;
+  reason: 'manual' | 'threshold' | 'overflow';
+  willRetry: boolean;
+  signal: AbortSignal;
+}
+
+interface PiSessionBeforeCompactResult {
+  cancel?: boolean;
+  compaction?: {
+    summary: string;
+    firstKeptEntryId: string;
+    tokensBefore: number;
+    usage?: unknown;
+    details?: unknown;
+  };
+}
+
 export interface PiExtensionApi {
   on(
     event: typeof PiExtensionEventType.ToolCall,
@@ -72,6 +93,15 @@ export interface PiExtensionApi {
     handler: (
       event: PiBeforeAgentStartEvent,
     ) => PiBeforeAgentStartResult | void | Promise<PiBeforeAgentStartResult | void>,
+  ): void;
+  on(
+    event: typeof PiExtensionEventType.SessionBeforeCompact,
+    handler: (
+      event: PiSessionBeforeCompactEvent,
+    ) =>
+      | PiSessionBeforeCompactResult
+      | undefined
+      | Promise<PiSessionBeforeCompactResult | undefined>,
   ): void;
 }
 

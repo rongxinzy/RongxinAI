@@ -6,7 +6,9 @@
  * extensions (authorization, bash guardrails, plan mode, codemode, native MCP).
  */
 
+import type { Model, RetryPolicy } from '@earendil-works/pi-ai';
 import type { Skill, ToolAnnotations } from '@earendil-works/pi-coding-agent';
+import { runBoundedCompaction } from './piBoundedCompaction';
 
 import { ScheduledTaskResultGuidance } from '../../../scheduledTask/enginePrompt';
 import { captureMemoryPromptForE2e } from '../../memory/memoryPromptE2eCapture';
@@ -368,6 +370,39 @@ export async function createPiRuntimeResourceLoader(
                   block: true as const,
                   reason: authorization.reason || 'The action was not approved.',
                 };
+              });
+
+              extensionApi.on(PiExtensionEventType.SessionBeforeCompact, async event => {
+                const active = host.activeSessions.get(approvalContext.sessionId);
+                const streamFn = active?.piSession.agent?.streamFunction;
+                if (!active || typeof streamFn !== 'function') {
+                  return undefined;
+                }
+                const sessionModel =
+                  (active.piSession as { model?: Model<any> }).model ??
+                  (active.model as unknown as Model<any>);
+                if (!sessionModel) return undefined;
+                active.lastCompactionError = undefined;
+                try {
+                  const compaction = await runBoundedCompaction({
+                    preparation: event.preparation,
+                    model: sessionModel,
+                    streamFn: streamFn as unknown as Parameters<
+                      typeof runBoundedCompaction
+                    >[0]['streamFn'],
+                    customInstructions: event.customInstructions,
+                    signal: event.signal,
+                    thinkingLevel: active.piSession.thinkingLevel,
+                    retry: active.settingsManager?.getRetrySettings?.() as RetryPolicy | undefined,
+                  });
+                  return { compaction };
+                } catch (error) {
+                  if (!event.signal?.aborted) {
+                    active.lastCompactionError =
+                      error instanceof Error ? error : new Error(String(error));
+                  }
+                  return { cancel: true };
+                }
               });
             },
           ]

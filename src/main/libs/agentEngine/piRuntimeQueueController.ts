@@ -6,6 +6,7 @@
  * settle. Native follow-up and steer queues are delegated directly to Pi.
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import {
   CoworkQueueDelivery,
   CoworkQueueItemStatus,
@@ -41,45 +42,29 @@ export class PiRuntimeQueueController {
   private readonly queuedControlActions = new Map<string, Array<() => Promise<void>>>();
   private readonly nativeInputs = new Map<string, WeakMap<object, QueuedInput>>();
   private readonly pendingImageAdmissions = new Map<string, Promise<void>>();
-  private readonly hookedAgents = new WeakMap<
-    NonNullable<PiSession['agent']>,
-    {
-      steer: Array<(message: NonNullable<PiEvent['message']>) => void>;
-      followUp: Array<(message: NonNullable<PiEvent['message']>) => void>;
-    }
-  >();
+  private readonly hookedAgents = new WeakSet<NonNullable<PiSession['agent']>>();
+  private readonly activeQueueCallbacks = new AsyncLocalStorage<{
+    kind: 'steer' | 'followUp';
+    onQueued: (message: NonNullable<PiEvent['message']>) => void;
+  }>();
 
   constructor(private readonly host: PiRuntimeAdapterHost) {}
 
-  private registerAgentQueueHook(
-    piSession: PiSession,
-    kind: 'steer' | 'followUp',
-    onQueued: (message: NonNullable<PiEvent['message']>) => void,
-  ): () => void {
+  private ensureAgentQueueHook(piSession: PiSession): void {
     const agent = piSession.agent;
-    if (!agent) return () => {};
-    let state = this.hookedAgents.get(agent);
-    if (!state) {
-      state = { steer: [], followUp: [] };
-      this.hookedAgents.set(agent, state);
-      const originalSteer = agent.steer.bind(agent);
-      const originalFollowUp = agent.followUp.bind(agent);
-      agent.steer = message => {
-        const callback = state!.steer.shift();
-        callback?.(message);
-        originalSteer(message);
-      };
-      agent.followUp = message => {
-        const callback = state!.followUp.shift();
-        callback?.(message);
-        originalFollowUp(message);
-      };
-    }
-    const list = state[kind];
-    list.push(onQueued);
-    return () => {
-      const index = list.indexOf(onQueued);
-      if (index !== -1) list.splice(index, 1);
+    if (!agent || this.hookedAgents.has(agent)) return;
+    this.hookedAgents.add(agent);
+    const originalSteer = agent.steer.bind(agent);
+    const originalFollowUp = agent.followUp.bind(agent);
+    agent.steer = message => {
+      const current = this.activeQueueCallbacks.getStore();
+      if (current?.kind === 'steer') current.onQueued(message);
+      originalSteer(message);
+    };
+    agent.followUp = message => {
+      const current = this.activeQueueCallbacks.getStore();
+      if (current?.kind === 'followUp') current.onQueued(message);
+      originalFollowUp(message);
     };
   }
 
@@ -315,17 +300,18 @@ export class PiRuntimeQueueController {
         }
         inputs.set(message, { itemId: item.id, images: imagePreparation });
       };
-      const unregister = this.registerAgentQueueHook(active.piSession, 'followUp', onQueued);
+      this.ensureAgentQueueHook(active.piSession);
+      // Scope the callback per async execution chain so concurrent handled inputs never steal hooks.
       // followUp queues even during initial prompt preparation, when Pi is still idle.
-      void active.piSession
-        .followUp(promptText, images, { onQueued })
+      void this.activeQueueCallbacks
+        .run({ kind: 'followUp', onQueued }, () =>
+          active.piSession.followUp(promptText, images, { onQueued }),
+        )
         .then(disposition => {
-          unregister();
           if (disposition === 'handled')
             throw new Error('The agent handled this input without adding a follow-up.');
         })
         .catch(error => {
-          unregister();
           if (
             this.host.activeSessions.get(sessionId) !== active ||
             active.aborted ||
@@ -378,12 +364,10 @@ export class PiRuntimeQueueController {
         }
         inputs.set(message, { steerText: text });
       };
-      const unregister = this.registerAgentQueueHook(active.piSession, 'steer', onQueued);
-      try {
-        await active.piSession.steer(text, undefined, { onQueued });
-      } finally {
-        unregister();
-      }
+      this.ensureAgentQueueHook(active.piSession);
+      await this.activeQueueCallbacks.run({ kind: 'steer', onQueued }, () =>
+        active.piSession.steer(text, undefined, { onQueued }),
+      );
       return { success: true };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };

@@ -23,6 +23,7 @@ import {
 import { t } from '../../i18n';
 import { magpieImageInput } from '../../magpie/catalog';
 import { resolveMagpieFallbackMaxTokens, resolveMagpieModelCompat } from './piMagpieModelCompat';
+import { wrapMagpieNativeApi } from './piMagpieApiGuard';
 import type { PiModelRuntime, PiModules, PiResolvedModel } from './piRuntimeSessionState';
 
 export const DEFAULT_PI_LOCAL_MAX_TOKENS = 8192;
@@ -152,12 +153,14 @@ export async function resolvePiModel(
       throw new Error(t('coworkErrorModelNotFound'));
     const key = () =>
       isCurrentGateway() ? (requiresScope ? scopeKey?.() : MAGPIE_RUNTIME_API_KEY) : undefined;
-    const nativeApi =
+    const nativeApi = wrapMagpieNativeApi(
       api === 'openai-responses'
         ? pi.openAIResponsesApi()
         : api === 'anthropic-messages'
           ? pi.anthropicMessagesApi()
-          : pi.openAICompletionsApi();
+          : pi.openAICompletionsApi(),
+      pi.createAssistantMessageEventStream,
+    );
     modelRuntime.registerNativeProvider(
       pi.createProvider({
         id: customModel.provider,
