@@ -38,7 +38,7 @@ test('concurrent direct saves and the scheduler never execute the same item twic
       content: 'B',
     }),
   ]);
-  await service.stopOutboxScheduler();
+  await service.shutdown();
 
   expect(adapter.confirmMemory).toHaveBeenCalledTimes(2);
   expect(repository.listPending()).toHaveLength(0);

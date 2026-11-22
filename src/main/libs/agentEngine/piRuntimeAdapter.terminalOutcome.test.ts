@@ -1,4 +1,9 @@
-import { adapter, mockSession, setupPiRuntimeAdapterSuite } from './piRuntimeAdapter.testHarness';
+import {
+  createTestPiRuntime,
+  adapter,
+  mockSession,
+  setupPiRuntimeAdapterSuite,
+} from './piRuntimeAdapter.testHarness';
 import { expect, test, vi } from 'vitest';
 import { CoworkErrorKind } from '../../../common/coworkError';
 import { PiAssistantStopReason } from './piToolConstants';
@@ -89,7 +94,7 @@ test('a settled response completes directly without a workbench verification gat
   const db = new Database(':memory:');
   initializeWorkbenchTaskSchema(db);
   const service = new WorkbenchTaskService(db);
-  adapter.setWorkbenchTaskService(service);
+  const adapter = createTestPiRuntime({ workbenchTaskService: service });
   const complete = vi.fn();
   const error = vi.fn();
   adapter.on('complete', complete);
@@ -110,6 +115,59 @@ test('a settled response completes directly without a workbench verification gat
     );
   } finally {
     adapter.stopAllSessions();
+    db.close();
+  }
+});
+
+test('Pi settles a failure on its own run when another run was reserved later', async () => {
+  const db = new Database(':memory:');
+  initializeWorkbenchTaskSchema(db);
+  const service = new WorkbenchTaskService(db);
+  const runtime = createTestPiRuntime({ workbenchTaskService: service });
+  runtime.on('error', vi.fn());
+  const sessionId = 'scoped-failure';
+  try {
+    await runtime.startSession(sessionId, 'First run', { sessionMode: 'work' });
+    const running = service.getCurrent(sessionId)!.runs[0];
+    const reserved = service.reserveRun({ sessionId, goal: 'Reserved' });
+    const listener = mockSession.subscribe.mock.calls.at(-1)![0];
+    listener({ type: 'turn_start' });
+    listener({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        content: [],
+        stopReason: PiAssistantStopReason.Aborted,
+      },
+    });
+    listener({ type: 'agent_settled' });
+    expect(service.repository.getRun(running.id)?.status).toBe(WorkbenchExecutionStatus.Failed);
+    expect(service.repository.getRun(reserved.runId)?.status).toBe(WorkbenchExecutionStatus.Queued);
+  } finally {
+    runtime.stopAllSessions();
+    db.close();
+  }
+});
+
+test('a rejected native continuation ends its Workbench run', async () => {
+  const db = new Database(':memory:');
+  initializeWorkbenchTaskSchema(db);
+  const service = new WorkbenchTaskService(db);
+  const runtime = createTestPiRuntime({ workbenchTaskService: service });
+  runtime.on('error', vi.fn());
+  const sessionId = 'rejected-continuation';
+  try {
+    await runtime.startSession(sessionId, 'First run', { sessionMode: 'work' });
+    mockSession.subscribe.mock.calls.at(-1)![0]({ type: 'agent_settled' });
+    mockSession.prompt.mockRejectedValueOnce(new Error('Rejected before native settlement'));
+    await expect(runtime.continueSession(sessionId, 'Second run')).rejects.toThrow(
+      'Rejected before native settlement',
+    );
+    const run = service.getCurrent(sessionId)!.runs[0];
+    expect(run.status).toBe(WorkbenchExecutionStatus.Failed);
+    expect(run.failure).toEqual({ message: 'Rejected before native settlement' });
+  } finally {
+    runtime.stopAllSessions();
     db.close();
   }
 });

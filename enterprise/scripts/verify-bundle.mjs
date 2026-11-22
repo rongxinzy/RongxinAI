@@ -1,8 +1,19 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const bundleUrl = new URL('../dist/extension.cjs', import.meta.url);
-const rendererDirectory = new URL('../dist/ui/', import.meta.url);
+const root = fileURLToPath(new URL('../../', import.meta.url));
+const bundleUrl = pathToFileURL(
+  path.resolve(
+    root,
+    process.env.ZHIYUAN_ENTERPRISE_EXTENSION_BUNDLE || 'enterprise/dist/extension.cjs',
+  ),
+);
+const rendererDirectory = pathToFileURL(
+  path.resolve(root, process.env.ZHIYUAN_ENTERPRISE_RENDERER_DIRECTORY || 'enterprise/dist/ui') +
+    path.sep,
+);
 const rendererIndexUrl = new URL('index.html', rendererDirectory);
 const bundleSource = await fs.readFile(bundleUrl, 'utf8');
 assert.doesNotMatch(

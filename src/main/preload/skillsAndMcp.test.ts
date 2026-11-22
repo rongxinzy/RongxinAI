@@ -72,4 +72,10 @@ describe('skillsAndMcpApi contract invokers', () => {
     expect(Object.keys(skillsAndMcpApi.mcp)).toContain('onBridgeSyncDone');
     expect(Object.keys(skillsAndMcpApi.marketplace).sort()).toEqual(['cancelSearch', 'search']);
   });
+
+  test('omits the retired Skill and MCP methods from preload', () => {
+    expect(skillsAndMcpApi.skills).not.toHaveProperty('getRoot');
+    expect(skillsAndMcpApi.skills).not.toHaveProperty('autoRoutingPrompt');
+    expect(skillsAndMcpApi.mcp).not.toHaveProperty('refreshBridge');
+  });
 });

@@ -1,5 +1,5 @@
 import { Message, MessageContent } from '@shared/components/ai-elements/message';
-import { StreamingMarkdownResponse } from '@shared/components/ai-elements/streamingMarkdownResponse';
+import { StreamingMarkdownResponse } from '../../ai-elements/streamingMarkdownResponse';
 import { Alert, AlertDescription } from '@shared/components/ui/alert';
 import React from 'react';
 

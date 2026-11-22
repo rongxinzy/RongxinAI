@@ -2,18 +2,23 @@
  * Browser Launcher - Manages Chrome browser lifecycle
  */
 
-import { spawn, ChildProcess } from 'child_process';
-import { existsSync, mkdirSync, accessSync, constants } from 'fs';
+import { spawn, type ChildProcess } from 'child_process';
+import { once } from 'node:events';
+import { setTimeout as delay } from 'node:timers/promises';
+import { existsSync, accessSync, constants } from 'fs';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { BrowserConfig } from '../config';
+import type { BrowserConfig } from '../config';
 
 export interface BrowserInstance {
   process: ChildProcess;
   pid: number;
   cdpPort: number;
+  cdpWebSocketUrl: string;
   headless: boolean;
   startTime: number;
+  removeProfile(): Promise<void>;
 }
 
 /**
@@ -122,71 +127,95 @@ function resolveHeadlessMode(configHeadless: boolean): boolean {
   return true;
 }
 
-/**
- * Wait for CDP port to become available
- */
+type OwnedCdp = Pick<BrowserInstance, 'process' | 'cdpPort' | 'cdpWebSocketUrl'>;
+
+export async function isOwnedCdpReachable(browser: OwnedCdp, signal?: AbortSignal): Promise<boolean> {
+  if (!isProcessRunning(browser.process)) return false;
+  const timeout = AbortSignal.timeout(1500);
+  try {
+    const response = await fetch(`http://127.0.0.1:${browser.cdpPort}/json/version`, {
+      redirect: 'error',
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    });
+    if (!response.ok) return false;
+    const version = (await response.json()) as { webSocketDebuggerUrl?: string } | null;
+    return (
+      version?.webSocketDebuggerUrl === browser.cdpWebSocketUrl &&
+      isProcessRunning(browser.process)
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function waitForCDP(
-  port: number,
+  profile: string,
   browserProcess: ChildProcess,
-  timeoutMs: number = 10000,
-): Promise<void> {
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<OwnedCdp> {
   const startTime = Date.now();
-  let attempts = 0;
+  const activePortFile = join(profile, 'DevToolsActivePort');
 
   while (Date.now() - startTime < timeoutMs) {
-    if (browserProcess.exitCode !== null || browserProcess.signalCode !== null) {
+    signal?.throwIfAborted();
+    if (!isProcessRunning(browserProcess)) {
       const exitCode = browserProcess.exitCode ?? 'null';
-      const signal = browserProcess.signalCode ?? 'none';
+      const exitSignal = browserProcess.signalCode ?? 'none';
       throw new Error(
-        `Chrome process exited before CDP was ready (exitCode=${exitCode}, signal=${signal})`,
+        `Chrome process exited before CDP was ready (exitCode=${exitCode}, signal=${exitSignal})`,
       );
     }
 
-    attempts++;
-    try {
-      const response = await fetch(`http://127.0.0.1:${port}/json/version`, {
-        signal: AbortSignal.timeout(2000),
-      });
-      if (response.ok) {
-        console.log(`[Browser] CDP ready after ${attempts} attempts (${Date.now() - startTime}ms)`);
-        return;
-      }
-      console.log(`[Browser] CDP attempt ${attempts}: response not OK (status ${response.status})`);
-    } catch {
-      // Port not ready yet, continue waiting
-      if (attempts % 5 === 0) {
-        console.log(
-          `[Browser] CDP attempt ${attempts}: still waiting... (${Date.now() - startTime}ms elapsed)`,
-        );
-      }
+    const activePort = await readFile(activePortFile, { encoding: 'utf8', signal }).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return '';
+        throw error;
+      },
+    );
+    const match = /^(\d{1,5})\r?\n(\/devtools\/browser\/[a-f\d-]+)\s*$/i.exec(activePort);
+    if (match) {
+      const cdpPort = Number(match[1]);
+      if (cdpPort < 1 || cdpPort > 65_535) throw new Error('Invalid Chrome CDP port');
+      const browser = {
+        process: browserProcess,
+        cdpPort,
+        cdpWebSocketUrl: `ws://127.0.0.1:${cdpPort}${match[2]}`,
+      };
+      const ready = await isOwnedCdpReachable(browser, signal);
+      signal?.throwIfAborted();
+      if (ready) return browser;
     }
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await delay(100, undefined, { signal });
   }
 
-  throw new Error(`CDP port ${port} not ready after ${timeoutMs}ms (${attempts} attempts)`);
+  throw new Error(`Chrome CDP did not become ready within ${timeoutMs}ms`);
 }
 
 /**
  * Launch Chrome browser with CDP enabled
  */
-export async function launchBrowser(config: BrowserConfig): Promise<BrowserInstance> {
+export async function launchBrowser(
+  config: BrowserConfig,
+  signal?: AbortSignal,
+): Promise<BrowserInstance> {
+  signal?.throwIfAborted();
   const chromePath = config.chromePath || getChromePath();
-  const cdpPort = config.cdpPort;
   const runtimeChromeFlags = resolveRuntimeChromeFlags(config.chromeFlags || []);
   const runtimeHeadless = resolveHeadlessMode(config.headless);
+  const profileRoot = config.userDataDir ?? tmpdir();
+  await mkdir(profileRoot, { recursive: true });
+  signal?.throwIfAborted();
+  const profile = await mkdtemp(join(profileRoot, 'zhiyuan-web-search-'));
+  let profileCleanup: Promise<void> | undefined;
+  const removeProfile = () =>
+    (profileCleanup ??= rm(profile, { recursive: true, force: true, maxRetries: 3 }));
 
-  // Create a temporary user data directory if not provided
-  const userDataDir = config.userDataDir || join(tmpdir(), `chrome-cdp-${Date.now()}`);
-  if (!existsSync(userDataDir)) {
-    mkdirSync(userDataDir, { recursive: true });
-  }
-
-  // Build Chrome arguments
   const args = [
-    `--remote-debugging-port=${cdpPort}`,
-    '--remote-debugging-address=127.0.0.1',
-    `--user-data-dir=${userDataDir}`, // Always use isolated user data dir
     ...runtimeChromeFlags,
+    '--remote-debugging-port=0',
+    '--remote-debugging-address=127.0.0.1',
+    `--user-data-dir=${profile}`,
   ];
 
   if (runtimeHeadless) {
@@ -194,26 +223,27 @@ export async function launchBrowser(config: BrowserConfig): Promise<BrowserInsta
   }
 
   console.log(`[Browser] Launching Chrome at: ${chromePath}`);
-  console.log(`[Browser] CDP port: ${cdpPort}`);
-  console.log(`[Browser] User data dir: ${userDataDir}`);
+  console.log(`[Browser] User data dir: ${profile}`);
   console.log(`[Browser] Headless: ${runtimeHeadless}`);
   console.log(`[Browser] Flags: ${runtimeChromeFlags.join(' ') || '(none)'}`);
 
-  // Spawn Chrome process
-  const browserProcess = spawn(chromePath, args, {
-    detached: false,
-    stdio: ['ignore', 'pipe', 'pipe'], // Capture stdout and stderr
-  });
   const recentStderr: string[] = [];
-
-  // Log Chrome output for debugging
-  if (browserProcess.stdout) {
-    browserProcess.stdout.on('data', data => {
+  let browserProcess: ChildProcess | undefined;
+  try {
+    signal?.throwIfAborted();
+    browserProcess = spawn(chromePath, args, {
+      detached: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    browserProcess.once('close', () => {
+      void removeProfile().catch(error => {
+        console.warn('[Browser] Failed to remove the Chrome profile:', error);
+      });
+    });
+    browserProcess.stdout?.on('data', data => {
       console.log(`[Browser stdout] ${data.toString().trim()}`);
     });
-  }
-  if (browserProcess.stderr) {
-    browserProcess.stderr.on('data', data => {
+    browserProcess.stderr?.on('data', data => {
       const message = data.toString().trim();
       console.log(`[Browser stderr] ${message}`);
       if (!message) {
@@ -230,71 +260,101 @@ export async function launchBrowser(config: BrowserConfig): Promise<BrowserInsta
         recentStderr.shift();
       }
     });
-  }
 
-  if (!browserProcess.pid) {
-    throw new Error('Failed to start Chrome process');
-  }
-
-  console.log(`[Browser] Chrome started with PID: ${browserProcess.pid}`);
-
-  // Wait for CDP to be ready
-  try {
-    await waitForCDP(cdpPort, browserProcess, 20000); // Increased timeout to 20 seconds
-    console.log(`[Browser] CDP ready on port ${cdpPort}`);
+    await once(browserProcess, 'spawn');
+    const pid = browserProcess.pid;
+    if (!pid) throw new Error('Failed to start Chrome process');
+    console.log(`[Browser] Chrome started with PID: ${pid}`);
+    const cdp = await waitForCDP(profile, browserProcess, 20_000, signal);
+    console.log(`[Browser] CDP ready on port ${cdp.cdpPort}`);
+    return {
+      ...cdp,
+      pid,
+      headless: runtimeHeadless,
+      startTime: Date.now(),
+      removeProfile,
+    };
   } catch (error) {
-    browserProcess.kill();
-    const baseMessage = error instanceof Error ? error.message : String(error);
+    const startupError = signal?.aborted ? signal.reason : error;
+    try {
+      if (browserProcess) await stopBrowserProcess(browserProcess);
+      await removeProfile();
+    } catch (cleanupError) {
+      console.warn('[Browser] Failed to clean up Chrome after startup failed:', cleanupError);
+    }
     if (recentStderr.length > 0) {
+      const baseMessage = startupError instanceof Error ? startupError.message : String(startupError);
       const tail = recentStderr.slice(-5).join(' | ');
       throw new Error(`${baseMessage}. Recent browser stderr: ${tail}`);
     }
-    throw error;
+    throw startupError;
   }
-
-  return {
-    process: browserProcess,
-    pid: browserProcess.pid,
-    cdpPort,
-    headless: runtimeHeadless,
-    startTime: Date.now(),
-  };
 }
 
-/**
- * Close browser instance
- */
-export async function closeBrowser(instance: BrowserInstance): Promise<void> {
-  if (instance.process && !instance.process.killed) {
-    console.log(`[Browser] Closing browser (PID: ${instance.pid})`);
-    instance.process.kill('SIGTERM');
+function isProcessRunning(browserProcess: ChildProcess): boolean {
+  return (
+    Boolean(browserProcess.pid) &&
+    browserProcess.exitCode === null &&
+    browserProcess.signalCode === null
+  );
+}
 
-    // Wait for graceful shutdown
-    await new Promise<void>(resolve => {
-      const timeout = setTimeout(() => {
-        if (!instance.process.killed) {
-          console.log(`[Browser] Force killing browser (PID: ${instance.pid})`);
-          instance.process.kill('SIGKILL');
-        }
-        resolve();
-      }, 5000);
+function signalAndWaitForExit(
+  browserProcess: ChildProcess,
+  signal: 'SIGTERM' | 'SIGKILL',
+  timeoutMs: number,
+): Promise<boolean> {
+  if (!isProcessRunning(browserProcess)) return Promise.resolve(true);
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timeout);
+      browserProcess.off('exit', onExit);
+      browserProcess.off('error', onError);
+    };
+    const onExit = () => {
+      cleanup();
+      resolve(true);
+    };
+    const onError = (error: unknown) => {
+      cleanup();
+      reject(error);
+    };
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve(!isProcessRunning(browserProcess));
+    }, timeoutMs);
+    browserProcess.once('exit', onExit);
+    browserProcess.once('error', onError);
+    try {
+      browserProcess.kill(signal);
+    } catch (error) {
+      onError(error);
+    }
+  });
+}
 
-      instance.process.on('exit', () => {
-        clearTimeout(timeout);
-        resolve();
-      });
-    });
-
-    console.log(`[Browser] Browser closed`);
+async function stopBrowserProcess(browserProcess: ChildProcess): Promise<void> {
+  if (!isProcessRunning(browserProcess)) return;
+  const pid = browserProcess.pid;
+  console.log(`[Browser] Closing browser (PID: ${pid})`);
+  // Node sets ChildProcess.killed when it sends a signal.
+  if (!(await signalAndWaitForExit(browserProcess, 'SIGTERM', 5000))) {
+    console.log(`[Browser] Force killing browser (PID: ${pid})`);
+    if (!(await signalAndWaitForExit(browserProcess, 'SIGKILL', 2000))) {
+      throw new Error(`Chrome did not exit after SIGKILL (PID: ${pid})`);
+    }
   }
+  console.log('[Browser] Browser closed');
+}
+
+export async function closeBrowser(instance: BrowserInstance): Promise<void> {
+  await stopBrowserProcess(instance.process);
+  await instance.removeProfile();
 }
 
 /**
  * Check if browser is running
  */
 export function isBrowserRunning(instance: BrowserInstance | null): boolean {
-  if (!instance) {
-    return false;
-  }
-  return instance.process && !instance.process.killed;
+  return instance !== null && isProcessRunning(instance.process);
 }

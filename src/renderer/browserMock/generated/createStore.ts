@@ -3,15 +3,15 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createStore(runtime: BrowserMockRuntime): Window['electron']['store'] {
   return {
-    get: async _p0 => {
-      void _p0;
-      runtime.warnOnce('store.get');
-      return {};
-    },
     set: async (_p0, _p1) => {
       void _p0;
       void _p1;
       runtime.warnOnce('store.set');
+    },
+    get: async _p0 => {
+      void _p0;
+      runtime.warnOnce('store.get');
+      return {};
     },
     remove: async _p0 => {
       void _p0;

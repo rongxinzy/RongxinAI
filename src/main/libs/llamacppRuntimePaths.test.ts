@@ -8,7 +8,17 @@ import type { NvidiaSmiSnapshot } from '../../shared/hardware';
 import { LlamaCppRuntimeBackend } from '../../shared/llamacpp';
 import type { BundledRuntimeManifest } from './llamacppBundledRuntime';
 import { clearBundledVulkanGpuProbeCache } from './llamacppBundledRuntimeSelection';
+import { resolveLlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import { findLlamaCppExecutable } from './llamacppRuntimePaths';
+
+test.each([
+  ['darwin', 'arm64', 'mac-arm64'],
+  ['darwin', 'x64', 'mac-x64'],
+  ['win32', 'x64', 'win-x64'],
+  ['linux', 'arm64', 'linux-arm64'],
+] as const)('maps %s %s to %s', (platform, arch, target) => {
+  expect(resolveLlamaCppRuntimeTargetId(platform, arch)).toBe(target);
+});
 
 const mocks = vi.hoisted(() => ({
   root: vi.fn<() => string>(),

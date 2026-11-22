@@ -1,17 +1,5 @@
-import { CodingAgentProfileStatus, type CodingWorkspaceSummary } from '../../../shared/codingAgent';
+import { CodingAgentProfileStatus } from '../../../shared/codingAgent';
 import { ToolState } from '../../../shared/components/ai-elements/constants';
-
-export const CodingUiEvent = {
-  CreateSession: 'coding:create-session',
-  ManageAgents: 'coding:manage-agents',
-  OpenWorkspaceDialog: 'coding:open-workspace-dialog',
-} as const;
-
-export interface CodingCreateSessionEventDetail {
-  workspace: CodingWorkspaceSummary;
-  /** Agent to start the session with; omitted to ask the user for one. */
-  profileId?: string;
-}
 
 export const CodingAgentStatusI18nKey: Record<CodingAgentProfileStatus, string> = {
   [CodingAgentProfileStatus.Detected]: 'codingAgentStatusDetected',

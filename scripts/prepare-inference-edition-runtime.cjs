@@ -22,25 +22,8 @@ function copyRuntimeTree(sourceRoot, targetRoot) {
   fs.cpSync(sourceRoot, targetRoot, { recursive: true, verbatimSymlinks: true });
 }
 
-function main() {
-  const edition = (process.env.ZHIYUAN_UPDATE_VARIANT || 'cpu').trim().toLowerCase();
-  if (edition === 'lite') {
-    console.log('[prepare-inference-edition-runtime] lite edition skips bundled llama.cpp.');
-    return;
-  }
-
-  const sourceRoot = path.join(ROOT, 'vendor', 'llamacpp', edition);
-  const targetRoot = path.join(ROOT, 'resources', 'llamacpp-bundled');
-  const manifestPath = path.join(sourceRoot, 'manifest.json');
-  if (!fs.existsSync(manifestPath)) {
-    console.warn(
-      `[prepare-inference-edition-runtime] Missing ${manifestPath}; skip staging bundled runtime.`,
-    );
-    return;
-  }
-
-  copyRuntimeTree(sourceRoot, targetRoot);
-
+function refreshRuntimeManifest(targetRoot) {
+  const manifestPath = path.join(targetRoot, 'manifest.json');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const executablePath = path.join(targetRoot, manifest.executable);
   if (!fs.existsSync(executablePath)) {
@@ -59,10 +42,29 @@ function main() {
       manifest.cpuFallbackSha256 = sha256File(fallbackPath);
     }
   }
-  fs.writeFileSync(
-    path.join(targetRoot, 'manifest.json'),
-    `${JSON.stringify(manifest, null, 2)}\n`,
-  );
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  return manifest;
+}
+
+function main() {
+  const edition = (process.env.ZHIYUAN_UPDATE_VARIANT || 'cpu').trim().toLowerCase();
+  if (edition === 'lite') {
+    console.log('[prepare-inference-edition-runtime] lite edition skips bundled llama.cpp.');
+    return;
+  }
+
+  const sourceRoot = path.join(ROOT, 'vendor', 'llamacpp', edition);
+  const targetRoot = path.join(ROOT, 'resources', 'llamacpp-bundled');
+  const manifestPath = path.join(sourceRoot, 'manifest.json');
+  if (!fs.existsSync(manifestPath)) {
+    console.warn(
+      `[prepare-inference-edition-runtime] Missing ${manifestPath}; skip staging bundled runtime.`,
+    );
+    return;
+  }
+
+  copyRuntimeTree(sourceRoot, targetRoot);
+  const manifest = refreshRuntimeManifest(targetRoot);
   console.log(
     `[prepare-inference-edition-runtime] Staged ${edition} runtime to resources/llamacpp-bundled (${manifest.sha256.slice(0, 12)}…).`,
   );
@@ -72,4 +74,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { copyRuntimeTree };
+module.exports = { copyRuntimeTree, refreshRuntimeManifest };

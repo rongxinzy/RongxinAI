@@ -2,15 +2,11 @@
  * System IPC contracts (channel + args + result), single source of truth for
  * the `appSystem` preload namespace, the main-side registrations it reaches
  * (store, permissions, dialog, project, shell, app, appUpdate, log,
- * appConfig), and the renderer-facing types under
- * `src/renderer/types/electron/appSystemApi.ts`.
+ * appConfig), and the renderer-facing types derived from the shared channel maps.
  *
  * Arg/result shapes mirror what the renderer sends today (call sites noted per
  * method). Results are not stripped at runtime; the schemas document the fields
- * the renderer reads. Fire-and-forget `ipcRenderer.send` channels
- * (contextMenu.execute, window controls, log.fromRenderer, networkStatus.send)
- * and push subscriptions stay hand-wired in the preload — contracts only cover
- * invoke methods.
+ * the renderer reads. The app event contract defines renderer sends separately.
  */
 import { z } from 'zod';
 
@@ -27,7 +23,6 @@ import {
   WindowIpc,
 } from './channels';
 import { AppUpdateIpc } from '../appUpdate/constants';
-import { ProjectCreateDirectorySchema } from './schemas';
 
 // ─── Shared result shapes ───────────────────────────────────────────────────
 
@@ -100,11 +95,6 @@ export const appSystemContract = defineIpcContract({
     args: z.tuple([]),
     result: z.boolean(),
   },
-  windowToggleDevTools: {
-    channel: WindowIpc.ToggleDevTools,
-    args: z.tuple([]),
-    result: z.boolean(),
-  },
   windowOpenDevTools: {
     channel: WindowIpc.OpenDevTools,
     args: z.tuple([]),
@@ -138,23 +128,12 @@ export const appSystemContract = defineIpcContract({
     args: z.tuple([z.object({ defaultPath: z.string().optional() }).optional()]),
     result: z.object({ success: z.boolean(), path: z.string().nullable() }),
   },
-  dialogSelectFile: {
-    channel: DialogIpc.SelectFile,
-    args: z.tuple([
-      z
-        .object({
-          title: z.string().optional(),
-          filters: z.array(FileFilterSchema).optional(),
-        })
-        .optional(),
-    ]),
-    result: z.object({ success: z.boolean(), path: z.string().nullable() }),
-  },
   dialogSelectFiles: {
     channel: DialogIpc.SelectFiles,
     args: z.tuple([
       z
         .object({
+          multiple: z.boolean().optional(),
           title: z.string().optional(),
           filters: z.array(FileFilterSchema).optional(),
         })
@@ -188,39 +167,11 @@ export const appSystemContract = defineIpcContract({
     args: z.tuple([z.string()]),
     result: z.object({ success: z.boolean() }),
   },
-  dialogGenerateThumbnail: {
-    channel: DialogIpc.GenerateThumbnail,
-    args: z.tuple([z.string()]),
-    result: z.object({
-      success: z.boolean(),
-      dataUrl: z.string().optional(),
-      error: z.string().optional(),
-    }),
-  },
-  dialogShowMessageBox: {
-    channel: DialogIpc.ShowMessageBox,
-    args: z.tuple([
-      z.object({
-        message: z.string(),
-        type: z.enum(['none', 'info', 'error', 'question', 'warning']).optional(),
-        title: z.string().optional(),
-      }),
-    ]),
-    result: z.object({ response: z.number() }),
-  },
-
   // project (CreateProjectDialog, FolderSelectorPopover)
   projectGetDefaultBaseDir: {
     channel: ProjectIpc.GetDefaultBaseDir,
     args: z.tuple([]),
     result: PathResultSchema,
-  },
-  projectCreateDirectory: {
-    channel: ProjectIpc.CreateDirectory,
-    args: z.tuple([ProjectCreateDirectorySchema.input]),
-    result: PathResultSchema.extend({
-      code: z.enum(['invalid-name', 'already-exists']).optional(),
-    }),
   },
   projectEnsureScratchDir: {
     channel: ProjectIpc.EnsureScratchDir,

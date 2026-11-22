@@ -6,12 +6,13 @@ import {
 } from './memoryOutboxPayloads';
 import { validateMemoryOutboxRelationships } from './memoryRelationshipResolution';
 import type { MemoryOutboxItem, MemoryRepository } from './repository';
-import type { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
+import { EngramRequestError, type ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
 
 export async function processMemoryOutboxItem(
   repository: MemoryRepository,
   adapter: ZhiYuanEngramAdapter,
   item: MemoryOutboxItem | null,
+  pendingRegistration?: (sessionId: string) => Promise<void> | undefined,
 ): Promise<number | null> {
   if (!item) return null;
   if (
@@ -30,7 +31,7 @@ export async function processMemoryOutboxItem(
     return await processMemoryForget(repository, adapter, item);
   }
   if (item.operation === MemoryOutboxOperation.FinalizeSession) {
-    return await processSessionFinalization(repository, adapter, item);
+    return await processSessionFinalization(repository, adapter, item, pendingRegistration);
   }
   if (
     item.operation !== MemoryOutboxOperation.Confirm &&
@@ -137,12 +138,16 @@ async function processSessionFinalization(
   repository: MemoryRepository,
   adapter: ZhiYuanEngramAdapter,
   item: MemoryOutboxItem,
+  pendingRegistration: ((sessionId: string) => Promise<void> | undefined) | undefined,
 ): Promise<number | null> {
   const payload = parseFinalizeSessionPayload(item.payload);
   if (!payload) return retryInvalidOutboxItem(repository, item);
+  // Registration can advance the effective identity before the close is sent.
+  const registration = pendingRegistration?.(payload.sessionId);
+  const [registrationResult] = registration ? await Promise.allSettled([registration]) : [];
   if (repository.lifecycle?.deferSessionFinalization(item.id, payload.sessionId)) return null;
-  const delivery =
-    repository.lifecycle?.resolveSessionFinalization(item.id, payload.sessionId) ?? payload;
+  const delivery = repository.lifecycle.resolveSessionFinalization(item.id, item.linkId, payload);
+  if (!delivery) return retryInvalidOutboxItem(repository, item);
   try {
     const result = await adapter.finalizeSession({
       sessionId: delivery.runtimeSessionId,
@@ -156,6 +161,18 @@ async function processSessionFinalization(
     repository.lifecycle.completeSessionFinalization(item.id);
     return result.summaryId;
   } catch (error) {
+    if (
+      error instanceof EngramRequestError &&
+      error.status === 404 &&
+      error.code === 'unknown_session' &&
+      registrationResult?.status !== 'rejected' &&
+      delivery.runtimeSessionId === payload.sessionId &&
+      !repository.lifecycle.getRuntimeSessionId(payload.sessionId) &&
+      !repository.lifecycle.getLocalSessionIdByRuntimeId(delivery.runtimeSessionId)
+    ) {
+      repository.lifecycle.completeSessionFinalization(item.id);
+      return null;
+    }
     repository.lifecycle.failSessionFinalization(
       item.id,
       error instanceof Error ? error.message : String(error),

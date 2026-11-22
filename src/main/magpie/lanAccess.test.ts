@@ -26,8 +26,16 @@ function fakeManagement(
           return { keys: [], secret: key?.secret ?? '' };
         }
         if (route === '/api/caller-keys/add-key') {
+          if ([...keys.values()].some(key => key.secret === body?.secret)) {
+            throw new Error('Another gateway key already has this key');
+          }
           const id = `key-${keys.size + 1}`;
           keys.set(id, { id, name: String(body?.name), secret: String(body?.secret) });
+          return { keys: [] };
+        }
+        if (route === '/api/caller-keys/on-key') {
+          const key = keys.get(String(body?.key));
+          if (key) key.off = false;
           return { keys: [] };
         }
         if (route === '/api/caller-keys/remove-key') {
@@ -99,6 +107,24 @@ describe('syncMagpieLanAccessKey', () => {
       .map(call => call.body?.key);
     expect(removed).toEqual(['key-1']);
   });
+
+  it.each([false, true])(
+    'reuses the matching key after interrupted cleanup (off=%s)',
+    async off => {
+      const { client, calls } = fakeManagement([
+        { id: 'key-1', name: 'zhiyuan-lan', secret: 'sk-lan-old' },
+        { id: 'key-2', name: 'zhiyuan-lan', secret: 'sk-lan-new', off },
+      ]);
+      await syncMagpieLanAccessKey(client, 'sk-lan-new');
+      expect(calls.filter(call => call.route === '/api/caller-keys/add-key')).toEqual([]);
+      expect(calls.filter(call => call.route === '/api/caller-keys/on-key')).toEqual(
+        off ? [{ route: '/api/caller-keys/on-key', body: { key: 'key-2' } }] : [],
+      );
+      expect(calls.filter(call => call.route === '/api/caller-keys/remove-key')).toEqual([
+        { route: '/api/caller-keys/remove-key', body: { key: 'key-1' } },
+      ]);
+    },
+  );
 
   it('rejects an empty token', async () => {
     const { client } = fakeManagement([]);

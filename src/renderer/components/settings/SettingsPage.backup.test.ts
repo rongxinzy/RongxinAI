@@ -64,7 +64,8 @@ beforeEach(() => {
 });
 
 const backupSwitch = () => screen.getByRole('switch', { name: 'sqliteAutoBackupEnabled' });
-const openSettings = () => render(React.createElement(SettingsPage, { onClose: vi.fn() }));
+const openSettings = () =>
+  render(React.createElement(SettingsPage, { onClose: vi.fn(), onAskAi: vi.fn() }));
 
 test('disables backup until loaded and while saving, then restores its saved state on failure', async () => {
   let reject!: (error: Error) => void;
@@ -137,7 +138,7 @@ test('allows Close during a save and reloads the saved value on reopening', asyn
     sqliteAutoBackupEnabled: saved,
   }));
   const close = vi.fn();
-  const view = render(React.createElement(SettingsPage, { onClose: close }));
+  const view = render(React.createElement(SettingsPage, { onClose: close, onAskAi: vi.fn() }));
   await waitFor(() => expect(backupSwitch()).not.toHaveAttribute('aria-disabled', 'true'));
   fireEvent.click(backupSwitch());
   fireEvent.click(screen.getByRole('button', { name: 'close' }));

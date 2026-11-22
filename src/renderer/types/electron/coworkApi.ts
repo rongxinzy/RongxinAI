@@ -3,8 +3,7 @@
  *
  * Method signatures and data types derive from the zod IPC contract
  * (`src/shared/ipc/coworkContract.ts`) — the contract is the single source of
- * truth shared with main and preload. Push subscriptions (onStream* /
- * onSessionsChanged) are not part of the contract and stay hand-typed.
+ * truth shared with main and preload. Stream subscriptions stay hand-typed.
  */
 
 import type { IpcContractApi } from '../../../shared/ipc/contract';
@@ -14,17 +13,7 @@ import type { PiUiEvent } from '../../../shared/cowork/piUiEvent';
 
 type CoworkContractApi = IpcContractApi<typeof coworkContract>;
 
-export interface CoworkApi extends Omit<
-  CoworkContractApi,
-  'onStreamRunState' | 'onStreamUiEvent' | 'onSessionsChanged'
-> {
+export interface CoworkApi extends Omit<CoworkContractApi, 'onStreamRunState' | 'onStreamUiEvent'> {
   onStreamRunState: (callback: (snapshot: CoworkRunSnapshot) => void) => () => void;
   onStreamUiEvent: (callback: (event: PiUiEvent) => void) => () => void;
-  onSessionsChanged: (
-    callback: (data: {
-      sessionId?: string;
-      deletedSessionIds?: string[];
-      agentId?: string;
-    }) => void,
-  ) => () => void;
 }

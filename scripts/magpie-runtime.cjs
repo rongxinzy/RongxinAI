@@ -7,6 +7,21 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const upstream = require('../resources/magpie/upstream.json');
 
+const pinnedSource = Object.freeze({
+  repository: upstream.repository,
+  commit: upstream.commit,
+  tree: upstream.tree,
+  archiveSha256: upstream.archiveSha256,
+  patchSha256: upstream.patchSha256,
+  treeSha256: upstream.patchedTreeSha256,
+  goModSha256: upstream.goModSha256,
+  goSumSha256: upstream.goSumSha256,
+});
+
+function isPinnedSource(source) {
+  return Object.entries(pinnedSource).every(([key, value]) => source?.[key] === value);
+}
+
 const TARGETS = Object.freeze({
   'linux-x64': { platform: 'linux', arch: 'x64', goos: 'linux', goarch: 'amd64' },
   'linux-arm64': { platform: 'linux', arch: 'arm64', goos: 'linux', goarch: 'arm64' },
@@ -53,9 +68,7 @@ function verifyRuntime(root, key, { allowSigned = false } = {}) {
       if (manifest[name] !== value) throw new Error(`Invalid manifest ${name}`);
     }
     if (
-      manifest.source?.commit !== upstream.commit ||
-      manifest.source?.archiveSha256 !== upstream.archiveSha256 ||
-      manifest.source?.tree !== upstream.tree ||
+      !isPinnedSource(manifest.source) ||
       manifest.toolchain?.version !== upstream.goVersion ||
       manifest.build?.version !== upstream.version ||
       manifest.build?.cgoEnabled !== false ||
@@ -63,7 +76,7 @@ function verifyRuntime(root, key, { allowSigned = false } = {}) {
       !/^[a-f0-9]{64}$/.test(manifest.sha256) ||
       !/^[a-f0-9]{64}$/.test(manifest.buildSha256)
     ) {
-      throw new Error('Manifest does not match the pinned upstream build');
+      throw new Error('Manifest does not match the pinned patched build');
     }
     if (!allowSigned && manifest.sha256 !== manifest.buildSha256) {
       throw new Error('Expected the unmodified compiler output before packaging');
@@ -120,49 +133,31 @@ function verifyRuntime(root, key, { allowSigned = false } = {}) {
   }
 }
 
-function contextTargets(context) {
+function contextTarget(context) {
   // electron-builder's Arch enum. Do not substitute the build host's architecture.
   const arch =
-    typeof context.arch === 'string'
-      ? context.arch
-      : { 1: 'x64', 3: 'arm64', 4: 'universal' }[context.arch];
-  const platform = context.electronPlatformName;
-  if (platform === 'darwin') {
-    if (arch === 'universal' || arch === 4) {
-      return ['darwin-x64', 'darwin-arm64'];
-    }
-    if (arch === 'x64' || arch === 1) {
-      return ['darwin-x64'];
-    }
-    if (arch === 'arm64' || arch === 3) {
-      return ['darwin-arm64'];
-    }
-  }
-  const key = `${platform}-${arch}`;
+    typeof context.arch === 'string' ? context.arch : { 1: 'x64', 3: 'arm64' }[context.arch];
+  const key = `${context.electronPlatformName}-${arch}`;
   targetFor(key);
-  return [key];
+  return key;
 }
 
 function configureMagpieResources(context) {
   const root = path.join(context.packager.projectDir, 'resources', 'magpie');
-  const targets = contextTargets(context);
-  for (const key of targets) verifyRuntime(root, key);
+  const key = contextTarget(context);
+  verifyRuntime(root, key);
   const config = context.packager.config;
-  // Per-arch macOS .apps ship only their own helper; a universal .app keeps
-  // both, so universal merging sees identical resources and never rewrites a
-  // pinned binary with lipo (x64ArchFiles). The running Electron process
-  // selects its own architecture at startup.
   const resources = (config.extraResources || []).filter(resource => {
     return !(typeof resource === 'object' && /^magpie(?:\/|$)/.test(resource.to || ''));
   });
   config.extraResources = [
     ...resources,
     { from: 'resources/magpie/upstream.json', to: 'magpie/upstream.json' },
-    ...targets.map(key => ({
+    {
       from: `resources/magpie/${key}`,
       to: `magpie/${key}`,
       filter: [binaryName(key), 'manifest.json', 'LICENSE'],
-    })),
+    },
   ];
 }
 
@@ -180,7 +175,7 @@ function packagedRoot(context) {
 
 function verifyPackagedMagpie(context) {
   const root = packagedRoot(context);
-  for (const key of contextTargets(context)) verifyRuntime(root, key, { allowSigned: true });
+  verifyRuntime(root, contextTarget(context), { allowSigned: true });
 }
 
 function certumThumbprint(env) {
@@ -239,77 +234,78 @@ function signPackagedWindowsMagpie(context, deps = {}) {
       : (binary, expectedThumbprint) =>
           verifyWindowsAuthenticodeSignature(binary, expectedThumbprint, env, spawn));
   const script = path.join(__dirname, 'runtime-signing', 'sign-runtime.ps1');
-  for (const key of contextTargets(context)) {
-    const directory = path.join(root, key);
-    const binary = path.join(directory, binaryName(key));
-    const manifestPath = path.join(directory, 'manifest.json');
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    const before = sha256File(binary);
-    if (before !== manifest.sha256) {
+  const key = contextTarget(context);
+  const directory = path.join(root, key);
+  const binary = path.join(directory, binaryName(key));
+  const manifestPath = path.join(directory, 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const before = sha256File(binary);
+  if (before !== manifest.sha256) {
+    throw new Error('Magpie binary changed before Windows signing');
+  }
+  if (before === manifest.buildSha256) {
+    if (!signingEnabled) {
+      verifyRuntime(root, key);
+      return;
+    }
+    // electron-builder.json excludes magpie.exe from electron-builder's Windows
+    // sign walk (win.signExts) so the bytes still match the sealed manifest
+    // at afterPack. Sign here with the same Certum signtool script the
+    // release environment already uses, then reseal the manifest below.
+    let result;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      result = spawn(
+        'powershell.exe',
+        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', binary],
+        { stdio: 'inherit', windowsHide: true, env: windowsPowerShellEnv(env) },
+      );
+      if (!result.error && result.status === 0) break;
+      if (attempt < maxAttempts) {
+        console.warn(
+          `[magpie-runtime] Windows Authenticode signing attempt ${attempt}/${maxAttempts} failed; retrying...`,
+        );
+      }
+    }
+    if (result.error) throw result.error;
+    if (result.status !== 0) {
+      throw new Error(`Magpie Authenticode signing failed with exit code ${result.status}`);
+    }
+  } else {
+    if (!signingEnabled) {
       throw new Error('Magpie binary changed before Windows signing');
     }
-    if (before === manifest.buildSha256) {
-      if (!signingEnabled) {
-        verifyRuntime(root, key);
-        continue;
-      }
-      // electron-builder.json excludes magpie.exe from electron-builder's Windows
-      // sign walk (win.signExts) so the bytes still match the sealed manifest
-      // at afterPack. Sign here with the same Certum signtool script the
-      // release environment already uses, then reseal the manifest below.
-      let result;
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        result = spawn(
-          'powershell.exe',
-          ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', binary],
-          { stdio: 'inherit', windowsHide: true, env: windowsPowerShellEnv(env) },
-        );
-        if (!result.error && result.status === 0) break;
-        if (attempt < maxAttempts) {
-          console.warn(
-            `[magpie-runtime] Windows Authenticode signing attempt ${attempt}/${maxAttempts} failed; retrying...`,
-          );
-        }
-      }
-      if (result.error) throw result.error;
-      if (result.status !== 0) {
-        throw new Error(`Magpie Authenticode signing failed with exit code ${result.status}`);
-      }
-    } else {
-      if (!signingEnabled) {
-        throw new Error('Magpie binary changed before Windows signing');
-      }
-      if (manifest.signing?.platform !== 'win32' || manifest.signing?.format !== 'authenticode') {
-        throw new Error('Magpie binary changed before Windows signing without a valid seal');
-      }
-      if (verifySignature) verifySignature(binary, thumbprint);
-      verifyRuntime(root, key, { allowSigned: true });
-      continue;
-    }
-    const sha256 = sha256File(binary);
-    if (sha256 === manifest.buildSha256) {
-      throw new Error('Windows signing left the Magpie compiler bytes unchanged');
+    if (manifest.signing?.platform !== 'win32' || manifest.signing?.format !== 'authenticode') {
+      throw new Error('Magpie binary changed before Windows signing without a valid seal');
     }
     if (verifySignature) verifySignature(binary, thumbprint);
-    const signed = {
-      ...manifest,
-      sha256,
-      sizeBytes: fs.statSync(binary).size,
-      signing: { platform: 'win32', format: 'authenticode' },
-    };
-    fs.writeFileSync(manifestPath, `${JSON.stringify(signed, null, 2)}\n`);
     verifyRuntime(root, key, { allowSigned: true });
+    return;
   }
+  const sha256 = sha256File(binary);
+  if (sha256 === manifest.buildSha256) {
+    throw new Error('Windows signing left the Magpie compiler bytes unchanged');
+  }
+  if (verifySignature) verifySignature(binary, thumbprint);
+  const signed = {
+    ...manifest,
+    sha256,
+    sizeBytes: fs.statSync(binary).size,
+    signing: { platform: 'win32', format: 'authenticode' },
+  };
+  fs.writeFileSync(manifestPath, `${JSON.stringify(signed, null, 2)}\n`);
+  verifyRuntime(root, key, { allowSigned: true });
 }
 
 module.exports = {
   TARGETS,
   upstream,
+  pinnedSource,
+  isPinnedSource,
   targetFor,
   binaryName,
   sha256File,
   verifyRuntime,
-  contextTargets,
+  contextTarget,
   configureMagpieResources,
   verifyPackagedMagpie,
   signPackagedWindowsMagpie,

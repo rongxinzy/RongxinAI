@@ -31,7 +31,7 @@ test('uses LocalAppData for the default Windows model library', async () => {
   vi.stubEnv('LOCALAPPDATA', localAppData);
   Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
 
-  const manager = new LlamaCppManager(() => ({}));
+  const manager = new LlamaCppManager(() => ({}), { resolveModel: vi.fn() });
 
   expect(manager.getModelsDir()).toBe(path.join(localAppData, 'ZhiYuanAgent', 'models'));
 });

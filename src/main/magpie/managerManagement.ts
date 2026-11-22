@@ -5,7 +5,7 @@ import { formatMagpieManagementError } from './managementErrors';
 import { mergeMagpiePreferences, projectMagpiePreferences } from './preferences';
 import type { MagpiePreferences, MagpiePreferencesPatch } from '../../shared/magpie/preferences';
 import { parseMagpieCatalog, readBoundedCatalog } from './catalogReader';
-import { isRetiredHostModel, RETIRED_STRATA_HOST_PROVIDER_ID } from './hostProviders';
+import { isRetiredHostModel, isRetiredHostProviderId } from './hostProviders';
 
 import type { MagpieStatus, MagpieModel } from '../../shared/magpie/types';
 
@@ -15,28 +15,37 @@ interface ManagementContext {
   status(): MagpieStatus;
   ensureRunning(): Promise<MagpieStatus>;
   webRequest(route: string, init?: RequestInit, timeoutMs?: number): Promise<Response>;
-  managementJson(route: string, init?: RequestInit): Promise<Record<string, unknown>>;
   state(): MagpieStatus;
   abort(): AbortController | undefined;
   request(url: string, init?: RequestInit, timeoutMs?: number): Promise<Response>;
 }
 
+interface ManagementWrites {
+  owner: AbortSignal;
+  preferences?: Promise<MagpiePreferences>;
+  lanKey?: Promise<void>;
+}
+
 /** Settings access and coalesced catalog reads for the owned process. */
 export class MagpieManagerManagement {
-  private catalogRead?: Promise<MagpieModel[]>;
+  private catalogRead?: { owner: AbortSignal; pending: Promise<MagpieModel[]> };
+  private writes?: ManagementWrites;
   constructor(private readonly context: ManagementContext) {}
 
   models(): Promise<MagpieModel[]> {
-    if (this.catalogRead) return this.catalogRead;
-    this.catalogRead = this.readModels().finally(() => {
-      this.catalogRead = undefined;
+    const state = this.context.state();
+    const owner = this.context.abort()?.signal;
+    if (state.state !== 'running' || !state.gatewayUrl || !owner || owner.aborted)
+      return Promise.resolve([]);
+    if (this.catalogRead?.owner === owner) return this.catalogRead.pending;
+    const pending = this.readModels(state.gatewayUrl, owner).finally(() => {
+      if (this.catalogRead?.pending === pending) this.catalogRead = undefined;
     });
-    return this.catalogRead;
+    this.catalogRead = { owner, pending };
+    return pending;
   }
-  private async readModels(): Promise<MagpieModel[]> {
-    if (this.context.state().state !== 'running' || !this.context.state().gatewayUrl) return [];
-    const gateway = this.context.state().gatewayUrl;
-    const signal = AbortSignal.any([this.context.abort()!.signal, AbortSignal.timeout(15_000)]);
+  private async readModels(gateway: string, owner: AbortSignal): Promise<MagpieModel[]> {
+    const signal = AbortSignal.any([owner, AbortSignal.timeout(15_000)]);
     const response = await this.context.request(`${gateway}/v1/models`, { signal });
     if (!response.ok) throw new Error('Unable to load local models');
     const bytes = await readBoundedCatalog(response, signal);
@@ -45,20 +54,59 @@ export class MagpieManagerManagement {
     if (this.context.state().state !== 'running' || this.context.state().gatewayUrl !== gateway)
       throw new Error('Model service changed while reading its catalog');
     return models.filter(
-      model => model.owned_by !== RETIRED_STRATA_HOST_PROVIDER_ID && !isRetiredHostModel(model.id),
+      model =>
+        !isRetiredHostProviderId(model.owned_by) &&
+        !isRetiredHostModel(model.id) &&
+        !isRetiredHostModel(model.canonical_id),
     );
   }
-  preferences(): Promise<MagpiePreferences> {
-    return this.context.managementJson('/api/settings').then(projectMagpiePreferences);
+  private runningOwner(): AbortSignal | undefined {
+    return this.context.state().state === 'running' ? this.context.abort()?.signal : undefined;
+  }
+  private writesFor(owner: AbortSignal): ManagementWrites {
+    owner.throwIfAborted();
+    if (this.writes?.owner !== owner) this.writes = { owner };
+    return this.writes;
+  }
+  async preferences(): Promise<MagpiePreferences> {
+    const signal = this.runningOwner();
+    if (!signal) throw new Error('Model service is unavailable');
+    return projectMagpiePreferences(await this.managementJson('/api/settings', { signal }));
   }
   async updatePreferences(patch: MagpiePreferencesPatch): Promise<MagpiePreferences> {
-    const raw = await this.context.managementJson('/api/settings');
-    const merged = mergeMagpiePreferences(raw, patch);
-    const saved = await this.context.managementJson('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(merged),
-    });
+    const owner = this.runningOwner();
+    if (!owner) throw new Error('Model service is unavailable');
+    const writes = this.writesFor(owner);
+    const pending = (writes.preferences ?? Promise.resolve())
+      .catch((): void => {})
+      .then(() => this.savePreferences(owner, patch));
+    writes.preferences = pending;
+    return pending;
+  }
+  private async savePreferences(signal: AbortSignal, patch: MagpiePreferencesPatch) {
+    const raw = await this.managementJson('/api/settings', { signal });
+    const {
+      bareModelIDs: on,
+      disabledModels: models,
+      ...merged
+    } = mergeMagpiePreferences(raw, patch);
+    const save = (route: string, body: Record<string, unknown>) =>
+      this.managementJson(route, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal,
+      });
+    let saved = raw;
+    if (Object.keys(patch).some(key => key !== 'bareModelIDs' && key !== 'disabledModels')) {
+      saved = await save('/api/settings', merged);
+    }
+    if (patch.bareModelIDs !== undefined) {
+      saved = await save('/api/settings/bare-ids', { on });
+    }
+    if (patch.disabledModels !== undefined) {
+      saved = await save('/api/settings/disabled-models', { models });
+    }
     return projectMagpiePreferences(saved);
   }
   /** Main-only read of a flow created by the official management page. */
@@ -66,7 +114,9 @@ export class MagpieManagerManagement {
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(id) || !this.context.status().subscriptionAccountsEnabled)
       throw new Error('Subscription sign-in is unavailable');
     await this.context.ensureRunning();
-    const result = await this.context.managementJson(`/api/signin/${encodeURIComponent(id)}`);
+    const signal = this.runningOwner();
+    if (!signal) throw new Error('Model service is unavailable');
+    const result = await this.managementJson(`/api/signin/${encodeURIComponent(id)}`, { signal });
     if (
       result.id !== id ||
       typeof result.agent !== 'string' ||
@@ -82,20 +132,21 @@ export class MagpieManagerManagement {
     init: RequestInit = {},
     timeoutMs?: number,
   ): Promise<Record<string, unknown>> {
+    init.signal?.throwIfAborted();
     const response = await this.context.webRequest(route, init, timeoutMs);
     const text = await response.text();
+    init.signal?.throwIfAborted();
     if (!response.ok)
       throw new Error(formatMagpieManagementError(response.status, response.statusText, text));
     if (text.length > 1024 * 1024) throw new Error('Management response exceeds size limit');
     return JSON.parse(text);
   }
   /** Best-effort key import after the gateway is up; failures surface in diagnostics. */
-  async syncLanAccessKeyAfterStart(): Promise<void> {
-    const lanToken = this.context.options.lanAccess?.read().lanToken;
-    if (!lanToken) return;
+  async syncLanAccessKeyAfterStart(owner: AbortSignal): Promise<void> {
     try {
-      await this.syncLanAccessKey(lanToken);
+      await this.syncLanAccessKey(owner);
     } catch (error) {
+      if (owner.aborted) return;
       console.warn('[Magpie] failed to import the LAN access key:', error);
       this.context.recordError('LAN access key import failed');
     }
@@ -103,15 +154,25 @@ export class MagpieManagerManagement {
 
   /** Re-imports the (already rotated) LAN token as the `zhiyuan-lan` gateway key. */
   async onLanAccessTokenRegenerated(): Promise<void> {
-    if (this.context.state().state !== 'running') return;
-    const lanToken = this.context.options.lanAccess?.read().lanToken;
-    if (!lanToken) return;
-    await this.syncLanAccessKey(lanToken);
+    const owner = this.runningOwner();
+    if (owner) await this.syncLanAccessKey(owner);
   }
-  private async syncLanAccessKey(lanToken: string): Promise<void> {
-    await syncMagpieLanAccessKey(
-      { managementJson: (route, init) => this.context.managementJson(route, init) },
-      lanToken,
-    );
+  private syncLanAccessKey(owner: AbortSignal): Promise<void> {
+    const writes = this.writesFor(owner);
+    const pending = (writes.lanKey ?? Promise.resolve())
+      .catch((): void => {})
+      .then(() => {
+        owner.throwIfAborted();
+        const lanToken = this.context.options.lanAccess?.read().lanToken;
+        if (!lanToken) return;
+        return syncMagpieLanAccessKey(
+          {
+            managementJson: (route, init) => this.managementJson(route, { ...init, signal: owner }),
+          },
+          lanToken,
+        );
+      });
+    writes.lanKey = pending;
+    return pending;
   }
 }

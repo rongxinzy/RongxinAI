@@ -1,17 +1,15 @@
 import type { CodingAgentDriver } from '../drivers/codingAgentDriver';
+import { CodingErrorMessage } from '../../../shared/codingAgent';
 import type { DriverSession } from './runtimeContract';
 
 /**
- * Per-lane agent driver pool, extracted from the service inheritance chain
- * as a collaborator (work package I.3). Owns the four coordinated maps —
- * driver instances, profile bindings, live sessions and in-flight session
- * promises — whose entries are created and forgotten together per lane.
- * `forgetWhereProfile` deliberately leaves session promises alone, matching
- * the authentication-exit path it was extracted from.
+ * Owns lane and authentication drivers, including stops that outlive their request.
  */
 export class CodingDriverPool {
   private readonly drivers = new Map<string, CodingAgentDriver>();
   private readonly profileIds = new Map<string, string>();
+  private readonly stopping = new Map<CodingAgentDriver, Promise<void>>();
+  private closing = false;
   private readonly sessions = new Map<string, DriverSession>();
   private readonly sessionPromises = new Map<
     string,
@@ -23,8 +21,17 @@ export class CodingDriverPool {
   }
 
   register(laneId: string, driver: CodingAgentDriver, profileId: string): void {
+    this.assertOpen();
     this.drivers.set(laneId, driver);
     this.profileIds.set(laneId, profileId);
+  }
+
+  get isClosing(): boolean {
+    return this.closing;
+  }
+
+  assertOpen(): void {
+    if (this.closing) throw new Error(CodingErrorMessage.RoomShuttingDown);
   }
 
   sessionFor(laneId: string): DriverSession | undefined {
@@ -57,12 +64,13 @@ export class CodingDriverPool {
     }
   }
 
-  /** Drop every map entry for the lane. The driver's own disposal stays with the caller. */
-  forget(laneId: string): void {
+  retire(laneId: string): Promise<void> {
+    const driver = this.drivers.get(laneId);
     this.drivers.delete(laneId);
     this.profileIds.delete(laneId);
     this.sessions.delete(laneId);
     this.sessionPromises.delete(laneId);
+    return driver ? this.stop(driver) : Promise.resolve();
   }
 
   /**
@@ -76,21 +84,37 @@ export class CodingDriverPool {
       if (bound === profileId) laneIds.push(laneId);
     }
     for (const laneId of laneIds) {
-      await this.drivers.get(laneId)?.dispose();
+      const driver = this.drivers.get(laneId);
+      if (!driver) continue;
+      await this.stop(driver);
+      if (this.drivers.get(laneId) !== driver) continue;
       this.drivers.delete(laneId);
       this.profileIds.delete(laneId);
       this.sessions.delete(laneId);
     }
   }
 
-  allDrivers(): CodingAgentDriver[] {
-    return [...this.drivers.values()];
+  private stop(driver: CodingAgentDriver): Promise<void> {
+    const pending = this.stopping.get(driver);
+    if (pending) return pending;
+    const stopping = Promise.resolve()
+      .then(() => driver.dispose())
+      .finally(() => this.stopping.delete(driver));
+    this.stopping.set(driver, stopping);
+    return stopping;
   }
 
-  clear(): void {
+  async disposeAll(): Promise<void> {
+    this.closing = true;
+    for (const driver of this.drivers.values()) this.stop(driver);
     this.drivers.clear();
     this.profileIds.clear();
     this.sessions.clear();
     this.sessionPromises.clear();
+    const results = await Promise.allSettled(this.stopping.values());
+    const failures = results.flatMap(result =>
+      result.status === 'rejected' ? [result.reason] : [],
+    );
+    if (failures.length) throw new AggregateError(failures, 'Failed to stop Coding Room drivers.');
   }
 }

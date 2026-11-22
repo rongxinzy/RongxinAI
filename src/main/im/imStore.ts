@@ -5,7 +5,12 @@
 
 import Database from 'better-sqlite3';
 
-import { tryParseCcConnectScopedConversationId } from './ccConnectConversationId';
+import { DeliveryMode } from '../../scheduledTask/constants';
+import type { ScheduledTaskDelivery } from '../../scheduledTask/types';
+import {
+  getCcConnectScopedConversationId,
+  tryParseCcConnectScopedConversationId,
+} from './ccConnectConversationId';
 import type { IMGatewayConfigPatch } from './configPatch';
 
 import {
@@ -43,12 +48,6 @@ import {
   WeixinChannelConfig,
 } from './types';
 
-interface StoredConversationReplyRoute {
-  channel: string;
-  to: string;
-  accountId?: string;
-}
-
 interface StoredCcConnectSessionRoute {
   sessionKey: string;
 }
@@ -57,49 +56,13 @@ interface SessionMappingRow {
   im_conversation_id: string;
   platform: string;
   cowork_session_id: string;
-  transport_session_key?: string | null;
   created_at: number;
   last_active_at: number;
 }
 
 export class IMStore {
-  private db: Database.Database;
+  constructor(private readonly db: Database.Database) {}
 
-  constructor(db: Database.Database) {
-    this.db = db;
-    this.initializeTables();
-  }
-
-  private initializeTables() {
-    this.db
-      .prepare(
-        `
-      CREATE TABLE IF NOT EXISTS im_config (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-    `,
-      )
-      .run();
-
-    // IM session mappings table for Cowork mode
-    this.db
-      .prepare(
-        `
-      CREATE TABLE IF NOT EXISTS channel_session_mappings (
-        im_conversation_id TEXT NOT NULL,
-        platform TEXT NOT NULL,
-        cowork_session_id TEXT NOT NULL,
-        transport_session_key TEXT,
-        created_at INTEGER NOT NULL,
-        last_active_at INTEGER NOT NULL,
-        PRIMARY KEY (im_conversation_id, platform)
-      );
-    `,
-      )
-      .run();
-  }
   private getConfigValue<T>(key: string): T | undefined {
     const row = this.db.prepare('SELECT value FROM im_config WHERE key = ?').get(key) as
       | { value: string }
@@ -655,34 +618,7 @@ export class IMStore {
     this.setConfigValue(`notification_target:${platform}`, target);
   }
 
-  getConversationReplyRoute(
-    platform: Platform,
-    conversationId: string,
-  ): StoredConversationReplyRoute | null {
-    const normalizedConversationId = conversationId.trim();
-    if (!normalizedConversationId) {
-      return null;
-    }
-    return (
-      this.getConfigValue<StoredConversationReplyRoute>(
-        `conversation_reply_route:${platform}:${normalizedConversationId}`,
-      ) ?? null
-    );
-  }
-
-  setConversationReplyRoute(
-    platform: Platform,
-    conversationId: string,
-    route: StoredConversationReplyRoute,
-  ): void {
-    const normalizedConversationId = conversationId.trim();
-    if (!normalizedConversationId) {
-      return;
-    }
-    this.setConfigValue(`conversation_reply_route:${platform}:${normalizedConversationId}`, route);
-  }
-
-  /** Keeps the sidecar-native reply key separate from legacy gateway mappings. */
+  /** Stores the sidecar-native key used by channel delivery. */
   getCcConnectSessionKey(
     accountId: string,
     platform: string,
@@ -709,13 +645,28 @@ export class IMStore {
 
   // ==================== Session Mapping Operations ====================
 
+  getCcConnectCoworkSessionId(
+    accountId: string,
+    platform: string,
+    conversationId: string,
+  ): string | null {
+    const alternate = platform === 'qqbot' ? 'qq' : platform === 'feishu' ? 'lark' : platform;
+    const row = this.db
+      .prepare<[string, string, string], { cowork_session_id: string }>(`
+        SELECT cowork_session_id FROM channel_session_mappings
+        WHERE im_conversation_id = ? AND platform IN (?, ?)
+        ORDER BY last_active_at DESC LIMIT 1`)
+      .get(getCcConnectScopedConversationId(accountId, conversationId), platform, alternate);
+    return row?.cowork_session_id ?? null;
+  }
+
   /**
    * Get session mapping by IM conversation ID and platform
    */
   getSessionMapping(imConversationId: string, platform: Platform): IMSessionMapping | null {
     const row = this.db
       .prepare(
-        'SELECT im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings WHERE im_conversation_id = ? AND platform = ?',
+        'SELECT im_conversation_id, platform, cowork_session_id, created_at, last_active_at FROM channel_session_mappings WHERE im_conversation_id = ? AND platform = ?',
       )
       .get(imConversationId, platform) as SessionMappingRow | undefined;
     if (!row) return null;
@@ -723,7 +674,6 @@ export class IMStore {
       imConversationId: row.im_conversation_id,
       platform: row.platform as Platform,
       coworkSessionId: row.cowork_session_id,
-      ...(row.transport_session_key ? { transportSessionKey: row.transport_session_key } : {}),
       createdAt: row.created_at,
       lastActiveAt: row.last_active_at,
     };
@@ -735,7 +685,7 @@ export class IMStore {
   getSessionMappingByCoworkSessionId(coworkSessionId: string): IMSessionMapping | null {
     const row = this.db
       .prepare(
-        'SELECT im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings WHERE cowork_session_id = ? LIMIT 1',
+        'SELECT im_conversation_id, platform, cowork_session_id, created_at, last_active_at FROM channel_session_mappings WHERE cowork_session_id = ? LIMIT 1',
       )
       .get(coworkSessionId) as SessionMappingRow | undefined;
     if (!row) return null;
@@ -743,9 +693,20 @@ export class IMStore {
       imConversationId: row.im_conversation_id,
       platform: row.platform as Platform,
       coworkSessionId: row.cowork_session_id,
-      ...(row.transport_session_key ? { transportSessionKey: row.transport_session_key } : {}),
       createdAt: row.created_at,
       lastActiveAt: row.last_active_at,
+    };
+  }
+
+  getScheduledTaskDelivery(coworkSessionId: string): ScheduledTaskDelivery | null {
+    const mapping = this.getSessionMappingByCoworkSessionId(coworkSessionId);
+    if (!mapping) return null;
+    const scoped = tryParseCcConnectScopedConversationId(mapping.imConversationId);
+    return {
+      mode: DeliveryMode.Announce,
+      channel: mapping.platform,
+      to: scoped?.[1] ?? mapping.imConversationId,
+      ...(scoped ? { accountId: scoped[0] } : {}),
     };
   }
 
@@ -756,29 +717,17 @@ export class IMStore {
     imConversationId: string,
     platform: Platform,
     coworkSessionId: string,
-    transportSessionKey: string = '',
   ): IMSessionMapping {
     const now = Date.now();
-    const normalizedTransportSessionKey = transportSessionKey.trim();
     this.db
       .prepare(
-        'INSERT INTO channel_session_mappings (im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO channel_session_mappings (im_conversation_id, platform, cowork_session_id, created_at, last_active_at) VALUES (?, ?, ?, ?, ?)',
       )
-      .run(
-        imConversationId,
-        platform,
-        coworkSessionId,
-        normalizedTransportSessionKey || null,
-        now,
-        now,
-      );
+      .run(imConversationId, platform, coworkSessionId, now, now);
     return {
       imConversationId,
       platform,
       coworkSessionId,
-      ...(normalizedTransportSessionKey
-        ? { transportSessionKey: normalizedTransportSessionKey }
-        : {}),
       createdAt: now,
       lastActiveAt: now,
     };
@@ -796,23 +745,6 @@ export class IMStore {
       .run(now, imConversationId, platform);
   }
 
-  updateSessionTransportSessionKey(
-    imConversationId: string,
-    platform: Platform,
-    transportSessionKey: string,
-  ): void {
-    const normalizedKey = transportSessionKey.trim();
-    if (!normalizedKey) {
-      return;
-    }
-    const now = Date.now();
-    this.db
-      .prepare(
-        'UPDATE channel_session_mappings SET transport_session_key = ?, last_active_at = ? WHERE im_conversation_id = ? AND platform = ?',
-      )
-      .run(normalizedKey, now, imConversationId, platform);
-  }
-
   /**
    * Delete a session mapping
    */
@@ -827,10 +759,13 @@ export class IMStore {
    * Called when a cowork session is deleted so that the IM conversation
    * can be re-synced as a fresh session.
    */
-  deleteSessionMappingByCoworkSessionId(coworkSessionId: string): void {
+  deleteSessionMappingsByCoworkSessionIds(sessionIds: readonly string[]): void {
+    if (sessionIds.length === 0) return;
     this.db
-      .prepare('DELETE FROM channel_session_mappings WHERE cowork_session_id = ?')
-      .run(coworkSessionId);
+      .prepare(
+        'DELETE FROM channel_session_mappings WHERE cowork_session_id IN (SELECT value FROM json_each(?))',
+      )
+      .run(JSON.stringify(sessionIds));
   }
 
   /** List session mappings, optionally scoped to the owning pi-connect account. */
@@ -840,11 +775,11 @@ export class IMStore {
 
     if (platform) {
       query =
-        'SELECT im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings WHERE platform = ? ORDER BY last_active_at DESC';
+        'SELECT im_conversation_id, platform, cowork_session_id, created_at, last_active_at FROM channel_session_mappings WHERE platform = ? ORDER BY last_active_at DESC';
       params = [platform];
     } else {
       query =
-        'SELECT im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings ORDER BY last_active_at DESC';
+        'SELECT im_conversation_id, platform, cowork_session_id, created_at, last_active_at FROM channel_session_mappings ORDER BY last_active_at DESC';
       params = [];
     }
 
@@ -858,7 +793,6 @@ export class IMStore {
         imConversationId: row.im_conversation_id,
         platform: row.platform as Platform,
         coworkSessionId: row.cowork_session_id,
-        ...(row.transport_session_key ? { transportSessionKey: row.transport_session_key } : {}),
         createdAt: row.created_at,
         lastActiveAt: row.last_active_at,
       }));
@@ -870,7 +804,12 @@ function ccConnectSessionRouteKey(
   platform: string,
   conversationId: string,
 ): string {
-  const values = [accountId, platform, conversationId].map(value => value.trim());
+  const transportPlatform = platform.trim();
+  const values = [
+    accountId.trim(),
+    transportPlatform === 'qqbot' ? 'qq' : transportPlatform,
+    conversationId.trim(),
+  ];
   if (values.some(value => !value))
     throw new Error('cc-connect session route identity is required');
   return `cc_connect_session_route:${Buffer.from(JSON.stringify(values)).toString('base64url')}`;

@@ -1,7 +1,11 @@
+import type { SpawnOptions } from 'node:child_process';
+import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import net from 'node:net';
 import { EventEmitter } from 'node:events';
+import os from 'node:os';
+import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -9,14 +13,19 @@ import {
   classifyLlamaCppModelLoadError,
   LlamaCppModelLoadFailureReason,
 } from './llamacppModelLoadErrors';
-import type { LlamaCppServiceConfig } from '../../shared/llamacpp';
+import type { LlamaCppModel, LlamaCppServiceConfig } from '../../shared/llamacpp';
 import { LlamaCppOrchestrator } from '../../shared/llamacpp';
 import { LlamaCppRouterOrchestrator } from './llamacppRouterOrchestrator';
 import { buildLlamaCppRouterProcessArgs } from './llamacppRouterProcess';
+import { LlamaCppClient } from './llamacppClient';
 
+const mocks = vi.hoisted(() => ({ scanLocalModels: vi.fn() }));
 vi.mock('./llamacppRuntimePaths', async importOriginal => ({
   ...(await importOriginal<typeof import('./llamacppRuntimePaths')>()),
   findLlamaCppExecutable: async () => '/fake/llama-server',
+}));
+vi.mock('../workbenchTask/artifactWorkerPool', () => ({
+  scanLocalModelsAsync: mocks.scanLocalModels,
 }));
 
 /**
@@ -56,13 +65,43 @@ describe('buildLlamaCppRouterProcessArgs', () => {
 });
 
 describe('LlamaCppRouterOrchestrator', () => {
-  test('stopAll rejects when the router still reports a resident model after unload', async () => {
+  test('stopAll waits for the router to report that the resident model exited', async () => {
     await orchestrator.applyConfig({ port: String(gatewayPort) });
     modelStates.set('resident', 'loaded');
-    unloadHandler = () => {};
-    await expect(orchestrator.stopAll()).rejects.toThrow('still reports active model processes');
-    expect(routerCalls).toContainEqual({ method: 'POST', url: '/models/unload' });
+    const unload = vi.fn();
+    unloadHandler = unload;
+    const finished = vi.fn();
+    const stopping = orchestrator.stopAll().then(finished);
+    await expect.poll(() => unload.mock.calls.length).toBe(1);
+    expect(finished).not.toHaveBeenCalled();
+    modelStates.set('resident', 'unloaded');
+    await stopping;
+    expect(finished).toHaveBeenCalledOnce();
   });
+
+  test.skipIf(process.platform === 'win32')(
+    'quit terminates the router group after the parent exits',
+    async () => {
+      const signalGroup = vi.mocked(process.kill);
+      signalGroup.mockImplementation((pid, signal) => {
+        expect(pid).toBe(-fakeChild.pid);
+        if (signal === 'SIGTERM') fakeChild.kill(signal);
+        return true;
+      });
+      await orchestrator.start();
+
+      expect(spawnCalls[0]?.options).toMatchObject({
+        detached: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      await orchestrator.shutdownForQuit();
+
+      expect(signalGroup.mock.calls).toEqual([
+        [-fakeChild.pid, 'SIGTERM'],
+        [-fakeChild.pid, 'SIGKILL'],
+      ]);
+    },
+  );
 
   let routerServer: http.Server | null = null;
   let gatewayPort = 0;
@@ -70,15 +109,21 @@ describe('LlamaCppRouterOrchestrator', () => {
   let loadHandler: (model: string) => void;
   let unloadHandler: (model: string) => void;
   let fakeChild: FakeChildProcess;
-  let spawnCalls: Array<{ command: string; args: string[] }>;
+  let spawnCalls: Array<{ command: string; args: string[]; options: SpawnOptions }>;
   let orchestrator: LlamaCppRouterOrchestrator;
+  let userDataPath: string;
+  let modelsDir: string;
   /** model name -> router status value; drives the fake /models payload. */
   let modelStates: Map<string, string>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     routerCalls = [];
     spawnCalls = [];
+    userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-router-test-'));
+    modelsDir = path.join(userDataPath, 'models');
     modelStates = new Map();
+    mocks.scanLocalModels.mockReset();
+    mocks.scanLocalModels.mockResolvedValue([]);
     loadHandler = model => {
       modelStates.set(model, 'loaded');
     };
@@ -86,17 +131,17 @@ describe('LlamaCppRouterOrchestrator', () => {
       modelStates.set(model, 'unloaded');
     };
     fakeChild = new FakeChildProcess();
+    const kill = process.kill;
+    vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (pid === -fakeChild.pid) {
+        throw Object.assign(new Error('Fake process has no process group'), { code: 'ESRCH' });
+      }
+      return kill(pid, signal);
+    });
 
     // Reserve an ephemeral port for the gateway so its listener never collides
     // with the fake router or the default 8080, then release it for binding.
-    const gatewayReservation = net.createServer();
-    gatewayPort = 0;
-    void new Promise<void>(resolve => {
-      gatewayReservation.listen(0, '127.0.0.1', () => {
-        gatewayPort = (gatewayReservation.address() as AddressInfo).port;
-        gatewayReservation.close(() => resolve());
-      });
-    });
+    gatewayPort = await reservePort();
 
     orchestrator = createOrchestrator();
   });
@@ -104,23 +149,28 @@ describe('LlamaCppRouterOrchestrator', () => {
   afterEach(async () => {
     await orchestrator?.stopService().catch(() => undefined);
     await closeRouterServer();
+    fs.rmSync(userDataPath, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
   function createOrchestrator(
     serviceConfig: Partial<LlamaCppServiceConfig> = {},
+    resolveExecutable?: () => Promise<string | null>,
+    stopPreviousDaemon?: () => Promise<void>,
   ): LlamaCppRouterOrchestrator {
     return new LlamaCppRouterOrchestrator({
-      userDataPath: '/tmp/llamacpp-router-test-user-data',
+      userDataPath,
       getStore: () => makeStore(),
       getServiceConfig: () => ({
         port: String(gatewayPort),
         orchestrator: LlamaCppOrchestrator.Router,
         ...serviceConfig,
       }),
-      getModelsDir: () => '/tmp/llamacpp-router-test-models',
-      getPresetPath: () => '/tmp/llamacpp-router-test-user-data/llamacpp/models-preset.ini',
-      spawnProcess: (command, args) => {
-        spawnCalls.push({ command, args });
+      getModelsDir: () => modelsDir,
+      resolveExecutable,
+      stopPreviousDaemon,
+      spawnProcess: (command, args, options) => {
+        spawnCalls.push({ command, args, options });
         // The orchestrator reserved the port in the spawn args; serve the fake
         // router there so health checks and model loads reach this server.
         const port = Number(getArgValue(args, '--port'));
@@ -168,7 +218,7 @@ describe('LlamaCppRouterOrchestrator', () => {
                 id,
                 value,
                 failed: value === 'failed',
-                ...(value === 'loaded' ? { port: 35021 } : {}),
+                ...(value === 'loaded' || value === 'unloaded' ? { port: 35021 } : {}),
               })),
             ),
           );
@@ -207,7 +257,7 @@ describe('LlamaCppRouterOrchestrator', () => {
   }
 
   test('starts the router off config.port with unlimited router-side capacity', async () => {
-    await orchestrator.status();
+    await orchestrator.start();
 
     expect(spawnCalls).toHaveLength(1);
     expect(spawnCalls[0].command).toBe('/fake/llama-server');
@@ -221,6 +271,75 @@ describe('LlamaCppRouterOrchestrator', () => {
     expect(String(routerPort)).not.toBe(String(gatewayPort));
   });
 
+  test('failed startup keeps the child owned until confirmed exit and rejects a replacement', async () => {
+    const now = vi.spyOn(Date, 'now');
+    vi.spyOn(LlamaCppClient.prototype, 'health').mockImplementationOnce(async () => {
+      now.mockReturnValue(Date.now() + 20_000);
+      throw new Error('Router health unavailable');
+    });
+    const kill = vi.spyOn(fakeChild, 'kill').mockReturnValue(true);
+    try {
+      const results = await Promise.all([orchestrator.start(), orchestrator.start()]);
+      expect(results).toEqual([
+        expect.objectContaining({
+          status: 'stopped',
+          error: expect.stringContaining('Router health unavailable'),
+        }),
+        expect.objectContaining({
+          status: 'stopped',
+          error: expect.stringContaining('Router health unavailable'),
+        }),
+      ]);
+      expect(kill.mock.calls).toEqual([['SIGTERM'], ['SIGKILL']]);
+      await expect(orchestrator.reconnect({ requireResponsive: true })).rejects.toThrow(
+        'still stopping',
+      );
+      await expect(orchestrator.start()).resolves.toMatchObject({
+        status: 'stopped',
+        error: expect.stringContaining('still stopping'),
+      });
+      expect(spawnCalls).toHaveLength(1);
+    } finally {
+      now.mockRestore();
+      kill.mockRestore();
+      await orchestrator.stopService();
+      await closeRouterServer();
+    }
+    expect(fakeChild.killed).toBe(true);
+    fakeChild = new FakeChildProcess();
+    await expect(orchestrator.start()).resolves.toMatchObject({ status: 'running' });
+    expect(spawnCalls).toHaveLength(2);
+  });
+
+  test('quit joins child termination already started by a failed launch', async () => {
+    const now = vi.spyOn(Date, 'now');
+    vi.spyOn(LlamaCppClient.prototype, 'health').mockImplementationOnce(async () => {
+      now.mockReturnValue(Date.now() + 20_000);
+      throw new Error('Router health unavailable');
+    });
+    const terminating = Promise.withResolvers<void>();
+    const kill = vi.spyOn(fakeChild, 'kill').mockImplementation(() => {
+      terminating.resolve();
+      return true;
+    });
+    const startup = orchestrator.start();
+    await terminating.promise;
+    const stopped = vi.fn();
+    const quit = orchestrator.shutdownForQuit().then(stopped);
+    try {
+      await Promise.resolve();
+      expect(kill).toHaveBeenCalledExactlyOnceWith('SIGTERM');
+      expect(stopped).not.toHaveBeenCalled();
+    } finally {
+      fakeChild.exitCode = 0;
+      fakeChild.emit('exit', 0, null);
+      await quit;
+      now.mockRestore();
+    }
+    await expect(startup).resolves.toMatchObject({ status: 'stopped' });
+    expect(orchestrator.gatewayBaseUrl()).toBeNull();
+  });
+
   test('loads a model through preset reload + POST /models/load and reports it running', async () => {
     modelStates.set('smol', 'unloaded');
 
@@ -232,9 +351,83 @@ describe('LlamaCppRouterOrchestrator', () => {
 
     expect(status.status.status).toBe('running');
     expect(status.runningModels.map(model => model.name)).toEqual(['smol']);
+    expect(status.runningModels[0].runtime_context_length).toBe(2048);
     const urls = routerCalls.map(call => call.url);
     expect(urls).toContain('/models?reload=1');
     expect(urls).toContain('/models/load');
+    expect(urls.slice(urls.indexOf('/v1/chat/completions'))).toEqual(['/v1/chat/completions']);
+  });
+
+  test('keeps each model library’s preset and ignores a model lookup from the replaced router', async () => {
+    const libraryA = modelsDir;
+    const libraryB = path.join(userDataPath, 'other-models');
+    const readPreset = (presetPath: string) => fs.readFileSync(presetPath, 'utf8');
+    const spawnedPreset = () => getArgValue(spawnCalls.at(-1)!.args, '--models-preset')!;
+    const legacyPreset = path.join(userDataPath, 'llamacpp', 'models-preset.ini');
+    const legacy = '[legacy]\nmodel = /old-library/legacy.gguf\n';
+    fs.mkdirSync(path.dirname(legacyPreset), { recursive: true });
+    fs.writeFileSync(legacyPreset, legacy);
+
+    const modelA = path.join(libraryA, 'smol.gguf');
+    await orchestrator.ensureModel({
+      model: 'smol',
+      modelPath: modelA,
+      options: { ctxSize: 2048 },
+    });
+    const presetA = spawnedPreset();
+    expect(getArgValue(spawnCalls.at(-1)!.args, '--models-dir')).toBe(libraryA);
+    expect(readPreset(presetA)).toContain(`[smol]\nmodel = ${modelA}\nctx-size = 2048`);
+
+    modelsDir = libraryB;
+    await orchestrator.applyConfigIfRunning({
+      port: String(gatewayPort),
+      modelsDir: libraryB,
+      gpuLayers: '0',
+    });
+    expect(spawnCalls).toHaveLength(1);
+    expect(readPreset(presetA)).toContain('n-gpu-layers = 0');
+    expect(readPreset(presetA)).toContain('ctx-size = 2048');
+    const beforeSwitch = readPreset(presetA);
+    const lookup = Promise.withResolvers<Array<Pick<LlamaCppModel, 'name' | 'path'>>>();
+    mocks.scanLocalModels.mockReturnValueOnce(lookup.promise);
+    const staleLoad = expect(orchestrator.ensureModel({ model: 'late' })).rejects.toThrow(
+      'The local inference router has stopped.',
+    );
+    await vi.waitFor(() =>
+      expect(mocks.scanLocalModels).toHaveBeenCalledWith(libraryA, expect.any(AbortSignal)),
+    );
+
+    const stopFakeRouter = async () => {
+      await orchestrator.stopService();
+      await closeRouterServer();
+      fakeChild = new FakeChildProcess();
+      modelStates.clear();
+    };
+    await stopFakeRouter();
+    await orchestrator.start();
+    const presetB = spawnedPreset();
+    expect(presetB).not.toBe(presetA);
+    expect(getArgValue(spawnCalls.at(-1)!.args, '--models-dir')).toBe(libraryB);
+    lookup.resolve([{ name: 'late', path: path.join(libraryA, 'late.gguf') }]);
+    await staleLoad;
+    expect(readPreset(presetA)).toBe(beforeSwitch);
+    expect(readPreset(presetB)).not.toContain('[smol]');
+    expect(readPreset(presetB)).not.toContain('[late]');
+
+    const modelB = path.join(libraryB, 'smol.gguf');
+    await orchestrator.ensureModel({
+      model: 'smol',
+      modelPath: modelB,
+      options: { ctxSize: 8192 },
+    });
+    expect(readPreset(presetB)).toContain(`[smol]\nmodel = ${modelB}\nctx-size = 8192`);
+
+    await stopFakeRouter();
+    modelsDir = libraryA;
+    await orchestrator.start();
+    expect(spawnedPreset()).toBe(presetA);
+    expect(readPreset(presetA)).toContain(`[smol]\nmodel = ${modelA}\nctx-size = 2048`);
+    expect(readPreset(legacyPreset)).toBe(legacy);
   });
 
   test('a failed load throws the model log tail so the classifier maps it', async () => {
@@ -298,13 +491,31 @@ describe('LlamaCppRouterOrchestrator', () => {
       unloadedModels.push(model);
       modelStates.set(model, 'unloaded');
     };
-    await orchestrator.status(); // starts router + gateway, caches running models
+    await orchestrator.start(); // starts router + gateway, caches running models
 
     const status = await orchestrator.stopModel('smol');
 
     expect(unloadedModels).toEqual(['smol']);
     expect(routerCalls.some(call => call.url === '/models/unload')).toBe(true);
     expect(status.runningModels.map(model => model.name)).toEqual([]);
+  });
+
+  test('model deletion preserves the file until the router confirms unload', async () => {
+    const modelPath = path.join(userDataPath, 'smol.gguf');
+    fs.writeFileSync(modelPath, 'GGUF');
+    modelStates.set('smol', 'loaded');
+    const unload = vi.fn();
+    unloadHandler = unload;
+    await orchestrator.start();
+
+    const deleting = orchestrator.deleteModelFile('smol', modelPath);
+    await expect.poll(() => unload.mock.calls.length).toBe(1);
+    expect(unload).toHaveBeenCalledExactlyOnceWith('smol');
+    expect(fs.existsSync(modelPath)).toBe(true);
+
+    modelStates.set('smol', 'unloaded');
+    await deleting;
+    expect(fs.existsSync(modelPath)).toBe(false);
   });
 
   test('shutdownForQuit unloads every loaded model, stops the gateway and kills the router', async () => {
@@ -315,7 +526,7 @@ describe('LlamaCppRouterOrchestrator', () => {
       unloadedModels.push(model);
       modelStates.set(model, 'unloaded');
     };
-    await orchestrator.status(); // starts router + gateway
+    await orchestrator.start(); // starts router + gateway
 
     await orchestrator.shutdownForQuit();
 
@@ -324,10 +535,204 @@ describe('LlamaCppRouterOrchestrator', () => {
     expect(orchestrator.gatewayBaseUrl()).toBeNull();
   });
 
+  test('quit closes startup admission even when executable resolution is pending', async () => {
+    const executable = Promise.withResolvers<string>();
+    const resolveExecutable = vi.fn(() => executable.promise);
+    orchestrator = createOrchestrator({}, resolveExecutable);
+    const starting = orchestrator.start();
+    expect(resolveExecutable).toHaveBeenCalledOnce();
+
+    const quitting = orchestrator.shutdownForQuit();
+    executable.resolve('/fake/llama-server');
+    const [status] = await Promise.all([starting, quitting]);
+
+    expect(spawnCalls.length).toBe(0);
+    expect(status).toMatchObject({ status: 'stopped' });
+    await expect(orchestrator.listRunningModels()).rejects.toThrow('shutting down');
+    expect(resolveExecutable).toHaveBeenCalledOnce();
+  });
+
+  test('foreground router starts share the pending daemon handoff and retry a failed stop', async () => {
+    const firstStop = Promise.withResolvers<void>();
+    const secondStop = Promise.withResolvers<void>();
+    const stopPreviousDaemon = vi
+      .fn(() => secondStop.promise)
+      .mockReturnValueOnce(firstStop.promise);
+    orchestrator = createOrchestrator({}, undefined, stopPreviousDaemon);
+    const background = orchestrator.finishDaemonHandoff().catch(error => error);
+    const initial = orchestrator.start();
+    expect(stopPreviousDaemon).toHaveBeenCalledOnce();
+    expect(spawnCalls).toEqual([]);
+
+    const failure = new Error('The previous daemon is still running.');
+    firstStop.reject(failure);
+    await expect(background).resolves.toBe(failure);
+    await expect(initial).resolves.toMatchObject({ status: 'stopped', error: failure.message });
+    expect(spawnCalls).toEqual([]);
+
+    const retry = orchestrator.start();
+    const concurrent = orchestrator.start();
+    expect(stopPreviousDaemon).toHaveBeenCalledTimes(2);
+    expect(spawnCalls).toEqual([]);
+    secondStop.resolve();
+    expect(await Promise.all([retry, concurrent])).toEqual([
+      expect.objectContaining({ status: 'running' }),
+      expect.objectContaining({ status: 'running' }),
+    ]);
+    expect(spawnCalls).toHaveLength(1);
+  });
+
+  test('quit joins the daemon handoff and prevents a waiting router launch', async () => {
+    const pending = Promise.withResolvers<void>();
+    orchestrator = createOrchestrator({}, undefined, () => pending.promise);
+    const starting = orchestrator.start();
+    const stopped = vi.fn();
+    const quitting = orchestrator.shutdownForQuit().then(stopped);
+    await Promise.resolve();
+    expect(stopped).not.toHaveBeenCalled();
+    pending.resolve();
+
+    await expect(starting).resolves.toMatchObject({ status: 'stopped' });
+    await quitting;
+    expect(stopped).toHaveBeenCalledOnce();
+    expect(spawnCalls).toEqual([]);
+  });
+
+  test('quit cancels the GGUF scan of an admitted model load', async () => {
+    await orchestrator.start();
+    const scan = Promise.withResolvers<Array<{ name: string; path: string }>>();
+    let scanSignal: AbortSignal | undefined;
+    mocks.scanLocalModels.mockImplementation((_dir: string, signal?: AbortSignal) => {
+      scanSignal = signal;
+      signal?.addEventListener('abort', () => scan.reject(signal.reason), { once: true });
+      return scan.promise;
+    });
+    const loading = orchestrator.ensureModel({ model: 'smol' }).catch(error => error);
+    await vi.waitFor(() => expect(mocks.scanLocalModels).toHaveBeenCalledOnce());
+
+    await orchestrator.shutdownForQuit();
+    scan.resolve([{ name: 'smol', path: '/tmp/llamacpp-router-test-models/smol.gguf' }]);
+
+    expect(await loading).toMatchObject({ message: expect.stringContaining('shutting down') });
+    expect(scanSignal?.aborted).toBe(true);
+    expect(routerCalls.map(call => call.url)).not.toContain('/models/load');
+  });
+
+  test('binds to the requested port when the saved config has not changed', async () => {
+    await orchestrator.start();
+    const oldUrl = orchestrator.gatewayBaseUrl();
+    const newPort = await reservePort();
+
+    await orchestrator.applyConfig({ port: String(newPort) });
+
+    expect(orchestrator.gatewayBaseUrl()).toBe(`http://127.0.0.1:${newPort}/v1`);
+    await expect(fetch(`${oldUrl}/models`)).rejects.toThrow();
+  });
+
+  test('quit disposes a gateway that finishes rebinding after its router child stops', async () => {
+    await orchestrator.start();
+    const enteringBind = Promise.withResolvers<void>();
+    const releaseBind = Promise.withResolvers<void>();
+    const createServer = http.createServer;
+    using serverFactory = vi.spyOn(http, 'createServer').mockImplementationOnce((...args) => {
+      const server = createServer(...args);
+      const listen = server.listen;
+      server.listen = ((...listenArgs: unknown[]) => {
+        enteringBind.resolve();
+        void releaseBind.promise.then(() => Reflect.apply(listen, server, listenArgs));
+        return server;
+      }) as typeof server.listen;
+      return server;
+    });
+    gatewayPort = await reservePort();
+    const applying = orchestrator.applyConfig({ port: String(gatewayPort) }).catch(error => error);
+    await enteringBind.promise;
+
+    const quitting = orchestrator.shutdownForQuit();
+    try {
+      await expect(orchestrator.reconnect()).resolves.toBeNull();
+      await vi.waitFor(() => expect(fakeChild.killed).toBe(true));
+    } finally {
+      releaseBind.resolve();
+    }
+    await quitting;
+
+    expect(serverFactory).toHaveBeenCalledOnce();
+    expect(await applying).toMatchObject({ message: expect.stringContaining('shutting down') });
+    expect(orchestrator.gatewayBaseUrl()).toBeNull();
+    await expect(fetch(`http://127.0.0.1:${gatewayPort}/v1/models`)).rejects.toThrow();
+  });
+
+  test('quit still stops its owned child when graceful model unload stalls', async () => {
+    modelStates.set('smol', 'loaded');
+    await orchestrator.start();
+    const unload = vi
+      .spyOn(LlamaCppClient.prototype, 'unloadModel')
+      .mockImplementation(() => new Promise(() => {}));
+
+    await orchestrator.shutdownForQuit();
+
+    expect(unload).toHaveBeenCalledExactlyOnceWith('smol', expect.any(Number));
+    expect(fakeChild.killed).toBe(true);
+    expect(orchestrator.gatewayBaseUrl()).toBeNull();
+  });
+
+  test('reconnect observes only an already-ready router and never asks it to reload', async () => {
+    await expect(orchestrator.reconnect()).resolves.toBeNull();
+    expect(spawnCalls).toHaveLength(0);
+    expect(routerCalls).toEqual([]);
+
+    await orchestrator.start();
+    routerCalls.length = 0;
+    modelStates.set('fresh', 'loaded');
+    modelStates.set('unloaded', 'unloaded');
+
+    await expect(orchestrator.reconnect()).resolves.toMatchObject({
+      runningModels: [{ name: 'fresh' }],
+    });
+    expect(routerCalls).toEqual([{ method: 'GET', url: '/models' }]);
+  });
+
+  test('a failed probe cannot report an owned router as stopped during reconfiguration', async () => {
+    await orchestrator.start();
+    const probeError = new Error('Fixture model probe timed out');
+    vi.spyOn(LlamaCppClient.prototype, 'listModelsSnapshot').mockRejectedValue(probeError);
+
+    await expect(orchestrator.reconnect()).resolves.toBeNull();
+    await expect(orchestrator.reconnect({ requireResponsive: true })).rejects.toBe(probeError);
+    expect(spawnCalls).toHaveLength(1);
+  });
+
+  test('strict reconnect distinguishes in-progress model processes from ready models', async () => {
+    await orchestrator.start();
+    modelStates.set('starting', 'loading');
+    modelStates.set('finished', 'unloaded');
+
+    await expect(orchestrator.reconnect({ requireResponsive: true })).resolves.toMatchObject({
+      runningModels: [],
+      modelProcesses: [expect.objectContaining({ modelName: 'starting' })],
+    });
+  });
+
+  test('reconnect drops a snapshot that completes after quit', async () => {
+    await orchestrator.start();
+    const snapshot = Promise.withResolvers<LlamaCppModel[]>();
+    const read = vi
+      .spyOn(LlamaCppClient.prototype, 'listModelsSnapshot')
+      .mockReturnValue(snapshot.promise);
+    const reading = orchestrator.reconnect();
+    expect(read).toHaveBeenCalledExactlyOnceWith(2000);
+    await orchestrator.shutdownForQuit();
+    snapshot.resolve([]);
+    await expect(reading).resolves.toBeNull();
+    await expect(orchestrator.reconnect()).resolves.toBeNull();
+    expect(read).toHaveBeenCalledOnce();
+  });
+
   test('the gateway /v1/models listing only contains loaded models', async () => {
     modelStates.set('smol', 'loaded');
     modelStates.set('qwen', 'unloaded');
-    await orchestrator.status();
+    await orchestrator.start();
 
     const gatewayUrl = orchestrator.gatewayBaseUrl();
     expect(gatewayUrl).toBeTruthy();
@@ -340,7 +745,7 @@ describe('LlamaCppRouterOrchestrator', () => {
 
   test('gateway acquireModel loads an unloaded model before the chat request is forwarded', async () => {
     modelStates.set('smol', 'unloaded');
-    await orchestrator.status();
+    await orchestrator.start();
     const gatewayUrl = orchestrator.gatewayBaseUrl();
 
     const response = await fetch(`${gatewayUrl}/chat/completions`, {
@@ -360,7 +765,7 @@ describe('LlamaCppRouterOrchestrator', () => {
       listenHost: '0.0.0.0',
     });
     try {
-      await lanOrchestrator.status();
+      await lanOrchestrator.start();
       // The gateway URL is the loopback listener itself.
       expect(lanOrchestrator.gatewayBaseUrl()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/v1$/);
       // A LAN-configured request without a bearer token still reaches the
@@ -372,6 +777,17 @@ describe('LlamaCppRouterOrchestrator', () => {
     }
   });
 });
+
+async function reservePort(): Promise<number> {
+  const reservation = net.createServer();
+  return await new Promise((resolve, reject) => {
+    reservation.once('error', reject);
+    reservation.listen(0, '127.0.0.1', () => {
+      const port = (reservation.address() as AddressInfo).port;
+      reservation.close(error => (error ? reject(error) : resolve(port)));
+    });
+  });
+}
 
 function modelsFixture(
   entries: Array<{ id: string; value: string; failed?: boolean; port?: number }>,
@@ -423,7 +839,7 @@ class FakeChildProcess extends EventEmitter {
     void this.stderr;
   }
 
-  kill(): boolean {
+  kill(_signal?: NodeJS.Signals): boolean {
     this.killed = true;
     this.exitCode = 0;
     queueMicrotask(() => this.emit('exit', 0, null));

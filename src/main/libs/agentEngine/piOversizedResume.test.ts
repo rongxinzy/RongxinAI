@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -6,7 +6,7 @@ import path from 'node:path';
 import { app } from 'electron';
 import { expect, test, vi } from 'vitest';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
-import { installTestMagpie } from '../../../../tests/helpers/installTestMagpie';
+import { createTestMagpie } from '../../../../tests/helpers/createTestMagpie';
 import { CoworkExecutionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
@@ -44,8 +44,9 @@ test.each([
     const root = await mkdtemp(path.join(tmpdir(), 'pi-oversized-resume-'));
     const workspace = path.join(root, 'workspace');
     const sessionId = 'oversized-history';
-    const modelId = 'resume-model';
+    const modelId = 'fixture/resume-model';
     let summaryCalls = 0;
+    let summarizedLegacyReply = false;
     let regularCalls = 0;
     let writeCalls = 0;
     let failSummary = configuration.scenario === Scenario.SummaryFailure;
@@ -73,8 +74,10 @@ test.each([
           res.end(JSON.stringify({ error: { message: 'maximum context length exceeded' } }));
           return;
         }
-        if (summary) summaryCalls++;
-        else regularCalls++;
+        if (summary) {
+          summaryCalls++;
+          summarizedLegacyReply ||= text.includes('[Assistant]: Recorded.');
+        } else regularCalls++;
         const partial = summary && failSummary && summaryCalls === 2;
         const found = [...new Set(text.match(/EVIDENCE_\d{3}/g) ?? [])];
         const write = !summary && writeCalls === 0;
@@ -124,12 +127,12 @@ test.each([
       });
     });
     let store: SqliteStore | undefined;
-    let gateway: ReturnType<typeof installTestMagpie> | undefined;
-    const adapter = new PiRuntimeAdapter();
+    let gateway: ReturnType<typeof createTestMagpie> | undefined;
+    let adapter: PiRuntimeAdapter | undefined;
     const restored = vi.spyOn(agentResourceDiagnostics, 'recordPiHistoryRestored');
     try {
       await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
-      gateway = installTestMagpie({
+      gateway = createTestMagpie({
         gatewayUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
         defaultModelId: modelId,
         acceptUnknownModels: false,
@@ -155,10 +158,16 @@ test.each([
         CoworkSessionMode.Work,
         sessionId,
       );
-      adapter.setCoworkStore(cowork);
-      adapter.setWorkbenchTaskService(new WorkbenchTaskService(db));
-      adapter.setPiSessionStoreRoot(root);
-      const manager = SessionManager.create(workspace, piSessionDirFor(root, sessionId));
+      adapter = new PiRuntimeAdapter({
+        modelService: gateway.modelService,
+        coworkStore: cowork,
+        workbenchTaskService: new WorkbenchTaskService(db),
+        piSessionStoreRoot: root,
+      });
+      const manager = SessionManager.create(
+        workspace,
+        piSessionDirFor(root, sessionId, cowork.getPiHistoryKey(sessionId)),
+      );
       // Around 420K locally estimated input: larger than both tested windows.
       for (const marker of markers) {
         manager.appendMessage({
@@ -191,7 +200,12 @@ test.each([
         });
       }
       const file = manager.getSessionFile()!;
-      const original = await readFile(file, 'utf8');
+      // Simulate an archived assistant reply whose JSON bypasses the SDK's typed writer.
+      const recorded = '"content":[{"type":"text","text":"Recorded."}]';
+      const original = (await readFile(file, 'utf8')).replaceAll(recorded, '"content":"Recorded."');
+      expect(original).toContain('"content":"Recorded."');
+      await writeFile(file, original);
+      const originalBranch = SessionManager.open(file).getBranch();
       const errors: unknown[] = [];
       let complete = 0;
       adapter.on('error', (_id, error) => errors.push(error));
@@ -199,10 +213,10 @@ test.each([
         complete++;
       });
       adapter.on('permissionRequest', (_id, request) => {
-        adapter.respondToPermission(request.requestId, { behavior: 'allow' });
+        adapter!.respondToPermission(request.requestId, { behavior: 'allow' });
       });
       const resume = () =>
-        adapter.continueSession(
+        adapter!.continueSession(
           sessionId,
           'Continue the old task. Write all evidence markers, in order, to recovered.md.',
           {
@@ -220,7 +234,7 @@ test.each([
         expect((await readFile(file, 'utf8')).startsWith(original)).toBe(true);
         const failedBranch = SessionManager.open(file).getBranch();
         expect(failedBranch.filter(entry => entry.type === 'message')).toEqual(
-          manager.getBranch().filter(entry => entry.type === 'message'),
+          originalBranch.filter(entry => entry.type === 'message'),
         );
         expect(
           failedBranch.some(entry => entry.type === 'compaction' || entry.type === 'context_edit'),
@@ -233,6 +247,7 @@ test.each([
       expect(errors).toEqual([]);
       expect(complete).toBe(1);
       expect(summaryCalls).toBeGreaterThan(1);
+      expect(summarizedLegacyReply).toBe(true);
       expect(await readFile(path.join(workspace, 'recovered.md'), 'utf8')).toBe(markers.join('\n'));
       expect(
         requests
@@ -260,10 +275,9 @@ test.each([
       expect(errors).toEqual([]);
       expect(serverErrors).toEqual([]);
     } finally {
-      await adapter.stopAllSessions();
+      await adapter?.stopAllSessions();
       await new Promise<void>(resolve => setTimeout(resolve, 0));
       restored.mockRestore();
-      gateway?.dispose();
       store?.close();
       server.closeAllConnections();
       await new Promise<void>(resolve => server.close(() => resolve()));

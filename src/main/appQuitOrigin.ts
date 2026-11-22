@@ -4,6 +4,7 @@ export const AppQuitOrigin = {
   RendererRelaunch: 'renderer-relaunch',
   SignalInterrupt: 'signal-interrupt',
   SignalTerminate: 'signal-terminate',
+  StartupFailure: 'startup-failure',
   TrayMenu: 'tray-menu',
   UpdateInstall: 'update-install',
   WindowAllClosed: 'window-all-closed',

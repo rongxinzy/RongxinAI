@@ -3,25 +3,22 @@ import { net } from 'electron';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { marketplaceContract } from '../../shared/marketplace/contract';
 import type { MarketplaceSearchParams } from '../../shared/marketplace';
-import { MarketplaceService } from '../libs/marketplaceService';
-import { getAppLocalModelCatalog } from '../libs/appLocalModelCatalog';
-import { createModelCatalogUpdateCheck } from '../libs/modelCatalogSync';
-import { resolveModelCatalogUrl } from '../libs/modelCatalogClient';
+import type { MarketplaceService } from '../libs/marketplaceService';
+import type { LocalModelCatalog } from '../libs/localModelCatalog';
+import {
+  createModelCatalogUpdateCheck,
+  resolveModelCatalogFeedUrl,
+} from '../libs/modelCatalogSync';
 
 function searchKey(senderId: number, requestId: string): string {
   return `${senderId}:${requestId}`;
 }
 
-export function registerMarketplaceIpcHandlers(options: {
-  getModelsDir: () => string;
-  userDataPath: string;
-}): void {
-  const localCatalog = getAppLocalModelCatalog(options.userDataPath);
-  const service = new MarketplaceService(options.getModelsDir, { localCatalog });
-  const catalogUrl = resolveModelCatalogUrl();
-  const feedUrl =
-    process.env.ZHIYUAN_MODEL_CATALOG_FEED_URL?.trim() ||
-    (catalogUrl ? `${catalogUrl}/v1/catalog/feed` : undefined);
+export function registerMarketplaceIpcHandlers(
+  service: MarketplaceService,
+  localCatalog: LocalModelCatalog,
+): void {
+  const feedUrl = resolveModelCatalogFeedUrl();
   const checkForUpdate = feedUrl
     ? createModelCatalogUpdateCheck(localCatalog, feedUrl, net.fetch)
     : undefined;

@@ -41,8 +41,6 @@ runs:
           electron-downloads-v1-${{ runner.os }}-${{ runner.arch }}-
     - shell: bash
       run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
-    - shell: bash
-      run: bun run apply:patches
     - name: Save Bun package cache
       if: inputs.save-cache == 'true' && steps.bun-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5

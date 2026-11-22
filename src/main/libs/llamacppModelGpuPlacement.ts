@@ -1,5 +1,3 @@
-import fs from 'fs';
-
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
 import {
   estimateRequiredLlamaCppModelVramMiB,
@@ -12,7 +10,7 @@ import {
   LlamaCppModelLoadFailureReason,
   type LlamaCppModelLoadFailureReason as LlamaCppModelLoadFailureReasonType,
 } from './llamacppModelLoadErrors';
-import { readGgufBlockCount, readGgufKvBytesPerToken } from './ggufMetadata';
+import { readGgufPlacementAsync } from '../workbenchTask/artifactWorkerPool';
 import { resolveLlamaCppDeviceSelection } from './llamacppServe';
 
 export const LlamaCppModelGpuPlacementMode = {
@@ -38,6 +36,7 @@ export type LlamaCppModelGpuPlacementInput = {
   memoryPolicy?: LlamaCppMemoryPolicy;
   memoryBudgetPercent?: number;
   modelSizeBytes?: number;
+  signal?: AbortSignal;
 };
 
 export type LlamaCppModelGpuPlacementResult =
@@ -62,14 +61,30 @@ const LlamaCppModelGpuLayerSelection = {
  * Lets llama.cpp select the GPU layer split. Manual memory policy is only a
  * load-admission check and does not try to infer architecture-specific layers.
  */
-export function planLlamaCppModelGpuPlacement(
+export async function planLlamaCppModelGpuPlacement(
   input: LlamaCppModelGpuPlacementInput,
-): LlamaCppModelGpuPlacementResult {
-  const memoryBudgetFailure = validateManualMemoryBudget(input);
-  if (memoryBudgetFailure) return memoryBudgetFailure;
+): Promise<LlamaCppModelGpuPlacementResult> {
+  const { modelPath, options } = input.launchInput;
+  let metadata: ReturnType<typeof readGgufPlacementAsync> | undefined;
+  const getMetadata = (): ReturnType<typeof readGgufPlacementAsync> =>
+    (metadata ??= modelPath
+      ? readGgufPlacementAsync(modelPath, input.cacheTypeK, input.cacheTypeV, input.signal)
+      : Promise.resolve({}));
+  if (input.memoryPolicy === LlamaCppMemoryPolicy.Manual) {
+    const kvBytesPerToken = input.systemMemorySnapshot?.available
+      ? (await getMetadata()).kvBytesPerToken
+      : undefined;
+    const memoryBudgetFailure = validateManualMemoryBudget(input, kvBytesPerToken);
+    if (memoryBudgetFailure) return memoryBudgetFailure;
+  }
 
-  const nCpuMoeFailure = validateNCpuMoeAgainstBlockCount(input.launchInput);
-  if (nCpuMoeFailure) return nCpuMoeFailure;
+  if (options?.nCpuMoe !== undefined && modelPath) {
+    const nCpuMoeFailure = validateNCpuMoeAgainstBlockCount(
+      options.nCpuMoe,
+      (await getMetadata()).blockCount,
+    );
+    if (nCpuMoeFailure) return nCpuMoeFailure;
+  }
 
   if (hasExplicitGpuPlacement(input.launchInput)) {
     return {
@@ -90,7 +105,7 @@ export function planLlamaCppModelGpuPlacement(
   const probeFailure = getGpuProbeFailure(input);
   if (probeFailure) return probeFailure;
 
-  const selectedGpuIndexes = selectGpuIndexes(input);
+  const selectedGpuIndexes = selectGpuIndexes(input, (await getMetadata()).kvBytesPerToken);
   return {
     success: true,
     mode: LlamaCppModelGpuPlacementMode.Auto,
@@ -106,9 +121,8 @@ export { estimateRequiredLlamaCppModelVramMiB } from '../../shared/llamacpp/mode
 
 function validateManualMemoryBudget(
   input: LlamaCppModelGpuPlacementInput,
+  kvBytesPerToken?: number,
 ): Extract<LlamaCppModelGpuPlacementResult, { success: false }> | null {
-  if (input.memoryPolicy !== LlamaCppMemoryPolicy.Manual) return null;
-
   const systemMemory = input.systemMemorySnapshot;
   if (!systemMemory?.available) {
     return {
@@ -122,7 +136,9 @@ function validateManualMemoryBudget(
   const budgetMiB = Math.floor(systemMemory.totalMemoryMiB * (budgetPercent / 100));
   const availableSystemMemoryMiB = Math.min(budgetMiB, systemMemory.freeMemoryMiB);
   const availableMemoryMiB = availableSystemMemoryMiB + sumAvailableVramMiB(input.nvidiaSnapshot);
-  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB(buildMemoryEstimateInput(input));
+  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB(
+    buildMemoryEstimateInput(input, kvBytesPerToken),
+  );
   if (requiredMemoryMiB <= availableMemoryMiB) return null;
 
   return {
@@ -135,12 +151,7 @@ function validateManualMemoryBudget(
   };
 }
 
-function buildMemoryEstimateInput(input: LlamaCppModelGpuPlacementInput) {
-  const modelPath = input.launchInput.modelPath;
-  const kvBytesPerToken =
-    modelPath && fs.existsSync(modelPath)
-      ? readGgufKvBytesPerToken(modelPath, input.cacheTypeK, input.cacheTypeV)
-      : undefined;
+function buildMemoryEstimateInput(input: LlamaCppModelGpuPlacementInput, kvBytesPerToken?: number) {
   return {
     modelSizeBytes: input.modelSizeBytes,
     contextSize: input.launchInput.options?.ctxSize,
@@ -208,11 +219,16 @@ function getGpuProbeFailure(
   return null;
 }
 
-function selectGpuIndexes(input: LlamaCppModelGpuPlacementInput): number[] {
+function selectGpuIndexes(
+  input: LlamaCppModelGpuPlacementInput,
+  kvBytesPerToken?: number,
+): number[] {
   const candidates = (input.nvidiaSnapshot?.gpus ?? [])
     .filter(gpu => Number.isFinite(gpu.memoryFreeMiB) && (gpu.memoryFreeMiB ?? -1) >= 0)
     .sort((left, right) => (right.memoryFreeMiB ?? 0) - (left.memoryFreeMiB ?? 0));
-  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB(buildMemoryEstimateInput(input));
+  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB(
+    buildMemoryEstimateInput(input, kvBytesPerToken),
+  );
   const selected: number[] = [];
   let availableMemoryMiB = 0;
 
@@ -233,12 +249,9 @@ function selectGpuIndexes(input: LlamaCppModelGpuPlacementInput): number[] {
  * itself rejects impossible overrides at load time.
  */
 function validateNCpuMoeAgainstBlockCount(
-  launchInput: LlamaCppModelLaunchInput,
+  nCpuMoe: number,
+  blockCount?: number,
 ): Extract<LlamaCppModelGpuPlacementResult, { success: false }> | null {
-  const nCpuMoe = launchInput.options?.nCpuMoe;
-  if (nCpuMoe === undefined || !launchInput.modelPath) return null;
-
-  const blockCount = readGgufBlockCount(launchInput.modelPath);
   if (blockCount === undefined || nCpuMoe <= blockCount) return null;
 
   return {

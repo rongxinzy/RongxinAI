@@ -1,11 +1,14 @@
 import fs from 'fs';
-import { createHash } from 'crypto';
 import { pipeline } from 'node:stream/promises';
 import { sha256FileStream } from './fileHasher';
 
 const DOWNLOAD_SPEED_SAMPLE_INTERVAL_MS = 500;
 const DOWNLOAD_SPEED_MIN_SAMPLE_DURATION_MS = 100;
+const INSTALL_CANCELLED = 'Install cancelled';
 
+class ModelFileValidationError extends Error {}
+
+/** Returns whether a new file was published. Verified existing files are kept in place. */
 export async function downloadLocalModelFile(
   urls: string | readonly string[],
   targetPath: string,
@@ -14,7 +17,23 @@ export async function downloadLocalModelFile(
   expectedSha256?: string,
   expectedSizeBytes?: number,
   onVerify?: () => void,
-): Promise<void> {
+): Promise<boolean> {
+  if (signal?.aborted) throw new Error(INSTALL_CANCELLED);
+  if (expectedSha256) {
+    try {
+      const { size } = await fs.promises.stat(targetPath);
+      await validateModelFile(targetPath, size, expectedSha256, expectedSizeBytes, signal);
+      return false;
+    } catch (error) {
+      if (signal?.aborted) throw new Error(INSTALL_CANCELLED);
+      if (
+        !(error instanceof ModelFileValidationError) &&
+        (error as NodeJS.ErrnoException)?.code !== 'ENOENT'
+      ) {
+        throw error;
+      }
+    }
+  }
   const candidates = typeof urls === 'string' ? [urls] : [...urls];
   const errors: string[] = [];
   for (let index = 0; index < candidates.length; index += 1) {
@@ -32,7 +51,7 @@ export async function downloadLocalModelFile(
         expectedSizeBytes,
         onVerify,
       );
-      return;
+      return true;
     } catch (error) {
       if (!shouldTryNextModelDownloadUrl(error, index, candidates.length)) {
         throw error;
@@ -50,11 +69,7 @@ function shouldTryNextModelDownloadUrl(
 ): boolean {
   if (index >= totalCandidates - 1) return false;
   if (!(error instanceof Error)) return false;
-  if (
-    /(?:SHA-256 checksum mismatch|byte-size mismatch|invalid GGUF|Install cancelled)/.test(
-      error.message,
-    )
-  ) {
+  if (error instanceof ModelFileValidationError || error.message === INSTALL_CANCELLED) {
     return false;
   }
   return /HTTP 40[34]|HTTP 50[0234]|network error/i.test(error.message);
@@ -81,39 +96,45 @@ async function downloadFileOnce(
       await transferModelFile(url, tempPath, resumeFrom, onProgress, signal, expectedSizeBytes);
     }
     const actualSize = fs.statSync(tempPath).size;
-    if (
-      expectedSizeBytes &&
-      Number.isSafeInteger(expectedSizeBytes) &&
-      actualSize !== expectedSizeBytes
-    ) {
-      throw new Error(
-        `Model download failed: byte-size mismatch (expected ${expectedSizeBytes}, received ${actualSize}).`,
-      );
-    }
     onProgress(actualSize, actualSize);
     onVerify?.();
-    if (expectedSha256) {
-      const actualSha256 = await sha256File(tempPath, signal);
-      if (actualSha256.toLowerCase() !== expectedSha256.trim().toLowerCase()) {
-        throw new Error(
-          'Model download failed: SHA-256 checksum mismatch. Please retry the download.',
-        );
-      }
-    }
-    signal?.throwIfAborted();
-    assertValidGgufFile(tempPath);
+    await validateModelFile(tempPath, actualSize, expectedSha256, expectedSizeBytes, signal);
     fs.renameSync(tempPath, targetPath);
   } catch (error) {
-    if (signal?.aborted) throw new Error('Install cancelled');
-    if (
-      error instanceof Error &&
-      /(?:SHA-256 checksum mismatch|byte-size mismatch|invalid GGUF)/.test(error.message) &&
-      fs.existsSync(tempPath)
-    ) {
+    if (signal?.aborted) throw new Error(INSTALL_CANCELLED);
+    if (error instanceof ModelFileValidationError) {
       fs.rmSync(tempPath, { force: true });
     }
     throw error;
   }
+}
+
+async function validateModelFile(
+  filePath: string,
+  actualSize: number,
+  expectedSha256?: string,
+  expectedSizeBytes?: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (
+    expectedSizeBytes &&
+    Number.isSafeInteger(expectedSizeBytes) &&
+    actualSize !== expectedSizeBytes
+  ) {
+    throw new ModelFileValidationError(
+      `Model download failed: byte-size mismatch (expected ${expectedSizeBytes}, received ${actualSize}).`,
+    );
+  }
+  await assertValidGgufFile(filePath);
+  if (expectedSha256) {
+    const actualSha256 = await sha256File(filePath, signal);
+    if (actualSha256.toLowerCase() !== expectedSha256.trim().toLowerCase()) {
+      throw new ModelFileValidationError(
+        'Model download failed: SHA-256 checksum mismatch. Please retry the download.',
+      );
+    }
+  }
+  signal?.throwIfAborted();
 }
 
 async function transferModelFile(
@@ -185,7 +206,7 @@ async function transferModelFile(
         if (done) break;
         completed += value.byteLength;
         if (expectedSizeBytes && completed > expectedSizeBytes) {
-          throw new Error(
+          throw new ModelFileValidationError(
             `Model download failed: byte-size mismatch (expected ${expectedSizeBytes}, received at least ${completed}).`,
           );
         }
@@ -222,37 +243,29 @@ async function transferModelFile(
   }
 }
 
-export function assertValidGgufFile(filePath: string): void {
-  const fd = fs.openSync(filePath, 'r');
+export async function assertValidGgufFile(filePath: string): Promise<void> {
+  const file = await fs.promises.open(filePath, 'r');
   try {
     const header = Buffer.alloc(8);
-    if (fs.readSync(fd, header, 0, header.length, 0) !== header.length) {
-      throw new Error('Model download failed: invalid GGUF header.');
+    const { bytesRead } = await file.read(header, 0, header.length, 0);
+    if (bytesRead !== header.length) {
+      throw new ModelFileValidationError('Model download failed: invalid GGUF header.');
     }
     if (header.toString('ascii', 0, 4) !== 'GGUF') {
-      throw new Error('Model download failed: invalid GGUF magic bytes.');
+      throw new ModelFileValidationError('Model download failed: invalid GGUF magic bytes.');
     }
     const version = header.readUInt32LE(4);
     if (version < 2 || version > 3) {
-      throw new Error(`Model download failed: invalid GGUF version ${version}.`);
+      throw new ModelFileValidationError(`Model download failed: invalid GGUF version ${version}.`);
     }
   } finally {
-    fs.closeSync(fd);
+    await file.close();
   }
 }
 
 export async function sha256File(filePath: string, signal?: AbortSignal): Promise<string> {
   const { size } = await fs.promises.stat(filePath);
-  if (size > 512 * 1024 * 1024) {
-    return sha256FileStream(filePath, { signal, maxBytes: size, timeoutMs: 60 * 60_000 });
-  }
-  return new Promise((resolve, reject) => {
-    const hash = createHash('sha256');
-    const stream = fs.createReadStream(filePath, { signal });
-    stream.on('data', chunk => hash.update(chunk));
-    stream.on('error', reject);
-    stream.on('end', () => resolve(hash.digest('hex')));
-  });
+  return sha256FileStream(filePath, { signal, maxBytes: size, timeoutMs: 60 * 60_000 });
 }
 
 function parseContentRangeTotal(value: string | null): number | undefined {

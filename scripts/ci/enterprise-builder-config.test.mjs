@@ -10,6 +10,7 @@ const { packagingExcludePatterns } = require(
   path.join(root, 'scripts/packaging/assert-package-contents.cjs'),
 );
 const configPath = path.join(root, 'electron-builder.enterprise.cjs');
+const signedConfigPath = path.join(root, 'electron-builder.windows-signed.cjs');
 
 const ENV_KEYS = [
   'ZHIYUAN_ENTERPRISE_EXTENSION_BUNDLE',
@@ -17,6 +18,7 @@ const ENV_KEYS = [
   'ZHIYUAN_ENTERPRISE_NOTICE_FILE',
   'ZHIYUAN_ENTERPRISE_CONFIG_FILE',
   'CERTUM_CERT_THUMBPRINT',
+  'ZHIYUAN_ENTERPRISE_BUILD',
 ];
 
 const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'enterprise-builder-config-'));
@@ -32,15 +34,17 @@ fs.writeFileSync(path.join(fixture.renderer, 'index.html'), '<html></html>');
 fs.writeFileSync(fixture.notices, 'notices');
 fs.writeFileSync(fixture.config, '{"schemaVersion":1}');
 
-function loadConfig(env) {
+function loadConfig(env, file = configPath) {
   const saved = new Map(ENV_KEYS.map(key => [key, process.env[key]]));
   for (const key of ENV_KEYS) delete process.env[key];
   for (const [key, value] of Object.entries(env)) process.env[key] = value;
   delete require.cache[configPath];
+  delete require.cache[signedConfigPath];
   try {
-    return require(configPath);
+    return require(file);
   } finally {
     delete require.cache[configPath];
+    delete require.cache[signedConfigPath];
     for (const [key, value] of saved) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -94,19 +98,42 @@ try {
     'enterprise package must not bundle an admin console directory',
   );
 
-  const signed = loadConfig({
-    ...fixtureEnv(),
-    CERTUM_CERT_THUMBPRINT: '  a1b2-c3d4 e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0 ',
-  });
-  assert.deepEqual(signed.win.signtoolOptions, {
+  const certificate = '  a1b2-c3d4 e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0 ';
+  const signed = loadConfig(
+    { ...fixtureEnv(), ZHIYUAN_ENTERPRISE_BUILD: '1', CERTUM_CERT_THUMBPRINT: certificate },
+    signedConfigPath,
+  );
+  const communitySigned = loadConfig({ CERTUM_CERT_THUMBPRINT: certificate }, signedConfigPath);
+  const signToolOptions = {
     certificateSha1: 'A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B0',
     signingHashAlgorithms: ['sha256'],
     rfc3161TimeStampServer: 'http://time.certum.pl',
-  });
+  };
+  assert.equal(signed.forceCodeSigning, true);
+  assert.equal(communitySigned.forceCodeSigning, true);
+  assert.deepEqual(signed.win.signtoolOptions, signToolOptions);
+  assert.deepEqual(communitySigned.win.signtoolOptions, signToolOptions);
+  assert.equal(signed.appId, unsigned.appId);
+  assert.deepEqual(signed.extraResources, unsigned.extraResources);
+  assert.equal(communitySigned.appId, base.appId);
+  assert.deepEqual(communitySigned.extraResources, base.extraResources);
 
-  assert.throws(() => loadConfig({ ...fixtureEnv(), CERTUM_CERT_THUMBPRINT: 'not-a-thumbprint' }), {
-    message: /CERTUM_CERT_THUMBPRINT must contain the 40-character SHA-1 thumbprint/,
-  });
+  for (const enterprise of ['0', '1']) {
+    for (const invalid of [undefined, 'not-a-thumbprint']) {
+      assert.throws(
+        () =>
+          loadConfig(
+            {
+              ...fixtureEnv(),
+              ZHIYUAN_ENTERPRISE_BUILD: enterprise,
+              ...(invalid ? { CERTUM_CERT_THUMBPRINT: invalid } : {}),
+            },
+            signedConfigPath,
+          ),
+        { message: /CERTUM_CERT_THUMBPRINT must contain the 40-character SHA-1 thumbprint/ },
+      );
+    }
+  }
 
   const missing = path.join(temporaryDirectory, 'does-not-exist.cjs');
   assert.throws(
@@ -127,7 +154,7 @@ try {
           'enterprise product identity overrides (productName, executableName, appId, protocols, extraMetadata.name)',
           'base extraResources and win options preserved',
           'enterprise extraResources mapping honors env overrides',
-          'signtoolOptions present only with a valid CERTUM_CERT_THUMBPRINT',
+          'same enforced signing policy for community and enterprise with a required valid certificate',
           'missing enterprise input fails with the path and the overriding env var',
         ],
       },

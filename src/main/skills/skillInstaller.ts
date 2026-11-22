@@ -8,10 +8,7 @@ import { cpRecursiveSync } from '../fsCompat';
 import { t } from '../i18n';
 import { mergeReports } from '../libs/skillSecurity/skillSecurityScanner';
 import { scanSkillDirsAsync } from '../libs/skillSecurity/skillSecurityScanPool';
-import type {
-  SecurityReportAction,
-  SkillSecurityReport,
-} from '../libs/skillSecurity/skillSecurityTypes';
+import type { SecurityReportAction, SkillSecurityReport } from '../../shared/skills/securityTypes';
 import { SKILL_FILE_NAME } from './constants';
 import {
   downloadGithubArchive,
@@ -27,7 +24,7 @@ import {
   resolveGitCommand,
 } from './gitUtils';
 import { resolveMarketplaceSkillSource } from './marketplaceSource';
-import { collectSkillDirsFromSource } from './skillDirs';
+import { findSkillSourceDirsAsync } from '../workbenchTask/artifactWorkerPool';
 import {
   findDuplicateSkillName,
   isZipFile,
@@ -182,7 +179,7 @@ export async function downloadSkillImpl(
       }
     }
 
-    const skillDirs = collectSkillDirsFromSource(localSource);
+    const skillDirs = await findSkillSourceDirsAsync(localSource);
     if (skillDirs.length === 0) {
       cleanupPathSafely(cleanupPath);
       cleanupPath = null;
@@ -191,7 +188,7 @@ export async function downloadSkillImpl(
 
     const duplicateSkillName = findDuplicateSkillName(
       skillDirs,
-      ctx.listSkills().map(skill => skill.name),
+      (await ctx.listSkills()).map(skill => skill.name),
     );
     if (duplicateSkillName) {
       cleanupPathSafely(cleanupPath);
@@ -241,7 +238,6 @@ export async function downloadSkillImpl(
       );
 
       ctx.pendingInstalls.set(pendingId, {
-        tempDir: localSource,
         cleanupPath,
         root,
         skillDirs,
@@ -261,7 +257,7 @@ export async function downloadSkillImpl(
     console.log(`[SkillManager] Skill is safe (or scan failed), installing directly`);
     const duplicateSkillNameBeforeInstall = findDuplicateSkillName(
       skillDirs,
-      ctx.listSkills().map(skill => skill.name),
+      (await ctx.listSkills()).map(skill => skill.name),
     );
     if (duplicateSkillNameBeforeInstall) {
       cleanupPathSafely(cleanupPath);
@@ -279,9 +275,8 @@ export async function downloadSkillImpl(
     cleanupPathSafely(cleanupPath);
     cleanupPath = null;
 
-    ctx.startWatching();
     ctx.notifySkillsChanged();
-    return { success: true, skills: ctx.listSkills() };
+    return { success: true, skills: await ctx.listSkills() };
   } catch (error) {
     cleanupPathSafely(cleanupPath);
     return {
@@ -338,92 +333,27 @@ export async function confirmPendingInstallImpl(
     return { success: true };
   }
 
-  if (!pending.isUpgrade) {
+  let installedIds: string[];
+  try {
     const duplicateSkillName = findDuplicateSkillName(
       pending.skillDirs,
-      ctx.listSkills().map(skill => skill.name),
+      (await ctx.listSkills()).map(skill => skill.name),
     );
     if (duplicateSkillName) {
-      cleanupPathSafely(pending.cleanupPath);
       return {
         success: false,
         error: t('skillErrAlreadyInstalled', { name: duplicateSkillName }),
       };
     }
+    installedIds = await installSkillDirsToRoot(pending.skillDirs, pending.root);
+    ctx.persistSkillInstallState(installedIds, pending);
+  } finally {
+    cleanupPathSafely(pending.cleanupPath);
   }
 
-  // Install the skill(s)
-  const installedIds: string[] = [];
-
-  // Upgrade path: overwrite existing skill directory
-  if (pending.isUpgrade && pending.existingSkillDir) {
-    for (const skillDir of pending.skillDirs) {
-      performSkillUpgrade(skillDir, pending.existingSkillDir);
-      installedIds.push(path.basename(pending.existingSkillDir));
-    }
-  } else {
-    // Fresh install path: find unique directory name
-    installedIds.push(...(await installSkillDirsToRoot(pending.skillDirs, pending.root)));
-  }
-
-  ctx.persistSkillInstallState(installedIds, pending);
-  cleanupPathSafely(pending.cleanupPath);
-
-  // If user chose 'installDisabled', disable all newly installed skills
-  if (action === 'installDisabled') {
-    for (const id of installedIds) {
-      try {
-        ctx.setSkillEnabled(id, false);
-      } catch {
-        // Non-critical
-      }
-    }
-  }
-
-  ctx.startWatching();
   ctx.notifySkillsChanged();
-  return { success: true, skills: ctx.listSkills() };
-}
-
-export function performSkillUpgrade(newSkillDir: string, existingSkillDir: string): void {
-  const upgradingDir = existingSkillDir + '.upgrading';
-
-  // Back up .env and _meta.json
-  let envBackup: Buffer | null = null;
-  let metaBackup: Buffer | null = null;
-  const envPath = path.join(existingSkillDir, '.env');
-  const metaPath = path.join(existingSkillDir, '_meta.json');
-  if (fs.existsSync(envPath)) {
-    envBackup = fs.readFileSync(envPath);
+  if (action === 'installDisabled') {
+    return { success: true, skills: await ctx.setSkillsEnabled(installedIds, false) };
   }
-  if (fs.existsSync(metaPath)) {
-    metaBackup = fs.readFileSync(metaPath);
-  }
-
-  // Atomic rename old dir to .upgrading backup
-  fs.renameSync(existingSkillDir, upgradingDir);
-
-  try {
-    // Copy new version to original path
-    cpRecursiveSync(newSkillDir, existingSkillDir);
-
-    // Restore .env and _meta.json
-    if (envBackup !== null) {
-      fs.writeFileSync(path.join(existingSkillDir, '.env'), envBackup);
-    }
-    if (metaBackup !== null) {
-      fs.writeFileSync(path.join(existingSkillDir, '_meta.json'), metaBackup);
-    }
-  } catch (error) {
-    // Roll back: remove partial new dir and restore backup
-    console.error('[SkillManager] upgrade copy failed, rolling back:', error);
-    if (fs.existsSync(existingSkillDir)) {
-      fs.rmSync(existingSkillDir, { recursive: true, force: true });
-    }
-    fs.renameSync(upgradingDir, existingSkillDir);
-    throw error;
-  }
-
-  // Remove backup
-  fs.rmSync(upgradingDir, { recursive: true, force: true });
+  return { success: true, skills: await ctx.listSkills() };
 }

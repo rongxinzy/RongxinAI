@@ -281,7 +281,7 @@ describe('ConversationThread', () => {
     expect(container.querySelector('[role="status"]')).toBeNull();
   });
 
-  test('virtualizes long sessions to a bounded DOM window while keeping full static rendering for export', () => {
+  test('virtualizes long sessions to a bounded DOM window', () => {
     const messages = Array.from({ length: 200 }, (_, index) => [
       {
         id: `vu-${index}`,
@@ -317,16 +317,5 @@ describe('ConversationThread', () => {
     const mountedCount = virtualized.container.querySelectorAll('[data-turn-id]').length;
     expect(mountedCount).toBeGreaterThan(0);
     expect(mountedCount).toBeLessThan(30);
-
-    virtualized.rerender(
-      <ConversationThread
-        sessionId="s-virtual"
-        turns={turns}
-        skills={[]}
-        isExporting
-        scrollContainerRef={scrollRef}
-      />,
-    );
-    expect(virtualized.container.querySelectorAll('[data-turn-id]')).toHaveLength(200);
   });
 });

@@ -47,7 +47,7 @@ export const TITLEBAR_COLORS = {
   light: { color: '#F3F4F6', symbolColor: '#1A1D23' },
 } as const;
 
-// 2026/09/21 lixiang  开发态用独立 AUMID，并配套开始菜单快捷方式（见 ensureWindowsTaskbarBrand），
+// 2026/09/21 lixiang  开发态用独立 AUMID，并配套开始菜单快捷方式（见 prepareWindowsTaskbarIdentity），
 // 避免 Windows 继续拿 Electron 默认原子图标的任务栏缓存。打包态仍用产品 AUMID。
 export const WINDOWS_TASKBAR_APP_USER_MODEL_ID = app.isPackaged
   ? APP_USER_MODEL_ID

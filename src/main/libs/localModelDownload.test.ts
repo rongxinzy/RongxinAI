@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { downloadLocalModelFile, sha256File } from './localModelDownload';
 import { sha256FileStream } from './fileHasher';
 
@@ -11,6 +11,10 @@ vi.mock('./fileHasher', () => ({ sha256FileStream: vi.fn() }));
 const directories: string[] = [];
 const bytes = Buffer.from([0x47, 0x47, 0x55, 0x46, 3, 0, 0, 0]);
 const checksum = createHash('sha256').update(bytes).digest('hex');
+
+beforeEach(() => {
+  vi.mocked(sha256FileStream).mockReset().mockResolvedValue(checksum);
+});
 
 function target(): string {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'model-download-lifecycle-'));
@@ -198,12 +202,10 @@ test('an already cancelled download does not fetch or open a file', async () => 
   expect(open).not.toHaveBeenCalled();
 });
 
-test('large model hashes retain the streaming worker path and cancellation signal', async () => {
+test.each([8, 513 * 1024 * 1024])('hashes %i bytes in the streaming worker', async size => {
   const destination = target();
   const signal = new AbortController().signal;
-  const size = 513 * 1024 * 1024;
   vi.spyOn(fs.promises, 'stat').mockResolvedValue({ size } as fs.Stats);
-  vi.mocked(sha256FileStream).mockResolvedValue(checksum);
   await expect(sha256File(destination, signal)).resolves.toBe(checksum);
   expect(sha256FileStream).toHaveBeenCalledWith(destination, {
     signal,

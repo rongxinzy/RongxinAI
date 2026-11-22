@@ -115,11 +115,15 @@ export const sanitizeCoworkMessageForIpc = (message: unknown): unknown => {
 };
 
 /** Session load/save: drop image bytes + redundant toolResult copies. */
-export const slimCoworkMessageForIpc = (message: unknown): unknown => {
+export const slimCoworkMessageForIpc = (
+  message: unknown,
+  liveMessageIds?: ReadonlySet<string>,
+): unknown => {
   if (!message || typeof message !== 'object') {
     return message;
   }
   const messageRecord = message as {
+    id?: unknown;
     type?: unknown;
     content?: unknown;
     metadata?: unknown;
@@ -142,6 +146,12 @@ export const slimCoworkMessageForIpc = (message: unknown): unknown => {
     string,
     unknown
   >;
+  if (
+    rest.isStreaming === true &&
+    !(typeof messageRecord.id === 'string' && liveMessageIds?.has(messageRecord.id))
+  ) {
+    rest.isStreaming = false;
+  }
   const slimImages = slimImageAttachmentsForIpc(imageAttachments);
   // Prefer content; only keep metadata.toolResult when content is empty (legacy rows).
   const keepToolResult =
@@ -162,11 +172,14 @@ export const slimCoworkMessageForIpc = (message: unknown): unknown => {
   };
 };
 
-export const sanitizeCoworkSessionForIpc = <T extends { messages?: unknown[] }>(session: T): T => {
+export const sanitizeCoworkSessionForIpc = <T extends { messages?: unknown[] }>(
+  session: T,
+  liveMessageIds?: ReadonlySet<string>,
+): T => {
   if (!session?.messages?.length) return session;
   return {
     ...session,
-    messages: session.messages.map(message => slimCoworkMessageForIpc(message)),
+    messages: session.messages.map(message => slimCoworkMessageForIpc(message, liveMessageIds)),
   };
 };
 

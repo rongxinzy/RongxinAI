@@ -1,6 +1,15 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { expect, test, vi } from 'vitest';
 
 import { McpServerManager } from './mcpServerManager';
+import * as coworkUtil from './coworkUtil';
+
+vi.mock('electron', async importOriginal => {
+  const electron = await importOriginal<typeof import('electron')>();
+  return { ...electron, app: { ...electron.app, getAppPath: () => '/unused' } };
+});
 
 const createRecord = (updatedAt = 1) => ({
   id: 'server-1',
@@ -111,4 +120,75 @@ test('restarts only the MCP connection whose configuration changed', async () =>
 
   expect(close).toHaveBeenCalledOnce();
   expect(internals.startSingleServer).toHaveBeenCalledOnce();
+});
+
+test('quit while resolving the stdio environment prevents MCP transport startup', async () => {
+  const manager = new McpServerManager();
+  const environment = Promise.withResolvers<Record<string, string>>();
+  const resolving = Promise.withResolvers<void>();
+  const enhancedEnv = vi.spyOn(coworkUtil, 'getEnhancedEnv').mockImplementationOnce(() => {
+    resolving.resolve();
+    return environment.promise;
+  });
+  const spawn = vi.spyOn(StdioClientTransport.prototype, 'start');
+  const shutdown = new AbortController();
+  try {
+    const discovering = manager.reconcileServers(
+      [
+        {
+          ...createRecord(),
+          transportType: 'stdio',
+          command: process.execPath,
+          args: ['-e', 'process.exit(0)'],
+        },
+      ],
+      shutdown.signal,
+    );
+    await Promise.race([
+      resolving.promise,
+      discovering.then(() => {
+        throw new Error('Discovery finished before resolving the stdio environment');
+      }),
+    ]);
+    shutdown.abort(new Error('quitting'));
+    environment.resolve({});
+
+    await expect(discovering).rejects.toThrow('quitting');
+    expect(spawn).not.toHaveBeenCalled();
+  } finally {
+    environment.resolve({});
+    await manager.stopServers();
+    enhancedEnv.mockRestore();
+    spawn.mockRestore();
+  }
+});
+
+test('quit closes a transport that is still discovering tools', async () => {
+  const manager = new McpServerManager();
+  const tools = Promise.withResolvers<{ tools: [] }>();
+  const requesting = Promise.withResolvers<void>();
+  const connect = vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
+  const listTools = vi.spyOn(Client.prototype, 'listTools').mockImplementationOnce(() => {
+    requesting.resolve();
+    return tools.promise;
+  });
+  const close = vi.spyOn(StreamableHTTPClientTransport.prototype, 'close').mockResolvedValue();
+  const shutdown = new AbortController();
+  const discovering = manager.reconcileServers([createRecord()], shutdown.signal);
+  const outcome = discovering.catch((error: unknown) => error);
+  try {
+    await requesting.promise;
+    shutdown.abort(new Error('quitting'));
+
+    await expect.poll(() => close.mock.calls.length).toBe(1);
+    expect(await outcome).toEqual(new Error('quitting'));
+    expect(manager.toolManifest).toEqual([]);
+  } finally {
+    tools.resolve({ tools: [] });
+    await outcome;
+    await manager.stopServers();
+    connect.mockRestore();
+    listTools.mockRestore();
+    close.mockRestore();
+  }
 });

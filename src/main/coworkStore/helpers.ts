@@ -1,4 +1,4 @@
-// Parsing/normalization helpers shared by the CoworkStore class chain.
+// Parsing and normalization for Cowork persistence.
 // Split from src/main/coworkStore.ts (issue #1069).
 import { app } from 'electron';
 import fs from 'fs';
@@ -91,10 +91,6 @@ export function parseTimeToMs(input?: string | null): number | null {
   const timestamp = Date.parse(input);
   if (!Number.isFinite(timestamp)) return null;
   return timestamp;
-}
-
-export function normalizeMessageTimestamp(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 }
 
 let cachedDefaultSystemPrompt: string | null = null;

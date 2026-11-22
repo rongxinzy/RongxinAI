@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 
 import { EventEmitter } from 'node:events';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { PassThrough } from 'node:stream';
 
 import { projectMagpieCatalog } from './catalog';
@@ -9,8 +11,39 @@ import { MagpieManager } from './manager';
 
 import { MAGPIE_LAN_KEY_NAME } from './lanAccess';
 
-import { setup, temporary } from './manager.testHarness';
+import { installJobRunnerFixture, setup, temporary } from './manager.testHarness';
 describe('Magpie owned lifecycle', () => {
+  it('limits the graceful quit request before falling back to the owned process', async () => {
+    const { root, manager, fetcher, child } = await setup();
+    const quitRequest = Promise.withResolvers<Response>();
+    const quitStarted = Promise.withResolvers<void>();
+    let stopping: ReturnType<typeof manager.shutdown> | undefined;
+    try {
+      expect((await manager.start()).state).toBe('running');
+      const fetchNormally = fetcher.getMockImplementation()!;
+      fetcher.mockImplementation((url, init) => {
+        if (!url.endsWith('/api/window/quit')) return fetchNormally(url, init);
+        quitStarted.resolve();
+        return quitRequest.promise;
+      });
+      const deadline = vi.spyOn(AbortSignal, 'timeout');
+      try {
+        stopping = manager.shutdown();
+        await quitStarted.promise;
+        expect(deadline).toHaveBeenCalledWith(1_000);
+      } finally {
+        deadline.mockRestore();
+        quitRequest.reject(new Error('Graceful quit unavailable'));
+        await stopping;
+      }
+      expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+      expect(manager.status().state).toBe('stopped');
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('stays stopped until explicitly enabled, starts once, projects only public fields, stops owned process', async () => {
     const { root, manager, spawn, fetcher, child } = await setup();
     try {
@@ -28,7 +61,17 @@ describe('Magpie owned lifecycle', () => {
       ).toBe(false);
       expect(JSON.stringify(await manager.agents())).not.toContain('secret');
       expect(await manager.models()).toMatchObject([{ id: 'm1', owned_by: 'test' }]);
-      await manager.setModel({ agentId: 'codex', field: 'model', value: 'm2' });
+      fetcher.mockClear();
+      await expect(
+        manager.setModel({ agentId: 'codex', field: 'model', value: 'm2' }),
+      ).resolves.toMatchObject({
+        agents: [{ id: 'codex', version: '1' }],
+      });
+      expect(fetcher.mock.calls.map(([url]) => new URL(url).pathname)).toEqual([
+        '/api/state',
+        '/api/set',
+        '/api/agents/cli',
+      ]);
       await expect(
         manager.setModel({ agentId: 'codex', field: 'model', value: 'gateway-id-not-valid-here' }),
       ).rejects.toThrow('Unknown agent model selection');
@@ -69,6 +112,86 @@ describe('Magpie owned lifecycle', () => {
       expect((await stop).state).toBe('stopped');
       expect(spawn).not.toHaveBeenCalled();
     } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+  it('provides a private Work key only for the current owned gateway process', async () => {
+    const ports = [21001, 21002, 21001, 21003];
+    const { manager, root, spawn, child, callerKeys } = await setup(
+      undefined,
+      undefined,
+      undefined,
+      {
+        managerOptions: { port: async () => ports.shift()! },
+      },
+    );
+    const origin = 'http://127.0.0.1:21001';
+    try {
+      expect(manager.workKeyResolver(origin)).toBeUndefined();
+      const status = await manager.start();
+      expect(status.gatewayUrl).toBe(origin);
+      expect(manager.workKeyResolver(`${origin}/`)).toBeUndefined();
+      const firstResolver = manager.workKeyResolver(origin)!;
+      const key = firstResolver()!;
+      expect(key).toMatch(/^sk-zhiyuan-work-[A-Za-z0-9_-]{43}$/);
+      const [, args, options] = spawn.mock.calls[0];
+      expect(options.env?.MAGPIE_WORK_KEY_SHA256).toBe(
+        createHash('sha256').update(key).digest('hex'),
+      );
+      expect(JSON.stringify([args, options.env, manager.status()])).not.toContain(key);
+      expect(callerKeys).toEqual([]);
+      expect(
+        await fs.readFile(path.join(root, 'config/magpie/settings.json'), 'utf8'),
+      ).not.toContain(key);
+
+      const stopping = manager.stop();
+      expect(firstResolver()).toBeUndefined();
+      expect(manager.workKeyResolver(origin)).toBeUndefined();
+      await stopping;
+      child.exitCode = null;
+      expect((await manager.start()).gatewayUrl).toBe(origin);
+      const secondResolver = manager.workKeyResolver(origin)!;
+      expect(secondResolver()).toBeTruthy();
+      expect(secondResolver()).not.toBe(key);
+      expect(firstResolver()).toBeUndefined();
+
+      child.emit('exit', 1);
+      expect(manager.status().state).toBe('failed');
+      expect(secondResolver()).toBeUndefined();
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+  it('does not share a pending catalog read with a restarted process on the same port', async () => {
+    const ports = [21001, 21002, 21001, 21003];
+    const old = Promise.withResolvers<{ id: string }[]>();
+    const parsing = Promise.withResolvers<void>();
+    const parseCatalog = vi
+      .fn(async () => [{ id: 'next/model' }])
+      .mockImplementationOnce(() => {
+        parsing.resolve();
+        return old.promise;
+      });
+    const { manager, root, child } = await setup(undefined, undefined, undefined, {
+      managerOptions: { port: async () => ports.shift()!, parseCatalog },
+    });
+    try {
+      const first = await manager.start();
+      const before = manager.models();
+      const oldRejected = expect(before).rejects.toThrow();
+      await parsing.promise;
+      await manager.stop();
+      child.exitCode = null;
+      expect((await manager.start()).gatewayUrl).toBe(first.gatewayUrl);
+      const after = manager.models();
+      expect(after).not.toBe(before);
+      expect(await after).toEqual([{ id: 'next/model' }]);
+      old.resolve([{ id: 'previous/model' }]);
+      await oldRejected;
+    } finally {
+      old.resolve([]);
+      await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });
     }
   });
@@ -167,6 +290,9 @@ describe('Magpie owned lifecycle', () => {
       expect((await manager.onLanAccessChanged()).state).toBe('stopped');
       expect(enabled).toBe(false);
       expect(await manager.ensureRunning().catch((): null => null)).toBeNull();
+      lanEnabled = true;
+      expect((await manager.onLanAccessChanged()).state).toBe('running');
+      expect(enabled).toBe(false);
     } finally {
       await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });
@@ -202,6 +328,31 @@ describe('Magpie owned lifecycle', () => {
     }
   });
 
+  it('does not relaunch a pending LAN restart after application shutdown', async () => {
+    let lanEnabled = false;
+    const write = vi.fn();
+    const { manager, root, spawn } = await setup({ read: () => true, write }, undefined, {
+      read: () => ({ enabled: lanEnabled, lanToken: 'sk-lan-token' }),
+    });
+    try {
+      await manager.start();
+      write.mockClear();
+      lanEnabled = true;
+      const toggling = manager.onLanAccessChanged();
+      const shutdown = manager.shutdown();
+      expect(await toggling).toMatchObject({ state: 'stopped', enabled: true });
+      await shutdown;
+      await expect(manager.ensureRunning()).rejects.toThrow();
+      await expect(manager.start()).rejects.toThrow();
+      expect((await manager.onLanAccessChanged()).state).toBe('stopped');
+      expect(spawn).toHaveBeenCalledOnce();
+      expect(write).not.toHaveBeenCalled();
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('replaces the imported key after the LAN token is regenerated', async () => {
     let lanToken: string | null = 'sk-lan-first';
     const lanAccess = { read: () => ({ enabled: true, lanToken }) };
@@ -220,6 +371,43 @@ describe('Magpie owned lifecycle', () => {
     }
   });
 
+  it('keeps only the latest LAN key when a rotation overlaps the startup import', async () => {
+    let lanToken = 'sk-lan-startup';
+    const { manager, root, fetcher, callerKeys } = await setup(undefined, undefined, {
+      read: () => ({ enabled: true, lanToken }),
+    });
+    const originalFetch = fetcher.getMockImplementation()!;
+    const firstRead = Promise.withResolvers<Response>();
+    const started = Promise.withResolvers<void>();
+    const steps: string[] = [];
+    fetcher.mockImplementation(async (url, init) => {
+      if (url.endsWith('/api/caller-keys')) {
+        steps.push('read');
+        if (steps.length === 1) {
+          started.resolve();
+          return firstRead.promise;
+        }
+      }
+      if (url.endsWith('/api/caller-keys/add-key')) steps.push('add');
+      return originalFetch(url, init);
+    });
+    try {
+      await manager.start();
+      await started.promise;
+      lanToken = 'sk-lan-latest';
+      const rotated = manager.onLanAccessTokenRegenerated();
+      await new Promise<void>(resolve => setImmediate(resolve));
+      firstRead.resolve(Response.json({ keys: [] }));
+      await rotated;
+      expect(steps).toEqual(['read', 'add', 'read', 'add']);
+      await vi.waitFor(() => expect(callerKeys.map(key => key.secret)).toEqual(['sk-lan-latest']));
+    } finally {
+      firstRead.resolve(Response.json({ keys: [] }));
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('logs sanitized startup stderr and exit phase when launch fails while keeping status error sanitized', async () => {
     const root = await temporary();
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -227,6 +415,7 @@ describe('Magpie owned lifecycle', () => {
       privateHome: root,
       resourcesRoot: root,
       serviceEnabled: { read: () => true, write: () => {} },
+      platform: 'darwin',
       verify: async () => '/fake/magpie.exe',
       spawn: (() => {
         const stderr = new PassThrough();
@@ -347,43 +536,51 @@ describe('Magpie owned lifecycle', () => {
     }
   });
 
-  it('wraps Magpie with job-runner.exe and invokes Windows process-tree kill when SIGTERM stalls', async () => {
-    const killProcessTree = vi.fn(async () => {});
+  it('refuses an unsupervised Windows launch when the bundled job runner is missing', async () => {
+    const { manager, root, spawn } = await setup(undefined, undefined, undefined, {
+      managerOptions: { platform: 'win32' },
+    });
+    try {
+      expect((await manager.start()).state).toBe('failed');
+      expect(spawn).not.toHaveBeenCalled();
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('wraps Magpie in the Windows job runner and confirms that the runner exited', async () => {
     const { manager, root, spawn } = await setup(
       { read: () => true, write: () => {} },
       undefined,
       undefined,
       {
-        managerOptions: {
-          platform: 'win32',
-          jobRunnerPath: 'C:\\Program Files\\ZhiYuan\\resources\\python-runtime\\job-runner.exe',
-          killProcessTree,
-        },
+        managerOptions: { platform: 'win32' },
       },
     );
     const originalSpawnImpl = spawn.getMockImplementation()!;
     let spawnedChild: ReturnType<typeof originalSpawnImpl> | undefined;
+    const signals: Array<NodeJS.Signals | number | undefined> = [];
     spawn.mockImplementation(((...args: Parameters<typeof originalSpawnImpl>) => {
       const child = originalSpawnImpl(...args);
       spawnedChild = child;
       (child as { pid?: number }).pid = 43210;
-      // Ignore SIGTERM once so terminate() exercises Windows taskkill tree cleanup, then exit.
+      // Keep the supervisor alive until the direct force signal.
       const origKill = child.kill.bind(child);
       child.kill = ((sig?: NodeJS.Signals | number) => {
+        signals.push(sig);
         if (sig === 'SIGTERM') return true;
         return origKill(sig);
       }) as typeof child.kill;
-      killProcessTree.mockImplementationOnce(async () => {
-        origKill('SIGTERM');
-      });
       return child;
     }) as typeof originalSpawnImpl);
 
     try {
+      const jobRunner = await installJobRunnerFixture(root);
       const started = await manager.start();
       expect(started.state).toBe('running');
       expect(spawn).toHaveBeenCalledWith(
-        'C:\\Program Files\\ZhiYuan\\resources\\python-runtime\\job-runner.exe',
+        jobRunner,
         [
           String(process.pid),
           expect.stringContaining('magpie'),
@@ -395,9 +592,41 @@ describe('Magpie owned lifecycle', () => {
         expect.objectContaining({ windowsHide: true, shell: false }),
       );
       expect(spawnedChild).toBeDefined();
-      await manager.shutdown();
-      expect(killProcessTree).toHaveBeenCalledWith(43210);
+      vi.useFakeTimers();
+      const stopped = vi.fn();
+      const stopping = manager.shutdown().then(stopped);
+      await vi.advanceTimersByTimeAsync(400);
+      expect(signals).toEqual(['SIGTERM']);
+      expect(stopped).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(signals).toEqual(['SIGTERM', 'SIGKILL']);
+      expect(stopped).toHaveBeenCalledWith(expect.objectContaining({ state: 'stopped' }));
+      expect(spawnedChild?.exitCode).toBe(0);
+      await stopping;
     } finally {
+      vi.useRealTimers();
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps ownership and refuses to launch a replacement if the process never exits', async () => {
+    const { manager, root, child, spawn, fetcher } = await setup();
+    const originalKill = child.kill.getMockImplementation()!;
+    try {
+      await manager.start();
+      child.kill.mockImplementation(() => true);
+      vi.useFakeTimers();
+      const failure = expect(manager.stop()).rejects.toThrow();
+      await vi.advanceTimersByTimeAsync(5_000);
+      await failure;
+      expect(manager.status().state).toBe('failed');
+      await expect(manager.start()).rejects.toThrow('previous model service');
+      expect(spawn).toHaveBeenCalledOnce();
+      expect(fetcher.mock.calls.some(([url]) => url.endsWith('/api/window/quit'))).toBe(true);
+    } finally {
+      vi.useRealTimers();
+      child.kill.mockImplementation(originalKill);
       await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });
     }

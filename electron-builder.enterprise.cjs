@@ -1,14 +1,5 @@
-// Enterprise Windows package configuration: electron-builder.json plus the
-// Zhiyuan enterprise plugin overlay. The community flow never loads this file;
-// selecting the enterprise variant is realized purely at the config level
-// (`electron-builder --config electron-builder.enterprise.cjs`).
-//
-// When CERTUM_CERT_THUMBPRINT is present (injected by the release environment
-// after the setup-certum-signing action connects SimplySign), electron-builder
-// signs the packaged executables and the NSIS installer in a single pass;
-// re-signing the installer afterwards would leave the inner executables
-// unsigned. Without it the overlay stays unsigned so local `--dir` builds keep
-// working. The certificate private key never leaves the Certum cloud HSM.
+// Enterprise product identity and resources. Signed packages use the shared
+// Windows signing configuration on top of this overlay.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -80,27 +71,6 @@ const config = {
   // enterprise build uses in-app password login and must not claim the scheme.
   protocols: [],
   extraResources: [...(baseConfig.extraResources || []), ...enterpriseResources],
-  win: { ...baseConfig.win },
 };
-
-const certificateThumbprint = (process.env.CERTUM_CERT_THUMBPRINT || '')
-  .replace(/[^0-9a-f]/gi, '')
-  .toUpperCase();
-
-if (certificateThumbprint) {
-  if (!/^[0-9A-F]{40}$/.test(certificateThumbprint)) {
-    throw new Error(
-      'CERTUM_CERT_THUMBPRINT must contain the 40-character SHA-1 thumbprint of the Certum ' +
-        'code-signing certificate. It is injected by the release environment after the ' +
-        'setup-certum-signing action connects SimplySign.',
-    );
-  }
-  config.forceCodeSigning = true;
-  config.win.signtoolOptions = {
-    certificateSha1: certificateThumbprint,
-    signingHashAlgorithms: ['sha256'],
-    rfc3161TimeStampServer: 'http://time.certum.pl',
-  };
-}
 
 module.exports = config;

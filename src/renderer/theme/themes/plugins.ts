@@ -1,21 +1,19 @@
 import { zenithLight } from './zenith-light';
 import { zenithDark } from './zenith-dark';
-import { validateComponentAppearances } from '../components/contract';
-import type { ThemeDefinition } from './types';
+import type { ThemeAppearance } from './types';
 import { TOKEN_NAMES } from '../tokens/contract';
 
-export const THEME_PLUGIN_VERSION = 1 as const;
-export const DEFAULT_THEME_PLUGIN_ID = 'zenith';
+const THEME_PLUGIN_VERSION = 1 as const;
 
 /** Presentation data only. Plugins cannot replace controls or own application state. */
 export interface ThemePlugin {
   version: typeof THEME_PLUGIN_VERSION;
   id: string;
   name: { zh: string; en: string };
-  appearances: { light: ThemeDefinition; dark: ThemeDefinition };
+  appearances: { light: ThemeAppearance; dark: ThemeAppearance };
 }
 
-export function validateTheme(theme: ThemeDefinition): void {
+export function validateTheme(theme: ThemeAppearance): void {
   if (!/^[a-z][a-z0-9-]*$/.test(theme.meta.id)) throw new Error('Invalid theme ID');
   if (!['light', 'dark'].includes(theme.meta.appearance)) throw new Error('Invalid appearance');
   for (const token of TOKEN_NAMES) {
@@ -24,7 +22,6 @@ export function validateTheme(theme: ThemeDefinition): void {
       throw new Error(`Invalid theme token: ${token}`);
     }
   }
-  validateComponentAppearances(theme.components);
   const extra = Object.keys(theme.tokens).find(key => !TOKEN_NAMES.includes(key as never));
   if (extra) throw new Error(`Unknown theme token: ${extra}`);
 }
@@ -60,15 +57,11 @@ export function defineThemePlugins(plugins: ThemePlugin[]): ThemePlugin[] {
  * Traditional themes (Daming, Changan, Weiyang, Xiaoruan) removed to focus on
  * premium, tech-forward aesthetic.
  */
-export const themePlugins = defineThemePlugins([
+export const themePlugins: ThemePlugin[] = [
   {
     version: THEME_PLUGIN_VERSION,
-    id: DEFAULT_THEME_PLUGIN_ID,
+    id: 'zenith',
     name: { zh: 'Zenith', en: 'Zenith' },
     appearances: { light: zenithLight, dark: zenithDark },
   },
-]);
-
-export function resolveThemePlugin(id: string): ThemePlugin {
-  return themePlugins.find(plugin => plugin.id === id) ?? themePlugins[0];
-}
+];

@@ -52,33 +52,14 @@ jobs:
           restore-keys: |
             copy-v2-windows-installer-node24-bun1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
-      - run: bun run apply:patches
-      - name: Read pinned Magpie Go toolchain
-        id: magpie-toolchain
-        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
-      - uses: actions/setup-go@v6
+      - uses: ./.github/actions/prepare-magpie-runtime
         with:
-          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
-          cache: false
-      - name: Build and verify pinned Magpie gateway
-        run: |
-          bun run magpie:build -- --target win32-x64
-          bun run magpie:verify -- --target win32-x64
+          target: win32-x64
       - name: Validate real Windows interaction drivers
         # These suites spawn real PowerShell processes and a C# compiler. Avoid
         # cross-suite CPU contention on the hosted runner; retain every timeout.
         run: bunx vitest run --maxWorkers=1 scripts/ci/windows-installer-size-smoke.test.ts scripts/ci/windows-installer-interactive.test.ts scripts/ci/windows-shell-interactive.test.ts scripts/ci/windows-shell-uninstall.test.ts scripts/installer-shell/app/engine-contracts.test.ts scripts/installer-shell/preview-ui.test.ts scripts/installer-shell/powershell-environment.test.ts scripts/installer/cleanup-after-install.test.ts scripts/installer/recover-component-switch.test.ts scripts/installer/migrate-user-skills.test.ts scripts/installer/validate-install-root.test.ts tests/nsis-installer.test.ts
-      - name: Set up offline Windows runtimes
-        run: |
-          bun run setup:uv-runtime
-          bun run setup:python-runtime
-          bun run engram:runtime:win-x64
-      - uses: ilammy/msvc-dev-cmd@v1
-      - name: Build and verify the Windows Python job helper
-        shell: pwsh
-        run: |
-          ./scripts/python-runtime/build-job-runner.ps1
-          node --test scripts/python-runtime/job-runner.test.cjs
+      - uses: ./.github/actions/prepare-windows-packaging-runtime
       - name: Build complete offline installer
         id: offline-build
         # Keep a stuck packager observable and fail it before the job-level

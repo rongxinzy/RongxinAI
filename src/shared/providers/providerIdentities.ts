@@ -30,7 +30,6 @@ export const ProviderName = {
   OpenRouter: 'openrouter',
   Grok: 'grok',
   LlamaCpp: 'llamacpp',
-  Ollama: 'ollama',
   Custom: 'custom',
   Copilot: 'github-copilot',
   Magpie: 'magpie',
@@ -58,7 +57,6 @@ export const AgentProviderId = {
   Copilot: 'github-copilot',
   ZhiyuanCopilot: 'zhiyuan-copilot',
   LlamaCpp: 'llamacpp',
-  Ollama: 'ollama',
   Zhiyuan: 'zhiyuan',
 } as const;
 export type AgentProviderId = (typeof AgentProviderId)[keyof typeof AgentProviderId];

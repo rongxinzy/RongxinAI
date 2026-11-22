@@ -8,10 +8,11 @@ import { ArtifactLedger, normalizeArtifactKeyPath } from './artifactLedger';
 import { initializeArtifactLedgerSchema } from './schema';
 import { ArtifactRecorder } from './artifactRecorder';
 import { setArtifactUpsertPublisher, type ArtifactUpsertEvent } from './publisher';
-import { takeWorkspaceSnapshot } from './workspaceSnapshot';
+import * as workspaceSnapshots from './workspaceSnapshot';
 import { recordCodingLaneArtifact } from './codingLaneArtifacts';
-import { CodingEventKind } from '../../shared/codingAgent';
+import { CodingAgentProfileId, CodingEventKind } from '../../shared/codingAgent';
 
+const { takeWorkspaceSnapshot } = workspaceSnapshots;
 const workspaces: string[] = [];
 const databases: Database.Database[] = [];
 
@@ -47,6 +48,44 @@ function capturePublishes(): ArtifactUpsertEvent[] {
   setArtifactUpsertPublisher(event => events.push(event));
   return events;
 }
+
+test('retains explicit writes and withholds overlapping workspace diffs from both runs', async () => {
+  const { root, ledger, recorder } = await createWorkspace();
+  const child = path.join(root, 'child');
+  await fs.mkdir(child);
+  const peer = new ArtifactRecorder({ sessionId: 'peer', workspaceRoot: child, ledger });
+  recorder.onRunStart('run-1');
+  peer.onRunStart('peer-1');
+  await Promise.all([recorder.flushDiffs(), peer.flushDiffs()]);
+
+  const known = path.join(child, 'known.md');
+  await fs.writeFile(known, 'Explicit write');
+  await fs.writeFile(path.join(child, 'ambiguous.md'), 'Unowned change');
+  const own = path.join(root, 'exclusive.md');
+  await fs.writeFile(own, 'Outside the shared directory');
+  peer.onToolEnd({
+    toolCallId: 'write-known',
+    toolName: 'write',
+    args: { path: known, content: 'Explicit write' },
+    isError: false,
+    resultMessageId: 'peer-write',
+  });
+
+  // A peer settling first does not make its earlier writes attributable to the other run.
+  expect(await peer.onRunSettled('peer-answer')).toBe(1);
+  expect(await recorder.onRunSettled('answer')).toBe(1);
+  expect(ledger.list('session-1').map(artifact => artifact.filePath)).toEqual([own]);
+  expect(ledger.list('peer').map(artifact => artifact.filePath)).toEqual([known]);
+
+  peer.onRunStart('peer-2');
+  await peer.flushDiffs();
+  const solo = path.join(child, 'solo.md');
+  await fs.writeFile(solo, 'Isolated scan');
+  expect(await peer.onRunSettled('solo-answer')).toBe(1);
+  expect(ledger.list('peer').map(artifact => artifact.filePath)).toEqual([known, solo]);
+  recorder.dispose();
+  peer.dispose();
+});
 
 // ── Scenario 1: write tool with a relative path ─────────────────────────────
 
@@ -332,6 +371,7 @@ test('coding lane events record under the lane scope', async () => {
   db.exec(`
     CREATE TABLE coding_agent_lanes (
       id TEXT PRIMARY KEY,
+      profile_id TEXT NOT NULL,
       execution_root TEXT,
       source_root TEXT
     );
@@ -340,13 +380,14 @@ test('coding lane events record under the lane scope', async () => {
   initializeArtifactLedgerSchema(db);
   databases.push(db);
   db.prepare(
-    `INSERT INTO coding_agent_lanes (id, execution_root, source_root) VALUES ('lane-1', '/repo/worktree', '/repo')`,
-  ).run();
+    `INSERT INTO coding_agent_lanes (id, profile_id, execution_root, source_root) VALUES
+      ('lane-1', 'external', '/repo/worktree', '/repo'),
+      ('builtin-lane', ?, '/repo/worktree', '/repo')`,
+  ).run(CodingAgentProfileId.Builtin);
 
   capturePublishes();
-  recordCodingLaneArtifactsForTest(db);
-
   const ledger = new ArtifactLedger(db);
+  recordCodingLaneArtifactsForTest(db, ledger);
   const artifacts = ledger.list('lane-1');
   expect(artifacts).toHaveLength(1);
   expect(artifacts[0]).toMatchObject({
@@ -359,18 +400,27 @@ test('coding lane events record under the lane scope', async () => {
   });
 
   // Source-code files stay out of the artifact ledger.
-  recordCodingLaneArtifact(db, 'lane-1', CodingEventKind.FileChange, {
+  recordCodingLaneArtifact(db, ledger, 'lane-1', CodingEventKind.FileChange, {
     path: 'src/main.ts',
     type: 'diff',
     newText: 'export {}',
   });
   expect(ledger.list('lane-1')).toHaveLength(1);
+
+  recordCodingLaneArtifact(db, ledger, 'builtin-lane', CodingEventKind.FileChange, {
+    path: 'out/report.html',
+    type: 'diff',
+    newText: '<h1>x</h1>',
+  });
+  expect(ledger.list('builtin-lane')).toHaveLength(0);
 });
 
 test('coding lane rows carry the workbench run of the lane assignment', () => {
   const db = new Database(':memory:');
   db.exec(`
-    CREATE TABLE coding_agent_lanes (id TEXT PRIMARY KEY, execution_root TEXT, source_root TEXT);
+    CREATE TABLE coding_agent_lanes (
+      id TEXT PRIMARY KEY, profile_id TEXT NOT NULL, execution_root TEXT, source_root TEXT
+    );
     CREATE TABLE coding_assignments (
       id TEXT PRIMARY KEY, lane_id TEXT, workbench_run_id TEXT, created_at INTEGER
     );
@@ -379,31 +429,33 @@ test('coding lane rows carry the workbench run of the lane assignment', () => {
   initializeArtifactLedgerSchema(db);
   databases.push(db);
   db.prepare(
-    `INSERT INTO coding_agent_lanes (id, execution_root, source_root) VALUES ('lane-1', '/repo', '/repo')`,
+    `INSERT INTO coding_agent_lanes (id, profile_id, execution_root, source_root)
+      VALUES ('lane-1', 'external', '/repo', '/repo')`,
   ).run();
   db.prepare(
     `INSERT INTO coding_assignments (id, lane_id, workbench_run_id, created_at) VALUES
       ('old', 'lane-1', 'run-old', 1), ('new', 'lane-1', 'run-new', 2)`,
   ).run();
 
-  recordCodingLaneArtifact(db, 'lane-1', CodingEventKind.FileChange, {
+  const ledger = new ArtifactLedger(db);
+  recordCodingLaneArtifact(db, ledger, 'lane-1', CodingEventKind.FileChange, {
     path: 'out/report.html',
     type: 'diff',
     newText: '<h1>x</h1>',
   });
 
-  expect(new ArtifactLedger(db).list('lane-1')[0].runId).toBe('run-new');
+  expect(ledger.list('lane-1')[0].runId).toBe('run-new');
 });
 
-function recordCodingLaneArtifactsForTest(db: Database.Database): void {
-  recordCodingLaneArtifact(db, 'lane-1', CodingEventKind.FileChange, {
+function recordCodingLaneArtifactsForTest(db: Database.Database, ledger: ArtifactLedger): void {
+  recordCodingLaneArtifact(db, ledger, 'lane-1', CodingEventKind.FileChange, {
     path: 'out/report.html',
     type: 'diff',
     newText: '<h1>x</h1>',
     toolCallId: 'call-1',
   });
   // Unknown lanes never throw.
-  recordCodingLaneArtifact(db, 'lane-missing', CodingEventKind.FileChange, {
+  recordCodingLaneArtifact(db, ledger, 'lane-missing', CodingEventKind.FileChange, {
     path: 'x.html',
     type: 'diff',
   });
@@ -477,6 +529,93 @@ test('script changes to an already recorded path still advance work version', as
 
   expect(recorder.recordedWorkVersion()).toBeGreaterThan(coveredVersion);
   recorder.dispose();
+});
+
+test('native read-only tools leave workspace scanning to the final capture', async () => {
+  const { root, recorder, ledger } = await createWorkspace();
+  recorder.onRunStart('run-1');
+  await recorder.flushDiffs();
+  const filePath = path.join(root, 'output.md');
+  await fs.writeFile(filePath, 'A file to capture at settlement.');
+
+  recorder.onToolEnd({
+    toolCallId: 'read',
+    toolName: 'read',
+    isError: false,
+    resultMessageId: 'read-result',
+  });
+  await recorder.flushDiffs();
+  expect(ledger.list('session-1')).toEqual([]);
+
+  await recorder.onRunSettled('answer');
+  expect(ledger.listForRun('session-1', 'run-1')).toMatchObject([
+    { filePath, messageId: 'answer' },
+  ]);
+  recorder.dispose();
+});
+
+test('a native continuation preserves pending outputs for the same Workbench run', async () => {
+  const { root, recorder, ledger } = await createWorkspace();
+  recorder.onRunStart('run-1');
+  await recorder.flushDiffs();
+  const target = path.join(root, 'continuation.md');
+  await fs.writeFile(target, 'created before recovery');
+  recorder.onToolEnd({
+    toolCallId: 'create-file',
+    toolName: 'bash',
+    isError: false,
+    resultMessageId: 'tool-result',
+  });
+  recorder.onRunStart('run-1');
+  await expect(recorder.onRunSettled('final-answer')).resolves.toBe(1);
+
+  expect(ledger.listForRun('session-1', 'run-1')).toEqual([
+    expect.objectContaining({ filePath: target, messageId: 'final-answer' }),
+  ]);
+  recorder.dispose();
+});
+
+test('final capture waits for an in-flight scan before reading the latest workspace', async () => {
+  const { root, recorder, ledger } = await createWorkspace();
+  recorder.onRunStart('run-1');
+  await recorder.flushDiffs();
+  const firstPath = path.join(root, 'first.md');
+  const lastPath = path.join(root, 'last.md');
+  await fs.writeFile(firstPath, 'first output');
+  const olderSnapshot = await takeWorkspaceSnapshot(root);
+  const pendingScan = Promise.withResolvers<typeof olderSnapshot>();
+  const started = Promise.withResolvers<void>();
+  const snapshots = vi
+    .spyOn(workspaceSnapshots, 'takeWorkspaceSnapshot')
+    .mockImplementationOnce(() => {
+      started.resolve();
+      return pendingScan.promise;
+    });
+  recorder.onToolEnd({
+    toolCallId: 'bash',
+    toolName: 'bash',
+    isError: false,
+    resultMessageId: 'tool-result',
+  });
+  const scan = recorder.flushDiffs();
+  await started.promise;
+  await fs.writeFile(lastPath, 'output written before settlement');
+  const capture = recorder.onRunSettled('final-answer');
+  try {
+    expect(snapshots).toHaveBeenCalledTimes(1);
+  } finally {
+    pendingScan.resolve(olderSnapshot);
+    await Promise.all([scan, capture]);
+    recorder.dispose();
+  }
+  expect(await capture).toBe(2);
+  expect(ledger.listForRun('session-1', 'run-1')).toHaveLength(2);
+  expect(ledger.listForRun('session-1', 'run-1')).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ filePath: firstPath, messageId: 'tool-result' }),
+      expect.objectContaining({ filePath: lastPath, messageId: 'final-answer' }),
+    ]),
+  );
 });
 
 test.each(['write', 'edit'])('%s is not counted again by the final scan', async toolName => {

@@ -5,7 +5,6 @@ import { createDesktopPet } from './createDesktopPet';
 import { createCompanion } from './createCompanion';
 import { createSkills } from './createSkills';
 import { createMcp } from './createMcp';
-import { createOllama } from './createOllama';
 import { createLlamacpp } from './createLlamacpp';
 import { createMarketplace } from './createMarketplace';
 import { createHardware } from './createHardware';
@@ -37,12 +36,9 @@ import { createIm } from './createIm';
 import { createScheduledTasks } from './createScheduledTasks';
 import { createPermissions } from './createPermissions';
 import { createAuth } from './createAuth';
-import { createModelPool } from './createModelPool';
 import { createEnterprise } from './createEnterprise';
 import { createManagedProviders } from './createManagedProviders';
 import { createNetworkStatus } from './createNetworkStatus';
-import { createFeishu } from './createFeishu';
-import { createDingtalk } from './createDingtalk';
 import { createActivity } from './createActivity';
 
 export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['electron'] {
@@ -54,7 +50,6 @@ export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['ele
     companion: createCompanion(runtime),
     skills: createSkills(runtime),
     mcp: createMcp(runtime),
-    ollama: createOllama(runtime),
     llamacpp: createLlamacpp(runtime),
     marketplace: createMarketplace(runtime),
     hardware: createHardware(runtime),
@@ -85,12 +80,9 @@ export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['ele
     scheduledTasks: createScheduledTasks(runtime),
     permissions: createPermissions(runtime),
     auth: createAuth(runtime),
-    modelPool: createModelPool(runtime),
     enterprise: createEnterprise(runtime),
     managedProviders: createManagedProviders(runtime),
     networkStatus: createNetworkStatus(runtime),
-    feishu: createFeishu(runtime),
-    dingtalk: createDingtalk(runtime),
     activity: createActivity(runtime),
   };
 }

@@ -9,8 +9,10 @@
  */
 
 import {
+  createTestPiRuntime,
   adapter,
   applyTestResolution,
+  createTemporaryPiSessionRoot,
   createTemporaryWorkspace,
   mockCreateAgentSession,
   mockCodemodeExtensionFactory,
@@ -20,16 +22,26 @@ import {
   mockMcpExtensionFactory,
   mockModelRuntime,
   mockSession,
+  mockSessionManagerOpen,
   mockSettingsManagerCreate,
   mockSettingsManagerInMemory,
   mockToolSearchExtensionFactory,
+  seedPersistedPiSession,
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
 
 import { describe, expect, it, vi } from 'vitest';
+import Database from 'better-sqlite3';
+import path from 'node:path';
+import { CanonicalScheduledTaskService } from '../../../scheduledTask/canonicalScheduledTaskService';
+import { SchedulerRuntime } from '../../../scheduledTask/schedulerRuntime';
+import { ScheduleKind } from '../../../scheduledTask/constants';
+import { initializeScheduledTaskSchema } from '../../../scheduledTask/schema';
+import { SqliteScheduledTaskStore } from '../../../scheduledTask/sqliteScheduledTaskStore';
+import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { PiWebSearchToolName } from './constants';
 import { getZhiyuanProductPreamble } from './piPromptOverrides';
-import { TEST_MAGPIE_GATEWAY } from '../../../../tests/helpers/installTestMagpie';
+import { TEST_MAGPIE_GATEWAY } from '../../../../tests/helpers/createTestMagpie';
 import { ModelCapabilityStatus } from '../../../shared/providers';
 import { resolveBundledOcrHelper } from '../ocrHelper';
 import { PiDocumentReaderToolName } from './piDocumentReaderTool';
@@ -40,9 +52,183 @@ import type { CoworkStore } from '../../coworkStore';
 import type { McpServerRecord } from '../../mcpStore';
 import type { PiLoadedMcpConfig } from './piMcpExtensionBridge';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
+import { piCompanionChatSessionId } from './piRuntimeTypes';
+import { readCoworkImageAsync } from '../../workbenchTask/artifactWorkerPool';
+import { MagpieModelService } from '../../magpie/modelService';
 
 describe('PiRuntimeAdapter', () => {
   setupPiRuntimeAdapterSuite();
+
+  it('rejects an unpublished Companion model before registering its fallback with Pi', async () => {
+    const modelService = new MagpieModelService(
+      {
+        status: () => ({ state: 'running', version: 'test', gatewayUrl: TEST_MAGPIE_GATEWAY }),
+        models: async () => [{ id: 'vendor/fallback' }],
+        providers: async () => [
+          {
+            id: 'vendor',
+            name: 'Vendor',
+            api: 'openai-completions',
+            baseUrl: TEST_MAGPIE_GATEWAY,
+            off: false,
+            hasKey: true,
+            models: ['vendor/removed'],
+            fallback: ['vendor/fallback'],
+          },
+        ],
+      },
+      { readDefaultModelId: () => 'vendor/removed', writeDefaultModelId: vi.fn() },
+    );
+    const runtime = createTestPiRuntime({ modelService });
+    await expect(
+      runtime.continueSession(piCompanionChatSessionId('pet'), 'Private input', {
+        companionChat: true,
+        modelOverride: 'vendor/removed',
+      }),
+    ).rejects.toThrow();
+    expect(mockModelRuntime.registerNativeProvider).not.toHaveBeenCalled();
+    expect(mockCreateAgentSession).not.toHaveBeenCalled();
+  });
+
+  it('can save a scheduled task on the first Work turn without arming saved schedules', async () => {
+    const db = new Database(':memory:');
+    initializeScheduledTaskSchema(db);
+    const store = new SqliteScheduledTaskStore(db);
+    const clock = { upsert: vi.fn(), remove: vi.fn(), stop: vi.fn() };
+    const scheduledTaskService = new CanonicalScheduledTaskService(
+      store,
+      new SchedulerRuntime(store, clock, async () => ({})),
+    );
+    const runtime = createTestPiRuntime({ scheduledTaskService });
+
+    try {
+      await runtime.startSession('first-work', 'Schedule a report', {
+        workspaceRoot: createTemporaryWorkspace(),
+        sessionMode: CoworkSessionMode.Work,
+      });
+      const options = mockCreateAgentSession.mock.calls.at(-1)?.[0] as {
+        customTools: Array<{
+          name: string;
+          execute: (id: string, params: object) => Promise<unknown>;
+        }>;
+      };
+      const tool = options.customTools.find(tool => tool.name === 'scheduled_task');
+      expect(clock.upsert).not.toHaveBeenCalled();
+      await expect(
+        tool?.execute('schedule-1', {
+          name: 'Daily report',
+          message: 'Report progress',
+          schedule: { kind: ScheduleKind.Cron, expr: '0 9 * * *' },
+        }),
+      ).resolves.toMatchObject({ details: { taskId: expect.any(String) } });
+      expect(store.list()).toMatchObject([{ name: 'Daily report', sessionKey: 'first-work' }]);
+      expect(clock.upsert).toHaveBeenCalledOnce();
+    } finally {
+      runtime.stopAllSessions();
+      db.close();
+    }
+  });
+
+  it('settles a tool-free private Companion session and reopens its native history', async () => {
+    const root = createTemporaryPiSessionRoot();
+    const sessionId = piCompanionChatSessionId('pet');
+    const sessionFile = seedPersistedPiSession(path.join(root, 'companion-chat'), sessionId);
+    const onSettled = vi.fn();
+    const options = { companionChat: true, systemPrompt: 'You are Xiaoyuan.', onSettled } as const;
+    const store = {
+      getSession: vi.fn(),
+      messages: { addMessage: vi.fn() },
+      updateSession: vi.fn(),
+    };
+    const memory = { registerSession: vi.fn() };
+    const workbench = { beginRun: vi.fn(), cancelRun: vi.fn() };
+    const publicEvent = vi.fn();
+    const runtime = createTestPiRuntime({
+      piSessionStoreRoot: root,
+      coworkStore: store as unknown as CoworkStore,
+      projectMemoryService: memory as never,
+      workbenchTaskService: workbench as unknown as WorkbenchTaskService,
+    });
+    runtime.on('executionEvent', publicEvent);
+    runtime.on('messageUpdate', publicEvent);
+    runtime.on('complete', publicEvent);
+
+    await expect(runtime.startSession(sessionId, 'Public input')).rejects.toThrow(
+      'Invalid Companion chat session.',
+    );
+    await expect(runtime.continueSession(sessionId, 'Public input')).rejects.toThrow();
+    await expect(
+      runtime.continueSession('ordinary-session', 'Private input', options),
+    ).rejects.toThrow('Invalid Companion chat session.');
+    await runtime.continueSession(sessionId, 'Hello', {
+      ...options,
+      sessionMode: CoworkSessionMode.Work,
+      skillIds: ['not-for-companion'],
+    });
+    const listener = mockSession.subscribe.mock.calls.at(-1)![0];
+    listener({ type: 'agent_start' });
+    listener({ type: 'turn_start' });
+    listener({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        stopReason: 'stop',
+        content: [{ type: 'text', text: 'Hello from Xiaoyuan.' }],
+      },
+    });
+    listener({ type: 'agent_end' });
+    listener({ type: 'agent_settled' });
+    await vi.waitFor(() =>
+      expect(onSettled).toHaveBeenCalledExactlyOnceWith({
+        ok: true,
+        output: 'Hello from Xiaoyuan.',
+      }),
+    );
+    expect(mockSessionManagerOpen).toHaveBeenCalledWith(
+      sessionFile,
+      path.dirname(sessionFile),
+      expect.any(String),
+    );
+    expect(mockCreateAgentSession.mock.calls.at(-1)?.[0]).toMatchObject({ noTools: 'all' });
+    expect(mockCreateAgentSession.mock.calls.at(-1)?.[0]).not.toHaveProperty('customTools');
+    expect(mockDefaultResourceLoader.mock.calls.at(-1)?.[0]).toMatchObject({
+      noExtensions: true,
+      noSkills: true,
+      noContextFiles: true,
+      noPromptTemplates: true,
+      appendSystemPrompt: [],
+    });
+    expect(mockDefaultResourceLoader.mock.calls.at(-1)?.[0]).not.toHaveProperty(
+      'extensionFactories',
+    );
+    expect(store.getSession).not.toHaveBeenCalled();
+    expect(store.messages.addMessage).not.toHaveBeenCalled();
+    expect(store.updateSession).not.toHaveBeenCalled();
+    expect(memory.registerSession).not.toHaveBeenCalled();
+    expect(workbench.beginRun).not.toHaveBeenCalled();
+    expect(publicEvent).not.toHaveBeenCalled();
+
+    runtime.stopSession(sessionId);
+    expect(mockSession.abort).not.toHaveBeenCalled();
+    runtime.stopSession(sessionId, { companionChat: true });
+    expect(mockSession.abort).toHaveBeenCalledOnce();
+    expect(workbench.cancelRun).not.toHaveBeenCalled();
+  });
+
+  it('does not send Companion input with its image removed', async () => {
+    applyTestResolution({
+      providerMetadata: { capabilities: { imageInput: ModelCapabilityStatus.Unsupported } },
+    });
+    const sessionId = piCompanionChatSessionId('pet');
+    await expect(
+      adapter.continueSession(sessionId, 'Look at this', {
+        companionChat: true,
+        imageAttachments: [{ name: 'sample.png', mimeType: 'image/png', base64Data: 'aW1hZ2U=' }],
+      }),
+    ).rejects.toThrow();
+    expect(mockSession.prompt).not.toHaveBeenCalled();
+    expect(mockSession.sendUserMessage).not.toHaveBeenCalled();
+  });
 
   describe('startSession', () => {
     it('should inject the session system prompt through Pi resource loading', async () => {
@@ -78,17 +264,19 @@ describe('PiRuntimeAdapter', () => {
 
     it('keeps Chat on Pi while skipping Work prompt, default Skill, and MCP resources', async () => {
       const listEnabled = vi.fn(() => []);
-      adapter.setMcpServerSource({ listEnabled });
-      adapter.setProjectMemoryService({} as never);
-      adapter.setConversationHistoryService({ search: vi.fn(() => []) } as never);
       const beginRun = vi.fn();
-      adapter.setWorkbenchTaskService({
-        on: vi.fn(),
-        off: vi.fn(),
-        beginRun,
-      } as unknown as WorkbenchTaskService);
+      const runtime = createTestPiRuntime({
+        mcpServerSource: { listEnabled },
+        projectMemoryService: {} as never,
+        conversationHistoryService: { search: vi.fn(() => []) } as never,
+        workbenchTaskService: {
+          on: vi.fn(),
+          off: vi.fn(),
+          beginRun,
+        } as unknown as WorkbenchTaskService,
+      });
 
-      await adapter.startSession('chat-resources', 'Hello', {
+      await runtime.startSession('chat-resources', 'Hello', {
         sessionMode: 'chat',
         systemPrompt: 'Only the explicitly selected chat prompt.',
       });
@@ -235,21 +423,37 @@ describe('PiRuntimeAdapter', () => {
 
     it('loads current MCP configuration through Pi and keeps the expert server scope', async () => {
       const records: McpServerRecord[] = [];
-      adapter.setMcpServerSource({ listEnabled: () => records });
-      adapter.setCoworkStore({
-        getSession: vi.fn(() => ({
-          experts: [
-            {
-              expertId: 'expert',
-              capabilityPolicy: { mcpIds: ['by-id', 'by-name'] },
-            },
-          ],
-        })),
-        getAgent: vi.fn(),
-        addMessage: vi.fn(),
-        updateSession: vi.fn(),
-      } as unknown as CoworkStore);
-      await adapter.startSession('mcp-native', 'Hello Pi', { expertIds: ['expert'] });
+      const getSessionExperts = vi.fn(() => [
+        {
+          expertId: 'expert',
+          expertName: 'Fixture expert',
+          packageId: 'fixture-package',
+          capabilityPolicy: { mcpIds: ['by-id', 'by-name'] },
+        },
+      ]);
+      const addMessage = vi.fn();
+      const runtime = createTestPiRuntime({
+        mcpServerSource: { listEnabled: () => records },
+        coworkStore: {
+          getSessionExperts,
+          getAgent: vi.fn(),
+          messages: { addMessage },
+          updateSession: vi.fn(),
+        } as unknown as CoworkStore,
+      });
+      await runtime.startSession('mcp-native', 'Hello Pi', { expertIds: ['expert'] });
+      expect(getSessionExperts).toHaveBeenCalledExactlyOnceWith('mcp-native');
+      expect(addMessage).toHaveBeenCalledWith(
+        'mcp-native',
+        expect.objectContaining({
+          type: 'user',
+          metadata: {
+            experts: [
+              { expertId: 'expert', expertName: 'Fixture expert', presetId: 'fixture-package' },
+            ],
+          },
+        }),
+      );
 
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         extensionFactories?: unknown[];
@@ -311,15 +515,14 @@ describe('PiRuntimeAdapter', () => {
           }),
         }),
       );
-      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
-        'magpie',
+      expect(mockModelRuntime.registerNativeProvider).toHaveBeenCalledWith(
         expect.objectContaining({
+          id: 'magpie',
           baseUrl: `${TEST_MAGPIE_GATEWAY}/v1`,
-          api: 'openai-completions',
           models: [expect.objectContaining({ id: 'llamacpp/qwen-local' })],
         }),
       );
-      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('magpie', 'magpie-zhiyuan');
+      expect(mockModelRuntime.setRuntimeApiKey).not.toHaveBeenCalled();
     });
 
     it('should make session active after start', async () => {
@@ -388,7 +591,56 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
+    it.each(['start', 'continue'])(
+      'does not send a saved image if the %s turn is stopped during its read',
+      async action => {
+        applyTestResolution({
+          config: {
+            apiKey: 'sk-vision',
+            baseURL: 'https://api.moonshot.cn/v1',
+            model: 'kimi-k2.6',
+            apiType: 'openai',
+          },
+          providerMetadata: {
+            providerName: 'moonshot',
+            codingPlanEnabled: false,
+            supportsImage: true,
+            capabilities: { imageInput: ModelCapabilityStatus.Supported },
+          },
+        });
+        const id = 'stopped-image';
+        if (action === 'continue') await adapter.startSession(id, 'Choose a picture');
+
+        const reading = Promise.withResolvers<AbortSignal>();
+        const bytes = Promise.withResolvers<string>();
+        vi.mocked(readCoworkImageAsync).mockImplementationOnce((_file, signal) => {
+          reading.resolve(signal!);
+          return bytes.promise;
+        });
+        const options = {
+          imageAttachments: [
+            { name: 'saved.png', mimeType: 'image/png', path: path.resolve('saved.png') },
+          ],
+        };
+        const submission =
+          action === 'start'
+            ? adapter.startSession(id, 'Describe this image', options)
+            : adapter.continueSession(id, 'Describe this image', options);
+        const signal = await reading.promise;
+        adapter.stopSession(id);
+        bytes.resolve('aW1hZ2U=');
+
+        await submission;
+        expect(signal.aborted).toBe(true);
+        expect(mockSession.sendUserMessage).not.toHaveBeenCalled();
+      },
+    );
+
     it('keeps an image attachment as a text hint for non-vision models', async () => {
+      const savedPath = 'C:\\cowork-images\\s\\example.png';
+      using persist = vi
+        .spyOn(adapter, 'persistImageAttachments')
+        .mockResolvedValueOnce([{ name: 'example.png', mimeType: 'image/png', path: savedPath }]);
       await adapter.startSession('text-only', 'Describe this image', {
         imageAttachments: [{ name: 'example.png', mimeType: 'image/png', base64Data: 'aW1hZ2U=' }],
       });
@@ -399,7 +651,9 @@ describe('PiRuntimeAdapter', () => {
       // is reported as unconfirmed, not as a confirmed text-only model.
       expect(sentPrompt).toContain('Describe this image');
       expect(sentPrompt).toContain('not sent');
+      expect(sentPrompt).toContain(savedPath);
       expect(sentPrompt).toMatch(/not confirmed/i);
+      expect(persist).toHaveBeenCalledOnce();
       expect(mockSession.sendUserMessage).not.toHaveBeenCalled();
     });
 
@@ -537,18 +791,21 @@ describe('PiRuntimeAdapter', () => {
       );
 
       adapter.stopSession('chat-unclamped');
+      await adapter.waitForNativeSessionStop('chat-unclamped');
       expect(mockSession.dispose).toHaveBeenCalledOnce();
     });
 
     it('injects project memory through before_agent_start custom messages instead of mutating systemPrompt sections', async () => {
-      adapter.setProjectMemoryService({
-        buildProjectContext: vi
-          .fn()
-          .mockResolvedValue('<project_memory>\nRemember convention X\n</project_memory>'),
-        registerSession: vi.fn().mockResolvedValue(undefined),
-      } as never);
+      const runtime = createTestPiRuntime({
+        projectMemoryService: {
+          buildProjectContext: vi
+            .fn()
+            .mockResolvedValue('<project_memory>\nRemember convention X\n</project_memory>'),
+          registerSession: vi.fn().mockResolvedValue(undefined),
+        } as never,
+      });
 
-      await adapter.startSession('memory-section', 'Inspect repository', {
+      await runtime.startSession('memory-section', 'Inspect repository', {
         sessionMode: 'work',
         workspaceRoot: createTemporaryWorkspace(),
       });

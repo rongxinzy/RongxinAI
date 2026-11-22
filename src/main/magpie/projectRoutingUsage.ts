@@ -58,10 +58,10 @@ function projectTotals(raw: Record<string, unknown>): MagpieUsageTotals {
 function projectMemberInfo(value: unknown): MagpieRoutingMemberInfo | null {
   const item = record(value);
   const id = text(item.id, 500);
-  if (!id) return null;
+  if (!id || typeof item.ready !== 'boolean') return null;
   return {
     id,
-    ready: bool(item.ready),
+    ready: item.ready,
     ...(text(item.provider, 120) ? { provider: text(item.provider, 120) } : {}),
     ...(text(item.name, 200) ? { name: text(item.name, 200) } : {}),
     ...(text(item.model, 200) ? { model: text(item.model, 200) } : {}),
@@ -81,13 +81,19 @@ function projectGroup(value: unknown): MagpieRoutingGroup | null {
         .filter((m): m is MagpieRoutingMemberInfo => m !== null)
         .slice(0, 200)
     : [];
+  const members = strings(item.members, 200);
   const matched = strings(item.matched, 200);
   return {
     id,
     name,
-    members: strings(item.members, 200),
+    members,
+    ...(!Array.isArray(item.members) || members.length !== item.members.length
+      ? { membersIncomplete: true }
+      : {}),
     ...(matched.length ? { matched } : {}),
     ...(text(item.routing, 40) ? { routing: text(item.routing, 40) } : {}),
+    ...(text(item.picked) ? { picked: text(item.picked) } : {}),
+    ...(bool(item.disabled) ? { disabled: true } : {}),
     ...(text(item.affinity, 40) ? { affinity: text(item.affinity, 40) } : {}),
     ...(Array.isArray(item.off) ? { off: strings(item.off, 200) } : {}),
     ready: bool(item.ready),

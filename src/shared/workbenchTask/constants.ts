@@ -85,14 +85,6 @@ export const WorkbenchArtifactProvenance = {
 export type WorkbenchArtifactProvenance =
   (typeof WorkbenchArtifactProvenance)[keyof typeof WorkbenchArtifactProvenance];
 
-export const WorkbenchArtifactCandidateSource = {
-  Declaration: 'declaration',
-  ToolEffect: 'tool_effect',
-  DomainWorkflow: 'domain_workflow',
-} as const;
-export type WorkbenchArtifactCandidateSource =
-  (typeof WorkbenchArtifactCandidateSource)[keyof typeof WorkbenchArtifactCandidateSource];
-
 export const WorkbenchArtifactVerificationStatus = {
   Pending: 'pending',
   Verified: 'verified',

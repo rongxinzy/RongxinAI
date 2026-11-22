@@ -1,12 +1,9 @@
-import { ipcMain } from 'electron';
 import type { BrowserWindow, ContextMenuParams } from 'electron';
 
-import {
-  ContextMenuAction,
-  isContextMenuAction,
-  type ContextMenuOpenEvent,
-} from '../shared/contextMenu';
+import { ContextMenuAction, type ContextMenuOpenEvent } from '../shared/contextMenu';
+import { appEventContract } from '../shared/ipc/appEventContract';
 import { ContextMenuIpc } from '../shared/ipc/channels';
+import { listenToWindowIpcEvent } from './ipc/listenToWindowIpcEvent';
 
 type ContextMenuSource = Pick<
   ContextMenuParams,
@@ -61,13 +58,12 @@ export function registerContextMenu(window: BrowserWindow): () => void {
     if (window.isDestroyed() || window.webContents.isDestroyed()) return;
     window.webContents.send(ContextMenuIpc.Open, createContextMenuOpenEvent(params));
   };
-  const executeListener = (event: Electron.IpcMainEvent, action: unknown) => {
-    if (event.sender !== window.webContents || !isContextMenuAction(action)) return;
-    executeContextMenuAction(window, action);
-  };
-
   window.webContents.on('context-menu', listener);
-  ipcMain.on(ContextMenuIpc.Execute, executeListener);
+  const stopExecution = listenToWindowIpcEvent(
+    appEventContract.contextMenuExecute,
+    () => window,
+    executeContextMenuAction,
+  );
   return () => {
     if (isUnregistered) return;
     isUnregistered = true;
@@ -75,6 +71,6 @@ export function registerContextMenu(window: BrowserWindow): () => void {
       const contents = window.webContents;
       if (!contents.isDestroyed()) contents.removeListener('context-menu', listener);
     }
-    ipcMain.removeListener(ContextMenuIpc.Execute, executeListener);
+    stopExecution();
   };
 }

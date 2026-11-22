@@ -9,6 +9,7 @@
  */
 import { homedir } from 'os';
 import path from 'path';
+import { isDeepStrictEqual } from 'node:util';
 
 import type Database from 'better-sqlite3';
 
@@ -20,6 +21,7 @@ import {
   type CoworkPersistedArtifact,
 } from '../../shared/cowork/artifacts';
 import { resolveCoworkArtifactType } from '../../shared/cowork/artifactPreview';
+import { WorkspaceObservations } from './workspaceObservations';
 
 /** Normalize a resolved path for the artifact key: unified separators; case
  * folded only on Windows, where paths are case-insensitive. */
@@ -155,6 +157,8 @@ export interface ArtifactLedgerAnnotateInput {
 }
 
 export class ArtifactLedger {
+  readonly workspaceObservations = new WorkspaceObservations();
+
   constructor(private readonly db: Database.Database) {}
 
   /**
@@ -182,7 +186,7 @@ export class ArtifactLedger {
     return this.db.transaction(() => {
       const existingRow = this.readRow(scopeId, artifactKey);
       const merged = existingRow ? mergeLedgerRow(existingRow, incoming) : incoming;
-      this.writeRow(scopeId, artifactKey, merged);
+      this.writeRow(scopeId, artifactKey, merged, existingRow);
       return merged;
     })();
   }
@@ -214,7 +218,7 @@ export class ArtifactLedger {
         createdAt: Date.now(),
       };
       const merged = existing ? mergeLedgerRow(existing, incoming) : incoming;
-      this.writeRow(scopeId, artifactKey, merged);
+      this.writeRow(scopeId, artifactKey, merged, existing);
       return merged;
     })();
   }
@@ -223,6 +227,15 @@ export class ArtifactLedger {
     const rows = this.db
       .prepare(`SELECT * FROM artifact_ledger WHERE scope_id = ? ORDER BY created_at ASC, id ASC`)
       .all(scopeId) as RowShape[];
+    return rows.map(row => this.mapRow(row));
+  }
+
+  listForRun(scopeId: string, runId: string): CoworkPersistedArtifact[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM artifact_ledger WHERE scope_id = ? AND run_id = ? ORDER BY created_at ASC, id ASC`,
+      )
+      .all(scopeId, runId) as RowShape[];
     return rows.map(row => this.mapRow(row));
   }
 
@@ -237,7 +250,13 @@ export class ArtifactLedger {
     return row ? this.mapRow(row) : null;
   }
 
-  private writeRow(scopeId: string, artifactKey: string, artifact: CoworkPersistedArtifact): void {
+  private writeRow(
+    scopeId: string,
+    artifactKey: string,
+    artifact: CoworkPersistedArtifact,
+    existing: CoworkPersistedArtifact | null,
+  ): void {
+    if (isDeepStrictEqual(existing, artifact)) return;
     const now = Date.now();
     this.db
       .prepare(

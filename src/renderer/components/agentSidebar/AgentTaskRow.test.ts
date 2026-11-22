@@ -31,7 +31,6 @@ function props() {
     isSelected: false,
     onSelect: vi.fn(),
     onDelete: vi.fn(async () => {}),
-    onShare: vi.fn(async () => {}),
     onTogglePin: vi.fn(async (_pinned: boolean) => {}),
     onRename: vi.fn(async (_title: string) => {}),
     onToggleSelection: vi.fn(),

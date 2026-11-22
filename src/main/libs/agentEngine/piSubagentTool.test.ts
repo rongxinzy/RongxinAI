@@ -5,12 +5,9 @@
  * mocked Pi SDK createAgentSession.
  */
 
-import * as fs from 'fs';
-import * as os from 'os';
-import path from 'path';
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CoreSkillId } from '../../../shared/skills/constants';
+import * as gateway from '../anysearchGateway';
+import type { buildPiWebSearchTool } from './piWebSearchTool';
 
 const hoisted = vi.hoisted(() => ({
   mockCreateAgentSession: vi.fn(),
@@ -128,11 +125,9 @@ function buildTool(depsOverride: Partial<PiSubagentToolDeps> = {}): {
   deps: PiSubagentToolDeps;
 } {
   const deps: PiSubagentToolDeps = {
-    getPiAgentsDir: () => '/nonexistent-pi-agents',
-    presetId: undefined,
     resolvedModel: {
       model: { provider: 'test', id: 'test-model' },
-      modelRuntime: null,
+      modelRuntime: { registerNativeProvider: vi.fn(), completeSimple: vi.fn() },
       maxOutputTokens: 4096,
     },
     workspaceRoot: '/tmp/workspace',
@@ -186,7 +181,7 @@ describe('buildPiSubagentTool', () => {
     const { tool } = buildTool({
       resolvedModel: {
         model: { provider: 'test', id: 'small', contextWindow: 16384 },
-        modelRuntime: null,
+        modelRuntime: { registerNativeProvider: vi.fn(), completeSimple: vi.fn() },
         maxOutputTokens: 4096,
       },
       createPiResourceLoader: async () => ({ settingsManager: { applyOverrides } }),
@@ -261,89 +256,64 @@ describe('buildPiSubagentTool', () => {
       );
     });
 
-    it('gives researcher subagents an explicit web-search capability', async () => {
-      const { tool, deps } = buildTool({ webSearchSkillPath: '/tmp/web-search' });
-      await tool.execute('call-1', { agent: 'researcher', task: 'find primary sources' });
+    it('routes researcher retrieval through the same hosted search tool', async () => {
+      const search = vi.spyOn(gateway, 'searchAnySearchGateway').mockResolvedValue({
+        results: [
+          { title: 'Primary source', url: 'https://example.com/source', snippet: 'Result' },
+        ],
+        total: 1,
+        elapsed: 1,
+      });
+      try {
+        const { tool, deps } = buildTool();
+        await tool.execute('call-1', { agent: 'researcher', task: 'find primary sources' });
+        const { customTools } = hoisted.mockCreateAgentSession.mock.calls[0][0] as {
+          customTools: ReturnType<typeof buildPiWebSearchTool>[];
+        };
+        expect(customTools.map(tool => tool.name)).toEqual(['web_search']);
+        expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
+          '/tmp/workspace',
+          expect.stringContaining('Use web_search to retrieve sources'),
+          4096,
+        );
+        await expect(
+          customTools[0].execute('search', { query: 'project docs', maxResults: 2 }),
+        ).resolves.toMatchObject({ details: { results: [{ title: 'Primary source' }] } });
+        expect(search).toHaveBeenCalledExactlyOnceWith('project docs', 2, undefined);
+      } finally {
+        search.mockRestore();
+      }
+    });
+
+    it('merges team member profiles and lets members override same-name builtins', async () => {
+      const { tool, deps } = buildTool({
+        memberProfiles: [
+          {
+            id: 'researcher',
+            description: 'Custom team researcher',
+            systemPrompt: 'You are the team researcher override.',
+          },
+          {
+            id: 'custom-member',
+            description: 'Custom member',
+            systemPrompt: 'You are a custom team member.',
+          },
+        ],
+      });
+      expect(tool.description).toContain('custom-member');
+      expect(tool.description).toContain('Custom team researcher');
+      await tool.execute('call-1', { agent: 'researcher', task: 'investigate' });
       expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
         '/tmp/workspace',
-        expect.stringContaining(path.join('/tmp/web-search', 'scripts', 'search.mjs')),
+        expect.stringContaining('You are the team researcher override.'),
         4096,
-        [CoreSkillId.WebSearch],
       );
-    });
-
-    it('merges team member agents and lets members override same-name builtins', async () => {
-      const agentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-subagent-test-'));
-      try {
-        fs.writeFileSync(
-          path.join(agentsDir, 'team1--researcher.md'),
-          '---\ndescription: Custom team researcher\n---\nYou are the team researcher override.\n',
-        );
-        fs.writeFileSync(
-          path.join(agentsDir, 'team1--custom-member.md'),
-          '---\ndescription: Custom member\n---\nYou are a custom team member.\n',
-        );
-
-        const { tool, deps } = buildTool({
-          getPiAgentsDir: () => agentsDir,
-          presetId: 'team1',
-        });
-
-        // Member agent is available and its description shows in the tool listing.
-        expect(tool.description).toContain('custom-member');
-        expect(tool.description).toContain('Custom team researcher');
-
-        // The member definition overrides the same-name builtin profile.
-        await tool.execute('call-1', { agent: 'researcher', task: 'investigate' });
-        expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
-          '/tmp/workspace',
-          'You are the team researcher override.',
-          4096,
-        );
-
-        // The custom member agent runs with its own system prompt.
-        await tool.execute('call-2', { agent: 'custom-member', task: 'help out' });
-        expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
-          '/tmp/workspace',
-          'You are a custom team member.',
-          4096,
-        );
-      } finally {
-        fs.rmSync(agentsDir, { recursive: true, force: true });
-      }
-    });
-
-    it('prefers live bundled member definitions over synced pi agents files', async () => {
-      const agentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-subagent-test-'));
-      try {
-        // Stale synced copy: would be used if the bundled source were absent.
-        fs.writeFileSync(
-          path.join(agentsDir, 'team1--custom-member.md'),
-          '---\ndescription: Stale member\n---\nYou are the stale member definition.\n',
-        );
-
-        const { tool, deps } = buildTool({
-          getPiAgentsDir: () => agentsDir,
-          presetId: 'team1',
-          loadBundledMembers: () => [
-            {
-              id: 'custom-member',
-              description: 'Live member',
-              systemPrompt: 'You are the live bundled member definition.',
-            },
-          ],
-        });
-
-        expect(tool.description).toContain('Live member');
-        await tool.execute('call-1', { agent: 'custom-member', task: 'help out' });
-        expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
-          '/tmp/workspace',
-          'You are the live bundled member definition.',
-          4096,
-        );
-      } finally {
-        fs.rmSync(agentsDir, { recursive: true, force: true });
-      }
+      await tool.execute('call-2', { agent: 'custom-member', task: 'help out' });
+      expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
+        '/tmp/workspace',
+        'You are a custom team member.',
+        4096,
+      );
     });
   });
 

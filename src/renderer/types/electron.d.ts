@@ -24,12 +24,7 @@ import type {
   ShellApi,
 } from './electron/appSystemApi';
 import type { McpApi, SkillsApi } from './electron/skillsMcpApi';
-import type {
-  HardwareApi,
-  LlamaCppApi,
-  MarketplaceApi,
-  OllamaApi,
-} from './electron/localInferenceApi';
+import type { HardwareApi, LlamaCppApi, MarketplaceApi } from './electron/localInferenceApi';
 import type { AgentsApi, TodoApi, WorkbenchTaskApi } from './electron/agentsApi';
 import type { CoworkApi } from './electron/coworkApi';
 import type { CodingAgentApi } from './electron/codingAgentApi';
@@ -38,40 +33,43 @@ import type { ScheduledTasksApi } from './electron/scheduledTaskApi';
 import type {
   ActivityApi,
   AuthApi,
-  DingTalkApi,
   EnterpriseApi,
-  FeishuApi,
   ManagedProvidersApi,
-  ModelPoolApi,
   PermissionsApi,
 } from './electron/integrationsApi';
 import type { RuntimeRetryNotice } from '../../common/runtimeNotice';
-import type { IpcContractApi } from '../../shared/ipc/contract';
-import type { appSystemContract } from '../../shared/ipc/appSystemContract';
+import type {
+  AppSystemInvokers,
+  appConfigChannels,
+  autoLaunchChannels,
+  preventSleepChannels,
+} from '../../shared/ipc/appSystemContract.channels';
 
-type AppSystemContractApi = IpcContractApi<typeof appSystemContract>;
+import type { IpcContractApi } from '../../shared/ipc/contract';
+import type { magpieContract } from '../../shared/ipc/providersContract';
+
+type AppConfigApi = AppSystemInvokers<typeof appConfigChannels>;
 
 export interface IElectronAPI {
   platform: string;
   arch: string;
   store: StoreApi;
   desktopPet: import('../../shared/desktopPet/types').DesktopPetApi;
-  companion: import('../../shared/companion/types').CompanionWindowApi;
+  companion: import('../../shared/companion/types').CompanionNavigationApi;
   skills: SkillsApi;
   mcp: McpApi;
-  ollama: OllamaApi;
   llamacpp: LlamaCppApi;
   marketplace: MarketplaceApi;
   hardware: HardwareApi;
   agents: AgentsApi;
-  checkApiConfig: AppSystemContractApi['checkApiConfig'];
-  generateSessionTitle: AppSystemContractApi['generateSessionTitle'];
-  getRecentCwds: AppSystemContractApi['getRecentCwds'];
+  checkApiConfig: AppConfigApi['checkApiConfig'];
+  generateSessionTitle: AppConfigApi['generateSessionTitle'];
+  getRecentCwds: AppConfigApi['getRecentCwds'];
   appEvents: AppEventsApi;
   contextMenu: ContextMenuApi;
   window: WindowApi;
   memory: MemoryApi;
-  magpie: import('../../shared/magpie/types').MagpieApi;
+  magpie: IpcContractApi<typeof magpieContract>;
   artifacts: ArtifactsApi;
   cowork: CoworkApi;
   workbenchTask: WorkbenchTaskApi;
@@ -80,14 +78,8 @@ export interface IElectronAPI {
   dialog: DialogApi;
   project: ProjectApi;
   shell: ShellApi;
-  autoLaunch: {
-    get: AppSystemContractApi['autoLaunchGet'];
-    set: AppSystemContractApi['autoLaunchSet'];
-  };
-  preventSleep: {
-    get: AppSystemContractApi['preventSleepGet'];
-    set: AppSystemContractApi['preventSleepSet'];
-  };
+  autoLaunch: AppSystemInvokers<typeof autoLaunchChannels>;
+  preventSleep: AppSystemInvokers<typeof preventSleepChannels>;
   appInfo: AppInfoApi;
   appUpdate: AppUpdateApi;
   runtimeNotices: {
@@ -98,14 +90,11 @@ export interface IElectronAPI {
   scheduledTasks: ScheduledTasksApi;
   permissions: PermissionsApi;
   auth: AuthApi;
-  modelPool: ModelPoolApi;
   enterprise: EnterpriseApi;
   managedProviders: ManagedProvidersApi;
   networkStatus: {
     send: (status: 'online' | 'offline') => void;
   };
-  feishu: FeishuApi;
-  dingtalk: DingTalkApi;
   activity: ActivityApi;
 }
 

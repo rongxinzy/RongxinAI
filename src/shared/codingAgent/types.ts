@@ -268,25 +268,16 @@ export interface UpdateCodingWorkspaceInput extends CreateCodingWorkspaceInput {
   workspaceId: string;
 }
 
-export interface CreateCodingSessionInput {
+export interface StartCodingSessionInput {
   workspaceId: string;
   profileId: string;
   sourceRoot: string;
   title?: string;
   modelOverride?: string;
-}
-
-export interface StartCodingSessionInput extends CreateCodingSessionInput {
   prompt: string;
   attachments?: CodingPromptAttachment[];
   /** Config option values chosen in the draft composer, applied at creation. */
   configOptionOverrides?: Record<string, string>;
-}
-
-export interface CreateCodingMissionInput {
-  workspaceRoot: string;
-  profileId: string;
-  title?: string;
 }
 
 export interface CodingPromptInput {
@@ -417,13 +408,6 @@ export interface CodingGitCommitAndPushResult {
   status: CodingGitStatus;
   pushed: boolean;
   pushError?: string;
-}
-
-export interface CreateCodingCollaborationPresetInput {
-  workspaceRoot: string;
-  missionId: string;
-  reviewerProfileId: string;
-  verifierProfileId: string;
 }
 
 export interface AddCodingAgentProfileInput {

@@ -6,17 +6,15 @@ const {
   existsSync,
   cpSync,
   readFileSync,
-  readdirSync,
   statSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
   renameSync,
-  lstatSync,
   writeFileSync,
   symlinkSync,
 } = require('fs');
-const { spawnSync } = require('child_process');
+const { execFileSync, spawnSync } = require('child_process');
 const { writeNsisOfflineComponentRouting } = require('./resolve-nsis-offline-components.cjs');
 const { ensurePortablePythonRuntime, checkRuntimeHealth } = require('./setup-python-runtime.js');
 const { configureMagpieResources } = require('./magpie-runtime.cjs');
@@ -51,6 +49,7 @@ const {
   getWindowsResourceArchiveCompression,
   getWindowsResourceComponents,
   isWindowsResourceComponentReusable,
+  listWindowsResourceComponentFiles,
   sha256File,
 } = require('./windows-resource-pack.cjs');
 
@@ -106,20 +105,41 @@ function resolveWindows7zaPath() {
   return sevenZipPath;
 }
 
-function packWindowsResourceComponent7z(component, archivePath, sevenZipPath) {
+function packWindowsResourceComponent7z(
+  component,
+  archivePath,
+  sevenZipPath,
+  files = listWindowsResourceComponentFiles(component),
+) {
+  if (files.length === 0) {
+    throw new Error(`[electron-builder-hooks] No files to archive for ${component.key}`);
+  }
   const stagingRoot = mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-component-7z-'));
   const stagedPrefix = path.join(stagingRoot, component.prefix);
+  const listPath = path.join(stagingRoot, 'files.txt');
   const temporaryArchivePath = `${archivePath}.${process.pid}.packing`;
   try {
     // A junction keeps the archive layout stable without copying a multi-hundred-MB
-    // component into a temporary staging directory.  The archive is created from
-    // the relative prefix only, so it never contains an absolute build-machine path.
+    // component into a temporary staging directory. List only the files used for its ID.
     symlinkSync(component.dir, stagedPrefix, 'junction');
+    writeFileSync(
+      listPath,
+      files.map(file => path.join(component.prefix, file)).join('\n') + '\n',
+      'utf8',
+    );
     const compression = getWindowsResourceArchiveCompression(component);
     rmSync(temporaryArchivePath, { force: true });
     const result = spawnSync(
       sevenZipPath,
-      ['a', '-t7z', ...compression.sevenZipArgs, temporaryArchivePath, component.prefix],
+      [
+        'a',
+        '-t7z',
+        '-spd',
+        '-scsUTF-8',
+        ...compression.sevenZipArgs,
+        temporaryArchivePath,
+        `@${listPath}`,
+      ],
       {
         cwd: stagingRoot,
         encoding: 'utf8',
@@ -282,105 +302,7 @@ function applyMacIconFix(appPath) {
   console.log('[electron-builder-hooks] macOS Launchpad icon fix applied');
 }
 
-/**
- * Remove node_modules/.bin directories from bundled dependency trees.
- *
- * macOS codesign rejects symlinks inside app bundles (even valid relative ones).
- * .bin/ directories contain only CLI wrapper symlinks that are never used at
- * runtime, so removing them entirely is safe and fixes signing.
- */
-
-/**
- * Check if a command exists in the system PATH.
- */
-function hasCommand(command) {
-  const checker = process.platform === 'win32' ? 'where' : 'which';
-  const result = spawnSync(checker, [command], { stdio: 'ignore' });
-  return result.status === 0;
-}
-
-/**
- * Install dependencies for all skills in the SKILLs directory.
- * This ensures bundled skills include node_modules for users without npm.
- */
-function installSkillDependencies() {
-  // Check if npm is available (should be available during build)
-  if (!hasCommand('npm')) {
-    console.warn(
-      '[electron-builder-hooks] npm not found in PATH, skipping skill dependency installation',
-    );
-    console.warn(
-      '[electron-builder-hooks]   (This is only a warning - skills will be installed at runtime if needed)',
-    );
-    return;
-  }
-
-  const skillsDir = path.join(__dirname, '..', 'SKILLs');
-  if (!existsSync(skillsDir)) {
-    console.log(
-      '[electron-builder-hooks] SKILLs directory not found, skipping skill dependency installation',
-    );
-    return;
-  }
-
-  console.log('[electron-builder-hooks] Installing skill dependencies...');
-
-  const entries = readdirSync(skillsDir);
-  let installedCount = 0;
-  let skippedCount = 0;
-  let failedCount = 0;
-
-  for (const entry of entries) {
-    const skillPath = path.join(skillsDir, entry);
-    const stat = statSync(skillPath);
-    if (!stat.isDirectory()) continue;
-
-    const packageJsonPath = path.join(skillPath, 'package.json');
-    const nodeModulesPath = path.join(skillPath, 'node_modules');
-
-    if (!existsSync(packageJsonPath)) {
-      continue; // No package.json, skip
-    }
-
-    if (existsSync(nodeModulesPath)) {
-      console.log(`[electron-builder-hooks]   ${entry}: node_modules exists, skipping`);
-      skippedCount++;
-      continue;
-    }
-
-    console.log(`[electron-builder-hooks]   ${entry}: installing dependencies...`);
-    // On Windows, use shell: true so cmd.exe resolves npm.cmd correctly
-    const isWin = process.platform === 'win32';
-    const result = spawnSync('npm', ['install'], {
-      cwd: skillPath,
-      encoding: 'utf-8',
-      stdio: 'pipe',
-      timeout: 5 * 60 * 1000, // 5 minute timeout
-      shell: isWin,
-    });
-
-    if (result.status === 0) {
-      console.log(`[electron-builder-hooks]   ${entry}: ✓ installed`);
-      installedCount++;
-    } else {
-      console.error(`[electron-builder-hooks]   ${entry}: ✗ failed`);
-      if (result.error) {
-        console.error(`[electron-builder-hooks]     Error: ${result.error.message}`);
-      }
-      if (result.stderr) {
-        console.error(`[electron-builder-hooks]     ${result.stderr.substring(0, 200)}`);
-      }
-      failedCount++;
-    }
-  }
-
-  console.log(
-    `[electron-builder-hooks] Skill dependencies: ${installedCount} installed, ${skippedCount} skipped, ${failedCount} failed`,
-  );
-}
-
-function configureInferenceEditionPublishUrls(context) {
-  const edition = (process.env.ZHIYUAN_UPDATE_VARIANT || 'lite').trim().toLowerCase();
+function configureInferenceEditionPublishUrls(context, edition) {
   const arch = resolveTargetArch(context);
   const platformName = context?.electronPlatformName;
   if (!platformName) return;
@@ -420,8 +342,7 @@ function configureInferenceEditionPublishUrls(context) {
   console.log(`[electron-builder-hooks] inference edition ${edition}: publish url ${publishUrl}`);
 }
 
-function configureInferenceEditionResources(context) {
-  const edition = (process.env.ZHIYUAN_UPDATE_VARIANT || 'lite').trim().toLowerCase();
+function configureInferenceEditionResources(context, edition) {
   const extraResources = Array.isArray(context.packager.config.extraResources)
     ? [...context.packager.config.extraResources]
     : [];
@@ -482,17 +403,34 @@ function configureInferenceEditionResources(context) {
   );
 }
 
+let bundledSkillsPrepared = false;
+
 async function beforePack(context) {
-  assertModelCatalog(path.join(__dirname, '..', 'resources', 'model-catalog.sqlite'));
+  const projectRoot = path.join(__dirname, '..');
+  const edition = (process.env.ZHIYUAN_UPDATE_VARIANT || 'lite').trim().toLowerCase();
+  assertModelCatalog(path.join(projectRoot, 'resources', 'model-catalog.sqlite'));
   configureMagpieResources(context);
+  context.packager.config.extraMetadata = {
+    ...context.packager.config.extraMetadata,
+    zhiyuanUpdateVariant: edition,
+  };
   configureMacAutoUpdateMetadata(context);
-  configureInferenceEditionPublishUrls(context);
-  configureInferenceEditionResources(context);
+  configureInferenceEditionPublishUrls(context, edition);
+  configureInferenceEditionResources(context, edition);
   ensureBundledChannelRuntime(context);
-  // Install skill dependencies first (for all platforms)
-  installSkillDependencies();
+  if (!bundledSkillsPrepared) {
+    execFileSync('bun', ['run', 'build:skills'], {
+      cwd: projectRoot,
+      stdio: 'inherit',
+    });
+    bundledSkillsPrepared = true;
+  }
 
   if (isWindowsTarget(context)) {
+    execFileSync(process.execPath, [require.resolve('./build-docx-runtime.cjs')], {
+      cwd: projectRoot,
+      stdio: 'inherit',
+    });
     console.log(
       '[electron-builder-hooks] Windows target detected, ensuring portable uv runtime is prepared...',
     );
@@ -578,7 +516,6 @@ async function beforePack(context) {
   if (isWindowsTarget(context)) {
     // The installer remains fully offline, while each non-llama.cpp component
     // gets an independent content ID so upgrades expand only changed pieces.
-    const projectRoot = path.join(__dirname, '..');
     const componentsDir = path.join(projectRoot, 'build-tar', 'windows-components');
     mkdirSync(componentsDir, { recursive: true });
     const sevenZipPath = resolveWindows7zaPath();
@@ -592,7 +529,8 @@ async function beforePack(context) {
       const versionPath = path.join(componentsDir, `${component.key}.version`);
       const hashPath = path.join(componentsDir, `${component.key}.sha256`);
       const sentinelHashPath = path.join(componentsDir, `${component.key}.sentinel-sha256`);
-      const contentId = computeWindowsResourceComponentId(component);
+      const files = listWindowsResourceComponentFiles(component);
+      const contentId = computeWindowsResourceComponentId(component, files);
       const reusable = isWindowsResourceComponentReusable(
         manifestPath,
         archivePath,
@@ -602,7 +540,7 @@ async function beforePack(context) {
 
       if (!reusable) {
         const startedAt = Date.now();
-        packWindowsResourceComponent7z(component, archivePath, sevenZipPath);
+        packWindowsResourceComponent7z(component, archivePath, sevenZipPath, files);
         console.log(
           `[electron-builder-hooks] Packed ${component.key} ${contentId} with ${
             getWindowsResourceArchiveCompression(component).id

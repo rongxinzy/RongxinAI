@@ -1,4 +1,4 @@
-/** Cowork session IPC: Start and Continue (prompt composition, experts, Pi handoff). */
+/** Cowork session IPC: start, continue and respond to Pi permissions. */
 import {
   haveSameExpertIds,
   haveSameExpertSnapshots,
@@ -9,14 +9,16 @@ import { sanitizeCoworkSessionForIpc } from '../appBootstrap/ipcPayloadSanitize'
 import { composeCoworkSystemPrompt } from '../coworkPrompt/composer';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { coworkSessionLifecycleContract } from '../../shared/ipc/coworkContract';
-import { persistCoworkImageAttachments } from '../coworkImageAttachments';
-import { reportPiSessionFailure } from '../piSessionFailure';
+import { projectCoworkSessionRuntimeState } from '../coworkSessionRuntimeState';
 import { t } from '../i18n';
-import { resolveCoworkContinuationSkillState } from '../coworkSessionSkills';
 import { CoworkSessionMode } from '../../shared/cowork/constants';
 import { resolveCoworkApprovalMode } from './approvalMode';
 
-import { startCoworkSession, type CoworkSessionIpcDeps } from './sessionStart';
+import {
+  assertCoworkSubmissionOpen,
+  startCoworkSession,
+  type CoworkSessionIpcDeps,
+} from './sessionStart';
 export type { CoworkSessionIpcDeps } from './sessionStart';
 
 export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
@@ -24,8 +26,21 @@ export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
   handleIpcContract(coworkSessionLifecycleContract, {
     startSession: (_event, options) => startCoworkSession(deps, options),
 
+    respondToPermission: async (_event, options) => {
+      try {
+        deps.getPiRuntimeAdapter().respondToPermission(options.requestId, options.result);
+        return { success: true as const };
+      } catch (error) {
+        return {
+          success: false as const,
+          error: error instanceof Error ? error.message : 'Failed to respond to permission',
+        };
+      }
+    },
+
     continueSession: async (_event, options) => {
       try {
+        assertCoworkSubmissionOpen();
         // Work sessions use Pi (SDK mode, instant availability).
         const runtime = deps.getPiRuntimeAdapter();
         if (runtime.isSessionReservedForDelivery(options.sessionId)) {
@@ -35,15 +50,27 @@ export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
         let existingSession = localStore.getSession(options.sessionId, 0, {
           includeArtifacts: false,
         });
-        if (existingSession) {
-          const previousExpertSnapshots = existingSession.experts;
-          const expertSnapshots =
-            options.expertIds === undefined ||
-            haveSameExpertIds(previousExpertSnapshots, options.expertIds)
-              ? previousExpertSnapshots.slice(0, 1)
-              : resolveSessionExpertSnapshots(options.expertIds);
-          const isChatSession = existingSession?.mode === CoworkSessionMode.Chat;
-          const nextSystemPrompt = isChatSession
+        if (!existingSession) return { success: false, error: t('coworkSessionNotFound') };
+
+        let replacement;
+        if (
+          options.expertIds !== undefined &&
+          !haveSameExpertIds(existingSession.experts, options.expertIds)
+        ) {
+          replacement = await resolveSessionExpertSnapshots(options.expertIds);
+          assertCoworkSubmissionOpen();
+          if (runtime.isSessionReservedForDelivery(options.sessionId)) {
+            return { success: false, error: t('modelPoolSessionBusy') };
+          }
+          existingSession = localStore.getSession(options.sessionId, 0, {
+            includeArtifacts: false,
+          });
+          if (!existingSession) return { success: false, error: t('coworkSessionNotFound') };
+        }
+        const previousExpertSnapshots = existingSession.experts;
+        const expertSnapshots = replacement ?? previousExpertSnapshots.slice(0, 1);
+        const nextSystemPrompt =
+          existingSession.mode === CoworkSessionMode.Chat
             ? (options.systemPrompt ?? '').trim()
             : composeCoworkSystemPrompt({
                 basePrompt: existingSession.systemPrompt || options.systemPrompt,
@@ -51,89 +78,54 @@ export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
                 previousExpertSnapshots,
                 language: resolveCoworkPromptLanguage(),
               });
-          const expertsChanged = !haveSameExpertSnapshots(previousExpertSnapshots, expertSnapshots);
-          if (expertsChanged) {
-            localStore.replaceSessionExperts(options.sessionId, expertSnapshots);
-          }
-          if (nextSystemPrompt !== existingSession.systemPrompt) {
-            localStore.updateSession(options.sessionId, { systemPrompt: nextSystemPrompt });
-          }
-          if (expertsChanged || nextSystemPrompt !== existingSession.systemPrompt) {
-            existingSession = localStore.getSession(options.sessionId, 0, {
-              includeArtifacts: false,
-            });
-          }
-        }
-        let storedImages: ReturnType<typeof persistCoworkImageAttachments> | undefined;
-        if (options.imageAttachments?.length) {
-          console.log('[Cowork:ContinueSession] imageAttachments received via IPC:', {
-            sessionId: options.sessionId,
-            count: options.imageAttachments.length,
-            details: options.imageAttachments.map(img => ({
-              name: img.name,
-              mimeType: img.mimeType,
-              base64Length: img.base64Data?.length ?? 0,
-            })),
+        const expertsChanged = !haveSameExpertSnapshots(previousExpertSnapshots, expertSnapshots);
+        const systemPromptChanged = nextSystemPrompt !== existingSession.systemPrompt;
+        if (expertsChanged || systemPromptChanged) {
+          localStore.updateSessionPrompt(options.sessionId, {
+            expertSnapshots: expertsChanged ? expertSnapshots : undefined,
+            systemPrompt: systemPromptChanged ? nextSystemPrompt : undefined,
           });
-          // Persist once at the IPC boundary; runtime receives paths only.
-          storedImages = persistCoworkImageAttachments(
-            deps.getCoworkImageRoot(),
-            options.sessionId,
-            options.imageAttachments,
-          );
+          const refreshedSession = localStore.getSession(options.sessionId, 0, {
+            includeArtifacts: false,
+          });
+          if (!refreshedSession) return { success: false, error: t('coworkSessionNotFound') };
+          existingSession = refreshedSession;
         }
-
-        const continuationSkillState = resolveCoworkContinuationSkillState({
-          activeSkillIds: options.activeSkillIds,
-          savedSkillIds: existingSession?.activeSkillIds,
-          expertSkillIds: (existingSession?.experts || []).flatMap(expert => expert.skillIds),
-        });
-
-        // The session keeps a skill until the user removes it, so this turn's
-        // picks are added to the persisted capability set rather than replacing it.
-        try {
-          localStore.updateSession(
-            options.sessionId,
-            { activeSkillIds: continuationSkillState.sessionSkillIds },
-            { touchUpdatedAt: false },
-          );
-        } catch (error) {
-          console.error('[Cowork:ContinueSession] failed to persist activeSkillIds:', error);
+        const attachedSkillIds = options.activeSkillIds ?? [];
+        let sessionSkillIds = [...existingSession.activeSkillIds, ...attachedSkillIds];
+        if (attachedSkillIds.length) {
+          try {
+            sessionSkillIds = localStore.appendSessionSkills(options.sessionId, attachedSkillIds);
+          } catch (error) {
+            console.error('[Cowork:ContinueSession] failed to persist activeSkillIds:', error);
+          }
         }
+        const runtimeSkillIds = [
+          ...new Set([
+            ...sessionSkillIds,
+            ...existingSession.experts.flatMap(expert => expert.skillIds),
+          ]),
+        ];
 
-        const runtimeSkillIds = continuationSkillState.runtimeSkillIds;
-        const sessionMode = existingSession?.mode ?? CoworkSessionMode.Work;
-
-        const runtimeSystemPrompt = existingSession
-          ? existingSession.systemPrompt
-          : sessionMode === CoworkSessionMode.Chat
-            ? (options.systemPrompt ?? '').trim()
-            : composeCoworkSystemPrompt({
-                basePrompt: options.systemPrompt,
-                language: resolveCoworkPromptLanguage(),
-              });
-
-        if (existingSession && options.prompt.trim()) {
-          localStore.touchWorkspace(existingSession.workspaceId);
+        if (options.prompt.trim()) {
+          localStore.workspaces.touchWorkspace(existingSession.workspaceId);
         }
 
         runtime
           .continueSession(options.sessionId, options.prompt, {
-            systemPrompt: runtimeSystemPrompt,
+            systemPrompt: existingSession.systemPrompt,
             skillIds: runtimeSkillIds,
-            // The user's per-input selection (empty when they attached none) is
-            // what the transcript shows; runtimeSkillIds also carries the expert
-            // preset bundle and must not reappear as chips on this turn.
+            // The transcript shows only the skills attached to this input.
             attachedSkillIds: options.activeSkillIds,
-            sessionMode,
+            sessionMode: existingSession.mode,
             goalMode: options.goalMode,
             codemode: localStore.getConfig().codemodeEnabled === true,
-            imageAttachments: storedImages,
+            imageAttachments: options.imageAttachments,
             fileAttachments: options.fileAttachments,
-            workspaceRoot: existingSession?.cwd,
-            agentId: existingSession?.agentId,
-            expertIds: existingSession?.experts.map(expert => expert.expertId),
-            modelOverride: existingSession?.modelOverride,
+            workspaceRoot: existingSession.cwd,
+            agentId: existingSession.agentId,
+            expertIds: existingSession.experts.map(expert => expert.expertId),
+            modelOverride: existingSession.modelOverride,
             approvalMode: resolveCoworkApprovalMode(
               options.permissionMode ??
                 localStore.getConfig().permissionModeBySession[options.sessionId] ??
@@ -143,15 +135,7 @@ export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
           .catch(error => {
             console.error('[Cowork] continue error:', error);
             try {
-              const existing = deps.getCoworkStore().getSession(options.sessionId, 0, {
-                includeArtifacts: false,
-              });
-              reportPiSessionFailure(
-                deps.getPiRuntimeAdapter(),
-                options.sessionId,
-                error,
-                existing?.status,
-              );
+              runtime.recovery.reportRejectedSubmission(options.sessionId, error);
             } catch (handlerError) {
               console.error(
                 '[Cowork] failed to send error notification to renderer:',
@@ -161,7 +145,14 @@ export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
           });
 
         const session = localStore.getSession(options.sessionId, 0, { includeArtifacts: false });
-        return { success: true, session: session ? sanitizeCoworkSessionForIpc(session) : session };
+        return {
+          success: true,
+          session:
+            session &&
+            sanitizeCoworkSessionForIpc(
+              projectCoworkSessionRuntimeState(session, runtime.isSessionRunning(session.id)),
+            ),
+        };
       } catch (error) {
         return {
           success: false,

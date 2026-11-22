@@ -108,30 +108,12 @@ export const skillsContract = defineIpcContract({
     args: z.tuple([z.string(), z.enum(['install', 'installDisabled', 'cancel'])]),
     result: SkillsEnvelopeSchema,
   },
-  getRoot: {
-    channel: SkillsIpc.GetRoot,
-    args: z.tuple([]),
-    result: z.object({
-      success: z.boolean(),
-      path: z.string().optional(),
-      error: z.string().optional(),
-    }),
-  },
   getContent: {
     channel: SkillsIpc.GetContent,
     args: z.tuple([z.string()]),
     result: z.object({
       success: z.boolean(),
       content: z.string().optional(),
-      error: z.string().optional(),
-    }),
-  },
-  autoRoutingPrompt: {
-    channel: SkillsIpc.AutoRoutingPrompt,
-    args: z.tuple([]),
-    result: z.object({
-      success: z.boolean(),
-      prompt: z.string().nullable().optional(),
       error: z.string().optional(),
     }),
   },

@@ -12,6 +12,7 @@ import artifactReducer, {
   selectSessionArtifacts,
 } from '../store/slices/artifactSlice';
 import { coworkService, dispatchArtifactUpsert } from './cowork';
+import { agentService } from './agent';
 
 vi.mock('../store', () => ({
   store: {
@@ -103,12 +104,30 @@ test('repeated ledger upserts for the same row stay idempotent', () => {
   expect(state.getState().artifact.artifactsBySession['session-1']).toBe(rows);
 });
 
+test('expert deletion applies the returned session IDs without reloading unrelated sessions', async () => {
+  const listSessions = vi.fn();
+  vi.stubGlobal('window', {
+    electron: {
+      agents: {
+        delete: async () => ({ success: true, deleted: true, deletedSessionIds: ['deleted'] }),
+      },
+      cowork: { listSessions },
+    },
+  });
+  dispatchArtifactUpsert({ scopeId: 'deleted', artifact: ledgerRow() });
+  dispatchArtifactUpsert({ scopeId: 'kept', artifact: ledgerRow() });
+
+  await expect(agentService.deleteAgent('expert')).resolves.toBe(true);
+  expect(state.getState().artifact.artifactsBySession.deleted).toBeUndefined();
+  expect(state.getState().artifact.artifactsBySession.kept).toHaveLength(1);
+  expect(listSessions).not.toHaveBeenCalled();
+});
+
 test('loading a session folds the ledger rows in without opening the panel', async () => {
   vi.stubGlobal('window', {
     electron: {
       cowork: {
         onStreamUiEvent: () => () => {},
-        onSessionsChanged: () => () => {},
         getSession: async () => ({
           success: true,
           session: {
@@ -132,7 +151,6 @@ test('loading a session folds the ledger rows in without opening the panel', asy
             updatedAt: 1,
           },
         }),
-        remoteManaged: async () => ({ remoteManaged: false }),
         getRuntimeSnapshots: async () => ({ snapshots: [] }),
         requestStreamResync: async () => true,
         getConfig: async () => ({ success: false }),

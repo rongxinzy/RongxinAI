@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
-import { providersContract } from './providersContract';
-import { providersContractChannels } from './providersContract.channels';
+import { magpieContract, providersContract } from './providersContract';
+import { MagpieIpc, providersContractChannels } from './providersContract.channels';
 
 /**
  * Schema fidelity tests: fixtures below are copied from real renderer call
@@ -41,7 +41,11 @@ test('agents envelope result accepts real agent rows', () => {
     providersContract.agentsGet.result.safeParse({ success: true, agent: agentRow }).success,
   ).toBe(true);
   expect(
-    providersContract.agentsDelete.result.safeParse({ success: true, deleted: true }).success,
+    providersContract.agentsDelete.result.safeParse({
+      success: true,
+      deleted: true,
+      deletedSessionIds: ['session-1'],
+    }).success,
   ).toBe(true);
   expect(
     providersContract.agentsList.result.safeParse({ success: false, error: 'db locked' }).success,
@@ -150,16 +154,16 @@ test('magpie saveProvider/testProvider accept the ModelSettingsPanel form payloa
     models: ['gpt-4o', 'gpt-4o-mini'],
     fallback: ['gpt-4o-mini'],
   };
-  expect(providersContract.magpieSaveProvider.args.safeParse([input]).success).toBe(true);
-  expect(providersContract.magpieTestProvider.args.safeParse([input]).success).toBe(true);
+  expect(magpieContract.saveProvider.args.safeParse([input]).success).toBe(true);
+  expect(magpieContract.testProvider.args.safeParse([input]).success).toBe(true);
   // key optional on edit, id optional on create
   expect(
-    providersContract.magpieSaveProvider.args.safeParse([
+    magpieContract.saveProvider.args.safeParse([
       { name: 'New', api: 'anthropic-messages', baseUrl: 'https://api.anthropic.com', models: [] },
     ]).success,
   ).toBe(true);
   expect(
-    providersContract.magpieSaveProvider.args.safeParse([
+    magpieContract.saveProvider.args.safeParse([
       { name: 'Bad', api: 'grpc', baseUrl: 'x://', models: [] },
     ]).success,
   ).toBe(false);
@@ -168,14 +172,12 @@ test('magpie saveProvider/testProvider accept the ModelSettingsPanel form payloa
 test('magpie setModel / setProviderEnabled accept their payloads', () => {
   // CodingAgentManager model picker sends { agentId, field, value }
   expect(
-    providersContract.magpieSetModel.args.safeParse([
+    magpieContract.setModel.args.safeParse([
       { agentId: 'agent-1', field: 'primaryModel', value: 'gpt-4o' },
     ]).success,
   ).toBe(true);
-  expect(providersContract.magpieSetProviderEnabled.args.safeParse(['prov-1', false]).success).toBe(
-    true,
-  );
-  expect(providersContract.magpieSetModel.args.safeParse([{ agentId: 'a' }]).success).toBe(false);
+  expect(magpieContract.setProviderEnabled.args.safeParse(['prov-1', false]).success).toBe(true);
+  expect(magpieContract.setModel.args.safeParse([{ agentId: 'a' }]).success).toBe(false);
 });
 
 // --- enterprise ----------------------------------------------------------------
@@ -236,26 +238,15 @@ test('auth results accept the session shapes', () => {
   );
 });
 
-test('modelPool stream input accepts the chat request envelope', () => {
-  // enterprise renderer sends { requestId, conversationId, body }
-  expect(
-    providersContract.modelPoolStream.args.safeParse([
-      {
-        requestId: 'req_abc123',
-        conversationId: 'conv_abc123',
-        body: { messages: [{ role: 'user', content: 'hi' }], temperature: 0.7 },
-      },
-    ]).success,
-  ).toBe(true);
-  expect(
-    providersContract.modelPoolStream.args.safeParse([
-      { requestId: 'bad id!', conversationId: 'c', body: {} },
-    ]).success,
-  ).toBe(false);
-  expect(providersContract.modelPoolCancelStream.args.safeParse(['req_abc123']).success).toBe(true);
-});
-
 describe('contract/channel consistency', () => {
+  test('the Magpie preload maps each public method to the contract channel', () => {
+    expect(MagpieIpc).toEqual(
+      Object.fromEntries(
+        Object.entries(magpieContract).map(([name, method]) => [name, method.channel]),
+      ),
+    );
+  });
+
   test('channel map stays in sync with the contract', () => {
     expect(Object.keys(providersContractChannels).sort()).toEqual(
       Object.keys(providersContract).sort(),

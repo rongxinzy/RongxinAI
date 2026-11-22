@@ -156,6 +156,24 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     vi.clearAllMocks();
   });
 
+  test('does not mutate the manifest cache when an in-flight check responds after shutdown', async () => {
+    const response = Promise.withResolvers<Response>();
+    const fetchMock = vi.fn((_url: URL, _init: RequestInit) => response.promise);
+    vi.stubGlobal('fetch', fetchMock);
+    const store = new MemoryStore();
+    const coordinator = new AppUpdateCoordinator(store as unknown as SqliteStore);
+    const remove = vi.spyOn(store, 'delete');
+    const checking = coordinator.checkNow();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const stopping = coordinator.shutdown();
+    expect(fetchMock.mock.calls[0][1].signal?.aborted).toBe(true);
+    await coordinator.checkNow({ manual: true });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    response.resolve(new Response(null, { status: 404 }));
+    await Promise.all([checking, stopping]);
+    expect(remove).not.toHaveBeenCalled();
+  });
+
   test('requires the signed v1 authorization gate before downloading from the v2 feed', async () => {
     const envelope = signedManifest(privateKey, { updaterSha512 });
     vi.stubGlobal('fetch', manifestFetch(envelope));
@@ -378,7 +396,7 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     expect(installerMocks.installWindowsNsis).toHaveBeenCalledOnce();
   });
 
-  test('uses the Windows NSIS handoff for a fresh ready update', async () => {
+  test('lets the Windows installer handoff initiate shutdown without waiting for itself', async () => {
     Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' });
     Object.defineProperty(process, 'arch', { configurable: true, value: 'x64' });
     const installerFile = path.join(path.dirname(downloadedFile), 'ZhiYuan.Setup.exe');
@@ -401,6 +419,7 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     await coordinator.checkNow();
     await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
 
+    installerMocks.installWindowsNsis.mockImplementationOnce(() => coordinator.shutdown());
     const result = await coordinator.installReadyUpdate();
 
     expect(result.success).toBe(true);

@@ -1,5 +1,14 @@
 import type { MarketplaceModel } from '../../shared/marketplace';
 
+export const ModelCatalogUpdateLimit = { Bytes: 8 * 1024 * 1024, Records: 5000 } as const;
+
+export type VerifyModelCatalogUpdateInput = {
+  bytes: ArrayBuffer;
+  sha256: string;
+  baseRevision: number | null;
+  revision: number;
+};
+
 export type CatalogVersion = { revision: number; updatedAt: string };
 
 export type CatalogUpsert = [

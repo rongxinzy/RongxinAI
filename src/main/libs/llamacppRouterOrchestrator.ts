@@ -1,5 +1,9 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import type { SpawnOptions } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { addAbortListener } from 'node:events';
+import { unlink } from 'node:fs/promises';
+import path from 'node:path';
 
 import type {
   LlamaCppModel,
@@ -12,8 +16,13 @@ import { LlamaCppClient } from './llamacppClient';
 import { LlamaCppGatewayCredentialVault } from './llamacppGatewayCredentialVault';
 import type { LlamaCppModelDaemonStatus } from './llamacppModelDaemonProtocol';
 import type { LlamaCppModelOrchestrator } from './llamacppModelOrchestrator';
-import { createLlamaCppModelGateway, type LlamaCppModelGateway } from './llamacppModelGateway';
-import { scanLocalGgufModels } from './llamacppModelCatalog';
+import {
+  createLlamaCppModelGateway,
+  resolveLlamaCppGatewayPort,
+  type LlamaCppModelGateway,
+} from './llamacppModelGateway';
+import { stopOwnedProcess, terminateProcessTree } from './ownedProcessStop';
+import { scanLocalModelsAsync } from '../workbenchTask/artifactWorkerPool';
 import { createLlamaCppServerSpawnOptions } from './llamacppProcessLifecycle';
 import { buildLlamaCppServeEnv } from './llamacppServe';
 import { LlamaCppRouterLogSplitter } from './llamacppRouterLogSplitter';
@@ -29,10 +38,13 @@ import { findLlamaCppExecutable } from './llamacppRuntimePaths';
 
 const LLAMACPP_ROUTER_START_TIMEOUT_MS = 10_000;
 const LLAMACPP_ROUTER_START_POLL_INTERVAL_MS = 150;
-const LLAMACPP_ROUTER_KILL_GRACE_MS = 3_000;
+const LLAMACPP_ROUTER_STOP_UNLOAD_BUDGET_MS = 1_500;
+const LLAMACPP_ROUTER_UNLOAD_TIMEOUT_MS = 15_000;
+const LLAMACPP_ROUTER_UNLOAD_POLL_INTERVAL_MS = 150;
+const LLAMACPP_ROUTER_RECONNECT_TIMEOUT_MS = 2_000;
 const LLAMACPP_ROUTER_LOG_TAIL_ERROR_LINES = 30;
-const LLAMACPP_ROUTER_DEFAULT_GATEWAY_PORT = 8080;
 const LLAMACPP_ROUTER_DEFAULT_TIMEOUT_SECONDS = 120;
+const LLAMACPP_ROUTER_STILL_STOPPING = 'The previous local inference router is still stopping.';
 
 type KeyValueStore = {
   get<T = unknown>(key: string): T | undefined;
@@ -40,13 +52,18 @@ type KeyValueStore = {
   delete(key: string): void;
 };
 
+type RouterInstance = {
+  client: LlamaCppClient;
+  modelsDir: string;
+  presetPath: string;
+};
+
 export type LlamaCppRouterOrchestratorOptions = {
   userDataPath: string;
   getStore: () => KeyValueStore;
   getServiceConfig: () => LlamaCppServiceConfig;
   getModelsDir: () => string;
-  /** Preset INI path shared with the manager (manager.getPresetPath). */
-  getPresetPath: () => string;
+  stopPreviousDaemon?: () => Promise<void>;
   /** Spawns the router process; overridable in tests. */
   spawnProcess?: (command: string, args: string[], options: SpawnOptions) => ChildProcess;
   /** Resolves the llama-server executable; overridable in tests. */
@@ -78,28 +95,85 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
 
   private routerProcess: ChildProcess | null = null;
   private routerPort: number | null = null;
-  private routerClient: LlamaCppClient | null = null;
+  private router: RouterInstance | null = null;
   private splitter: LlamaCppRouterLogSplitter | null = null;
-  private gateway: LlamaCppModelGateway | null = null;
-  private gatewayPort = LLAMACPP_ROUTER_DEFAULT_GATEWAY_PORT;
+  private readonly gateway: LlamaCppModelGateway;
   private lastRunningModels: LlamaCppRunningModel[] = [];
   private starting: Promise<void> | null = null;
+  private previousDaemonStop?: Promise<void>;
   private stopping: Promise<void> | null = null;
+  private routerStopping: Promise<void> | undefined;
+  private readonly quitController = new AbortController();
 
   constructor(private readonly options: LlamaCppRouterOrchestratorOptions) {
     this.credentials = new LlamaCppGatewayCredentialVault(options.getStore());
     this.spawnProcess = options.spawnProcess ?? spawn;
     this.resolveExecutable = options.resolveExecutable ?? findLlamaCppExecutable;
+    this.gateway = createLlamaCppModelGateway({
+      shutdownSignal: this.quitController.signal,
+      acquireModel: async modelName => this.acquireGatewayModel(modelName),
+      listModels: () =>
+        this.lastRunningModels.map(model => ({
+          id: (model.name || model.model || model.id || '').trim(),
+        })),
+    });
   }
 
-  async reconnect(): Promise<LlamaCppModelDaemonStatus | null> {
+  async reconnect(options?: {
+    requireResponsive?: boolean;
+  }): Promise<LlamaCppModelDaemonStatus | null> {
+    if (options?.requireResponsive && (this.starting || this.stopping)) {
+      throw new Error('The local inference router is changing state.');
+    }
     // The router is an in-process child with no on-disk registry, so there is
     // nothing to reconnect to across app restarts; report live state only.
-    if (this.stopping) await this.stopping;
-    return this.routerProcess ? this.currentStatus() : null;
+    const child = this.routerProcess;
+    const router = this.router;
+    if (!child) return null;
+    if (!router) {
+      if (options?.requireResponsive) throw new Error(LLAMACPP_ROUTER_STILL_STOPPING);
+      return null;
+    }
+    const ownsLiveChild = () =>
+      this.routerProcess === child &&
+      this.router === router &&
+      child.exitCode === null &&
+      child.signalCode === null;
+    const isCurrent = () =>
+      ownsLiveChild() &&
+      !this.starting &&
+      !this.gateway.isChanging() &&
+      !this.stopping &&
+      !this.quitController.signal.aborted;
+    if (!isCurrent()) {
+      if (options?.requireResponsive && ownsLiveChild()) {
+        throw new Error('The local inference router is changing state.');
+      }
+      return null;
+    }
+    try {
+      const models = await router.client.listModelsSnapshot(LLAMACPP_ROUTER_RECONNECT_TIMEOUT_MS);
+      const processes = options?.requireResponsive
+        ? await router.client.listRouterModels(LLAMACPP_ROUTER_RECONNECT_TIMEOUT_MS)
+        : undefined;
+      if (!isCurrent()) return null;
+      this.lastRunningModels = toRunningModels(models);
+      const status = this.currentStatus();
+      if (processes) {
+        status.modelProcesses = processes.filter(ownsModelProcess).map(model => ({
+          modelName: model.id,
+          modelPath: model.modelPath ?? '',
+          port: model.port ?? 0,
+        }));
+      }
+      return status;
+    } catch (error) {
+      if (options?.requireResponsive && ownsLiveChild()) throw error;
+      return null;
+    }
   }
 
-  async status(): Promise<LlamaCppStatusSnapshot> {
+  async start(): Promise<LlamaCppStatusSnapshot> {
     try {
       await this.ensureStarted();
       this.lastRunningModels = await this.fetchRunningModels();
@@ -121,49 +195,61 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
   }
 
   async ensureModel(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelDaemonStatus> {
+    const { signal } = this.quitController;
     const modelName = input.model.trim();
     if (!modelName) throw new Error('Model name is required.');
     await this.ensureStarted();
+    const router = this.currentRouter();
+    this.assertCurrentRouter(router);
 
     // Already resident: never rewrite the preset, since a changed section makes
     // the router restart a running instance (and an option-less gateway load
     // would drop the ctx/GPU options of the last explicit load).
-    const known = (await this.client().listRouterModels()).find(model => model.id === modelName);
+    const known = (await router.client.listRouterModels()).find(model => model.id === modelName);
+    this.assertCurrentRouter(router);
     if (known?.state === 'loaded' || known?.state === 'sleeping') {
-      this.lastRunningModels = await this.fetchRunningModels();
+      this.lastRunningModels = await this.fetchRunningModels(router);
       return this.currentStatus();
     }
     const modelPath =
-      input.modelPath?.trim() || known?.modelPath || this.findLocalModel(modelName)?.path;
+      input.modelPath?.trim() ||
+      known?.modelPath ||
+      (await this.findLocalModel(router.modelsDir, modelName, signal))?.path;
+    this.assertCurrentRouter(router);
     if (!modelPath) throw new Error(`Local model was not found: ${modelName}.`);
 
     if (input.options || input.modelPath || !known) {
       upsertLlamaCppRouterModelPresetSection({
-        presetPath: this.options.getPresetPath(),
+        presetPath: router.presetPath,
         modelName,
         modelPath,
         options: input.options,
       });
       // listModels performs GET /models?reload=1 so the router sees the section.
-      await this.client().listModels();
+      await router.client.listModels({ signal });
     }
 
+    this.assertCurrentRouter(router);
     try {
-      await this.client().loadModel({
-        model: modelName,
-        ...(input.options ? { options: input.options } : {}),
-      });
+      const { runningModels } = await router.client.loadModel(
+        { model: modelName, ...(input.options ? { options: input.options } : {}) },
+        { signal },
+      );
+      this.assertCurrentRouter(router);
+      this.lastRunningModels = toRunningModels(runningModels);
     } catch (error) {
+      this.assertCurrentRouter(router);
       throw this.describeModelFailure(modelName, error);
     }
-    this.lastRunningModels = await this.fetchRunningModels();
     return this.currentStatus();
   }
 
   async stopModel(modelName: string): Promise<LlamaCppModelDaemonStatus> {
     const normalizedModelName = modelName.trim();
-    if (this.routerClient && normalizedModelName) {
-      await this.routerClient.unloadModel(normalizedModelName).catch((): undefined => undefined);
+    const router = this.router;
+    if (!router || !normalizedModelName) return this.currentStatus();
+    await router.client.unloadModel(normalizedModelName).catch((): undefined => undefined);
+    if (this.router === router) {
       this.lastRunningModels = this.lastRunningModels.filter(
         model => (model.name || model.model || model.id) !== normalizedModelName,
       );
@@ -172,19 +258,45 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
   }
 
   async stopAll(): Promise<LlamaCppModelDaemonStatus> {
-    if (this.routerClient) {
-      const ownsProcess = (model: LlamaCppRouterModelSnapshot) =>
-        (model.state !== 'unloaded' && model.state !== 'failed') || Boolean(model.port);
-      const models = await this.routerClient.listRouterModels();
-      for (const model of models.filter(ownsProcess)) {
-        await this.routerClient.unloadModel(model.id);
-      }
-      if ((await this.routerClient.listRouterModels()).some(ownsProcess)) {
-        throw new Error('The local inference router still reports active model processes.');
-      }
-      this.lastRunningModels = [];
-    }
+    await this.unloadRouterModels();
     return this.currentStatus();
+  }
+
+  async deleteModelFile(modelName: string, modelPath: string): Promise<void> {
+    const router = this.router;
+    if (router) {
+      this.assertCurrentRouter(router);
+      await this.unloadRouterModels(
+        undefined,
+        model => model.id === modelName || model.modelPath === modelPath,
+      );
+      this.assertCurrentRouter(router);
+    }
+    await unlink(modelPath);
+  }
+
+  private async unloadRouterModels(
+    deadline = Date.now() + LLAMACPP_ROUTER_UNLOAD_TIMEOUT_MS,
+    matches?: (model: LlamaCppRouterModelSnapshot) => boolean,
+  ): Promise<void> {
+    const router = this.router;
+    if (!router) return;
+    const { client } = router;
+    const remaining = () => {
+      if (this.router !== router) throw new Error('The local inference router has stopped.');
+      const ms = deadline - Date.now();
+      if (ms <= 0) throw new Error('Local model unload timed out.');
+      return ms;
+    };
+    const isActiveTarget = (model: LlamaCppRouterModelSnapshot) =>
+      ownsModelProcess(model) && (!matches || matches(model));
+    for (const model of (await client.listRouterModels(remaining())).filter(isActiveTarget)) {
+      await client.unloadModel(model.id, remaining());
+    }
+    while ((await client.listRouterModels(remaining())).some(isActiveTarget)) {
+      await waitMs(Math.min(remaining(), LLAMACPP_ROUTER_UNLOAD_POLL_INTERVAL_MS));
+    }
+    if (this.router === router && !matches) this.lastRunningModels = [];
   }
 
   async applyConfig(config: LlamaCppServiceConfig): Promise<LlamaCppModelDaemonStatus> {
@@ -200,6 +312,7 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
   }
 
   async restart(config: LlamaCppServiceConfig): Promise<LlamaCppStatusSnapshot> {
+    this.quitController.signal.throwIfAborted();
     await this.stopService();
     await this.ensureStarted(config);
     return { status: 'running', managedByApp: true, checkedAt: new Date().toISOString() };
@@ -222,11 +335,27 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
    * and the router exits with the app (keepRunningOnAppQuit is ignored).
    */
   async shutdownForQuit(): Promise<void> {
-    await this.stopService();
+    this.quitController.abort(new Error('The local inference router is shutting down.'));
+    const previousDaemonStop = this.previousDaemonStop;
+    try {
+      await this.stopService();
+    } finally {
+      await previousDaemonStop;
+    }
+  }
+
+  async finishDaemonHandoff(): Promise<void> {
+    this.quitController.signal.throwIfAborted();
+    this.previousDaemonStop ??= this.options.stopPreviousDaemon?.().catch(error => {
+      this.previousDaemonStop = undefined;
+      throw error;
+    });
+    await this.previousDaemonStop;
+    this.quitController.signal.throwIfAborted();
   }
 
   gatewayBaseUrl(): string | null {
-    return this.gateway?.baseUrl() ?? null;
+    return this.router ? this.gateway.baseUrl() : null;
   }
 
   getLanToken(): string {
@@ -241,14 +370,18 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
 
   /** In-flight probe for one model; any failure reports busy so callers never evict unknown state. */
   async getModelSlots(modelName: string): Promise<LlamaCppRouterModelSlots> {
-    if (!this.routerClient) return LLAMACPP_ROUTER_SLOTS_BUSY_UNKNOWN;
-    return await this.routerClient.getModelSlots(modelName);
+    if (!this.router) return LLAMACPP_ROUTER_SLOTS_BUSY_UNKNOWN;
+    return await this.router.client.getModelSlots(modelName);
   }
 
   private async ensureStarted(config?: LlamaCppServiceConfig): Promise<void> {
+    const { signal } = this.quitController;
+    signal.throwIfAborted();
     if (this.stopping) await this.stopping;
-    if (this.routerProcess) return;
+    signal.throwIfAborted();
     if (this.starting) return await this.starting;
+    if (this.router) return;
+    if (this.routerProcess) throw new Error(LLAMACPP_ROUTER_STILL_STOPPING);
     this.starting = this.startRouter(config).finally(() => {
       this.starting = null;
     });
@@ -256,33 +389,44 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
   }
 
   private async startRouter(config?: LlamaCppServiceConfig): Promise<void> {
+    const { signal } = this.quitController;
+    if (this.options.stopPreviousDaemon) {
+      await this.finishDaemonHandoff();
+      signal.throwIfAborted();
+    }
     const serviceConfig = config ?? this.options.getServiceConfig();
+    const modelsDir = path.resolve(serviceConfig.modelsDir?.trim() || this.options.getModelsDir());
+    // Per-model INI sections contain absolute paths, so they belong to one library.
+    const libraryKey = createHash('sha256').update(modelsDir).digest('hex');
+    const presetPath = path.join(
+      this.options.userDataPath,
+      'llamacpp',
+      'router-presets',
+      `${libraryKey}.ini`,
+    );
     const executablePath = await this.resolveExecutable(serviceConfig);
+    signal.throwIfAborted();
     if (!executablePath) throw new Error('llama.cpp runtime is not installed.');
 
     const port = await findAvailableLlamaCppRouterPort();
-    writeLlamaCppRouterPresetGlobalSection({
-      presetPath: this.options.getPresetPath(),
-      config: serviceConfig,
-    });
+    signal.throwIfAborted();
+    writeLlamaCppRouterPresetGlobalSection({ presetPath, config: serviceConfig });
 
     const splitter = new LlamaCppRouterLogSplitter({ userDataPath: this.options.userDataPath });
     const args = buildLlamaCppRouterProcessArgs({
       config: serviceConfig,
-      modelsDir: this.options.getModelsDir(),
-      presetPath: this.options.getPresetPath(),
+      modelsDir,
+      presetPath,
       port,
     });
-    // Router mode never leaves a resident process behind, so the router always
-    // spawns attached with piped stdio regardless of keepRunningOnAppQuit.
-    const child = this.spawnProcess(
-      executablePath,
-      args,
-      createLlamaCppServerSpawnOptions({
+    const child = this.spawnProcess(executablePath, args, {
+      ...createLlamaCppServerSpawnOptions({
         config: { ...serviceConfig, keepRunningOnAppQuit: false },
         env: buildLlamaCppServeEnv(process.env, executablePath, process.platform),
       }),
-    );
+      // A separate POSIX process group includes the model workers forked by the router.
+      detached: process.platform !== 'win32',
+    });
     let spawnError: Error | null = null;
     child.once('error', error => {
       spawnError = error;
@@ -298,14 +442,13 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
       loadTimeoutMs: this.resolveModelStartupTimeoutMs(),
     });
     this.routerProcess = child;
-    this.routerPort = port;
-    this.routerClient = client;
     this.splitter = splitter;
 
     try {
       const deadline = Date.now() + LLAMACPP_ROUTER_START_TIMEOUT_MS;
       let lastError = 'llama.cpp router did not become ready.';
       while (Date.now() < deadline) {
+        signal.throwIfAborted();
         if (spawnError || child.exitCode !== null || child.signalCode !== null) {
           throw new Error(
             `llama.cpp router exited during startup (code ${child.exitCode ?? 'null'}): ${spawnError?.message ?? lastError}`,
@@ -313,35 +456,36 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
         }
         try {
           await client.health(1_000);
-          await this.startGateway(serviceConfig);
+          signal.throwIfAborted();
+          await this.gateway.start(resolveLlamaCppGatewayPort(serviceConfig.port));
+          signal.throwIfAborted();
+          if (this.routerProcess !== child) throw new Error('The local inference router exited.');
+          this.routerPort = port;
+          this.router = { client, modelsDir, presetPath };
           return;
         } catch (error) {
+          signal.throwIfAborted();
           lastError = toErrorMessage(error);
           await waitMs(LLAMACPP_ROUTER_START_POLL_INTERVAL_MS);
         }
       }
       throw new Error(lastError);
     } catch (error) {
-      if (this.routerProcess === child) this.clearRuntimeState();
-      child.kill();
+      if (!signal.aborted) {
+        const gatewayStopped = this.gateway.stop().catch(() => {});
+        try {
+          if (this.routerProcess === child) await this.stopRouterChild(child);
+        } catch (stopError) {
+          throw new Error(`${toErrorMessage(error)}. ${toErrorMessage(stopError)}`, {
+            cause: stopError,
+          });
+        } finally {
+          await gatewayStopped;
+          await splitter.idle().catch(() => {});
+        }
+      }
       throw error;
     }
-  }
-
-  private async startGateway(config: LlamaCppServiceConfig): Promise<void> {
-    await this.gateway?.stop().catch((): undefined => undefined);
-    this.gateway = null;
-    this.gatewayPort = parseGatewayPort(config);
-    const gateway = createLlamaCppModelGateway({
-      acquireModel: async modelName => this.acquireGatewayModel(modelName),
-      listModels: () =>
-        this.lastRunningModels.map(model => ({
-          id: (model.name || model.model || model.id || '').trim(),
-        })),
-      getConfig: () => ({ port: parseGatewayPort(this.options.getServiceConfig()) }),
-    });
-    await gateway.start();
-    this.gateway = gateway;
   }
 
   /**
@@ -352,79 +496,121 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
    * the gateway listener restarts only when its port changed.
    */
   private async applyConfigWhileRunning(config: LlamaCppServiceConfig): Promise<void> {
-    writeLlamaCppRouterPresetGlobalSection({
-      presetPath: this.options.getPresetPath(),
-      config,
-    });
-    if (parseGatewayPort(config) !== this.gatewayPort) {
-      await this.startGateway(config);
-    }
+    const router = this.currentRouter();
+    this.assertCurrentRouter(router);
+    writeLlamaCppRouterPresetGlobalSection({ presetPath: router.presetPath, config });
+    await this.gateway.start(resolveLlamaCppGatewayPort(config.port));
   }
 
   private async acquireGatewayModel(
     modelName: string,
   ): Promise<{ baseUrl: string; release: () => void }> {
-    if (!this.routerClient || !this.routerPort) {
+    const { signal } = this.quitController;
+    signal.throwIfAborted();
+    const router = this.router;
+    if (!router || !this.routerPort || this.stopping) {
       throw new Error('The local inference router is not running.');
     }
     const baseUrl = `http://127.0.0.1:${this.routerPort}`;
     const load = async (): Promise<void> => {
+      this.assertCurrentRouter(router);
       await this.ensureModel({ model: modelName });
     };
     if (this.options.acquireModelLease) {
       const release = await this.options.acquireModelLease(modelName, load);
+      try {
+        this.assertCurrentRouter(router);
+      } catch (error) {
+        release();
+        throw error;
+      }
       return { baseUrl, release };
     }
     await load();
+    this.assertCurrentRouter(router);
     return { baseUrl, release: (): void => undefined };
   }
 
   private async stopEverything(): Promise<void> {
-    if (this.starting) await this.starting.catch((): undefined => undefined);
-    await this.stopAll().catch((): undefined => undefined);
-    await this.gateway?.stop().catch((): undefined => undefined);
-    this.gateway = null;
+    const { signal } = this.quitController;
+    if (this.starting && !signal.aborted) {
+      const quitting = Promise.withResolvers<void>();
+      const listener = addAbortListener(signal, () => quitting.resolve());
+      try {
+        await Promise.race([this.starting.catch(() => {}), quitting.promise]);
+      } finally {
+        listener[Symbol.dispose]();
+      }
+    }
 
     const child = this.routerProcess;
     const splitter = this.splitter;
-    this.clearRuntimeState();
-    this.lastRunningModels = [];
-    if (child && child.exitCode === null && child.signalCode === null) {
-      await new Promise<void>(resolve => {
-        const timeout = setTimeout(() => {
-          child.kill('SIGKILL');
-          resolve();
-        }, LLAMACPP_ROUTER_KILL_GRACE_MS);
-        child.once('exit', () => {
-          clearTimeout(timeout);
-          resolve();
-        });
-        child.kill('SIGTERM');
-      });
+    const gatewayStopped = this.gateway.stop().catch(() => {});
+    try {
+      if (child && !this.starting) await this.unloadBeforeStop();
+      if (child) await this.stopRouterChild(child);
+    } finally {
+      await gatewayStopped;
+      this.lastRunningModels = [];
+      await splitter?.idle().catch((): undefined => undefined);
     }
-    await splitter?.idle().catch((): undefined => undefined);
+  }
+
+  private stopRouterChild(child: ChildProcess): Promise<void> {
+    const stop = process.platform === 'win32' ? stopOwnedProcess : terminateProcessTree;
+    return (this.routerStopping ??= stop(child)
+      .then(() => {
+        if (this.routerProcess === child) this.clearRuntimeState();
+      })
+      .finally(() => {
+        this.routerStopping = undefined;
+      }));
+  }
+
+  private async unloadBeforeStop(): Promise<void> {
+    const deadline = Date.now() + LLAMACPP_ROUTER_STOP_UNLOAD_BUDGET_MS;
+    const budget = Promise.withResolvers<void>();
+    const timer = setTimeout(budget.resolve, LLAMACPP_ROUTER_STOP_UNLOAD_BUDGET_MS);
+    try {
+      await Promise.race([this.unloadRouterModels(deadline).catch(() => {}), budget.promise]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private clearRuntimeState(): void {
     this.routerProcess = null;
     this.routerPort = null;
-    this.routerClient = null;
+    this.router = null;
     this.splitter = null;
   }
 
-  private client(): LlamaCppClient {
-    if (!this.routerClient) throw new Error('The local inference router is not running.');
-    return this.routerClient;
+  private currentRouter(): RouterInstance {
+    if (!this.router) throw new Error('The local inference router is not running.');
+    return this.router;
   }
 
-  private async fetchRunningModels(): Promise<LlamaCppRunningModel[]> {
-    return toRunningModels(await this.client().listModels());
+  private assertCurrentRouter(router: RouterInstance): void {
+    this.quitController.signal.throwIfAborted();
+    if (this.router !== router || this.stopping) {
+      throw new Error('The local inference router has stopped.');
+    }
   }
 
-  private findLocalModel(modelName: string): LlamaCppModel | undefined {
-    const modelsDir =
-      this.options.getServiceConfig().modelsDir?.trim() || this.options.getModelsDir();
-    return scanLocalGgufModels(modelsDir).find(
+  private async fetchRunningModels(router = this.currentRouter()): Promise<LlamaCppRunningModel[]> {
+    const { signal } = this.quitController;
+    this.assertCurrentRouter(router);
+    const models = await router.client.listModels({ signal });
+    this.assertCurrentRouter(router);
+    return toRunningModels(models);
+  }
+
+  private async findLocalModel(
+    modelsDir: string,
+    modelName: string,
+    signal: AbortSignal,
+  ): Promise<LlamaCppModel | undefined> {
+    return (await scanLocalModelsAsync(modelsDir, signal)).find(
       model => model.name === modelName || model.id === modelName || model.model === modelName,
     );
   }
@@ -449,7 +635,7 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
   }
 
   private currentStatus(): LlamaCppModelDaemonStatus {
-    if (!this.routerProcess) return this.stoppedStatus();
+    if (!this.router) return this.stoppedStatus();
     return {
       status: { status: 'running', managedByApp: true, checkedAt: new Date().toISOString() },
       runningModels: this.lastRunningModels,
@@ -479,12 +665,9 @@ function toRunningModels(models: LlamaCppModel[]): LlamaCppRunningModel[] {
   ) as LlamaCppRunningModel[];
 }
 
-function matchesName(model: LlamaCppModel, modelName: string): boolean {
-  return [model.name, model.id, model.model].some(value => value?.trim() === modelName);
-}
-
-function parseGatewayPort(config: LlamaCppServiceConfig): number {
-  return Number.parseInt(config.port ?? '', 10) || LLAMACPP_ROUTER_DEFAULT_GATEWAY_PORT;
+function ownsModelProcess(model: LlamaCppRouterModelSnapshot): boolean {
+  // Router publishes the terminal state after reaping the child. Its launch args may keep the port.
+  return model.state !== 'unloaded' && model.state !== 'failed';
 }
 
 function toErrorMessage(error: unknown): string {

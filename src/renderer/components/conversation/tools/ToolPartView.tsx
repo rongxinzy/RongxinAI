@@ -13,7 +13,7 @@ import {
   ToolInput,
   ToolOutput,
   type ToolPart,
-} from '@shared/components/ai-elements/tool';
+} from '../../ai-elements/tool';
 import {
   Terminal,
   TerminalActions,

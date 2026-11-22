@@ -1,16 +1,18 @@
 import Database from 'better-sqlite3';
 import { chmod, mkdir, rm, writeFile } from 'fs/promises';
 import path from 'path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import {
   CodingAgentDriverKind,
   CodingAgentEnvironmentKey,
   CodingAgentManagedAdapterId,
   CodingAgentProfileStatus,
+  CodingErrorMessage,
   type CodingAgentProfile,
 } from '../../shared/codingAgent';
 import { CodingAgentProfileRepository } from './codingAgentProfileRepository';
+import { AcpDiscoveryService } from './acp/discoveryService';
 import { CodingAgentRegistry } from './codingAgentRegistry';
 import { initializeCodingAgentSchema } from './schema';
 
@@ -19,6 +21,45 @@ let db: Database.Database | undefined;
 afterEach(() => {
   db?.close();
   db = undefined;
+});
+
+test('shutdown closes discovery before a pending filesystem scan can write to SQLite', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingAgentProfileRepository(db);
+  const registry = new CodingAgentRegistry(repository);
+  const scan = Promise.withResolvers<Awaited<ReturnType<AcpDiscoveryService['discover']>>>();
+  const discover = vi
+    .spyOn(AcpDiscoveryService.prototype, 'discover')
+    .mockReturnValue(scan.promise);
+  const write = vi.spyOn(repository, 'save');
+  try {
+    const pending = registry.discoverExternalAgents();
+    const rejection = expect(pending).rejects.toThrow(CodingErrorMessage.RoomShuttingDown);
+    expect(discover).toHaveBeenCalledOnce();
+    await registry.shutdown();
+    await expect(registry.discoverExternalAgents()).rejects.toThrow(
+      CodingErrorMessage.RoomShuttingDown,
+    );
+    expect(discover).toHaveBeenCalledOnce();
+    db.close();
+    db = undefined;
+    scan.resolve([
+      {
+        ...registry.list()[0],
+        name: 'Late ACP adapter',
+        driverKind: CodingAgentDriverKind.Acp,
+        status: CodingAgentProfileStatus.Detected,
+        command: '/fixture/agent',
+      },
+    ]);
+    await rejection;
+    expect(write).not.toHaveBeenCalled();
+    expect(registry.list()).toHaveLength(1);
+  } finally {
+    scan.resolve([]);
+    discover.mockRestore();
+  }
 });
 
 test('requires explicit trust before a custom profile can be probed', () => {

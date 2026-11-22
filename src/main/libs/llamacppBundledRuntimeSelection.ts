@@ -161,10 +161,3 @@ function normalizeBackendRef(
     versionBackend,
   };
 }
-
-export function isVulkanBackendStartupFailure(detail: string | undefined): boolean {
-  if (!detail) return false;
-  return /vulkan.*(?:unavailable|not available|failed|missing|not found|unsupported|cannot|could not)/i.test(
-    detail,
-  );
-}

@@ -1,13 +1,12 @@
 import Database from 'better-sqlite3';
 import { expect, test } from 'vitest';
-import { CoworkArtifactRole } from '../../shared/cowork/artifacts';
 
 import {
-  WorkbenchArtifactCandidateSource,
   WorkbenchArtifactKind,
   WorkbenchArtifactProvenance,
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
+  WorkbenchExecutionStatus,
   WorkbenchRunEventType,
   WorkbenchRunTrigger,
 } from '../../shared/workbenchTask';
@@ -49,6 +48,34 @@ test('leaves retired task statuses stored without exposing them as current execu
   }
 });
 
+test('a supported run owns task visibility when the historical task status is retired', () => {
+  const { db, repository } = createRepository();
+  try {
+    const sessionId = 'session';
+    const task = repository.createTask(sessionId, 'Retained goal', contract);
+    const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
+    db.prepare('UPDATE workbench_tasks SET status = ? WHERE id = ?').run('completed', task.id);
+    repository.updateRunStatus(run.id, WorkbenchExecutionStatus.Running);
+
+    const projected = {
+      id: task.id,
+      activeRunId: run.id,
+      status: WorkbenchExecutionStatus.Running,
+    };
+    expect(repository.getDetail(task.id)?.task).toMatchObject(projected);
+    expect(repository.getLatestTaskForSession(sessionId)).toMatchObject(projected);
+    expect(repository.getLatestTaskStatuses([sessionId]).get(sessionId)).toBe(projected.status);
+    expect(repository.getLatestRunLinkForSession(sessionId)).toEqual({
+      taskId: task.id,
+      runId: run.id,
+    });
+    expect(repository.deleteSessionDomainData([sessionId])).toEqual([{ id: task.id, sessionId }]);
+    expect(repository.getRun(run.id)).toBeNull();
+  } finally {
+    db.close();
+  }
+});
+
 test('rolls back all repository writes when a transaction fails', () => {
   const { db, repository } = createRepository();
   try {
@@ -70,7 +97,7 @@ test('increments attempts and run event sequences while enforcing uniqueness', (
     const task = repository.createTask('session', 'goal', contract);
     const first = repository.createRun(task.id, WorkbenchRunTrigger.Message);
     const second = repository.createRun(task.id, WorkbenchRunTrigger.Retry);
-    repository.appendRunEvent(first.id, WorkbenchRunEventType.RunStarted);
+    repository.updateRunStatus(first.id, WorkbenchExecutionStatus.Running);
     repository.appendRunEvent(first.id, WorkbenchRunEventType.ToolRead);
 
     expect([first.attempt, second.attempt]).toEqual([1, 2]);
@@ -83,6 +110,32 @@ test('increments attempts and run event sequences while enforcing uniqueness', (
     expect(() =>
       db.prepare('UPDATE workbench_runs SET attempt = ? WHERE id = ?').run(1, second.id),
     ).toThrow();
+  } finally {
+    db.close();
+  }
+});
+
+test('links the latest session task to its current run without falling back to older tasks', () => {
+  const { db, repository } = createRepository();
+  try {
+    const first = repository.createTask('session', 'first', contract);
+    repository.createRun(first.id, WorkbenchRunTrigger.Message);
+    const next = repository.createTask('session', 'next', contract);
+    db.prepare('UPDATE workbench_tasks SET created_at = 1').run();
+    db.prepare('UPDATE workbench_tasks SET active_run_id = ? WHERE id = ?').run('missing', next.id);
+    expect(repository.getLatestRunLinkForSession('session')).toBeNull();
+
+    const run = repository.createRun(next.id, WorkbenchRunTrigger.Message);
+    const retry = repository.createRun(next.id, WorkbenchRunTrigger.Retry);
+    expect(repository.getLatestRunLinkForSession('session')).toEqual({
+      taskId: next.id,
+      runId: retry.id,
+    });
+    db.prepare('UPDATE workbench_runs SET status = ? WHERE id = ?').run('succeeded', retry.id);
+    expect(repository.getLatestRunLinkForSession('session')).toEqual({
+      taskId: next.id,
+      runId: run.id,
+    });
   } finally {
     db.close();
   }
@@ -134,6 +187,7 @@ test('adds runtime context storage to an existing workbench schema', () => {
       name: string;
     }>;
     expect(columns.map(column => column.name)).toContain('context_json');
+    expect(columns.map(column => column.name)).toContain('terminal_after_sequence');
   } finally {
     db.close();
   }
@@ -158,213 +212,75 @@ test('lists task history for one session in newest-first order', () => {
   }
 });
 
-test('deduplicates identical artifact evidence within a run', () => {
+test('fresh databases do not create the historical artifact table', () => {
   const { db, repository } = createRepository();
   try {
+    expect(
+      db.prepare("SELECT name FROM sqlite_schema WHERE name = 'workbench_artifacts'").get(),
+    ).toBeUndefined();
     const task = repository.createTask('session', 'goal', contract);
-    const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
-    const artifact = {
-      taskId: task.id,
-      runId: run.id,
-      kind: WorkbenchArtifactKind.File,
-      mimeType: 'text/plain',
-      reference: 'result.txt',
-      contentHash: 'hash',
-      provenance: WorkbenchArtifactProvenance.Workspace,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
-      metadata: {},
-    };
-
-    const first = repository.addArtifact(artifact);
-    const duplicate = repository.addArtifact(artifact);
-    expect(duplicate.id).toBe(first.id);
-    expect(repository.getDetail(task.id)?.artifacts).toHaveLength(1);
+    repository.createRun(task.id, WorkbenchRunTrigger.Message);
+    expect(repository.getDetail(task.id)?.artifacts).toEqual([]);
+    repository.deleteSessionDomainData(['session']);
+    expect(repository.getDetail(task.id)).toBeNull();
   } finally {
     db.close();
   }
 });
 
-test('promotes an existing pending artifact when verified evidence arrives', () => {
-  const { db, repository } = createRepository();
+test('loads historical artifact evidence for the audit and removes it with its session', () => {
+  const db = new Database(':memory:');
   try {
+    db.exec(`
+      CREATE TABLE workbench_artifacts (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL REFERENCES workbench_tasks(id),
+        run_id TEXT NOT NULL REFERENCES workbench_runs(id),
+        kind TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        reference TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        provenance TEXT NOT NULL,
+        verification_status TEXT NOT NULL,
+        metadata_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    `);
+    initializeWorkbenchTaskSchema(db);
+    const repository = new WorkbenchTaskRepository(db);
     const task = repository.createTask('session', 'goal', contract);
     const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
-    const pending = repository.addArtifact({
-      taskId: task.id,
-      runId: run.id,
-      kind: WorkbenchArtifactKind.File,
-      mimeType: 'text/plain',
-      reference: 'result.txt',
-      contentHash: 'hash',
-      provenance: WorkbenchArtifactProvenance.Workspace,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
-      metadata: { role: 'deliverable' },
-    });
-
-    const verified = repository.addArtifact({
-      taskId: task.id,
-      runId: run.id,
-      kind: WorkbenchArtifactKind.File,
-      mimeType: 'text/plain',
-      reference: 'result.txt',
-      contentHash: 'hash',
-      provenance: WorkbenchArtifactProvenance.Controller,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
-      metadata: { verifier: 'domain_workflow' },
-    });
-
-    expect(verified).toMatchObject({
-      id: pending.id,
-      provenance: WorkbenchArtifactProvenance.Controller,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
-      metadata: { role: 'deliverable', verifier: 'domain_workflow' },
-    });
-    expect(repository.getDetail(task.id)?.artifacts).toHaveLength(1);
-  } finally {
-    db.close();
-  }
-});
-
-test('persists and restores the run final answer', () => {
-  const { db, repository } = createRepository();
-  try {
-    const task = repository.createTask('session', 'goal', contract);
-    const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
-    expect(repository.getRunFinalAnswer(run.id)).toBe('');
-    expect(repository.getRunFinalAnswer('missing-run')).toBe('');
-
-    repository.updateFinalAnswer(run.id, 'final answer text');
-
-    expect(repository.getRunFinalAnswer(run.id)).toBe('final answer text');
-  } finally {
-    db.close();
-  }
-});
-
-test('marks only pending final deliverables of a run as verified', () => {
-  const { db, repository } = createRepository();
-  try {
-    const task = repository.createTask('session', 'goal', contract);
-    const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
-    const pending = repository.addArtifact({
-      taskId: task.id,
-      runId: run.id,
-      kind: WorkbenchArtifactKind.File,
-      mimeType: 'text/plain',
-      reference: 'pending.txt',
-      contentHash: 'pending-hash',
-      provenance: WorkbenchArtifactProvenance.Workspace,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
-      metadata: {
-        source: WorkbenchArtifactCandidateSource.Declaration,
-        role: CoworkArtifactRole.Deliverable,
-      },
-    });
-    const failed = repository.addArtifact({
-      taskId: task.id,
-      runId: run.id,
-      kind: WorkbenchArtifactKind.File,
-      mimeType: 'text/plain',
-      reference: 'failed.txt',
-      contentHash: 'failed-hash',
-      provenance: WorkbenchArtifactProvenance.Workspace,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Failed,
-      metadata: {
-        source: WorkbenchArtifactCandidateSource.Declaration,
-        role: CoworkArtifactRole.Deliverable,
-      },
-    });
-    const verified = repository.addArtifact({
-      taskId: task.id,
-      runId: run.id,
-      kind: WorkbenchArtifactKind.File,
-      mimeType: 'text/plain',
-      reference: 'verified.txt',
-      contentHash: 'verified-hash',
-      provenance: WorkbenchArtifactProvenance.Workspace,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
-      metadata: {},
-    });
-    const otherRun = repository.createRun(task.id, WorkbenchRunTrigger.Retry);
-    const otherPending = repository.addArtifact({
-      taskId: task.id,
-      runId: otherRun.id,
-      kind: WorkbenchArtifactKind.File,
-      mimeType: 'text/plain',
-      reference: 'other.txt',
-      contentHash: 'other-hash',
-      provenance: WorkbenchArtifactProvenance.Workspace,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
-      metadata: {},
-    });
-
-    const changes = repository.markArtifactsVerified(
+    db.prepare(
+      `INSERT INTO workbench_artifacts
+       (id, task_id, run_id, kind, mime_type, reference, content_hash, provenance,
+        verification_status, metadata_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'legacy-artifact',
+      task.id,
       run.id,
-      repository.getDetail(task.id)!.artifacts,
-    );
-
-    expect(changes).toBe(1);
-    const artifacts = repository.getDetail(task.id)?.artifacts ?? [];
-    expect(artifacts.find(artifact => artifact.id === pending.id)?.verificationStatus).toBe(
+      WorkbenchArtifactKind.File,
+      'text/plain',
+      'result.txt',
+      'hash',
+      WorkbenchArtifactProvenance.Workspace,
       WorkbenchArtifactVerificationStatus.Verified,
+      '{"role":"deliverable"}',
+      1,
+      2,
     );
-    expect(artifacts.find(artifact => artifact.id === failed.id)?.verificationStatus).toBe(
-      WorkbenchArtifactVerificationStatus.Failed,
-    );
-    expect(artifacts.find(artifact => artifact.id === verified.id)?.verificationStatus).toBe(
-      WorkbenchArtifactVerificationStatus.Verified,
-    );
-    expect(artifacts.find(artifact => artifact.id === otherPending.id)?.verificationStatus).toBe(
-      WorkbenchArtifactVerificationStatus.Pending,
-    );
-  } finally {
-    db.close();
-  }
-});
-
-test('preserves declared identity when pending tool evidence is deduplicated', () => {
-  const { db, repository } = createRepository();
-  try {
-    const task = repository.createTask('session', 'goal', contract);
-    const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
-    const declared = repository.addArtifact({
-      taskId: task.id,
-      runId: run.id,
-      kind: WorkbenchArtifactKind.File,
-      mimeType: 'text/markdown',
-      reference: 'result.md',
-      contentHash: 'hash',
-      provenance: WorkbenchArtifactProvenance.Workspace,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
-      metadata: {
-        source: WorkbenchArtifactCandidateSource.Declaration,
-        role: 'deliverable',
-        title: 'Final report',
-      },
-    });
-
-    const duplicate = repository.addArtifact({
-      taskId: task.id,
-      runId: run.id,
-      kind: WorkbenchArtifactKind.File,
-      mimeType: 'text/markdown',
-      reference: 'result.md',
-      contentHash: 'hash',
-      provenance: WorkbenchArtifactProvenance.Workspace,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
-      metadata: { source: WorkbenchArtifactCandidateSource.ToolEffect },
-    });
-
-    expect(duplicate).toMatchObject({
-      id: declared.id,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
-      metadata: {
-        source: WorkbenchArtifactCandidateSource.Declaration,
-        role: 'deliverable',
-        title: 'Final report',
-      },
-    });
-    expect(repository.getDetail(task.id)?.artifacts).toHaveLength(1);
+    expect(repository.getDetail(task.id)?.artifacts).toEqual([
+      expect.objectContaining({
+        id: 'legacy-artifact',
+        runId: run.id,
+        reference: 'result.txt',
+        verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+        metadata: { role: 'deliverable' },
+      }),
+    ]);
+    repository.deleteSessionDomainData(['session']);
+    expect(db.prepare('SELECT id FROM workbench_artifacts').all()).toEqual([]);
   } finally {
     db.close();
   }

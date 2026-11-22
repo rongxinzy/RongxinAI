@@ -9,10 +9,11 @@ const require = createRequire(import.meta.url);
 const {
   TARGETS,
   upstream,
+  pinnedSource,
   binaryName,
   sha256File,
   verifyRuntime,
-  contextTargets,
+  contextTarget,
   configureMagpieResources,
   verifyPackagedMagpie,
   signPackagedWindowsMagpie,
@@ -54,7 +55,7 @@ function fixture(root: string, key: string) {
     sha256: sha256File(binary),
     buildSha256: sha256File(binary),
     sizeBytes: fs.statSync(binary).size,
-    source: { commit: upstream.commit, tree: upstream.tree, archiveSha256: upstream.archiveSha256 },
+    source: { ...pinnedSource },
     toolchain: { version: upstream.goVersion },
     build: { version: upstream.version, cgoEnabled: false, tags: 'nogui' },
     license: { sha256: upstream.licenseSha256 },
@@ -85,6 +86,9 @@ describe('pinned Magpie runtime build', () => {
     ]);
     expect(upstream.commit).toMatch(/^[a-f0-9]{40}$/);
     expect(upstream.archiveSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(sha256File(path.join(__dirname, '../resources/magpie/work-caller.patch'))).toBe(
+      upstream.patchSha256,
+    );
     expect(sha256File(path.join(__dirname, '../resources/magpie/LICENSE'))).toBe(
       upstream.licenseSha256,
     );
@@ -151,22 +155,30 @@ describe('pinned Magpie runtime build', () => {
     const { directory, manifest } = fixture(root, 'win32-arm64');
     manifest.source.commit = '0'.repeat(40);
     fs.writeFileSync(path.join(directory, 'manifest.json'), JSON.stringify(manifest));
-    expect(() => verifyRuntime(root, 'win32-arm64')).toThrow('pinned upstream');
+    expect(() => verifyRuntime(root, 'win32-arm64')).toThrow('pinned patched build');
     fixture(root, 'win32-arm64');
     fs.writeFileSync(path.join(directory, 'LICENSE'), 'replacement notice');
     expect(() => verifyRuntime(root, 'win32-arm64')).toThrow('MIT license');
   });
 
-  test('uses the target architecture and keeps both macOS helpers only for universal builds', () => {
-    expect(contextTargets({ electronPlatformName: 'win32', arch: 3 })).toEqual(['win32-arm64']);
-    expect(contextTargets({ electronPlatformName: 'linux', arch: 1 })).toEqual(['linux-x64']);
-    expect(contextTargets({ electronPlatformName: 'darwin', arch: 4 })).toEqual([
-      'darwin-x64',
-      'darwin-arm64',
-    ]);
-    expect(contextTargets({ electronPlatformName: 'darwin', arch: 1 })).toEqual(['darwin-x64']);
-    expect(contextTargets({ electronPlatformName: 'darwin', arch: 3 })).toEqual(['darwin-arm64']);
-    expect(() => contextTargets({ electronPlatformName: 'linux', arch: 0 })).toThrow('Unsupported');
+  test.each(['patchSha256', 'treeSha256'])(
+    'rejects a stale or missing %s source attestation',
+    field => {
+      const root = temporaryRoot();
+      const { directory, manifest } = fixture(root, 'linux-x64');
+      delete manifest.source[field];
+      fs.writeFileSync(path.join(directory, 'manifest.json'), JSON.stringify(manifest));
+      expect(() => verifyRuntime(root, 'linux-x64')).toThrow('pinned patched build');
+    },
+  );
+
+  test('uses the target architecture for the packaged helper', () => {
+    expect(contextTarget({ electronPlatformName: 'win32', arch: 3 })).toBe('win32-arm64');
+    expect(contextTarget({ electronPlatformName: 'linux', arch: 1 })).toBe('linux-x64');
+    expect(contextTarget({ electronPlatformName: 'darwin', arch: 1 })).toBe('darwin-x64');
+    expect(contextTarget({ electronPlatformName: 'darwin', arch: 3 })).toBe('darwin-arm64');
+    expect(() => contextTarget({ electronPlatformName: 'darwin', arch: 4 })).toThrow('Unsupported');
+    expect(() => contextTarget({ electronPlatformName: 'linux', arch: 0 })).toThrow('Unsupported');
   });
 
   test('configures only the packaged macOS helper for single-arch builds', () => {
@@ -224,6 +236,16 @@ describe('pinned Magpie runtime build', () => {
     const root = path.join(app, 'Contents', 'Resources', 'magpie');
     const x64 = fixture(root, 'darwin-x64');
     const arm64 = fixture(root, 'darwin-arm64');
+    const bundledRuntime = path.join(app, 'Contents', 'Resources', 'llamacpp-bundled');
+    const llamaServer = path.join(bundledRuntime, 'llama-server');
+    const runtimeManifest = path.join(bundledRuntime, 'manifest.json');
+    fs.mkdirSync(bundledRuntime);
+    fs.writeFileSync(llamaServer, 'unsigned runtime bytes');
+    const originalSha256 = sha256File(llamaServer);
+    fs.writeFileSync(
+      runtimeManifest,
+      JSON.stringify({ executable: 'llama-server', sha256: originalSha256 }),
+    );
     const perFile = { entitlements: 'retained.plist', hardenedRuntime: true };
     const options = {
       app,
@@ -238,8 +260,13 @@ describe('pinned Magpie runtime build', () => {
         expect(received.optionsForFile(entry.binary)).toBe(perFile);
         fs.appendFileSync(entry.binary, 'test-signature');
       }
+      fs.appendFileSync(llamaServer, 'test-signature');
+      expect(JSON.parse(fs.readFileSync(runtimeManifest, 'utf8')).sha256).toBe(originalSha256);
       // The callback must be synchronous: osx-sign reads returned options directly.
       expect(received.optionsForFile(app)).toBe(perFile);
+      expect(JSON.parse(fs.readFileSync(runtimeManifest, 'utf8')).sha256).toBe(
+        sha256File(llamaServer),
+      );
       for (const key of ['darwin-x64', 'darwin-arm64']) {
         expect(() => verifyRuntime(root, key, { allowSigned: true })).not.toThrow();
       }

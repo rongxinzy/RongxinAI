@@ -471,6 +471,7 @@ function validateExpert(expertPath, options = {}) {
     return result;
   }
 
+  result.pluginJson = pluginJson;
   validatePluginJson(pluginJson, expertPath, result);
   const primaryAgents = resolvePrimaryAgents(pluginJson, expertPath);
 

@@ -2,27 +2,70 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { load } from 'js-yaml';
 import { test } from 'vitest';
 import { readInferenceWorkflow } from '../scripts/ci/read-inference-workflow.mjs';
 
 const root = path.resolve(__dirname, '..');
 
-test('unsigned macOS release builds do not receive empty signing credentials', () => {
-  const workflow = readInferenceWorkflow();
-  const unsignedStart = workflow.indexOf('- name: Build unsigned macOS release');
-  const signedStart = workflow.indexOf('- name: Build signed macOS release');
-  const verifyStart = workflow.indexOf('- name: Verify signed and notarized macOS release');
-
-  assert.ok(unsignedStart >= 0 && signedStart > unsignedStart && verifyStart > signedStart);
-  const unsignedStep = workflow.slice(unsignedStart, signedStart);
-  const signedStep = workflow.slice(signedStart, verifyStart);
-  assert.match(unsignedStep, /ZHIYUAN_MAC_AUTO_UPDATE_ENABLED != 'true'/);
-  assert.doesNotMatch(
-    unsignedStep,
-    /CSC_LINK|CSC_KEY_PASSWORD|APPLE_ID|APPLE_APP_SPECIFIC_PASSWORD|APPLE_TEAM_ID/,
+test('one macOS build command passes signing credentials only to signed releases', () => {
+  const workflow = load(readInferenceWorkflow(root)) as {
+    jobs: Record<string, { steps?: Array<{ name?: string; run?: string; if?: string }> }>;
+  };
+  const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
+  const step = steps.find(candidate => candidate.name === 'Build macOS packages');
+  assert.ok(step?.run);
+  assert.equal(
+    step.if,
+    "${{ matrix.platform == 'macos' && (inputs.mode == 'verify' || inputs.mode == 'release') }}",
   );
-  assert.match(signedStep, /ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true'/);
-  assert.match(signedStep, /CSC_LINK:[\s\S]*APPLE_TEAM_ID:/);
+  assert.ok(
+    steps.findIndex(candidate => candidate.name === 'Verify signed and notarized macOS release') >
+      steps.indexOf(step),
+  );
+  const fixture = `
+node() { printf '%s\\n' "$*"; }
+bun() {
+  printf '%s\\n' "$*" "$CSC_IDENTITY_AUTO_DISCOVERY" "$ZHIYUAN_MAC_AUTO_UPDATE_ENABLED"
+  for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+    if declare -p "$name" >/dev/null 2>&1; then
+      printf '%s\\n' "$name"
+    fi
+  done
+}
+`;
+  const credentials = {
+    CSC_LINK: 'fixture',
+    CSC_KEY_PASSWORD: 'fixture',
+    APPLE_ID: 'fixture',
+    APPLE_APP_SPECIFIC_PASSWORD: 'fixture',
+    APPLE_TEAM_ID: 'fixture',
+  };
+  for (const [mode, signing, arch] of [
+    ['verify', 'true', 'x64'],
+    ['release', 'false', 'arm64'],
+    ['release', 'true', 'x64'],
+  ]) {
+    const signed = mode === 'release' && signing === 'true';
+    const output = execFileSync('bash', ['-e', '-c', fixture + step.run], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        ...credentials,
+        PACKAGING_MODE: mode,
+        MACOS_ARCH: arch,
+        ZHIYUAN_MAC_AUTO_UPDATE_ENABLED: signing,
+        CSC_IDENTITY_AUTO_DISCOVERY: signing,
+      },
+    });
+    assert.deepEqual(output.trim().split('\n'), [
+      'scripts/ensure-build-version.js',
+      `run dist:mac:${arch}`,
+      String(signed),
+      String(signed),
+      ...(signed ? Object.keys(credentials) : []),
+    ]);
+  }
 });
 
 test('release workflows explicitly provision the private POSIX toolchain', () => {
@@ -108,6 +151,7 @@ test('protected Windows releases authenticate with Certum and require valid sign
         encoding: 'utf8',
         env: {
           ...process.env,
+          ZHIYUAN_ENTERPRISE_BUILD: '0',
           CERTUM_CERT_THUMBPRINT: '0123456789abcdef0123456789abcdef01234567',
         },
       },

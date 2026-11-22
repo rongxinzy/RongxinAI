@@ -1,11 +1,11 @@
 /**
- * Community auth bootstrap: zhiyuan:// deep-link registration, renderer log
- * forwarding, second-instance focus/deep-link handling and community OAuth
+ * Community auth bootstrap: zhiyuan:// deep-link registration,
+ * second-instance focus/deep-link handling and community OAuth
  * IPC (login/logout/user). The enterprise build never claims the protocol.
  */
 import crypto from 'crypto';
 
-import { app, ipcMain, net, shell } from 'electron';
+import { app, net, shell } from 'electron';
 
 import { isEnterprise } from './appEnv';
 import { getStore } from './runtimeServices';
@@ -13,11 +13,9 @@ import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { focusOrCreateMainWindow } from './mainWindow';
 import { COMMUNITY_AUTH_ORIGIN, configureCommunityAuthSession } from '../communityAuthSession';
 import { registerZhiyuanDeepLinkProtocol } from '../deepLinkRegistration';
-import { registerModelPoolIpcHandlers } from '../modelPoolIpc';
 import { CommunityAuthIpc } from '../../shared/ipc/channels';
 import { providersContract } from '../../shared/ipc/providersContract';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
-import { getBranding } from '../../shared/branding';
 import { t } from '../i18n';
 
 type CommunityAuthSession = ReturnType<typeof configureCommunityAuthSession>;
@@ -67,11 +65,6 @@ export const registerCommunityAuthBootstrap = (): void => {
     isDefaultApp: process.defaultApp === true,
     entryPoint: process.argv[1],
     execPath: process.execPath,
-  });
-
-  ipcMain.on('log:fromRenderer', (_event, level: string, tag: string, message: string) => {
-    const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
-    fn(`[Renderer][${tag}] ${message}`);
   });
 
   // macOS: handle open-url event for deep links
@@ -140,9 +133,6 @@ async function completeCommunityLogin(code: string, state: string): Promise<void
 
 export const registerCommunityAuthIpc = (): void => {
   communityAuthSession = configureCommunityAuthSession(getStore);
-  if (getBranding().features.enableCommunityFreeModels) {
-    registerModelPoolIpcHandlers(communityAuthSession);
-  }
 
   handleIpcContractSubset(providersContract, {
     authGetCommunityUser: async () => {

@@ -9,13 +9,12 @@ import { AcpConnectionSupervisor } from './connectionSupervisor';
 import {
   ACP_MINIMUM_PROTOCOL_VERSION,
   ACP_PROBE_CLIENT_CAPABILITIES,
-  ACP_AUTH_REQUIRED_CODE,
   ACP_PROTOCOL_VERSION,
   AcpMethod,
   AcpSessionUpdateKind,
   AcpProtocolIncompatibleError,
 } from './protocol';
-import { AcpRequestError } from './requestError';
+import { isAcpAuthenticationRequired, parseAcpAuthMethods } from './authMethods';
 
 const PROBE_TIMEOUT_MS = 30_000;
 /**
@@ -46,38 +45,6 @@ export interface AcpProbeResult {
   capabilities: CodingAgentCapabilities;
   authMethods: CodingAgentAuthMethod[];
 }
-
-const parseAuthMethods = (value: unknown): CodingAgentAuthMethod[] => {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap(method => {
-    if (!method || typeof method !== 'object') return [];
-    const candidate = method as Record<string, unknown>;
-    if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string') return [];
-    const environment =
-      candidate.env && typeof candidate.env === 'object'
-        ? Object.fromEntries(
-            Object.entries(candidate.env as Record<string, unknown>).filter(
-              (entry): entry is [string, string] =>
-                /^[A-Za-z_][A-Za-z0-9_]*$/.test(entry[0]) && typeof entry[1] === 'string',
-            ),
-          )
-        : undefined;
-    return [
-      {
-        id: candidate.id,
-        name: candidate.name,
-        ...(typeof candidate.description === 'string'
-          ? { description: candidate.description }
-          : {}),
-        ...(typeof candidate.type === 'string' ? { type: candidate.type } : {}),
-        ...(Array.isArray(candidate.args) && candidate.args.every(arg => typeof arg === 'string')
-          ? { args: candidate.args }
-          : {}),
-        ...(environment ? { environment } : {}),
-      },
-    ];
-  });
-};
 
 /**
  * Send one minimal prompt and require an answer.
@@ -207,12 +174,25 @@ export class AcpProbeService {
     cwd: string;
     environment: Record<string, string | undefined>;
     onPhase?: (phase: CodingAgentCheckPhase) => void;
+    signal?: AbortSignal;
   }): Promise<AcpProbeResult> {
+    const { signal } = input;
+    signal?.throwIfAborted();
     const supervisor = new AcpConnectionSupervisor();
+    let stopping: Promise<void> | undefined;
+    const stop = () => (stopping ??= supervisor.dispose());
+    const abort = () => {
+      void stop().catch(error =>
+        console.warn('[AcpProbe] Failed to stop the agent during shutdown:', error),
+      );
+    };
+    signal?.addEventListener('abort', abort, { once: true });
     let authMethods: CodingAgentAuthMethod[] = [];
     try {
       input.onPhase?.(CodingAgentCheckPhase.Starting);
+      signal?.throwIfAborted();
       await supervisor.start(input);
+      signal?.throwIfAborted();
       input.onPhase?.(CodingAgentCheckPhase.Handshake);
       const response = await supervisor.request<{
         agentCapabilities?: Record<string, unknown>;
@@ -242,7 +222,7 @@ export class AcpProbeService {
         capabilities.promptCapabilities && typeof capabilities.promptCapabilities === 'object'
           ? (capabilities.promptCapabilities as Record<string, unknown>)
           : {};
-      authMethods = parseAuthMethods(response.authMethods);
+      authMethods = parseAcpAuthMethods(response.authMethods);
       await verifyAgentAnswers(supervisor, input.cwd, authMethods, input.onPhase);
       return {
         capabilities: {
@@ -262,14 +242,11 @@ export class AcpProbeService {
         authMethods,
       };
     } catch (error) {
+      signal?.throwIfAborted();
       if (error instanceof AcpProbeFailureError || error instanceof AcpProtocolIncompatibleError)
         throw error;
       const message = error instanceof Error ? error.message : String(error);
-      const needsAuth =
-        (error instanceof AcpRequestError && error.code === ACP_AUTH_REQUIRED_CODE) ||
-        /auth(?:entication)?[_\s]required|not (?:logged|signed) in|unauthorized|invalid.*api.*key/i.test(
-          message,
-        );
+      const needsAuth = isAcpAuthenticationRequired(error);
       throw new AcpProbeFailureError(
         needsAuth ? CodingErrorMessage.AgentAuthRequired : message,
         authMethods,
@@ -277,7 +254,8 @@ export class AcpProbeService {
         error,
       );
     } finally {
-      await supervisor.dispose();
+      signal?.removeEventListener('abort', abort);
+      await stop();
     }
   }
 }

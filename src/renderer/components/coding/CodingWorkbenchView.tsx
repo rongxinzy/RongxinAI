@@ -12,7 +12,11 @@ import { Bot, FileDiff, FolderGit2, FolderPlus, PanelRight } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
-import type { CodingAgentProfile, CodingPromptAttachment } from '../../../shared/codingAgent';
+import type {
+  CodingAgentProfile,
+  CodingPromptAttachment,
+  CodingWorkspaceSummary,
+} from '../../../shared/codingAgent';
 import {
   CodingAgentDriverKind,
   CodingAgentProfileStatus,
@@ -44,16 +48,15 @@ import {
   CodingSessionRecoveryDialog,
 } from './codingWorkbenchDialogs';
 import { CodingSidePanelBottomSheet, CodingSidePanelFrame } from './codingWorkbenchSidePanel';
-import { CodingAgentStatusI18nKey, CodingSidePanelView, CodingUiEvent } from './constants';
+import { CodingAgentStatusI18nKey, CodingSidePanelView } from './constants';
 import { findPendingCodingPermission } from './codingPermission';
-import { useCodingAgentManager } from './useCodingAgentManager';
+import { buildCodingSessionDraftSelection, canStartCodingSession } from './codingSessionDraft';
 import { useCodingArtifactPanel } from './useCodingArtifactPanel';
 import { useCodingAuthTerminal } from './useCodingAuthTerminal';
 import { useCodingConversationDraft } from './useCodingConversationDraft';
 import { useCodingDraftSessionControls } from './useCodingDraftSessionControls';
 import { useCodingEventHistory } from './useCodingEventHistory';
 import { useCodingRoomSnapshot } from './useCodingRoomSnapshot';
-import { useCodingSessionSetup } from './useCodingSessionSetup';
 import { useCodingSidePanelController } from './useCodingSidePanelController';
 import {
   useCodingLaneActions,
@@ -75,7 +78,12 @@ interface CodingWorkbenchViewProps {
   workspaceRoot: string;
   selectedLaneId: string | null;
   draftSession: CodingSessionDraft | null;
+  agentManagerOpen: boolean;
+  onAgentManagerOpenChange: (open: boolean) => void;
+  onOpenCreateWorkspace: () => void;
   onSessionDraftCreated: (selection: CodingSidebarSelection) => void;
+  sessionSetupWorkspace: CodingWorkspaceSummary | null;
+  onCloseSessionSetup: () => void;
   onSessionCreated: (laneId: string) => void;
   onLaneSelected: (laneId: string) => void;
   isSidebarCollapsed?: boolean;
@@ -86,7 +94,12 @@ export const CodingWorkbenchView = ({
   workspaceRoot,
   selectedLaneId,
   draftSession,
+  agentManagerOpen,
+  onAgentManagerOpenChange,
+  onOpenCreateWorkspace,
   onSessionDraftCreated,
+  sessionSetupWorkspace,
+  onCloseSessionSetup,
   onSessionCreated,
   onLaneSelected,
   isSidebarCollapsed = false,
@@ -107,7 +120,6 @@ export const CodingWorkbenchView = ({
   const [applyConflict, setApplyConflict] = useState<string | null>(null);
   const { authTerminal, authTerminalInput, setAuthTerminalInput, submitAuthTerminalInput } =
     useCodingAuthTerminal();
-  const [agentManagerOpen, setAgentManagerOpen] = useCodingAgentManager();
   const [managerProfiles, setManagerProfiles] = useState<CodingAgentProfile[]>([]);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
@@ -119,10 +131,6 @@ export const CodingWorkbenchView = ({
   useEffect(() => {
     setPromptAttachments([]);
   }, [selectionKey]);
-  const { sessionSetupWorkspace, closeSessionSetup, submitSessionSetup } = useCodingSessionSetup({
-    selectionKey,
-    onSessionDraftCreated,
-  });
 
   const activeLane = useMemo(
     () =>
@@ -369,7 +377,7 @@ export const CodingWorkbenchView = ({
   const agentManagerElement = (
     <CodingAgentManager
       open={agentManagerOpen}
-      onOpenChange={setAgentManagerOpen}
+      onOpenChange={onAgentManagerOpenChange}
       profiles={managerProfiles.filter(profile => !profile.isBuiltin)}
       onDiscover={discoverAgents}
       onProbe={probeAgent}
@@ -384,7 +392,7 @@ export const CodingWorkbenchView = ({
       isSidebarCollapsed={isSidebarCollapsed}
       onToggleSidebar={onToggleSidebar}
       actions={
-        <Button size="sm" variant="outline" onClick={() => setAgentManagerOpen(true)}>
+        <Button size="sm" variant="outline" onClick={() => onAgentManagerOpenChange(true)}>
           <Bot className="mr-1 size-4" />
           {i18nService.t('codingAgentManageButton')}
         </Button>
@@ -406,12 +414,7 @@ export const CodingWorkbenchView = ({
               <EmptyDescription>{i18nService.t('codingWorkspaceEmpty')}</EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Button
-                type="button"
-                onClick={() =>
-                  window.dispatchEvent(new CustomEvent(CodingUiEvent.OpenWorkspaceDialog))
-                }
-              >
+              <Button type="button" onClick={onOpenCreateWorkspace}>
                 <FolderPlus />
                 {i18nService.t('codingWorkspaceAdd')}
               </Button>
@@ -494,7 +497,7 @@ export const CodingWorkbenchView = ({
                 <PanelRight />
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={() => setAgentManagerOpen(true)}>
+            <Button size="sm" variant="outline" onClick={() => onAgentManagerOpenChange(true)}>
               <Bot className="mr-1 size-4" />
               {i18nService.t('codingAgentManageButton')}
             </Button>
@@ -586,7 +589,7 @@ export const CodingWorkbenchView = ({
                 draftSession
                   ? !draftSession.profileId ||
                     !draftSession.sourceRoot ||
-                    activeProfile?.status !== CodingAgentProfileStatus.Ready
+                    !canStartCodingSession(activeProfile)
                   : !activeLane ||
                     activeLane.status === CodingLaneStatus.WaitingApproval ||
                     activeLane.status === CodingLaneStatus.WaitingElicitation
@@ -690,9 +693,13 @@ export const CodingWorkbenchView = ({
             <CodingSessionSetupDialog
               workspace={sessionSetupWorkspace}
               profiles={snapshot.profiles}
-              onCancel={closeSessionSetup}
-              onManageAgents={() => setAgentManagerOpen(true)}
-              onSubmit={input => submitSessionSetup(sessionSetupWorkspace, input)}
+              onCancel={onCloseSessionSetup}
+              onManageAgents={() => onAgentManagerOpenChange(true)}
+              onSubmit={({ profileId, sourceRoot }) =>
+                onSessionDraftCreated(
+                  buildCodingSessionDraftSelection(sessionSetupWorkspace, profileId, sourceRoot),
+                )
+              }
             />
           ) : null}
         </main>

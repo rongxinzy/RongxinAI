@@ -2,9 +2,9 @@
  * Agent preload surface, split from `../electron.d.ts`.
  *
  * Covers agent profiles/preset experts plus the per-session workbench task
- * and todo surfaces. `importExpertPackage` / `getPresetExperts` derive from
+ * and todo surfaces. `delete`, `importExpertPackage` and `getPresetExperts` derive from
  * the zod IPC contract (`src/shared/ipc/providersContract.ts`); the
- * list/get/create/update/delete methods unwrap the success envelope in the
+ * list/get/create/update methods unwrap the success envelope in the
  * preload and keep their unwrapped signatures.
  * The workbench/todo invoke signatures derive from the zod IPC contracts
  * (`src/shared/ipc/workbenchTaskContract.ts`, `src/shared/ipc/todoContract.ts`);
@@ -119,7 +119,7 @@ export interface AgentsApi {
       pinned?: boolean;
     },
   ) => Promise<Agent>;
-  delete: (id: string) => Promise<boolean>;
+  delete: ProvidersContractApi['agentsDelete'];
   importExpertPackage: ProvidersContractApi['agentsImportExpertPackage'];
   getPresetExperts: ProvidersContractApi['agentsGetPresetExperts'];
 }

@@ -159,7 +159,7 @@ chmod +x "$SKILLS_ROOT/web-search/scripts/*.sh"
 - `electron/libs/coworkRunner.ts` - Cowork execution engine
 - `SKILLs/web-search/SKILL.md` - Updated skill documentation
 - `electron/skillManager.ts` - Skill directory management
-- `electron/skillServices.ts` - Background service management
+- `scripts/start-server.mjs` and `scripts/stop-server.mjs` - Standalone browser bridge lifecycle
 
 ### Future Improvements
 

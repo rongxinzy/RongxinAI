@@ -5,12 +5,11 @@
  */
 import type { IpcContractChannels } from './contract';
 import type { providersContract } from './providersContract';
-import { CommunityAuthIpc, EnterpriseIpc, ManagedProviderIpc, ModelPoolIpc } from './channels';
+import { CommunityAuthIpc, EnterpriseIpc, ManagedProviderIpc } from './channels';
 import { AgentIpcChannel } from '../agent/constants';
 import { AISphereIpc } from '../aisphere';
 import { EnterpriseSessionIpc } from '../enterpriseSession';
 import { EnterpriseRendererIpc } from '../enterpriseRenderer';
-import { MagpieIpc } from '../magpie/types';
 
 export const providersContractChannels: IpcContractChannels<typeof providersContract> = {
   agentsList: AgentIpcChannel.List,
@@ -20,36 +19,6 @@ export const providersContractChannels: IpcContractChannels<typeof providersCont
   agentsDelete: AgentIpcChannel.Delete,
   agentsImportExpertPackage: AgentIpcChannel.ImportExpertPackage,
   agentsGetPresetExperts: AgentIpcChannel.GetPresetExperts,
-  magpieStatus: MagpieIpc.status,
-  magpieSetSubscriptionAccounts: MagpieIpc.setSubscriptionAccounts,
-  magpieStart: MagpieIpc.start,
-  magpieStop: MagpieIpc.stop,
-  magpieAgents: MagpieIpc.agents,
-  magpieSetModel: MagpieIpc.setModel,
-  magpiePreviewAgent: MagpieIpc.previewAgent,
-  magpieConnectAgent: MagpieIpc.connectAgent,
-  magpieDisconnectAgent: MagpieIpc.disconnectAgent,
-  magpieDisconnectAllAgents: MagpieIpc.disconnectAllAgents,
-  magpieModels: MagpieIpc.models,
-  magpieCatalog: MagpieIpc.catalog,
-  magpieSelectDefault: MagpieIpc.selectDefault,
-  magpieProviders: MagpieIpc.providers,
-  magpieSaveProvider: MagpieIpc.saveProvider,
-  magpieSetProviderEnabled: MagpieIpc.setProviderEnabled,
-  magpieDeleteProvider: MagpieIpc.deleteProvider,
-  magpieTestProvider: MagpieIpc.testProvider,
-  magpieDiagnostics: MagpieIpc.diagnostics,
-  magpieClearDiagnostics: MagpieIpc.clearDiagnostics,
-  magpiePreferences: MagpieIpc.preferences,
-  magpieUpdatePreferences: MagpieIpc.updatePreferences,
-  magpieRoutingGroups: MagpieIpc.routingGroups,
-  magpieSaveRoutingGroup: MagpieIpc.saveRoutingGroup,
-  magpieDeleteRoutingGroup: MagpieIpc.deleteRoutingGroup,
-  magpieArrangeRoutingGroups: MagpieIpc.arrangeRoutingGroups,
-  magpieUsageSummary: MagpieIpc.usageSummary,
-  magpieUsageRequests: MagpieIpc.usageRequests,
-  magpieUsageQuotas: MagpieIpc.usageQuotas,
-  magpieUsageBudget: MagpieIpc.usageBudget,
   enterpriseGetConfig: EnterpriseIpc.GetConfig,
   enterpriseSessionGateEntrypoint: EnterpriseRendererIpc.SessionGateEntrypoint,
   enterpriseSettingsPages: EnterpriseRendererIpc.SettingsPages,
@@ -66,7 +35,36 @@ export const providersContractChannels: IpcContractChannels<typeof providersCont
   authCommunityLogin: CommunityAuthIpc.Login,
   authGetCommunityUser: CommunityAuthIpc.GetCommunityUser,
   authCommunityLogout: CommunityAuthIpc.Logout,
-  modelPoolListModels: ModelPoolIpc.ListModels,
-  modelPoolStream: ModelPoolIpc.Stream,
-  modelPoolCancelStream: ModelPoolIpc.CancelStream,
+} as const;
+
+export const MagpieIpc = {
+  status: 'magpie:status',
+  start: 'magpie:start',
+  stop: 'magpie:stop',
+  agents: 'magpie:agents',
+  setModel: 'magpie:setModel',
+  previewAgent: 'magpie:previewAgent',
+  connectAgent: 'magpie:connectAgent',
+  disconnectAgent: 'magpie:disconnectAgent',
+  disconnectAllAgents: 'magpie:disconnectAllAgents',
+  catalog: 'magpie:catalog',
+  selectDefault: 'magpie:selectDefault',
+  setSubscriptionAccounts: 'magpie:setSubscriptionAccounts',
+  providers: 'magpie:providers',
+  saveProvider: 'magpie:saveProvider',
+  setProviderEnabled: 'magpie:setProviderEnabled',
+  deleteProvider: 'magpie:deleteProvider',
+  testProvider: 'magpie:testProvider',
+  diagnostics: 'magpie:diagnostics',
+  clearDiagnostics: 'magpie:clearDiagnostics',
+  preferences: 'magpie:preferences',
+  updatePreferences: 'magpie:updatePreferences',
+  routingGroups: 'magpie:routingGroups',
+  saveRoutingGroup: 'magpie:saveRoutingGroup',
+  deleteRoutingGroup: 'magpie:deleteRoutingGroup',
+  arrangeRoutingGroups: 'magpie:arrangeRoutingGroups',
+  usageSummary: 'magpie:usageSummary',
+  usageRequests: 'magpie:usageRequests',
+  usageQuotas: 'magpie:usageQuotas',
+  usageBudget: 'magpie:usageBudget',
 } as const;

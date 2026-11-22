@@ -4,24 +4,21 @@
  */
 import crypto from 'crypto';
 
-import { BrowserWindow } from 'electron';
+import type { BrowserWindow } from 'electron';
 
-import { agentRuntime } from './agentRuntimeState';
-import { getCoworkStore, getStore, setActiveRunSleepBlocker } from './runtimeServices';
-import { getPiRuntimeAdapter } from './sessionServices';
+import { setActiveRunSleepBlocker } from './runtimeServices';
 import { sanitizeCoworkMessageForIpc, sanitizePermissionRequestForIpc } from './ipcPayloadSanitize';
-import { CoworkStreamIpc } from '../../shared/ipc/channels';
+import { CoworkStreamIpc, RuntimeNoticeIpc } from '../../shared/ipc/channels';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { coworkPiStreamContract } from '../../shared/ipc/coworkContract';
 import { bindCoworkRunBridge } from '../coworkRunBridge';
 import { slimQueuedMessagesForIpc } from '../coworkImageAttachments';
-import { persistCoworkTerminalError } from '../coworkTerminalErrorPersistence';
 import { CoworkRunPolicy } from '../../shared/cowork/runState';
 import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import { UiMessageChunkCoalescer } from '../streaming/uiMessageChunkCoalescer';
 import { snapshotToContentPatches } from '../piUiStreamGateway';
 import { PiUiRuntimeSnapshots } from '../../shared/cowork/piUiRuntimeSnapshot';
-import { isDesktopPetWindow, observeDesktopPetEvent } from '../desktopPet/controller';
+import { observeDesktopPetEvent } from '../desktopPet/controller';
 import {
   type PiUiEvent,
   type PiUiEventPayload,
@@ -31,7 +28,10 @@ import {
 } from '../../shared/cowork/piUiEvent';
 import type { UIMessageChunk } from 'ai';
 
-export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void => {
+export const forwardPiWorkbenchRuntimeToRenderer = (
+  runtime: PiRuntimeAdapter,
+  getMainWindow: () => BrowserWindow | null,
+): void => {
   const sequencer = new PiUiEventSequencer(() => crypto.randomUUID());
   const runtimeSnapshots = new PiUiRuntimeSnapshots();
 
@@ -101,27 +101,29 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
     requestStreamResync: (_event, sessionId) => requestStreamResync(sessionId),
   });
 
-  const broadcastUiEvent = (event: PiUiEvent): void => {
+  const publish = (channel: string, payload: unknown): void => {
+    const window = getMainWindow();
+    if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
+    try {
+      window.webContents.send(channel, payload);
+    } catch (error) {
+      console.error('[PiWorkbenchForwarder] failed to deliver a renderer event:', error);
+    }
+  };
+
+  const publishUiEvent = (event: PiUiEvent): void => {
     runtimeSnapshots.observe(event);
     observeDesktopPetEvent(event);
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed() || isDesktopPetWindow(win)) return;
-      try {
-        win.webContents.send(CoworkStreamIpc.UiEvent, event);
-      } catch (error) {
-        console.error('[PiWorkbenchForwarder] failed to forward a Pi UI event:', error);
-      }
-    });
+    publish(CoworkStreamIpc.UiEvent, event);
   };
 
   const emitUiEvent = (payload: PiUiEventPayload): void => {
     coalescer.flush();
-    broadcastUiEvent(sequencer.next(payload));
+    publishUiEvent(sequencer.next(payload));
   };
 
   const coalescer = new UiMessageChunkCoalescer(({ sessionId, messageId, chunk }) => {
-    broadcastUiEvent(
+    publishUiEvent(
       sequencer.next({
         type: PiUiEventType.StreamPart,
         sessionId,
@@ -190,8 +192,10 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
     }
   };
 
-  bindCoworkRunBridge(runtime, patch =>
-    emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId: patch.sessionId, patch }),
+  bindCoworkRunBridge(
+    runtime,
+    patch => emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId: patch.sessionId, patch }),
+    snapshot => publish(CoworkStreamIpc.RunState, snapshot),
   );
 
   runtime.on('started', (sessionId: string) => {
@@ -344,6 +348,10 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
     emitUiEvent({ type: PiUiEventType.PermissionDismiss, sessionId: null, requestId });
   });
 
+  runtime.on('retryNotice', (sessionId, notice) => {
+    publish(RuntimeNoticeIpc.Notice, { sessionId, ...notice });
+  });
+
   runtime.on('sessionInterrupted', interruption => {
     emitUiEvent({
       type: PiUiEventType.Interrupted,
@@ -370,20 +378,6 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
   runtime.on(
     'error',
     (sessionId: string, error: import('../../common/coworkError').CoworkError) => {
-      try {
-        persistCoworkTerminalError(
-          getStore().getDatabase(),
-          getCoworkStore(),
-          sessionId,
-          error,
-          message => runtime.emit('message', sessionId, message),
-        );
-      } catch (persistenceError) {
-        console.error(
-          `[PiWorkbenchForwarder] failed to persist an error for session ${sessionId}:`,
-          persistenceError,
-        );
-      }
       coalescer.flush();
       clearSessionStreamBookkeeping(sessionId);
       emitUiEvent({ type: PiUiEventType.Error, sessionId, error });
@@ -404,10 +398,10 @@ const bindRunSleepBlocker = (runtime: PiRuntimeAdapter): void => {
   runtime.on('sessionInterrupted', interruption => release(interruption.sessionId));
 };
 
-export const bindPiWorkbenchRuntimeForwarder = (): void => {
-  if (agentRuntime.piWorkbenchRuntimeForwarderBound) return;
-
-  forwardPiWorkbenchRuntimeToRenderer(getPiRuntimeAdapter());
-  bindRunSleepBlocker(getPiRuntimeAdapter());
-  agentRuntime.piWorkbenchRuntimeForwarderBound = true;
+export const bindPiWorkbenchRuntimeForwarder = (
+  runtime: PiRuntimeAdapter,
+  getMainWindow: () => BrowserWindow | null,
+): void => {
+  forwardPiWorkbenchRuntimeToRenderer(runtime, getMainWindow);
+  bindRunSleepBlocker(runtime);
 };

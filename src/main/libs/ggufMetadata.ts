@@ -7,6 +7,8 @@ import {
 
 const GGUF_MAGIC = 0x46554747;
 const MAX_METADATA_STRING_BYTES = 4 * 1024 * 1024;
+const MAX_METADATA_BYTES = 64 * 1024 * 1024;
+const MAX_METADATA_VALUES = 2_000_000;
 const METADATA_READ_BUFFER_BYTES = 64 * 1024;
 
 const GgufValueType = {
@@ -29,10 +31,11 @@ const GgufValueType = {
  * Reads GGUF metadata only. Models whose chat template declares
  * `enable_thinking` can expose a safe on/off control in the chat UI.
  */
-export function readGgufMetadataMap(filePath: string): Map<string, unknown> | undefined {
+function readGgufMetadataMap(filePath: string): Map<string, unknown> | undefined {
   let descriptor: number | undefined;
   try {
-    descriptor = fs.openSync(filePath, 'r');
+    descriptor = fs.openSync(filePath, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
+    if (!fs.fstatSync(descriptor).isFile()) return undefined;
     const reader = new GgufReader(descriptor);
     if (reader.readUint32() !== GGUF_MAGIC) return undefined;
 
@@ -54,10 +57,7 @@ export function readGgufMetadataMap(filePath: string): Map<string, unknown> | un
   }
 }
 
-/** Layer count from `<general.architecture>.block_count`, if readable. */
-export function readGgufBlockCount(filePath: string): number | undefined {
-  const metadata = readGgufMetadataMap(filePath);
-  if (!metadata) return undefined;
+function ggufBlockCount(metadata: Map<string, unknown>): number | undefined {
   for (const [key, value] of metadata.entries()) {
     if (!key.endsWith('.block_count')) continue;
     const parsed = typeof value === 'bigint' ? Number(value) : value;
@@ -68,17 +68,19 @@ export function readGgufBlockCount(filePath: string): number | undefined {
   return undefined;
 }
 
-export function readGgufKvBytesPerToken(
+export type GgufPlacementMetadata = { blockCount?: number; kvBytesPerToken?: number };
+
+export function readGgufPlacementMetadata(
   filePath: string,
   cacheTypeK?: string,
   cacheTypeV?: string,
-): number | undefined {
+): GgufPlacementMetadata {
   const metadata = readGgufMetadataMap(filePath);
-  if (!metadata) return undefined;
+  if (!metadata) return {};
+  const blockCount = ggufBlockCount(metadata);
   const shape = resolveGgufKvCacheShapeFromMetadata(metadata);
-  if (!shape) return undefined;
-  const bytes = estimateKvBytesPerTokenFromGgufShape({ shape, cacheTypeK, cacheTypeV });
-  return bytes > 0 ? bytes : undefined;
+  const bytes = shape ? estimateKvBytesPerTokenFromGgufShape({ shape, cacheTypeK, cacheTypeV }) : 0;
+  return { blockCount, kvBytesPerToken: bytes > 0 ? bytes : undefined };
 }
 
 export function ggufSupportsThinkingToggle(filePath: string): boolean {
@@ -99,6 +101,7 @@ function containsThinkingToggle(value: unknown): boolean {
 
 class GgufReader {
   private position = 0;
+  private remainingValues = MAX_METADATA_VALUES;
 
   constructor(private readonly descriptor: number) {}
 
@@ -125,6 +128,7 @@ class GgufReader {
   }
 
   readTypedValue(valueType: number): unknown {
+    if (--this.remainingValues < 0) throw new Error('GGUF metadata value limit exceeded.');
     switch (valueType) {
       case GgufValueType.Uint8:
         return this.readBuffer(1).readUInt8(0);
@@ -160,6 +164,7 @@ class GgufReader {
   private readArray(): unknown[] {
     const valueType = this.readUint32();
     const length = this.readUint64();
+    if (length > this.remainingValues) throw new Error('GGUF metadata array is too large.');
     const values: unknown[] = [];
     for (let index = 0; index < length; index += 1) {
       values.push(this.readTypedValue(valueType));
@@ -167,17 +172,8 @@ class GgufReader {
     return values;
   }
 
-  private skip(length: number): undefined {
-    this.position += length;
-    return undefined;
-  }
-
-  private skipString(): undefined {
-    this.skip(this.readUint64());
-    return undefined;
-  }
-
   private readBuffer(length: number): Buffer {
+    if (this.position + length > MAX_METADATA_BYTES) throw new Error('GGUF metadata is too large.');
     if (length <= METADATA_READ_BUFFER_BYTES && this.hasBufferedRange(length)) {
       const offset = this.position - this.bufferStart;
       this.position += length;

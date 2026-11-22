@@ -12,9 +12,12 @@ interface ThemeMeta {
 /** A theme must provide a CSS value for every key in TOKEN_CONTRACT */
 type ThemeTokens = Record<TokenName, string>;
 
-export interface ThemeDefinition {
+export interface ThemeAppearance {
   meta: ThemeMeta;
   tokens: ThemeTokens;
   background?: ThemeBackground;
+}
+
+export interface ThemeDefinition extends ThemeAppearance {
   components: ComponentAppearances;
 }

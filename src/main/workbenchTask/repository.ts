@@ -1,17 +1,16 @@
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
+import { normalizeHarnessModelFields } from '../harness/modelProfile';
 
 import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalEffectStatus,
-  WorkbenchArtifactCandidateSource,
   WorkbenchArtifactKind,
-  WorkbenchArtifactVerificationStatus,
+  type WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
   WorkbenchRunEventType,
   WorkbenchExecutionStatus,
   WorkbenchTerminalExecutionStatuses,
-  isWorkbenchDeliverable,
   type WorkbenchApproval,
   type WorkbenchApprovalDecisionSource,
   type WorkbenchApprovalRiskLevel,
@@ -29,16 +28,34 @@ import {
 } from '../../shared/workbenchTask';
 
 const terminalTaskStatuses = new Set<string>(WorkbenchTerminalExecutionStatuses);
-const executionStatuses = new Set<string>(Object.values(WorkbenchExecutionStatus));
-
-const artifactSourcePriority: Record<string, number> = {
-  [WorkbenchArtifactCandidateSource.ToolEffect]: 1,
-  [WorkbenchArtifactCandidateSource.DomainWorkflow]: 2,
-  [WorkbenchArtifactCandidateSource.Declaration]: 3,
+const terminalRunEventTypes: Partial<
+  Record<WorkbenchExecutionStatusType, WorkbenchRunEvent['type']>
+> = {
+  [WorkbenchExecutionStatus.Settled]: WorkbenchRunEventType.RunSettled,
+  [WorkbenchExecutionStatus.Failed]: WorkbenchRunEventType.RunFailed,
+  [WorkbenchExecutionStatus.Cancelled]: WorkbenchRunEventType.RunCancelled,
 };
-
-const getArtifactSourcePriority = (source: unknown): number =>
-  typeof source === 'string' ? (artifactSourcePriority[source] ?? 0) : 0;
+const executionStatuses = new Set<string>(Object.values(WorkbenchExecutionStatus));
+const currentStatuses = [...executionStatuses].map(status => `'${status}'`).join(', ');
+const activeStatuses = `'${WorkbenchExecutionStatus.Queued}', '${WorkbenchExecutionStatus.Running}'`;
+const TASK_WITH_CURRENT_RUN = `
+  FROM workbench_tasks t
+  LEFT JOIN workbench_runs r ON r.id = (
+    SELECT id FROM workbench_runs WHERE task_id = t.id AND status IN (${currentStatuses})
+    ORDER BY attempt DESC LIMIT 1
+  )
+  WHERE (r.id IS NOT NULL OR t.status IN (${currentStatuses}))`;
+const LATEST_TASK_ORDER = 'ORDER BY t.created_at DESC, t.rowid DESC LIMIT 1';
+const LATEST_SESSION_TASK = `AND t.session_id = ? ${LATEST_TASK_ORDER}`;
+// Read the old task state only for historical tasks without a run.
+const TASK_PROJECTION = `
+  SELECT t.id, t.session_id, t.goal, t.contract_json, t.created_at,
+    COALESCE(r.status, t.status) AS status,
+    CASE WHEN r.id IS NULL THEN t.active_run_id
+         WHEN r.status IN (${activeStatuses}) THEN r.id END AS active_run_id,
+    COALESCE(r.updated_at, t.updated_at) AS updated_at,
+    CASE WHEN r.id IS NULL THEN t.completed_at ELSE r.ended_at END AS completed_at
+  ${TASK_WITH_CURRENT_RUN}`;
 
 const parseJson = <T>(value: string | null, fallback: T): T => {
   if (!value) return fallback;
@@ -71,6 +88,7 @@ type RunRow = {
   ended_at: number | null;
   context_json: string | null;
   failure_json: string | null;
+  terminal_after_sequence: number | null;
   created_at: number;
   updated_at: number;
 };
@@ -118,7 +136,17 @@ type ApprovalRow = {
 };
 
 export class WorkbenchTaskRepository {
-  constructor(private readonly db: Database.Database) {}
+  private readonly hasHistoricalArtifacts: boolean;
+
+  constructor(private readonly db: Database.Database) {
+    this.hasHistoricalArtifacts = Boolean(
+      db
+        .prepare(
+          "SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'workbench_artifacts'",
+        )
+        .get(),
+    );
+  }
 
   transaction<T>(operation: () => T): T {
     return this.db.transaction(operation)();
@@ -163,61 +191,86 @@ export class WorkbenchTaskRepository {
   }
 
   getTask(taskId: string): WorkbenchTask | null {
-    const row = this.db.prepare('SELECT * FROM workbench_tasks WHERE id = ?').get(taskId) as
+    const row = this.db.prepare(`${TASK_PROJECTION} AND t.id = ?`).get(taskId) as
       | TaskRow
       | undefined;
-    return row && executionStatuses.has(row.status) ? this.mapTask(row) : null;
+    return row ? this.mapTask(row) : null;
   }
 
   getLatestTaskForSession(sessionId: string): WorkbenchTask | null {
-    const row = this.db
-      .prepare(
-        'SELECT * FROM workbench_tasks WHERE session_id = ? AND status IN (?, ?, ?, ?, ?) ORDER BY created_at DESC LIMIT 1',
-      )
-      .get(sessionId, ...executionStatuses) as TaskRow | undefined;
+    const row = this.db.prepare(`${TASK_PROJECTION} ${LATEST_SESSION_TASK}`).get(sessionId) as
+      | TaskRow
+      | undefined;
     return row ? this.mapTask(row) : null;
+  }
+
+  getLatestTaskStatuses(sessionIds: readonly string[]): Map<string, WorkbenchExecutionStatusType> {
+    const rows = this.db
+      .prepare<[string], { sessionId: string; status: WorkbenchExecutionStatusType | null }>(`
+        SELECT ids.value AS sessionId, (
+          SELECT COALESCE(r.status, t.status)
+          ${TASK_WITH_CURRENT_RUN} AND t.session_id = ids.value ${LATEST_TASK_ORDER}
+        ) AS status
+        FROM json_each(?) ids`)
+      .all(JSON.stringify(sessionIds));
+    const statuses = new Map<string, WorkbenchExecutionStatusType>();
+    for (const row of rows) {
+      if (row.status !== null) statuses.set(row.sessionId, row.status);
+    }
+    return statuses;
+  }
+
+  getLatestRunLinkForSession(sessionId: string): { taskId: string; runId: string } | null {
+    const row = this.db
+      .prepare<[string], { taskId: string; runId: string | null }>(`
+        SELECT t.id AS taskId, r.id AS runId
+        ${TASK_WITH_CURRENT_RUN} ${LATEST_SESSION_TASK}`)
+      .get(sessionId);
+    return row?.runId ? { taskId: row.taskId, runId: row.runId } : null;
   }
 
   listTasksForSession(sessionId: string): WorkbenchTask[] {
     const rows = this.db
-      .prepare('SELECT * FROM workbench_tasks WHERE session_id = ? ORDER BY created_at DESC')
+      .prepare(`${TASK_PROJECTION} AND t.session_id = ? ORDER BY t.created_at DESC`)
       .all(sessionId) as TaskRow[];
-    return rows.filter(row => executionStatuses.has(row.status)).map(row => this.mapTask(row));
+    return rows.map(row => this.mapTask(row));
   }
 
   getActiveTaskForSession(sessionId: string): WorkbenchTask | null {
-    const rows = this.db
-      .prepare('SELECT * FROM workbench_tasks WHERE session_id = ? ORDER BY created_at DESC')
-      .all(sessionId) as TaskRow[];
-    const row = rows.find(
-      candidate =>
-        candidate.status === WorkbenchExecutionStatus.Queued ||
-        candidate.status === WorkbenchExecutionStatus.Running,
-    );
+    const row = this.db
+      .prepare(`${TASK_PROJECTION} AND t.session_id = ?
+        AND r.status IN (${activeStatuses})
+        ORDER BY t.created_at DESC, t.rowid DESC LIMIT 1`)
+      .get(sessionId) as TaskRow | undefined;
     return row ? this.mapTask(row) : null;
   }
 
-  updateTaskStatus(
-    taskId: string,
-    status: WorkbenchExecutionStatusType,
-    activeRunId?: string | null,
-  ): WorkbenchTask {
-    const current = this.requireTask(taskId);
+  listInterruptedRuns(): Array<{ id: string; sessionId: string; startedAt: number | null }> {
+    return this.db
+      .prepare(`SELECT r.id, t.session_id AS sessionId, r.started_at AS startedAt
+        FROM workbench_runs r JOIN workbench_tasks t ON t.id = r.task_id
+        WHERE r.status IN (?, ?)`)
+      .all(WorkbenchExecutionStatus.Queued, WorkbenchExecutionStatus.Running) as Array<{
+      id: string;
+      sessionId: string;
+      startedAt: number | null;
+    }>;
+  }
+
+  cancelInterruptedTasksWithoutRuns(): void {
     const now = Date.now();
-    const endedAt = terminalTaskStatuses.has(status)
-      ? now
-      : status === WorkbenchExecutionStatus.Running
-        ? null
-        : current.endedAt;
-    const nextActiveRunId = activeRunId === undefined ? current.activeRunId : activeRunId;
     this.db
-      .prepare(
-        `UPDATE workbench_tasks
-         SET status = ?, active_run_id = ?, updated_at = ?, completed_at = ?
-         WHERE id = ?`,
-      )
-      .run(status, nextActiveRunId, now, endedAt, taskId);
-    return this.requireTask(taskId);
+      .prepare(`UPDATE workbench_tasks AS t SET status = ?, active_run_id = NULL,
+        completed_at = ?, updated_at = ? WHERE status IN (?, ?)
+        AND NOT EXISTS (SELECT 1 FROM workbench_runs r
+          WHERE r.task_id = t.id AND r.status IN (${currentStatuses}))`)
+      .run(
+        WorkbenchExecutionStatus.Cancelled,
+        now,
+        now,
+        WorkbenchExecutionStatus.Queued,
+        WorkbenchExecutionStatus.Running,
+      );
   }
 
   createRun(taskId: string, trigger: WorkbenchRunTrigger, id: string = randomUUID()): WorkbenchRun {
@@ -260,10 +313,6 @@ export class WorkbenchTaskRepository {
         now,
         now,
       );
-    this.appendRunEvent(run.id, WorkbenchRunEventType.RunCreated, {
-      trigger,
-      attempt: run.attempt,
-    });
     return run;
   }
 
@@ -282,31 +331,6 @@ export class WorkbenchTaskRepository {
     return this.requireRun(runId);
   }
 
-  /**
-   * Keep the observed final answer as provenance for reviewable memory candidates.
-   * Native settlement alone does not verify the answer's business claims.
-   */
-  updateFinalAnswer(runId: string, finalAnswer: string): WorkbenchRun {
-    this.requireRun(runId);
-    this.db
-      .prepare('UPDATE workbench_runs SET final_answer_json = ?, updated_at = ? WHERE id = ?')
-      .run(JSON.stringify(finalAnswer), Date.now(), runId);
-    return this.requireRun(runId);
-  }
-
-  getRunFinalAnswer(runId: string): string {
-    const row = this.db
-      .prepare('SELECT final_answer_json FROM workbench_runs WHERE id = ?')
-      .get(runId) as { final_answer_json: string | null } | undefined;
-    if (!row || !row.final_answer_json) return '';
-    try {
-      const parsed = JSON.parse(row.final_answer_json);
-      return typeof parsed === 'string' ? parsed : '';
-    } catch {
-      return '';
-    }
-  }
-
   updateRunStatus(
     runId: string,
     status: WorkbenchExecutionStatusType,
@@ -320,15 +344,28 @@ export class WorkbenchTaskRepository {
       status === WorkbenchExecutionStatus.Running && current.startedAt === null
         ? now
         : current.startedAt;
-    const endedAt = terminalTaskStatuses.has(status) ? now : current.endedAt;
+    const terminal = terminalTaskStatuses.has(status);
+    const endedAt = terminal ? now : current.endedAt;
     const failure = options.failure === undefined ? current.failure : options.failure;
     this.db
       .prepare(
         `UPDATE workbench_runs
-         SET status = ?, started_at = ?, ended_at = ?, failure_json = ?, updated_at = ?
+         SET status = ?, started_at = ?, ended_at = ?, failure_json = ?, updated_at = ?,
+           terminal_after_sequence = CASE WHEN ? THEN COALESCE(terminal_after_sequence, (
+             SELECT COALESCE(MAX(sequence), 0) FROM workbench_run_events
+             WHERE run_id = workbench_runs.id
+           )) ELSE terminal_after_sequence END
          WHERE id = ?`,
       )
-      .run(status, startedAt, endedAt, failure ? JSON.stringify(failure) : null, now, runId);
+      .run(
+        status,
+        startedAt,
+        endedAt,
+        failure ? JSON.stringify(failure) : null,
+        now,
+        Number(terminal),
+        runId,
+      );
     return this.requireRun(runId);
   }
 
@@ -357,106 +394,6 @@ export class WorkbenchTaskRepository {
       )
       .run(event.id, runId, event.sequence, event.type, JSON.stringify(payload), event.createdAt);
     return event;
-  }
-
-  addArtifact(input: Omit<WorkbenchArtifact, 'id' | 'createdAt' | 'updatedAt'>): WorkbenchArtifact {
-    const existing = this.db
-      .prepare(
-        `SELECT * FROM workbench_artifacts
-         WHERE run_id = ? AND reference = ? AND content_hash = ?`,
-      )
-      .get(input.runId, input.reference, input.contentHash) as ArtifactRow | undefined;
-    if (existing) {
-      const current = this.mapArtifact(existing);
-      const replaceIdentity =
-        getArtifactSourcePriority(input.metadata.source) >=
-        getArtifactSourcePriority(current.metadata.source);
-      const replaceEvidence =
-        input.verificationStatus !== WorkbenchArtifactVerificationStatus.Pending ||
-        (current.verificationStatus === WorkbenchArtifactVerificationStatus.Pending &&
-          replaceIdentity);
-      const mergedMetadata = replaceIdentity
-        ? { ...current.metadata, ...input.metadata }
-        : { ...input.metadata, ...current.metadata };
-      const updatedAt = Date.now();
-      this.db
-        .prepare(
-          `UPDATE workbench_artifacts
-           SET provenance = ?, verification_status = ?, metadata_json = ?, updated_at = ?
-           WHERE id = ?`,
-        )
-        .run(
-          replaceEvidence ? input.provenance : current.provenance,
-          replaceEvidence ? input.verificationStatus : current.verificationStatus,
-          JSON.stringify(mergedMetadata),
-          updatedAt,
-          current.id,
-        );
-      return this.mapArtifact(
-        this.db
-          .prepare('SELECT * FROM workbench_artifacts WHERE id = ?')
-          .get(current.id) as ArtifactRow,
-      );
-    }
-    const now = Date.now();
-    const id = randomUUID();
-    this.db
-      .prepare(
-        `INSERT INTO workbench_artifacts
-         (id, task_id, run_id, kind, mime_type, reference, content_hash, provenance,
-          verification_status, metadata_json, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        id,
-        input.taskId,
-        input.runId,
-        input.kind,
-        input.mimeType,
-        input.reference,
-        input.contentHash,
-        input.provenance,
-        input.verificationStatus,
-        JSON.stringify(input.metadata),
-        now,
-        now,
-      );
-    return this.mapArtifact(
-      this.db.prepare('SELECT * FROM workbench_artifacts WHERE id = ?').get(id) as ArtifactRow,
-    );
-  }
-
-  /**
-   * Promote pending final deliverables only. Intermediate evidence, verified
-   * artifacts and failed artifacts are left untouched.
-   */
-  markArtifactsVerified(runId: string, artifacts: WorkbenchArtifact[]): number {
-    return this.transaction(() => {
-      const update = this.db.prepare(
-        'UPDATE workbench_artifacts SET verification_status = ?, updated_at = ? WHERE id = ? AND verification_status = ?',
-      );
-      let changes = 0;
-      for (const artifact of artifacts) {
-        if (artifact.runId !== runId || !isWorkbenchDeliverable(artifact)) continue;
-        changes += update.run(
-          WorkbenchArtifactVerificationStatus.Verified,
-          Date.now(),
-          artifact.id,
-          WorkbenchArtifactVerificationStatus.Pending,
-        ).changes;
-      }
-      return changes;
-    });
-  }
-
-  countPendingArtifacts(runId: string): number {
-    const row = this.db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM workbench_artifacts
-         WHERE run_id = ? AND verification_status = ?`,
-      )
-      .get(runId, WorkbenchArtifactVerificationStatus.Pending) as { n: number };
-    return row.n;
   }
 
   createApproval(
@@ -537,15 +474,12 @@ export class WorkbenchTaskRepository {
     return rows.map(row => this.mapApproval(row));
   }
 
-  listPendingApprovalsForSession(sessionId: string): WorkbenchApproval[] {
+  listPendingApprovalsForRun(runId: string): WorkbenchApproval[] {
     const rows = this.db
       .prepare(
-        `SELECT a.* FROM workbench_approvals a
-         JOIN workbench_tasks t ON t.id = a.task_id
-         WHERE t.session_id = ? AND a.decision = ?
-         ORDER BY a.created_at`,
+        `SELECT * FROM workbench_approvals WHERE run_id = ? AND decision = ? ORDER BY created_at`,
       )
-      .all(sessionId, WorkbenchApprovalDecision.Pending) as ApprovalRow[];
+      .all(runId, WorkbenchApprovalDecision.Pending) as ApprovalRow[];
     return rows.map(row => this.mapApproval(row));
   }
 
@@ -583,30 +517,27 @@ export class WorkbenchTaskRepository {
     return this.requireApproval(approvalId);
   }
 
-  listRecoverableRuns(): WorkbenchRun[] {
-    const rows = this.db
+  markInterruptedToolEffectsForReview(runId: string): void {
+    this.db
       .prepare(
-        `SELECT * FROM workbench_runs
-         WHERE status IN (?, ?, ?)
-         ORDER BY updated_at`,
+        'UPDATE workbench_approvals SET effect_status = ?, updated_at = ? WHERE run_id = ? AND effect_status = ?',
       )
-      .all(WorkbenchExecutionStatus.Running) as RunRow[];
-    return rows.filter(row => executionStatuses.has(row.status)).map(row => this.mapRun(row));
-  }
-
-  listExecutingApprovals(): WorkbenchApproval[] {
-    const rows = this.db
-      .prepare('SELECT * FROM workbench_approvals WHERE effect_status = ?')
-      .all(WorkbenchApprovalEffectStatus.Executing) as ApprovalRow[];
-    return rows.map(row => this.mapApproval(row));
+      .run(
+        WorkbenchApprovalEffectStatus.NeedsReview,
+        Date.now(),
+        runId,
+        WorkbenchApprovalEffectStatus.Executing,
+      );
   }
 
   getDetail(taskId: string): WorkbenchTaskDetail | null {
     const task = this.getTask(taskId);
     if (!task) return null;
-    const runRows = this.db
-      .prepare('SELECT * FROM workbench_runs WHERE task_id = ? ORDER BY attempt DESC')
-      .all(taskId) as RunRow[];
+    const runRows = (
+      this.db
+        .prepare('SELECT * FROM workbench_runs WHERE task_id = ? ORDER BY attempt DESC')
+        .all(taskId) as RunRow[]
+    ).filter(row => executionStatuses.has(row.status));
     const eventRows = this.db
       .prepare(
         `SELECT e.* FROM workbench_run_events e
@@ -614,55 +545,71 @@ export class WorkbenchTaskRepository {
          WHERE r.task_id = ? ORDER BY r.attempt DESC, e.sequence`,
       )
       .all(taskId) as EventRow[];
-    const artifactRows = this.db
-      .prepare('SELECT * FROM workbench_artifacts WHERE task_id = ? ORDER BY created_at DESC')
-      .all(taskId) as ArtifactRow[];
+    const artifactRows = this.hasHistoricalArtifacts
+      ? this.db
+          .prepare<[string], ArtifactRow>(
+            'SELECT * FROM workbench_artifacts WHERE task_id = ? ORDER BY created_at DESC',
+          )
+          .all(taskId)
+      : [];
     const approvalRows = this.db
       .prepare('SELECT * FROM workbench_approvals WHERE task_id = ? ORDER BY created_at DESC')
       .all(taskId) as ApprovalRow[];
-    const currentRuns = runRows.filter(row => executionStatuses.has(row.status));
-    const currentRunIds = new Set(currentRuns.map(row => row.id));
+    const currentRuns = runRows.map(row => ({
+      run: this.mapRun(row),
+      terminalAfterSequence: row.terminal_after_sequence,
+    }));
+    const runIds = new Set(runRows.map(row => row.id));
+    const eventsByRun = Map.groupBy(eventRows, row => row.run_id);
     return {
       task,
-      runs: currentRuns.map(row => this.mapRun(row)),
-      events: eventRows.filter(row => currentRunIds.has(row.run_id)).map(row => this.mapEvent(row)),
+      runs: currentRuns.map(({ run }) => run),
+      events: currentRuns.flatMap(({ run, terminalAfterSequence }) =>
+        this.projectRunEvents(run, eventsByRun.get(run.id) ?? [], terminalAfterSequence),
+      ),
       artifacts: artifactRows
-        .filter(row => currentRunIds.has(row.run_id))
+        .filter(row => runIds.has(row.run_id))
         .map(row => this.mapArtifact(row)),
       approvals: approvalRows
-        .filter(row => currentRunIds.has(row.run_id))
+        .filter(row => runIds.has(row.run_id))
         .map(row => this.mapApproval(row)),
     };
   }
 
-  deleteSessionDomainData(sessionId: string): void {
-    this.transaction(() => {
-      const taskIds = (
+  deleteSessionDomainData(
+    sessionIds: readonly string[],
+  ): Array<Pick<WorkbenchTask, 'id' | 'sessionId'>> {
+    if (!sessionIds.length) return [];
+    const ids = JSON.stringify(sessionIds);
+    const selectedTasks =
+      'SELECT id FROM workbench_tasks WHERE session_id IN (SELECT value FROM json_each(?))';
+    return this.transaction(() => {
+      const latest = this.db
+        .prepare<[string], Pick<WorkbenchTask, 'id' | 'sessionId'>>(`
+        SELECT ids.value AS sessionId, selected.id FROM json_each(?) ids
+        JOIN workbench_tasks selected ON selected.id = (
+          SELECT t.id ${TASK_WITH_CURRENT_RUN} AND t.session_id = ids.value ${LATEST_TASK_ORDER}
+        )`)
+        .all(ids);
+      this.db
+        .prepare(`DELETE FROM workbench_run_events WHERE run_id IN (
+        SELECT id FROM workbench_runs WHERE task_id IN (${selectedTasks})
+      )`)
+        .run(ids);
+      this.db
+        .prepare(`DELETE FROM workbench_approvals WHERE task_id IN (${selectedTasks})`)
+        .run(ids);
+      if (this.hasHistoricalArtifacts) {
         this.db
-          .prepare('SELECT id FROM workbench_tasks WHERE session_id = ?')
-          .all(sessionId) as Array<{ id: string }>
-      ).map(row => row.id);
-      for (const taskId of taskIds) {
-        const runIds = (
-          this.db.prepare('SELECT id FROM workbench_runs WHERE task_id = ?').all(taskId) as Array<{
-            id: string;
-          }>
-        ).map(row => row.id);
-        for (const runId of runIds) {
-          this.db.prepare('DELETE FROM workbench_run_events WHERE run_id = ?').run(runId);
-        }
-        this.db.prepare('DELETE FROM workbench_approvals WHERE task_id = ?').run(taskId);
-        this.db.prepare('DELETE FROM workbench_artifacts WHERE task_id = ?').run(taskId);
-        this.db.prepare('DELETE FROM workbench_runs WHERE task_id = ?').run(taskId);
+          .prepare(`DELETE FROM workbench_artifacts WHERE task_id IN (${selectedTasks})`)
+          .run(ids);
       }
-      this.db.prepare('DELETE FROM workbench_tasks WHERE session_id = ?').run(sessionId);
+      this.db.prepare(`DELETE FROM workbench_runs WHERE task_id IN (${selectedTasks})`).run(ids);
+      this.db
+        .prepare('DELETE FROM workbench_tasks WHERE session_id IN (SELECT value FROM json_each(?))')
+        .run(ids);
+      return latest;
     });
-  }
-
-  private requireTask(taskId: string): WorkbenchTask {
-    const task = this.getTask(taskId);
-    if (!task) throw new Error(`Workbench task not found: ${taskId}`);
-    return task;
   }
 
   private requireRun(runId: string): WorkbenchRun {
@@ -709,13 +656,96 @@ export class WorkbenchTaskRepository {
     };
   }
 
-  private mapEvent(row: EventRow): WorkbenchRunEvent {
+  private projectRunEvents(
+    run: WorkbenchRun,
+    rows: EventRow[],
+    terminalAfterSequence: number | null,
+  ): WorkbenchRunEvent[] {
+    const events = rows.map(row => this.mapEvent(row, run));
+    const project = (
+      type: WorkbenchRunEvent['type'],
+      createdAt: number,
+      payload: WorkbenchJsonObject,
+    ): WorkbenchRunEvent => ({
+      id: `${run.id}:${type}`,
+      runId: run.id,
+      sequence: 0,
+      type,
+      createdAt,
+      payload,
+    });
+    const created = events.find(event => event.type === WorkbenchRunEventType.RunCreated);
+    const started = events.find(event => event.type === WorkbenchRunEventType.RunStarted);
+    const terminalType = terminalRunEventTypes[run.status];
+    const terminal =
+      terminalType &&
+      run.endedAt !== null &&
+      terminalAfterSequence !== null &&
+      !events.some(event => event.type === terminalType)
+        ? project(
+            terminalType,
+            run.endedAt,
+            terminalType === WorkbenchRunEventType.RunSettled ? {} : (run.failure ?? {}),
+          )
+        : null;
+    if (!terminal && created && (started || run.startedAt === null)) return events;
+    if (terminal && terminalAfterSequence !== null) {
+      // Late observations can share the terminal timestamp, so use the recorded event boundary.
+      const firstLateEvent = events.findIndex(event => event.sequence > terminalAfterSequence);
+      events.splice(firstLateEvent === -1 ? events.length : firstLateEvent, 0, terminal);
+    }
+    const projected = [
+      created ??
+        project(WorkbenchRunEventType.RunCreated, run.createdAt, {
+          trigger: run.trigger,
+          attempt: run.attempt,
+        }),
+    ];
+    if (run.startedAt !== null && !started) {
+      projected.push(
+        project(WorkbenchRunEventType.RunStarted, run.startedAt, { trigger: run.trigger }),
+      );
+    }
+    projected.push(...events.filter(event => event !== created));
+    return projected.map((event, index) => ({ ...event, sequence: index + 1 }));
+  }
+
+  private mapEvent(row: EventRow, run: WorkbenchRun): WorkbenchRunEvent {
+    let payload = parseJson<WorkbenchJsonObject>(row.payload_json, {});
+    if (row.payload_json === '{}') {
+      switch (row.type) {
+        case WorkbenchRunEventType.RunCreated:
+          payload = { trigger: run.trigger, attempt: run.attempt };
+          break;
+        case WorkbenchRunEventType.RunStarted:
+          payload = { trigger: run.trigger };
+          break;
+        case WorkbenchRunEventType.RunFailed:
+        case WorkbenchRunEventType.RunCancelled:
+          payload = run.failure ?? {};
+          break;
+      }
+    }
+    const profile = payload.profile;
+    if (
+      row.type === WorkbenchRunEventType.HarnessProfiled &&
+      run.context &&
+      profile &&
+      typeof profile === 'object' &&
+      !Array.isArray(profile) &&
+      !('model' in profile)
+    ) {
+      payload.profile = {
+        ...profile,
+        ...normalizeHarnessModelFields(run.context),
+      };
+    }
     return {
       id: row.id,
       runId: row.run_id,
       sequence: row.sequence,
       type: row.type,
-      payload: parseJson<WorkbenchJsonObject>(row.payload_json, {}),
+      payload,
       createdAt: row.created_at,
     };
   }

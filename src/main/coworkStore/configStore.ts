@@ -1,5 +1,5 @@
-// Config kv access for the CoworkStore class chain.
-// Split from src/main/coworkStore.ts (issue #1069).
+import type Database from 'better-sqlite3';
+
 import { CoworkExecutionMode, CoworkPermissionMode } from '../../shared/cowork/constants';
 import {
   DEFAULT_EMBEDDING_ENABLED,
@@ -14,11 +14,11 @@ import {
   parseEmbeddingVectorWeight,
   normalizePermissionMode,
 } from './helpers';
-import { CoworkSessionStore } from './sessionStore';
 import type { CoworkConfig, CoworkConfigUpdate } from './types';
 
-export class CoworkConfigStore extends CoworkSessionStore {
-  // Config operations
+export class CoworkConfigStore {
+  constructor(private readonly db: Database.Database) {}
+
   getConfig(): CoworkConfig {
     const configKeys = [
       'workingDirectory',
@@ -34,10 +34,11 @@ export class CoworkConfigStore extends CoworkSessionStore {
       'embeddingRemoteApiKey',
       'codemodeEnabled',
     ] as const;
-    const configRows = this.getAll<{ key: string; value: string }>(
-      `SELECT key, value FROM cowork_config WHERE key IN (${configKeys.map(() => '?').join(', ')})`,
-      [...configKeys],
-    );
+    const configRows = this.db
+      .prepare<string[], { key: string; value: string }>(
+        `SELECT key, value FROM cowork_config WHERE key IN (${configKeys.map(() => '?').join(', ')})`,
+      )
+      .all(...configKeys);
     const cfg = new Map(configRows.map(r => [r.key, r.value]));
 
     return {
@@ -122,11 +123,9 @@ export class CoworkConfigStore extends CoworkSessionStore {
   }
 
   getAppLanguage(): 'zh' | 'en' {
-    interface KvRow {
-      value: string;
-    }
-
-    const row = this.getOne<KvRow>('SELECT value FROM kv WHERE key = ?', ['app_config']);
+    const row = this.db
+      .prepare<[string], { value: string }>('SELECT value FROM kv WHERE key = ?')
+      .get('app_config');
     if (!row?.value) {
       return 'zh';
     }
@@ -137,5 +136,17 @@ export class CoworkConfigStore extends CoworkSessionStore {
     } catch {
       return 'zh';
     }
+  }
+
+  private upsertConfig(key: string, value: string, now: number): void {
+    this.db
+      .prepare(
+        `INSERT INTO cowork_config (key, value, updated_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET
+           value = excluded.value,
+           updated_at = excluded.updated_at`,
+      )
+      .run(key, value, now);
   }
 }

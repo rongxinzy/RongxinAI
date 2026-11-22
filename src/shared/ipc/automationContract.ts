@@ -166,15 +166,6 @@ export const scheduledTasksContract = defineIpcContract({
       error: z.string().optional(),
     }),
   },
-  get: {
-    channel: ScheduledTaskIpc.Get,
-    args: z.tuple([z.string()]),
-    result: z.object({
-      success: z.boolean(),
-      task: ScheduledTaskSchema.optional(),
-      error: z.string().optional(),
-    }),
-  },
   create: {
     channel: ScheduledTaskIpc.Create,
     args: z.tuple([ScheduledTaskInputSchema]),
@@ -218,16 +209,6 @@ export const scheduledTasksContract = defineIpcContract({
     args: z.tuple([z.string()]),
     result: z.object({ success: z.boolean(), error: z.string().optional() }),
   },
-  stop: {
-    channel: ScheduledTaskIpc.Stop,
-    args: z.tuple([z.string()]),
-    // Handler returns `result: false` — a claimed Pi Run finishes on its own.
-    result: z.object({
-      success: z.boolean(),
-      result: z.boolean().optional(),
-      error: z.string().optional(),
-    }),
-  },
   preflight: {
     channel: ScheduledTaskIpc.Preflight,
     args: z.tuple([z.string()]),
@@ -266,30 +247,12 @@ export const scheduledTasksContract = defineIpcContract({
       error: z.string().optional(),
     }),
   },
-  countRuns: {
-    channel: ScheduledTaskIpc.CountRuns,
-    args: z.tuple([z.string()]),
-    result: z.object({
-      success: z.boolean(),
-      count: z.number().optional(),
-      error: z.string().optional(),
-    }),
-  },
   listAllRuns: {
     channel: ScheduledTaskIpc.ListAllRuns,
     args: z.tuple([z.number().optional(), z.number().optional(), RunFilterSchema.optional()]),
     result: z.object({
       success: z.boolean(),
       runs: z.array(ScheduledTaskRunWithNameSchema).optional(),
-      error: z.string().optional(),
-    }),
-  },
-  resolveSession: {
-    channel: ScheduledTaskIpc.ResolveSession,
-    args: z.tuple([z.string()]),
-    result: z.object({
-      success: z.boolean(),
-      session: z.unknown().nullable().optional(),
       error: z.string().optional(),
     }),
   },
@@ -331,7 +294,6 @@ export const activityContract = defineIpcContract({
           platform: z.string().optional(),
           conversationId: z.string().optional(),
           taskName: z.string().optional(),
-          inputPreview: z.string().optional(),
           replyPreview: z.string().optional(),
           errorMessage: z.string().optional(),
         }),

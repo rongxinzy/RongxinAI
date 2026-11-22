@@ -20,6 +20,7 @@ type VerifyResponse = {
   userVersion?: number;
   schemaVersion?: number;
   error?: string;
+  sqliteCode?: string;
   runMs: number;
 };
 
@@ -87,7 +88,11 @@ export async function verifySqliteFile(
         !Number.isInteger(response.schemaVersion) ||
         (response.schemaVersion ?? -1) < 0
       ) {
-        finish(new Error(response.error || 'Invalid sqlite verify worker result'));
+        finish(
+          Object.assign(new Error(response.error || 'Invalid sqlite verify worker result'), {
+            code: response.sqliteCode,
+          }),
+        );
       } else {
         console.debug(
           `[SqliteBackup] ${mode} finished in ${Math.round(response.runMs)} ms in worker`,

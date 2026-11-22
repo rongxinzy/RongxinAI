@@ -33,7 +33,14 @@ describe('Pi runtime isolation', () => {
   });
 
   test('projects only Pi runtime events into cowork streams', () => {
-    expect(mainSource).toContain('forwardPiWorkbenchRuntimeToRenderer(getPiRuntimeAdapter())');
+    const initSource = readSource('../../appBootstrap/initApp.ts');
+    const forwarderSource = readSource('../../appBootstrap/piUiForwarder.ts');
+    expect(initSource).toMatch(
+      /const (\w+) = initializeSessionRuntime\(magpie\.modelService, channelDelivery\);[\s\S]*?bindPiWorkbenchRuntimeForwarder\(\1, \(\) => lifecycleRuntime\.mainWindow\);/,
+    );
+    expect(forwarderSource).toMatch(
+      /bindPiWorkbenchRuntimeForwarder = \(\s*(\w+): PiRuntimeAdapter,[\s\S]*?forwardPiWorkbenchRuntimeToRenderer\(\1, getMainWindow\);/,
+    );
     expect(mainSource).not.toContain('OpenClawChannelGateway');
     expect(mainSource).not.toContain('OpenClawEngineManager');
     expect(mainSource).not.toContain("webContents.send('cowork:stream:");

@@ -2,30 +2,21 @@
 import fs from 'fs';
 import path from 'path';
 
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app } from 'electron';
 
-import {
-  listAllMatchingSessionIds,
-  forgetCoworkSession,
-} from '../appBootstrap/coworkSessionImages';
-import { listPresetExperts } from '../presetExpertCatalog';
+import { readPresetCatalogAsync } from '../workbenchTask/artifactWorkerPool';
 import { DB_FILENAME } from '../appConstants';
 import { CoworkSessionExpertSource } from '../../shared/cowork/sessionExperts';
-import { CoworkStreamIpc } from '../../shared/ipc/channels';
 import { providersContract } from '../../shared/ipc/providersContract';
-import type { ChannelAccountManager } from '../im/channelAccountManager';
 import type { AgentManager } from '../agentManager';
-import type { CoworkStore } from '../coworkStore';
+import type { CreateAgentRequest } from '../coworkStore/types';
 import type { SkillManager } from '../skillManager';
-import type { SqliteStore } from '../sqliteStore';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 
 export interface AgentIpcDeps {
   getAgentManager: () => AgentManager;
-  getCoworkStore: () => CoworkStore;
   getSkillManager: () => SkillManager;
-  getStore: () => SqliteStore;
-  getIMGatewayManager: () => ChannelAccountManager;
+  deleteAgentWithSessions: (agentId: string) => Promise<string[] | null>;
   bumpCodingCommandCatalog: () => void;
   resolveDefaultAgentModelRef: () => string;
 }
@@ -88,41 +79,11 @@ export const registerAgentIpc = (deps: AgentIpcDeps): void => {
 
     agentsDelete: async (_event, id) => {
       try {
-        const result = deps.getAgentManager().deleteAgent(id);
-        if (result) deps.bumpCodingCommandCatalog();
+        const deletedSessionIds = await deps.deleteAgentWithSessions(id);
+        if (!deletedSessionIds) return { success: true, deleted: false };
 
-        // Cascade delete all Cowork sessions belonging to the deleted agent
-        const agentIpcCoworkStore = deps.getCoworkStore();
-        for (const sessionId of listAllMatchingSessionIds({ agentId: id })) {
-          forgetCoworkSession(sessionId);
-        }
-        const deletedSessionIds = agentIpcCoworkStore.deleteSessionsByAgentId(id);
-
-        // Clean up IM session mappings for deleted sessions
-        if (deletedSessionIds.length > 0) {
-          try {
-            const imStore = deps.getIMGatewayManager()?.getIMStore();
-            if (imStore) {
-              for (const sessionId of deletedSessionIds) {
-                imStore.deleteSessionMappingByCoworkSessionId(sessionId);
-              }
-            }
-          } catch {
-            // IM rt.store may not be initialised yet; safe to ignore.
-          }
-
-          // Notify renderer to refresh session lists
-          const windows = BrowserWindow.getAllWindows();
-          for (const win of windows) {
-            if (win.isDestroyed()) continue;
-            win.webContents.send(CoworkStreamIpc.SessionsChanged, {
-              agentId: id,
-              deletedSessionIds,
-            });
-          }
-        }
-
-        return { success: true, deleted: result };
+        deps.bumpCodingCommandCatalog();
+        return { success: true, deleted: true, deletedSessionIds };
       } catch (error) {
         return {
           success: false,
@@ -137,17 +98,12 @@ export const registerAgentIpc = (deps: AgentIpcDeps): void => {
         const registerExpertModule = require(
           path.join(bundledSkillsRoot, 'zhiyuan-expert-manager', 'scripts', 'register_expert'),
         ) as {
-          parseExpertPackage: (...args: unknown[]) => {
+          parseExpertPackage: (
+            directory: string,
+            options: { dbPath: string; shouldUpdate: (presetId: string) => boolean },
+          ) => {
             pluginJson: { name?: unknown; version?: unknown; expertType?: unknown };
-            requests: Array<{
-              id: string;
-              name: string;
-              description: string;
-              systemPrompt: string;
-              identity: string;
-              icon: string;
-              skillIds?: string[];
-            }>;
+            requests: (CreateAgentRequest & { id: string })[];
             piSyncedFiles?: string[];
           };
           upsertExpertRegistry: (options: {
@@ -160,18 +116,10 @@ export const registerAgentIpc = (deps: AgentIpcDeps): void => {
         const dbPath = path.join(app.getPath('userData'), DB_FILENAME);
         const localAgentManager = deps.getAgentManager();
 
-        // Re-importing an installed preset upgrades it in place: existing
-        // agents are updated, packaged skills are refreshed, and the stale
-        // preset registry entry is replaced.
-        const packageJson = JSON.parse(
-          fs.readFileSync(path.join(expertDir, 'plugin.json'), 'utf-8'),
-        ) as { name?: unknown; version?: unknown; expertType?: unknown };
-        const isUpgrade =
-          typeof packageJson.name === 'string' &&
-          localAgentManager.listAgents().some(agent => agent.presetId === packageJson.name);
         const { pluginJson, requests, piSyncedFiles } = parseExpertPackage(expertDir, {
           dbPath,
-          update: isUpgrade,
+          shouldUpdate: presetId =>
+            localAgentManager.listAgents().some(agent => agent.presetId === presetId),
         });
 
         const defaultModel = deps.resolveDefaultAgentModelRef();
@@ -244,7 +192,7 @@ export const registerAgentIpc = (deps: AgentIpcDeps): void => {
     agentsGetPresetExperts: async () => {
       try {
         const bundledSkillsRoot = deps.getSkillManager().getBundledSkillsRoot();
-        return { experts: listPresetExperts(bundledSkillsRoot) };
+        return { experts: await readPresetCatalogAsync(bundledSkillsRoot) };
       } catch (error) {
         return {
           experts: [],

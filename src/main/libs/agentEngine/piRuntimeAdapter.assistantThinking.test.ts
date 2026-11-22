@@ -7,7 +7,12 @@
  * the Pi SDK mocks are registered before any module under test loads).
  */
 
-import { adapter, mockSession, setupPiRuntimeAdapterSuite } from './piRuntimeAdapter.testHarness';
+import {
+  createTestPiRuntime,
+  adapter,
+  mockSession,
+  setupPiRuntimeAdapterSuite,
+} from './piRuntimeAdapter.testHarness';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoworkStore } from '../../coworkStore';
@@ -39,15 +44,11 @@ describe('PiRuntimeAdapter', () => {
         content: string;
         metadata?: Record<string, unknown>;
       }> = [];
-      adapter.on('message', (_sid, msg) => messages.push(msg as never));
       const updates: Array<{
         messageId: string;
         content: string;
         metadata?: Record<string, unknown>;
       }> = [];
-      adapter.on('messageUpdate', (_sid, messageId, content, metadata) =>
-        updates.push({ messageId, content, metadata }),
-      );
       const stored: Array<{
         id: string;
         type: string;
@@ -60,23 +61,31 @@ describe('PiRuntimeAdapter', () => {
           if (target && patch.metadata) target.metadata = { ...target.metadata, ...patch.metadata };
         },
       );
-      adapter.setCoworkStore({
-        addMessage: (_sessionId: string, message: Record<string, unknown>) => {
-          const created = { ...message, id: `placeholder-${stored.length + 1}` };
-          stored.push(created as never);
-          return created;
-        },
-        getMessage: (_sessionId: string, messageId: string) =>
-          stored.find(message => message.id === messageId) ?? null,
-        getSession: () => ({ messages: stored }),
-        updateMessage,
-        deleteMessage: (_sessionId: string, messageId: string) => {
-          const index = stored.findIndex(message => message.id === messageId);
-          if (index === -1) return false;
-          stored.splice(index, 1);
-          return true;
-        },
-      } as unknown as CoworkStore);
+      const adapter = createTestPiRuntime({
+        coworkStore: {
+          messages: {
+            addMessage: (_sessionId: string, message: Record<string, unknown>) => {
+              const created = { ...message, id: `placeholder-${stored.length + 1}` };
+              stored.push(created as never);
+              return created;
+            },
+            getMessage: (_sessionId: string, messageId: string) =>
+              stored.find(message => message.id === messageId) ?? null,
+            updateMessage,
+            deleteMessage: (_sessionId: string, messageId: string) => {
+              const index = stored.findIndex(message => message.id === messageId);
+              if (index === -1) return false;
+              stored.splice(index, 1);
+              return true;
+            },
+          },
+          getSession: () => ({ messages: stored }),
+        } as unknown as CoworkStore,
+      });
+      adapter.on('message', (_sid, msg) => messages.push(msg as never));
+      adapter.on('messageUpdate', (_sid, messageId, content, metadata) =>
+        updates.push({ messageId, content, metadata }),
+      );
 
       await adapter.startSession('test', 'Use a tool without writing an answer');
       listener!({ type: 'turn_start' });
@@ -287,6 +296,9 @@ describe('PiRuntimeAdapter', () => {
 
     it('should not lose intermediate updates during a fast stream (no burst-freeze)', async () => {
       vi.useFakeTimers();
+      const unsubscribe = adapter.registerStreamingTextInterestResolver(
+        sessionId => sessionId === 'test',
+      );
       try {
         const updates: string[] = [];
         adapter.on('messageUpdate', (_sid, _id, content) => updates.push(content));
@@ -311,6 +323,7 @@ describe('PiRuntimeAdapter', () => {
         expect(updates.length).toBeGreaterThanOrEqual(2);
         expect(updates[updates.length - 1]).toBe('abcde');
       } finally {
+        unsubscribe();
         vi.useRealTimers();
       }
     });

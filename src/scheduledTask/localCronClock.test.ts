@@ -89,6 +89,20 @@ test('staggerMs delays the emitted trigger without changing the slot', () => {
   expect(fired).toHaveLength(1);
 });
 
+test('shutdown disarms scheduled and already staggered triggers', () => {
+  vi.setSystemTime(Date.parse('2026-10-31T08:59:00Z'));
+  const { clock, fired } = useScheduledClock();
+  clock.upsert(
+    task({ schedule: { kind: 'cron', expr: '0 9 * * *', tz: 'UTC', staggerMs: 5_000 } }),
+  );
+  clock.upsert(task({ taskId: 'next', schedule: { kind: 'at', at: '2026-10-31T09:01:00Z' } }));
+  vi.advanceTimersByTime(60_000);
+  clock.stop();
+  clock.upsert(task({ taskId: 'late', schedule: { kind: 'at', at: '2026-10-31T09:02:00Z' } }));
+  vi.advanceTimersByTime(2 * 60_000);
+  expect(fired).toEqual([]);
+});
+
 test('remove disarms the timer and an upsert replaces the previous schedule', () => {
   vi.setSystemTime(Date.parse('2026-10-31T08:00:00Z'));
   const { clock, fired } = useScheduledClock();

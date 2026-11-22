@@ -35,7 +35,7 @@ const resolveValidationError = (code: EmailValidationCodeType | undefined): stri
   return undefined;
 };
 
-export function EmailSettingsPage() {
+export function EmailSettingsPage({ onAskAi }: { onAskAi: (prompt: string) => void }) {
   const emptyForm = normalizeEmailConfig({});
   const [form, setForm] = useState<EmailFormState>(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -172,9 +172,9 @@ export function EmailSettingsPage() {
       const prompt = buildEmailDiagnosticsPrompt(formRef.current, result, genericError, key =>
         i18nService.t(key),
       );
-      window.dispatchEvent(new CustomEvent('app:ask-ai', { detail: prompt }));
+      onAskAi(prompt);
     },
-    [],
+    [onAskAi],
   );
 
   if (loading) {

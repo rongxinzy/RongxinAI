@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import { copyFile, mkdir, readdir, rename, rm, writeFile } from 'fs/promises';
+import { copyFile, mkdir, open, readdir, rename, rm, writeFile } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { setImmediate as yieldToMainLoop } from 'node:timers/promises';
@@ -163,6 +163,9 @@ export class LocalModelCatalog {
       await copyFile(base, staged);
       const db = new Database(staged);
       try {
+        // The staged copy is private until publication. Flush its final contents asynchronously.
+        db.pragma('journal_mode = MEMORY');
+        db.pragma('synchronous = OFF');
         db.exec('BEGIN');
         if (update.baseRevision === null) db.exec('DELETE FROM catalog_models');
         const remove = db.prepare('DELETE FROM catalog_models WHERE repo_id = ? COLLATE NOCASE');
@@ -187,6 +190,12 @@ export class LocalModelCatalog {
         db.exec('COMMIT');
       } finally {
         db.close();
+      }
+      const file = await open(staged, 'r+');
+      try {
+        await file.sync();
+      } finally {
+        await file.close();
       }
       await rename(staged, destination);
       await writeFile(pointer, String(update.revision), { flag: 'wx' });

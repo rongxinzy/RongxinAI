@@ -35,10 +35,6 @@ on:
         description: 'Release mode only: Windows is built by build-windows-release.yml'
         type: boolean
         default: false
-      linux-inference-editions:
-        description: 'Comma-separated Linux editions to build (cuda)'
-        type: string
-        default: 'cuda'
     secrets:
       CERTUM_USER_ID:
         required: false
@@ -82,7 +78,6 @@ jobs:
           BUILD_LINUX: ${{ inputs.build-linux }}
           WINDOWS_RELEASE_STAGED: ${{ inputs.windows-release-staged }}
           MODE: ${{ inputs.mode }}
-          LINUX_INFERENCE_EDITIONS: ${{ inputs.linux-inference-editions }}
         shell: bash
         run: |
           matrix='{"include":['
@@ -101,17 +96,8 @@ jobs:
           # Windows lite/cuda, Linux cuda only, macOS cpu/Metal (arm64 + x64) = 5 legs.
           # Keep in sync with scripts/release/inference-edition-targets.mjs.
           if [[ "$BUILD_LINUX" == "true" ]]; then
-            IFS=',' read -r -a linux_editions <<< "$LINUX_INFERENCE_EDITIONS"
-            for edition in "${linux_editions[@]}"; do
-              edition="${edition// /}"
-              if [[ -z "$edition" ]]; then continue; fi
-              if [[ "$edition" != 'cuda' ]]; then
-                echo "Unsupported Linux inference edition: $edition" >&2
-                exit 1
-              fi
-              matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-24.04\",\"artifact\":\"linux-${edition}-build\",\"runtime_target\":\"linux-x64\",\"inference_edition\":\"${edition}\",\"target\":\"linux-x64-${edition}\"}"
-              separator=','
-            done
+            matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-24.04\",\"artifact\":\"linux-cuda-build\",\"runtime_target\":\"linux-x64\",\"inference_edition\":\"cuda\",\"target\":\"linux-x64-cuda\"}"
+            separator=','
           fi
           if [[ "$BUILD_MACOS" == "true" ]]; then
             matrix+="${separator}{\"platform\":\"macos\",\"runner\":\"macos-latest\",\"artifact\":\"macos-arm64-cpu-build\",\"runtime_target\":\"mac-arm64\",\"arch\":\"arm64\",\"inference_edition\":\"cpu\",\"target\":\"darwin-arm64-cpu\"}"
@@ -290,7 +276,7 @@ jobs:
         if: ${{ always() && inputs.mode == 'verify' && matrix.platform == 'windows' }}
         uses: actions/upload-artifact@v6
         with:
-          name: shell-acceptance-${{ github.run_id }}
+          name: shell-acceptance-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}
           path: acceptance-diagnostics
           if-no-files-found: error
           retention-days: 7
@@ -298,7 +284,7 @@ jobs:
         if: ${{ always() && inputs.mode == 'release' && matrix.platform == 'windows' }}
         uses: actions/upload-artifact@v6
         with:
-          name: signed-shell-acceptance-${{ github.run_id }}
+          name: signed-shell-acceptance-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}
           path: acceptance-diagnostics
           if-no-files-found: error
           retention-days: 7

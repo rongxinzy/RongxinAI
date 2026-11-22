@@ -1,23 +1,12 @@
 /**
  * Channel map for the IM IPC contracts (gateway config, weixin login,
- * per-platform instances, feishu/dingtalk install), importable by the sandboxed
+ * per-platform instances and DingTalk setup), importable by the sandboxed
  * preload. Kept in a separate zod-free module because the preload bundle must
  * not require zod; the type arguments lock the maps to the contracts' channels.
  */
 import type { IpcContractChannels } from './contract';
-import type {
-  dingtalkInstallContract,
-  feishuInstallContract,
-  imContract,
-  imInstanceContract,
-} from './imContract';
-import {
-  DingTalkInstallIpc,
-  FeishuInstallIpc,
-  ImIpc,
-  ImInstanceIpc,
-  WeixinInstallIpc,
-} from './channels';
+import type { imContract, imInstanceContract } from './imContract';
+import { DingTalkInstallIpc, ImIpc, ImInstanceIpc, WeixinInstallIpc } from './channels';
 
 export const imContractChannels: IpcContractChannels<typeof imContract> = {
   getConfig: ImIpc.ConfigGet,
@@ -28,6 +17,8 @@ export const imContractChannels: IpcContractChannels<typeof imContract> = {
   testGateway: ImIpc.GatewayTest,
   getStatus: ImIpc.StatusGet,
   getLocalIp: ImIpc.GetLocalIp,
+  dingtalkLoginStart: DingTalkInstallIpc.Qrcode,
+  dingtalkLoginPoll: DingTalkInstallIpc.Poll,
   weixinLoginStart: WeixinInstallIpc.Start,
   weixinLoginPoll: WeixinInstallIpc.Poll,
 } as const;
@@ -52,14 +43,3 @@ export const imInstanceContractChannels: IpcContractChannels<typeof imInstanceCo
   deleteDiscordInstance: ImInstanceIpc.discordDelete,
   setDiscordInstanceConfig: ImInstanceIpc.discordSetConfig,
 } as const;
-
-export const feishuInstallContractChannels: IpcContractChannels<typeof feishuInstallContract> = {
-  verify: FeishuInstallIpc.Verify,
-} as const;
-
-export const dingtalkInstallContractChannels: IpcContractChannels<typeof dingtalkInstallContract> =
-  {
-    qrcode: DingTalkInstallIpc.Qrcode,
-    poll: DingTalkInstallIpc.Poll,
-    verify: DingTalkInstallIpc.Verify,
-  } as const;

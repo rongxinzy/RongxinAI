@@ -1,85 +1,46 @@
-import { ipcRenderer } from 'electron';
-
-import type { ContextMenuAction, ContextMenuOpenEvent } from '../../shared/contextMenu';
-import { AppUpdateIpc } from '../../shared/appUpdate/constants';
+import type { ContextMenuOpenEvent } from '../../shared/contextMenu';
+import { AppUpdateIpc, type AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import { DesktopPetIpc } from '../../shared/desktopPet/constants';
+import { desktopPetContractChannels } from '../../shared/desktopPet/contract.channels';
 import type { DesktopPetApi } from '../../shared/desktopPet/types';
-import { ContextMenuIpc, NetworkIpc, WindowIpc } from '../../shared/ipc/channels';
-import { appSystemContractChannels } from '../../shared/ipc/appSystemContract.channels';
-import type { appSystemContract } from '../../shared/ipc/appSystemContract';
-import type { IpcContractApi } from '../../shared/ipc/contract';
+import { ContextMenuIpc, WindowIpc } from '../../shared/ipc/channels';
+import type { appEventContract } from '../../shared/ipc/appEventContract';
+import { appEventChannels } from '../../shared/ipc/appEventContract.channels';
+import {
+  storeChannels,
+  permissionsChannels,
+  windowChannels,
+  dialogChannels,
+  projectChannels,
+  shellChannels,
+  autoLaunchChannels,
+  preventSleepChannels,
+  appInfoChannels,
+  appUpdateChannels,
+  logChannels,
+  appConfigChannels,
+  type AppSystemInvokers,
+} from '../../shared/ipc/appSystemContract.channels';
 import { onPush, onPushVoid } from './pushChannel';
-import { createIpcInvokers } from './createIpcInvokers';
-import { companionApi } from './companion';
-import type { CompanionWindowApi } from '../../shared/companion/types';
+import { createIpcEventSenders, createIpcInvokers } from './createIpcInvokers';
 
-type AppSystemContractApi = IpcContractApi<typeof appSystemContract>;
-const invokers = createIpcInvokers(appSystemContractChannels);
-
-// Rename a contract invoker to its preload-facing method name, keeping the
-// contract-derived signature.
-const asApi = <K extends keyof AppSystemContractApi>(method: K): AppSystemContractApi[K] =>
-  invokers[method] as AppSystemContractApi[K];
-
-/** Maps contract method names onto the preload-facing member names. */
-type Renamed<M extends Record<string, keyof AppSystemContractApi>> = {
-  [K in keyof M]: AppSystemContractApi[M[K]];
-};
-
-/** Contract invokers renamed to preload names, plus hand-wired members. */
-type WithExtra<E, M extends Record<string, keyof AppSystemContractApi>> = Renamed<M> & E;
+const events = createIpcEventSenders<typeof appEventContract>(appEventChannels);
 
 // App, window, dialog, shell, and other system-level bridges for the renderer.
-// Invoke methods come from the contract channel map via createIpcInvokers;
-// fire-and-forget sends (contextMenu.execute, window controls, network status)
-// and push subscriptions stay hand-wired below.
+// Invokes use the contract channel map. Renderer events use the same channels
+// as their main-side validation without loading zod into preload.
 export const appSystemApi = {
-  // Explicit member projection keeps the existing preload contract walker authoritative.
-  companion: {
-    visibility: companionApi.visibility,
-    bootstrap: companionApi.bootstrap,
-    select: companionApi.select,
-    submit: companionApi.submit,
-    answer: companionApi.answer,
-    stop: companionApi.stop,
-    submitTask: companionApi.submitTask,
-    tasks: companionApi.tasks,
-    stopTask: companionApi.stopTask,
-    chooseWorkspace: companionApi.chooseWorkspace,
-    chooseFiles: companionApi.chooseFiles,
-    stageFile: companionApi.stageFile,
-    listMemories: companionApi.listMemories,
-    saveMemory: companionApi.saveMemory,
-    confirmMemory: companionApi.confirmMemory,
-    forgetMemory: companionApi.forgetMemory,
-    shareMemory: companionApi.shareMemory,
-    hide: companionApi.hide,
-    openWorkbench: companionApi.openWorkbench,
-    onFocus: companionApi.onFocus,
-    onContext: companionApi.onContext,
-    onVisibility: companionApi.onVisibility,
-    onTasks: companionApi.onTasks,
-    onChanged: companionApi.onChanged,
-    onWorkbench: companionApi.onWorkbench,
-  },
   desktopPet: {
-    getSettings: () => ipcRenderer.invoke(DesktopPetIpc.GetSettings),
-    setSettings: patch => ipcRenderer.invoke(DesktopPetIpc.SetSettings, patch),
-    getPendingTask: () => ipcRenderer.invoke(DesktopPetIpc.GetPendingTask),
-    resolveTask: (requestId, result) =>
-      ipcRenderer.invoke(DesktopPetIpc.ResolveTask, requestId, result),
+    ...createIpcInvokers(desktopPetContractChannels),
     onSettingsChanged: listener => onPush(DesktopPetIpc.SettingsChanged, listener),
     onOpenTask: listener => onPush(DesktopPetIpc.OpenTask, listener),
-  },
+  } as DesktopPetApi,
   store: {
-    get: asApi('storeGet'),
-    set: asApi('storeSet'),
-    remove: asApi('storeRemove'),
+    ...(createIpcInvokers(storeChannels) as AppSystemInvokers<typeof storeChannels>),
   },
 
   permissions: {
-    checkCalendar: asApi('permissionsCheckCalendar'),
-    requestCalendar: asApi('permissionsRequestCalendar'),
+    ...(createIpcInvokers(permissionsChannels) as AppSystemInvokers<typeof permissionsChannels>),
   },
 
   // Internal app-level events (replaces raw ipcRenderer.on usage in App.tsx)
@@ -89,20 +50,17 @@ export const appSystemApi = {
   },
 
   contextMenu: {
-    execute: (action: ContextMenuAction) => ipcRenderer.send(ContextMenuIpc.Execute, action),
+    execute: events.contextMenuExecute,
     onOpen: (callback: (event: ContextMenuOpenEvent) => void) =>
       onPush<ContextMenuOpenEvent>(ContextMenuIpc.Open, callback),
   },
 
   window: {
-    minimize: () => ipcRenderer.send(WindowIpc.Minimize),
-    toggleMaximize: () => ipcRenderer.send(WindowIpc.ToggleMaximize),
-    close: () => ipcRenderer.send(WindowIpc.Close),
-    isMaximized: asApi('windowIsMaximized'),
-    showSystemMenu: (position: { x: number; y: number }) =>
-      ipcRenderer.send(WindowIpc.ShowSystemMenu, position),
-    toggleDevTools: asApi('windowToggleDevTools'), // 切换调试面板
-    openDevTools: asApi('windowOpenDevTools'),
+    minimize: events.windowMinimize,
+    toggleMaximize: events.windowToggleMaximize,
+    close: events.windowClose,
+    ...(createIpcInvokers(windowChannels) as AppSystemInvokers<typeof windowChannels>),
+    showSystemMenu: events.windowShowSystemMenu,
     onStateChanged: (
       callback: (state: {
         isMaximized: boolean;
@@ -112,77 +70,41 @@ export const appSystemApi = {
     ) => onPush(WindowIpc.StateChanged, callback),
   },
 
-  checkApiConfig: asApi('checkApiConfig'),
-  generateSessionTitle: asApi('generateSessionTitle'),
-  getRecentCwds: asApi('getRecentCwds'),
+  ...(createIpcInvokers(appConfigChannels) as AppSystemInvokers<typeof appConfigChannels>),
 
   dialog: {
-    selectDirectory: asApi('dialogSelectDirectory'),
-    selectFile: asApi('dialogSelectFile'),
-    selectFiles: asApi('dialogSelectFiles'),
-    saveInlineFile: asApi('dialogSaveInlineFile'),
-    readFileAsDataUrl: asApi('dialogReadFileAsDataUrl'),
-    checkArtifactFile: asApi('dialogCheckArtifactFile'),
-    generateThumbnail: asApi('dialogGenerateThumbnail'),
-    showMessageBox: asApi('dialogShowMessageBox'),
+    ...(createIpcInvokers(dialogChannels) as AppSystemInvokers<typeof dialogChannels>),
   },
 
   project: {
-    getDefaultBaseDir: asApi('projectGetDefaultBaseDir'),
-    createDirectory: asApi('projectCreateDirectory'),
-    ensureScratchDir: asApi('projectEnsureScratchDir'),
-    createRandomWorkspace: asApi('projectCreateRandomWorkspace'),
+    ...(createIpcInvokers(projectChannels) as AppSystemInvokers<typeof projectChannels>),
   },
 
   shell: {
-    openPath: asApi('shellOpenPath'),
-    showItemInFolder: asApi('shellShowItemInFolder'),
-    openExternal: asApi('shellOpenExternal'),
-    openHtmlInBrowser: asApi('shellOpenHtmlInBrowser'),
-    resolveLocalPath: asApi('shellResolveLocalPath'),
+    ...(createIpcInvokers(shellChannels) as AppSystemInvokers<typeof shellChannels>),
   },
 
   autoLaunch: {
-    get: asApi('autoLaunchGet'),
-    set: asApi('autoLaunchSet'),
+    ...(createIpcInvokers(autoLaunchChannels) as AppSystemInvokers<typeof autoLaunchChannels>),
   },
 
   preventSleep: {
-    get: asApi('preventSleepGet'),
-    set: asApi('preventSleepSet'),
+    ...(createIpcInvokers(preventSleepChannels) as AppSystemInvokers<typeof preventSleepChannels>),
   },
 
   appInfo: {
-    getVersion: asApi('appGetVersion'),
-    isDev: asApi('appIsDev'),
-    isEnterprise: asApi('appIsEnterprise'),
-    getSystemLocale: asApi('appGetSystemLocale'),
-    getInferenceEdition: asApi('appGetInferenceEdition'),
-    usesBundledLlamaCppRuntime: asApi('appUsesBundledLlamaCppRuntime'),
-    relaunch: asApi('appRelaunch'),
+    ...(createIpcInvokers(appInfoChannels) as AppSystemInvokers<typeof appInfoChannels>),
   },
 
   appUpdate: {
-    getChannel: asApi('appUpdateGetChannel'),
-    setChannel: asApi('appUpdateSetChannel'),
-    getState: asApi('appUpdateGetState'),
-    checkNow: asApi('appUpdateCheckNow'),
-    retryDownload: asApi('appUpdateRetryDownload'),
-    pauseDownload: asApi('appUpdatePauseDownload'),
-    resumeDownload: asApi('appUpdateResumeDownload'),
-    cancelDownload: asApi('appUpdateCancelDownload'),
-    installReady: asApi('appUpdateInstallReady'),
-    revealDownload: asApi('appUpdateRevealDownload'),
-    onStateChanged: (callback: (data: unknown) => void) =>
+    ...(createIpcInvokers(appUpdateChannels) as AppSystemInvokers<typeof appUpdateChannels>),
+    onStateChanged: (callback: (data: AppUpdateRuntimeState) => void) =>
       onPush(AppUpdateIpc.StateChanged, callback),
   },
 
   log: {
-    getPath: asApi('logGetPath'),
-    openFolder: asApi('logOpenFolder'),
-    exportZip: asApi('logExportZip'),
-    fromRenderer: (level: string, tag: string, message: string) =>
-      ipcRenderer.send('log:fromRenderer', level, tag, message),
+    ...(createIpcInvokers(logChannels) as AppSystemInvokers<typeof logChannels>),
+    fromRenderer: events.logFromRenderer,
   },
 
   runtimeNotices: {
@@ -192,114 +114,6 @@ export const appSystemApi = {
   },
 
   networkStatus: {
-    send: (status: 'online' | 'offline') => ipcRenderer.send(NetworkIpc.StatusChange, status),
+    send: events.networkStatusChange,
   },
-} satisfies {
-  desktopPet: DesktopPetApi;
-  companion: CompanionWindowApi;
-  appEvents: {
-    onOpenSettings: (callback: () => void) => () => void;
-    onNewTask: (callback: () => void) => () => void;
-  };
-  contextMenu: {
-    execute: (action: ContextMenuAction) => void;
-    onOpen: (callback: (event: ContextMenuOpenEvent) => void) => () => void;
-  };
-  runtimeNotices: {
-    onNotice: (
-      callback: (notice: import('../../common/runtimeNotice').RuntimeRetryNotice) => void,
-    ) => () => void;
-  };
-  networkStatus: {
-    send: (status: 'online' | 'offline') => void;
-  };
-  store: Renamed<{ get: 'storeGet'; set: 'storeSet'; remove: 'storeRemove' }>;
-  permissions: Renamed<{
-    checkCalendar: 'permissionsCheckCalendar';
-    requestCalendar: 'permissionsRequestCalendar';
-  }>;
-  window: WithExtra<
-    {
-      minimize: () => void;
-      toggleMaximize: () => void;
-      close: () => void;
-      showSystemMenu: (position: { x: number; y: number }) => void;
-      onStateChanged: (
-        callback: (state: {
-          isMaximized: boolean;
-          isFullscreen: boolean;
-          isFocused: boolean;
-        }) => void,
-      ) => () => void;
-    },
-    {
-      isMaximized: 'windowIsMaximized';
-      toggleDevTools: 'windowToggleDevTools';
-      openDevTools: 'windowOpenDevTools';
-    }
-  >;
-  checkApiConfig: AppSystemContractApi['checkApiConfig'];
-  generateSessionTitle: AppSystemContractApi['generateSessionTitle'];
-  getRecentCwds: AppSystemContractApi['getRecentCwds'];
-  dialog: Renamed<{
-    selectDirectory: 'dialogSelectDirectory';
-    selectFile: 'dialogSelectFile';
-    selectFiles: 'dialogSelectFiles';
-    saveInlineFile: 'dialogSaveInlineFile';
-    readFileAsDataUrl: 'dialogReadFileAsDataUrl';
-    checkArtifactFile: 'dialogCheckArtifactFile';
-    generateThumbnail: 'dialogGenerateThumbnail';
-    showMessageBox: 'dialogShowMessageBox';
-  }>;
-  project: Renamed<{
-    getDefaultBaseDir: 'projectGetDefaultBaseDir';
-    createDirectory: 'projectCreateDirectory';
-    ensureScratchDir: 'projectEnsureScratchDir';
-    createRandomWorkspace: 'projectCreateRandomWorkspace';
-  }>;
-  shell: Renamed<{
-    openPath: 'shellOpenPath';
-    showItemInFolder: 'shellShowItemInFolder';
-    openExternal: 'shellOpenExternal';
-    openHtmlInBrowser: 'shellOpenHtmlInBrowser';
-    resolveLocalPath: 'shellResolveLocalPath';
-  }>;
-  autoLaunch: Renamed<{ get: 'autoLaunchGet'; set: 'autoLaunchSet' }>;
-  preventSleep: Renamed<{ get: 'preventSleepGet'; set: 'preventSleepSet' }>;
-  appInfo: Renamed<{
-    getVersion: 'appGetVersion';
-    isDev: 'appIsDev';
-    isEnterprise: 'appIsEnterprise';
-    getSystemLocale: 'appGetSystemLocale';
-    getInferenceEdition: 'appGetInferenceEdition';
-    usesBundledLlamaCppRuntime: 'appUsesBundledLlamaCppRuntime';
-    relaunch: 'appRelaunch';
-  }>;
-  appUpdate: WithExtra<
-    {
-      onStateChanged: (callback: (data: unknown) => void) => () => void;
-    },
-    {
-      getChannel: 'appUpdateGetChannel';
-      setChannel: 'appUpdateSetChannel';
-      getState: 'appUpdateGetState';
-      checkNow: 'appUpdateCheckNow';
-      retryDownload: 'appUpdateRetryDownload';
-      pauseDownload: 'appUpdatePauseDownload';
-      resumeDownload: 'appUpdateResumeDownload';
-      cancelDownload: 'appUpdateCancelDownload';
-      installReady: 'appUpdateInstallReady';
-      revealDownload: 'appUpdateRevealDownload';
-    }
-  >;
-  log: WithExtra<
-    {
-      fromRenderer: (level: string, tag: string, message: string) => void;
-    },
-    {
-      getPath: 'logGetPath';
-      openFolder: 'logOpenFolder';
-      exportZip: 'logExportZip';
-    }
-  >;
 };

@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
-import { open, realpath } from 'node:fs/promises';
+import { realpath } from 'node:fs/promises';
 import path from 'node:path';
 import type { PythonSkillDependencies } from '../../shared/pythonRuntime';
+import { readBoundedFile } from '../libs/boundedFileRead';
 
 const NAME = '[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?';
 const REQUIREMENT = new RegExp(`^(${NAME})(?:[ \\t]*\\[([^\\]]+)\\])?[ \\t]*(.*)$`);
@@ -239,28 +240,6 @@ function lockedRequirements(content: string): string[] {
   return [...new Set(requirements)];
 }
 
-async function boundedRead(filePath: string, limit: number, signal: AbortSignal): Promise<Buffer> {
-  signal.throwIfAborted();
-  const file = await open(filePath, 'r');
-  try {
-    const info = await file.stat();
-    if (!info.isFile() || info.size > limit) throw manifestError('file exceeds its size limit.');
-    const buffer = Buffer.alloc(limit + 1);
-    let size = 0;
-    while (size < buffer.byteLength) {
-      signal.throwIfAborted();
-      const { bytesRead } = await file.read(buffer, size, buffer.byteLength - size, null);
-      if (bytesRead === 0) break;
-      size += bytesRead;
-    }
-    signal.throwIfAborted();
-    if (size > limit) throw manifestError('file exceeds its size limit.');
-    return buffer.subarray(0, size);
-  } finally {
-    await file.close();
-  }
-}
-
 function sharedRuntimeRoot(sharedPythonPath: string): string {
   const executableDirectory = path.dirname(path.resolve(sharedPythonPath));
   const environmentRoot = ['bin', 'scripts'].includes(
@@ -307,7 +286,7 @@ async function readDeltaLock(
   if (realLocksRoot !== locksRoot || !within(realLocksRoot, lockPath)) {
     throw manifestError('delta lock must remain inside its locks directory.');
   }
-  const bytes = await boundedRead(lockPath, MAX_LOCK_BYTES, signal);
+  const bytes = await readBoundedFile(lockPath, MAX_LOCK_BYTES, signal);
   const digest = sha256(bytes);
   if (digest !== delta.sha256.toLowerCase()) throw manifestError('delta lock hash does not match.');
   const content = bytes.toString('utf8');
@@ -327,8 +306,8 @@ export async function resolveSkillRequirements(
     }
     const root = sharedRuntimeRoot(sharedPythonPath);
     const [requirementsBytes, manifestBytes] = await Promise.all([
-      boundedRead(skill.requirementsPath, MAX_REQUIREMENT_BYTES, signal),
-      boundedRead(
+      readBoundedFile(skill.requirementsPath, MAX_REQUIREMENT_BYTES, signal),
+      readBoundedFile(
         path.join(root, 'skills', skill.skillId, 'runtime.json'),
         MAX_MANIFEST_BYTES,
         signal,

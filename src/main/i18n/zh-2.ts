@@ -1,4 +1,5 @@
 export const zhMain2 = {
+  coworkSessionNotFound: '此会话已不存在。',
   coworkWorkContextWindowTooSmall:
     '模型「{model}」的上下文长度为 {current} tokens，工作模式至少需要 {required} tokens。请选择上下文更长的模型，或切换到聊天模式。',
   coworkReasoningOutputTruncated:
@@ -42,12 +43,6 @@ export const zhMain2 = {
   llamacppModelLoadInProgress: '已有模型正在加载，请等待完成后再试。',
   llamacppServiceStartupPortInUse:
     '本地推理服务端口已被占用，请检查端口设置或关闭占用端口的程序后重试。',
-  llamacppServiceStartupProcessExited: '本地推理服务启动后异常退出，请稍后重试。',
-  llamacppServiceStartupTimeout: '本地推理服务启动超时，请稍后重试。',
-  llamacppServiceStartupBackendUnavailable:
-    '当前本地推理运行时后端不可用，请检查显卡驱动或运行时配置。',
-  llamacppServiceStartupRuntimeDamaged:
-    '本地推理 runtime 不可用或可能已损坏，请重新安装应用后重试。',
   llamacppServiceStartupUnknown: '本地推理服务启动失败，请稍后重试。',
   llamacppModelLaunchLogWindowTitle: '模型启动日志',
   localInferenceImportRuntimeDialogTitle: '选择本地推理 backend',

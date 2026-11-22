@@ -12,7 +12,10 @@
     "dotenv": "^16.6.1",
     "imap": "^0.8.19",
     "mailparser": "^3.9.3",
-    "nodemailer": "^7.0.13"
+    "nodemailer": "10.6.0"
+  },
+  "overrides": {
+    "semver": "5.7.2"
   },
   "keywords": [
     "imap",

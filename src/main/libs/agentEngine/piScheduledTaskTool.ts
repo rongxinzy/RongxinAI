@@ -13,7 +13,7 @@ export function buildPiScheduledTaskTool(input: {
   workspaceId?: string | null;
   sessionKey?: string | null;
   /** Delivery used when the model omits it (e.g. back to the IM chat). */
-  defaultDelivery?: ScheduledTaskDelivery | null;
+  getDefaultDelivery?: () => ScheduledTaskDelivery | null;
 }): Record<string, unknown> {
   return {
     name: 'scheduled_task',
@@ -58,24 +58,22 @@ export function buildPiScheduledTaskTool(input: {
           : undefined;
       const normalizedDelivery = validateDelivery(delivery);
       if (normalizedDelivery.ok === false) return failure(normalizedDelivery.error);
-      const effectiveDelivery =
-        delivery === undefined && input.defaultDelivery
-          ? input.defaultDelivery
-          : normalizedDelivery.value;
-      const taskInput: ScheduledTaskInput = {
-        name,
-        description: typeof params.description === 'string' ? params.description.trim() : message,
-        enabled: true,
-        schedule: normalizedSchedule.value,
-        sessionTarget: SessionTarget.Main,
-        wakeMode: WakeMode.Now,
-        payload: { kind: PayloadKind.AgentTurn, message },
-        delivery: effectiveDelivery,
-        workspaceId: input.workspaceId ?? null,
-        sessionKey: input.sessionKey ?? null,
-      };
       try {
-        const task = await input.service.addJob(taskInput);
+        const task = await input.service.addJob({
+          name,
+          description: typeof params.description === 'string' ? params.description.trim() : message,
+          enabled: true,
+          schedule: normalizedSchedule.value,
+          sessionTarget: SessionTarget.Main,
+          wakeMode: WakeMode.Now,
+          payload: { kind: PayloadKind.AgentTurn, message },
+          delivery:
+            delivery === undefined
+              ? (input.getDefaultDelivery?.() ?? normalizedDelivery.value)
+              : normalizedDelivery.value,
+          workspaceId: input.workspaceId ?? null,
+          sessionKey: input.sessionKey ?? null,
+        });
         return {
           content: [{ type: 'text', text: `Scheduled task created: ${task.name}` }],
           details: { taskId: task.id },

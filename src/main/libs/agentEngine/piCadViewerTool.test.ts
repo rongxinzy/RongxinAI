@@ -1,5 +1,6 @@
-import { expect, test, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 
+import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { buildPiCadViewerTool, PiCadViewerService, PiCadViewerToolName } from './piCadViewerTool';
 
 vi.mock('../skillRuntimeRunner', () => ({
@@ -9,8 +10,8 @@ vi.mock('../skillRuntimeRunner', () => ({
 
 import { runManagedSkillScript, startManagedSkillProcess } from '../skillRuntimeRunner';
 
-test('starts the CAD viewer through the managed process runner and reuses it', async () => {
-  const stop = vi.fn().mockResolvedValue(undefined);
+beforeEach(() => {
+  vi.resetAllMocks();
   vi.mocked(runManagedSkillScript).mockResolvedValue({
     ok: true,
     status: 'completed',
@@ -24,6 +25,10 @@ test('starts the CAD viewer through the managed process runner and reuses it', a
     durationMs: 1,
     timedOut: false,
   });
+});
+
+function mockViewer(overrides: Partial<Awaited<ReturnType<typeof startManagedSkillProcess>>> = {}) {
+  const stop = vi.fn().mockResolvedValue(undefined);
   vi.mocked(startManagedSkillProcess).mockResolvedValue({
     pid: 123,
     isRunning: () => true,
@@ -33,7 +38,13 @@ test('starts the CAD viewer through the managed process runner and reuses it', a
     scriptPath: '/skills/text-to-cad/viewer.py',
     waitForOutput: vi.fn().mockResolvedValue({ stdout: 'listening on 3245', stderr: '' }),
     stop,
+    ...overrides,
   });
+  return stop;
+}
+
+test('starts the CAD viewer through the managed process runner and reuses it', async () => {
+  const stop = mockViewer();
   const service = new PiCadViewerService();
   const tool = buildPiCadViewerTool({
     workspaceRoot: '/workspace',
@@ -51,4 +62,33 @@ test('starts the CAD viewer through the managed process runner and reuses it', a
   expect(stop).not.toHaveBeenCalled();
   await service.stop();
   expect(stop).toHaveBeenCalledOnce();
+});
+
+test('Pi shutdown cancels a starting viewer and waits for the owned process stop', async () => {
+  const readiness = Promise.withResolvers<{ stdout: string; stderr: string }>();
+  const processExited = Promise.withResolvers<void>();
+  const waitForOutput = vi.fn(() => readiness.promise);
+  const stop = vi.fn(() => processExited.promise);
+  mockViewer({ waitForOutput, stop });
+  const runtime = new PiRuntimeAdapter();
+  const options = { workspaceRoot: '/workspace', skillRoot: '/skills' };
+  const start = runtime.cadViewerService.start(options);
+  const startOutcome = start.catch((error: unknown) => error);
+  await vi.waitFor(() => expect(waitForOutput).toHaveBeenCalledOnce());
+
+  let stopped = false;
+  const shutdown = runtime.shutdown();
+  const viewerStopped = shutdown.viewerStopped.then(() => {
+    stopped = true;
+  });
+  await shutdown.drained;
+  await vi.waitFor(() => expect(stop).toHaveBeenCalled());
+  readiness.resolve({ stdout: 'ready', stderr: '' });
+  await expect(runtime.cadViewerService.start(options)).rejects.toThrow('shutting down');
+  expect(stopped).toBe(false);
+
+  processExited.resolve();
+  await expect(startOutcome).resolves.toMatchObject({ name: 'AbortError' });
+  await viewerStopped;
+  expect(stopped).toBe(true);
 });

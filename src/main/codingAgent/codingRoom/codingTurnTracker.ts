@@ -10,7 +10,7 @@ export class CodingTurnTracker {
   private readonly laneTurnGenerations = new Map<string, number>();
   private readonly cancelledTurnGenerations = new Map<string, number>();
   private readonly stagedLaneIds = new Set<string>();
-  private readonly inFlightTurns = new Set<Promise<void>>();
+  private readonly inFlightTurns = new Set<Promise<unknown>>();
 
   stageLane(laneId: string): void {
     this.stagedLaneIds.add(laneId);
@@ -38,6 +38,13 @@ export class CodingTurnTracker {
     return turnGeneration;
   }
 
+  isCurrentTurn(laneId: string, turnGeneration: number): boolean {
+    return (
+      this.laneTurnGenerations.get(laneId) === turnGeneration &&
+      this.cancelledTurnGenerations.get(laneId) !== turnGeneration
+    );
+  }
+
   /** Whether this generation was cancelled and not yet consumed. */
   consumeCancelledTurn(laneId: string, turnGeneration: number): boolean {
     if (this.cancelledTurnGenerations.get(laneId) !== turnGeneration) {
@@ -47,7 +54,7 @@ export class CodingTurnTracker {
     return true;
   }
 
-  trackTurn(turn: Promise<void>): void {
+  trackTurn(turn: Promise<unknown>): void {
     const tracked = turn
       .catch(error => {
         // runTurn records turn failures itself; a rejection here means the

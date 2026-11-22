@@ -4,18 +4,10 @@ import path from 'node:path';
 const DAEMON_REGISTRY_FILE = 'llamacpp-model-daemon.json';
 const DAEMON_REGISTRY_VERSION = 1;
 
-export type LlamaCppModelDaemonRegistry = {
-  version: 1;
+export type LlamaCppModelDaemonRegistryIdentity = {
   pid: number;
   controlPort: number;
-  gatewayPort: number;
   startedAt: string;
-  models: Array<{
-    modelName: string;
-    modelPath: string;
-    port: number;
-    logSessionId: string;
-  }>;
 };
 
 export function getLlamaCppModelDaemonRegistryPath(userDataPath: string): string {
@@ -24,7 +16,7 @@ export function getLlamaCppModelDaemonRegistryPath(userDataPath: string): string
 
 export async function readLlamaCppModelDaemonRegistry(
   userDataPath: string,
-): Promise<LlamaCppModelDaemonRegistry | null> {
+): Promise<LlamaCppModelDaemonRegistryIdentity | null> {
   try {
     const raw = await fs.readFile(getLlamaCppModelDaemonRegistryPath(userDataPath), 'utf8');
     return parseLlamaCppModelDaemonRegistry(JSON.parse(raw) as unknown);
@@ -35,58 +27,50 @@ export async function readLlamaCppModelDaemonRegistry(
 
 export async function writeLlamaCppModelDaemonRegistry(
   userDataPath: string,
-  registry: LlamaCppModelDaemonRegistry,
+  identity: LlamaCppModelDaemonRegistryIdentity,
 ): Promise<void> {
   const targetPath = getLlamaCppModelDaemonRegistryPath(userDataPath);
   await fs.mkdir(path.dirname(targetPath), { recursive: true });
   const temporaryPath = `${targetPath}.tmp`;
-  await fs.writeFile(temporaryPath, JSON.stringify(registry), 'utf8');
+  await fs.writeFile(
+    temporaryPath,
+    JSON.stringify({ version: DAEMON_REGISTRY_VERSION, ...identity }),
+    'utf8',
+  );
   await fs.rename(temporaryPath, targetPath);
 }
 
-function parseLlamaCppModelDaemonRegistry(value: unknown): LlamaCppModelDaemonRegistry | null {
+export async function removeLlamaCppModelDaemonRegistry(
+  userDataPath: string,
+  identity: LlamaCppModelDaemonRegistryIdentity,
+): Promise<void> {
+  const current = await readLlamaCppModelDaemonRegistry(userDataPath);
+  if (
+    current?.pid === identity.pid &&
+    current.startedAt === identity.startedAt &&
+    current.controlPort === identity.controlPort
+  ) {
+    await fs.rm(getLlamaCppModelDaemonRegistryPath(userDataPath), { force: true });
+  }
+}
+
+function parseLlamaCppModelDaemonRegistry(
+  value: unknown,
+): LlamaCppModelDaemonRegistryIdentity | null {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Record<string, unknown>;
   if (
     candidate.version !== DAEMON_REGISTRY_VERSION ||
     !isPort(candidate.controlPort) ||
-    !isPort(candidate.gatewayPort) ||
     !isPositiveInteger(candidate.pid) ||
-    typeof candidate.startedAt !== 'string' ||
-    !Array.isArray(candidate.models)
+    typeof candidate.startedAt !== 'string'
   ) {
     return null;
   }
-  const models = candidate.models
-    .map(parseModel)
-    .filter((model): model is NonNullable<typeof model> => Boolean(model));
-  if (models.length !== candidate.models.length) return null;
   return {
-    version: DAEMON_REGISTRY_VERSION,
     pid: candidate.pid,
     controlPort: candidate.controlPort,
-    gatewayPort: candidate.gatewayPort,
     startedAt: candidate.startedAt,
-    models,
-  };
-}
-
-function parseModel(value: unknown) {
-  if (!value || typeof value !== 'object') return null;
-  const candidate = value as Record<string, unknown>;
-  if (
-    typeof candidate.modelName !== 'string' ||
-    typeof candidate.modelPath !== 'string' ||
-    typeof candidate.logSessionId !== 'string' ||
-    !isPort(candidate.port)
-  ) {
-    return null;
-  }
-  return {
-    modelName: candidate.modelName,
-    modelPath: candidate.modelPath,
-    port: candidate.port,
-    logSessionId: candidate.logSessionId,
   };
 }
 

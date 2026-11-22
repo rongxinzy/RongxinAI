@@ -71,8 +71,6 @@ const config: KnipConfig = {
     'src/main/libs/appUpdateCoordinator.testHarness.ts': ['files'],
     'src/main/magpie/manager.testHarness.ts': ['files'],
     'src/main/im/__tests__/**': ['files'],
-    // Opt-in Magpie SMOKE (`integration.test.ts` dynamic import); not bundled in app.
-    'src/main/magpie/__fixtures__/durableProvider.ts': ['files'],
   },
   tags: baseConfig.tags,
   ignoreUnresolved: baseConfig.ignoreUnresolved,

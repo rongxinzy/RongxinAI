@@ -14,9 +14,11 @@ import type { ConversationHistoryService } from '../../conversationHistory/servi
 import type { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
 import type { ProjectMemoryService } from '../../memory/projectMemoryService';
 import type { SessionMemoryCompletion } from '../../memory/sessionMemoryExtractor';
+import type { BundledPresetMember } from '../../presetExpertSnapshot';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import type { ScheduledTaskDelivery } from '../../../scheduledTask/types';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
+import type { MagpieModelService } from '../../magpie/modelService';
 import type { PiMcpServerSource } from './piMcpExtensionBridge';
 import type { PiAssistantTranscript } from './piAssistantTranscript';
 import type { PiCadViewerService } from './piCadViewerTool';
@@ -28,6 +30,7 @@ import type { PiToolAuthorizationInput, PiToolAuthorizationResult } from './piTo
 import type { PiContinueOptions, PiStartOptions } from './piRuntimeTypes';
 
 export interface PiRuntimeAdapterHost {
+  readonly modelService: MagpieModelService | undefined;
   /** Live Pi sessions, keyed by Cowork session id. */
   readonly activeSessions: Map<string, ActivePiSession>;
   /** Sessions still creating their Pi counterpart; abortable by id. */
@@ -47,9 +50,9 @@ export interface PiRuntimeAdapterHost {
   /** Throttled Cowork transcript writes for assistant/thinking/tool messages. */
   readonly transcript: PiAssistantTranscript;
 
-  // Late-bound services, injected through the adapter's setters.
-  getStore(): CoworkStore | null;
-  getWorkbenchTaskService(): WorkbenchTaskService | null;
+  // Startup dependencies of the adapter.
+  getStore(sessionId?: string): CoworkStore | null;
+  getWorkbenchTaskService(sessionId?: string): WorkbenchTaskService | null;
   /** Shared event-time artifact ledger; null when artifact recording is off. */
   getArtifactLedger(): ArtifactLedger | null;
   getProjectMemoryService(): ProjectMemoryService | null;
@@ -69,28 +72,32 @@ export interface PiRuntimeAdapterHost {
 
   // Session-scoped helpers implemented by the adapter.
   getSessionMemoryCompletion(sessionId: string): SessionMemoryCompletion | null;
-  resolveBundledMemberProfiles(
-    presetId: string,
-  ): Array<{ id: string; description: string; systemPrompt: string }> | null;
-  getPiAgentsDir(): string;
+  readPresetMembers(presetId: string, signal: AbortSignal): Promise<BundledPresetMember[]>;
   persistImageAttachments(
     sessionId: string,
     attachments: PiStartOptions['imageAttachments'],
-  ): PiStartOptions['imageAttachments'];
+    signal: AbortSignal,
+    isCurrent: () => boolean,
+  ): Promise<PiStartOptions['imageAttachments']>;
 
   // Lifecycle operations the extracted modules call back into.
   evictIdleSessions(): void;
   stopActiveSession(sessionId: string, reason: string, cause?: CoworkInterruptionCause): void;
+  stopNativeSession(sessionId: string, active: ActivePiSession): void;
+  trackNativeSessionStop(sessionId: string, stop: Promise<void>): void;
+  waitForNativeSessionStop(sessionId: string): Promise<void> | undefined;
   disposeSessionForRecreation(sessionId: string, active: ActivePiSession): void;
+  waitForPriorArtifactCapture(sessionId: string): Promise<void> | undefined;
   /** Deletes the session's Pi JSONL directory (divergence or session delete). */
-  invalidatePiSessionDir(sessionId: string): void;
-  startSession(sessionId: string, prompt: string, options?: PiStartOptions): Promise<void>;
+  invalidatePiSessionDir(sessionId: string, piHistoryKey?: string | null): Promise<void>;
+  launchSession(sessionId: string, prompt: string, options: PiStartOptions): Promise<void>;
   continueSession(sessionId: string, prompt: string, options?: PiContinueOptions): Promise<void>;
   isSessionActive(sessionId: string): boolean;
   isSessionRunning(sessionId: string): boolean;
   /** Stored-session fallback for queue gates when no live session exists. */
   isStoredSessionWorkMode(sessionId: string): boolean;
   authorizeToolCall(input: PiToolAuthorizationInput): Promise<PiToolAuthorizationResult>;
+  clearToolPermissionsBySession(sessionId: string): void;
 
   emit(event: string, ...args: unknown[]): void;
 }

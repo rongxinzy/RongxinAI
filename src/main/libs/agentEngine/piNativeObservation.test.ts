@@ -207,7 +207,7 @@ test('real native queues preserve consecutive steering inputs, follow-ups and im
   const host = {
     activeSessions: new Map([['native-queue', active]]),
     isSessionRunning: () => true,
-    persistImageAttachments: (_id: string, images: unknown) => images,
+    persistImageAttachments: async (_id: string, images: unknown) => images,
     recovery: {
       imageInputVerdictForActive: () => ImageInputVerdict.Supported,
       reportOmittedImages: vi.fn(),
@@ -227,9 +227,11 @@ test('real native queues preserve consecutive steering inputs, follow-ups and im
   });
   let running: Promise<void> | undefined;
   try {
-    queue.enqueuePendingMessage('native-queue', 'Start', [
-      { name: 'image.png', mimeType: 'image/png', base64Data: pngData() },
-    ]);
+    await expect(
+      queue.enqueuePendingMessage('native-queue', 'Start', [
+        { name: 'image.png', mimeType: 'image/png', base64Data: pngData() },
+      ]),
+    ).resolves.toMatchObject({ success: true });
     await vi.waitFor(() => expect(session.getFollowUpMessages()).toEqual(['Start']));
     running = session.prompt('Start');
     await fixture.firstRequest;
@@ -237,10 +239,15 @@ test('real native queues preserve consecutive steering inputs, follow-ups and im
     expect(queue.list('native-queue')).toEqual([
       expect.objectContaining({ text: 'Start', imageAttachments: expect.any(Array) }),
     ]);
-    queue.enqueuePendingMessage('native-queue', 'Final follow-up');
+    await expect(
+      queue.enqueuePendingMessage('native-queue', 'Final follow-up'),
+    ).resolves.toMatchObject({
+      success: true,
+    });
     expect((await queue.steerInput('native-queue', 'First steer')).success).toBe(true);
     expect((await queue.steerInput('native-queue', 'Second steer')).success).toBe(true);
     expect(session.getSteeringMessages()).toEqual(['First steer', 'Second steer']);
+    expect(recorded).toEqual([]);
     fixture.release();
     await running;
     expect(recorded).toEqual(['First steer', 'Second steer', 'Start', 'Final follow-up']);
@@ -336,17 +343,17 @@ test('native follow-ups see and gain access to their own newly selected Skills i
   });
   let running: Promise<void> | undefined;
   try {
-    expect(
+    await expect(
       queue.enqueuePendingMessage(sessionId, 'Use beta', undefined, undefined, ['beta']),
-    ).toEqual(expect.objectContaining({ success: true }));
+    ).resolves.toMatchObject({ success: true });
     await vi.waitFor(() => expect(session.getFollowUpMessages()).toHaveLength(1));
     expect(visibleRequests).toHaveLength(0);
     running = session.prompt('Start');
     await fixture.firstRequest;
     expect(visibleRequests[0].content).toContain('<name>alpha</name>');
-    expect(
+    await expect(
       queue.enqueuePendingMessage(sessionId, 'Use CAD', undefined, undefined, ['text-to-cad']),
-    ).toEqual(expect.objectContaining({ success: true }));
+    ).resolves.toMatchObject({ success: true });
     expect(resourceState.skillIds).toEqual(['alpha']);
     await vi.waitFor(() => expect(session.getFollowUpMessages()).toHaveLength(2));
     fixture.release();

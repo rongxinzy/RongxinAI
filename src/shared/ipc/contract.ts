@@ -87,6 +87,20 @@ export type IpcContractHandlers<C extends IpcContract, E = IpcInvokeEventLike> =
 };
 
 /** Channel map for a contract: method name → channel constant. Zod-free values. */
-export type IpcContractChannels<C extends IpcContract> = Readonly<{
+export type IpcContractChannels<C extends Readonly<Record<string, IpcEventDefinition>>> = Readonly<{
   [K in keyof C]: C[K]['channel'];
 }>;
+
+/** Fire-and-forget renderer event with a validated argument tuple. */
+export interface IpcEventDefinition<Args extends z.ZodTuple = z.ZodTuple> {
+  readonly channel: string;
+  readonly args: Args;
+}
+
+export type IpcEventSender<Definition extends IpcEventDefinition> = (
+  ...args: z.input<Definition['args']>
+) => void;
+
+export type IpcEventApi<C extends Readonly<Record<string, IpcEventDefinition>>> = {
+  [K in keyof C]: IpcEventSender<C[K]>;
+};

@@ -21,12 +21,21 @@ const baseParams = {
   message: '提醒喝水',
 };
 
-test('uses the session default delivery when the model omits delivery', async () => {
+test('uses the current session route each time the model omits delivery', async () => {
   const { service, inputs } = createService();
+  const getDefaultDelivery = vi
+    .fn()
+    .mockReturnValueOnce({
+      mode: 'announce',
+      channel: 'dingtalk',
+      to: 'user-42',
+      accountId: 'acct-1',
+    })
+    .mockReturnValueOnce(null);
   const tool = buildPiScheduledTaskTool({
     service,
     sessionKey: 'session-1',
-    defaultDelivery: { mode: 'announce', channel: 'dingtalk', to: 'user-42', accountId: 'acct-1' },
+    getDefaultDelivery,
   });
 
   const result = await tool.execute!('call-1', baseParams);
@@ -37,14 +46,21 @@ test('uses the session default delivery when the model omits delivery', async ()
     to: 'user-42',
     accountId: 'acct-1',
   });
+  await tool.execute!('call-2', baseParams);
+  expect(inputs[1].delivery).toEqual({ mode: 'none' });
 });
 
 test('an explicit delivery from the model wins over the session default', async () => {
   const { service, inputs } = createService();
+  const getDefaultDelivery = vi.fn(() => ({
+    mode: 'announce' as const,
+    channel: 'dingtalk',
+    to: 'user-42',
+  }));
   const tool = buildPiScheduledTaskTool({
     service,
     sessionKey: 'session-1',
-    defaultDelivery: { mode: 'announce', channel: 'dingtalk', to: 'user-42' },
+    getDefaultDelivery,
   });
 
   await tool.execute!('call-1', {
@@ -52,6 +68,7 @@ test('an explicit delivery from the model wins over the session default', async 
     delivery: { mode: 'none' },
   });
   expect(inputs[0].delivery).toEqual({ mode: 'none' });
+  expect(getDefaultDelivery).not.toHaveBeenCalled();
 });
 
 test('without a default or explicit delivery the task stays undelivered', async () => {

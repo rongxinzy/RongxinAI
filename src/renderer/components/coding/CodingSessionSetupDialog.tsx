@@ -16,6 +16,7 @@ import {
   type CodingWorkspaceSummary,
 } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
+import { canStartCodingSession } from './codingSessionDraft';
 
 interface CodingSessionSetupDialogProps {
   workspace: CodingWorkspaceSummary;
@@ -32,22 +33,23 @@ export const CodingSessionSetupDialog = ({
   onManageAgents,
   onSubmit,
 }: CodingSessionSetupDialogProps) => {
-  const readyProfiles = useMemo(
-    () => profiles.filter(profile => profile.status === CodingAgentProfileStatus.Ready),
-    [profiles],
-  );
+  const selectableProfiles = useMemo(() => profiles.filter(canStartCodingSession), [profiles]);
   const [profileId, setProfileId] = useState('');
   const [sourceRoot, setSourceRoot] = useState('');
-  const selectedProfile = readyProfiles.find(profile => profile.id === profileId);
+  const selectedProfile = selectableProfiles.find(profile => profile.id === profileId);
 
   useEffect(() => {
     setProfileId(
-      readyProfiles.some(profile => profile.id === workspace.defaultProfileId)
+      selectableProfiles.some(
+        profile =>
+          profile.id === workspace.defaultProfileId &&
+          profile.status === CodingAgentProfileStatus.Ready,
+      )
         ? workspace.defaultProfileId
         : '',
     );
     setSourceRoot(workspace.sources[0]?.path ?? workspace.primaryRoot);
-  }, [readyProfiles, workspace]);
+  }, [selectableProfiles, workspace]);
 
   const submit = () => {
     if (!profileId || !sourceRoot) return;
@@ -81,7 +83,7 @@ export const CodingSessionSetupDialog = ({
           <X />
         </Button>
         <FieldGroup>
-          {readyProfiles.length > 0 ? (
+          {selectableProfiles.length > 0 ? (
             <Field>
               <FieldLabel>{i18nService.t('codingAgentChooseAgent')}</FieldLabel>
               <Select value={profileId} onValueChange={value => value && setProfileId(value)}>
@@ -95,7 +97,7 @@ export const CodingSessionSetupDialog = ({
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {readyProfiles.map(profile => (
+                  {selectableProfiles.map(profile => (
                     <SelectItem key={profile.id} value={profile.id}>
                       {profile.name}
                     </SelectItem>
@@ -130,7 +132,7 @@ export const CodingSessionSetupDialog = ({
           <Button type="button" variant="outline" onClick={onCancel}>
             {i18nService.t('codingWorkspaceCancel')}
           </Button>
-          {readyProfiles.length > 0 ? (
+          {selectableProfiles.length > 0 ? (
             <Button type="button" disabled={!profileId || !sourceRoot} onClick={submit}>
               {i18nService.t('codingSessionConfirm')}
             </Button>

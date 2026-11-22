@@ -1,4 +1,5 @@
 import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '@shared/magpie/constants';
+import { AISphere } from '@shared/aisphere';
 
 export type PresetBrandKey =
   | 'deepseek'
@@ -14,8 +15,7 @@ export type PresetBrandKey =
   | 'stepfun'
   | 'xiaomi'
   | 'grok'
-  | 'openrouter'
-  | 'ollama';
+  | 'openrouter';
 
 export type ProviderAvatarKind =
   | PresetBrandKey
@@ -56,12 +56,11 @@ const KEY_ALIASES: Record<string, PresetBrandKey> = {
   grok: 'grok',
   xai: 'grok',
   openrouter: 'openrouter',
-  ollama: 'ollama',
 };
 
 const HOST_MATCHERS: ReadonlyArray<{
   kind: PresetBrandKey;
-  match: (host: string, port: string) => boolean;
+  match: (host: string) => boolean;
 }> = [
   { kind: 'deepseek', match: host => host === 'deepseek.com' || host.endsWith('.deepseek.com') },
   {
@@ -115,7 +114,6 @@ const HOST_MATCHERS: ReadonlyArray<{
     kind: 'openrouter',
     match: host => host === 'openrouter.ai' || host.endsWith('.openrouter.ai'),
   },
-  { kind: 'ollama', match: (host, port) => port === '11434' || host.includes('ollama') },
 ];
 
 const LABEL_MATCHERS: ReadonlyArray<{ kind: PresetBrandKey; pattern: RegExp }> = [
@@ -133,7 +131,6 @@ const LABEL_MATCHERS: ReadonlyArray<{ kind: PresetBrandKey; pattern: RegExp }> =
   { kind: 'xiaomi', pattern: /\bxiaomi\b|\bmimo\b|小米/i },
   { kind: 'grok', pattern: /\bgrok\b|\bxai\b/i },
   { kind: 'openrouter', pattern: /openrouter/i },
-  { kind: 'ollama', pattern: /\bollama\b/i },
 ];
 
 function matchHostFromBaseUrl(baseUrl?: string): PresetBrandKey | null {
@@ -143,9 +140,8 @@ function matchHostFromBaseUrl(baseUrl?: string): PresetBrandKey | null {
     const normalized = /^[a-z]+:\/\//i.test(raw) ? raw : `https://${raw}`;
     const parsed = new URL(normalized);
     const host = parsed.hostname.toLowerCase();
-    const port = parsed.port;
     for (const entry of HOST_MATCHERS) {
-      if (entry.match(host, port)) return entry.kind;
+      if (entry.match(host)) return entry.kind;
     }
   } catch {
     return null;
@@ -166,6 +162,7 @@ export function resolveProviderAvatarKind(input: {
   }
   if (
     key === 'custom_aisphere' ||
+    key.startsWith(AISphere.HostProviderPrefix) ||
     key === 'aisphere' ||
     key === 'organization' ||
     key === 'enterprise' ||

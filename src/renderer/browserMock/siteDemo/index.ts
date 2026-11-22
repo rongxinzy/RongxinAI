@@ -156,7 +156,6 @@ export function createSiteDemoOverrides(): DeepPartial<ElectronApi> {
     },
     magpie: {
       catalog: () => Promise.resolve(catalog),
-      models: () => Promise.resolve(catalog.models),
       status: () => Promise.resolve(catalog.status),
       selectDefault: () => Promise.resolve(catalog),
     },

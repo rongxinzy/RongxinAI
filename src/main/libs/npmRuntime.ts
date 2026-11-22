@@ -2,7 +2,7 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
-import { getElectronNodeRuntimePath } from './coworkUtil';
+import { getElectronNodeRuntimePath } from './coworkEnv/electronNodeRuntime';
 
 export const NpmCli = {
   Npm: 'npm',
@@ -16,7 +16,7 @@ export interface BundledNpmRuntime {
   env: NodeJS.ProcessEnv;
 }
 
-function resolveCliPath(cli: NpmCli): string | null {
+export function resolveBundledNpmCliPath(cli: NpmCli): string | null {
   const scriptName = cli === NpmCli.Npx ? 'npx-cli.js' : 'npm-cli.js';
   const candidates = app.isPackaged
     ? [
@@ -44,7 +44,7 @@ export function resolveBundledNpmRuntime(
   args: string[] = [],
   env: NodeJS.ProcessEnv = process.env,
 ): BundledNpmRuntime | null {
-  const cliPath = resolveCliPath(cli);
+  const cliPath = resolveBundledNpmCliPath(cli);
   if (!cliPath) return null;
   return {
     command: getElectronNodeRuntimePath(),

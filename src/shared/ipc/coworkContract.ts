@@ -111,6 +111,7 @@ const CoworkSessionSchema = z.object({
   workspaceId: z.string(),
   agentId: z.string(),
   source: z.enum(CoworkSessionSource),
+  remoteManaged: z.boolean().optional(),
   experts: z.array(CoworkSessionExpertSchema).optional(),
   messages: z.array(CoworkMessageSchema),
   messagesOffset: z.number(),
@@ -221,13 +222,6 @@ const CoworkPermissionResultSchema = z.discriminatedUnion('behavior', [
   }),
 ]);
 
-const CaptureRectSchema = z.object({
-  x: z.number(),
-  y: z.number(),
-  width: z.number(),
-  height: z.number(),
-});
-
 /**
  * Streaming methods, registered in two files: `coworkRunBridge.ts` owns the
  * run snapshot read, `piUiForwarder.ts` owns the runtime snapshot read and
@@ -298,15 +292,6 @@ export const workspaceContract = defineIpcContract({
       error: z.string().optional(),
     }),
   },
-  renameWorkspace: {
-    channel: WorkspaceIpc.Rename,
-    args: z.tuple([z.string(), z.string()]),
-    result: z.object({
-      success: z.boolean(),
-      workspace: WorkspaceSchema.optional(),
-      error: z.string().optional(),
-    }),
-  },
   updateWorkspace: {
     channel: WorkspaceIpc.Update,
     args: z.tuple([
@@ -334,7 +319,7 @@ export const workspaceContract = defineIpcContract({
   },
 });
 
-/** Registered by `coworkSessionIpc.ts`. */
+/** Registered by `main/coworkIpc/session.ts`. */
 export const coworkSessionLifecycleContract = defineIpcContract({
   startSession: {
     channel: CoworkSessionIpc.Start,
@@ -356,6 +341,11 @@ export const coworkSessionLifecycleContract = defineIpcContract({
       code: z.string().optional(),
     }),
   },
+  respondToPermission: {
+    channel: CoworkPermissionIpc.Respond,
+    args: z.tuple([z.object({ requestId: z.string(), result: CoworkPermissionResultSchema })]),
+    result: z.object({ success: z.boolean(), error: z.string().optional() }),
+  },
 });
 
 /** Registered by `coworkSessionAdminIpc.ts`. */
@@ -373,44 +363,6 @@ export const coworkSessionAdminContract = defineIpcContract({
       queued: z.boolean().optional(),
       cancelled: z.boolean().optional(),
       reason: z.enum(CoworkCompactFailure).optional(),
-    }),
-  },
-  saveSession: {
-    // Imported transcript row sent by `saveChatSession` (the whole renderer
-    // CoworkSession). Pin the fields the impl consumes; the renderer may send
-    // additional row fields which main stores verbatim.
-    channel: CoworkSessionIpc.Save,
-    args: z.tuple([
-      z
-        .object({
-          id: z.string(),
-          title: z.string(),
-          status: z.string(),
-          mode: z.enum([CoworkSessionMode.Work, CoworkSessionMode.Chat]),
-          cwd: z.string(),
-          systemPrompt: z.string(),
-          modelOverride: z.string(),
-          executionMode: z.string(),
-          activeSkillIds: z.array(z.string()),
-          agentId: z.string(),
-          messages: z
-            .array(
-              z.object({
-                id: z.string(),
-                type: z.string(),
-                content: z.string(),
-                timestamp: z.number(),
-                metadata: z.record(z.string(), z.unknown()).optional(),
-              }),
-            )
-            .optional(),
-        })
-        .passthrough(),
-    ]),
-    result: z.object({
-      success: z.boolean(),
-      session: CoworkSessionSchema.nullable().optional(),
-      error: z.string().optional(),
     }),
   },
   deleteSession: {
@@ -462,15 +414,6 @@ export const coworkSessionAdminContract = defineIpcContract({
       error: z.string().optional(),
     }),
   },
-  remoteManaged: {
-    channel: CoworkSessionIpc.RemoteManaged,
-    args: z.tuple([z.string()]),
-    result: z.object({
-      success: z.boolean(),
-      remoteManaged: z.boolean(),
-      error: z.string().optional(),
-    }),
-  },
   listSessions: {
     channel: CoworkSessionIpc.List,
     args: z.tuple([
@@ -508,62 +451,6 @@ export const coworkSessionAdminContract = defineIpcContract({
       total: z.number().optional(),
       error: z.string().optional(),
     }),
-  },
-});
-
-/** Registered by `coworkExportIpc.ts`. */
-export const coworkExportContract = defineIpcContract({
-  exportResultImage: {
-    channel: CoworkSessionIpc.ExportResultImage,
-    args: z.tuple([z.object({ rect: CaptureRectSchema, defaultFileName: z.string().optional() })]),
-    result: z.object({
-      success: z.boolean(),
-      canceled: z.boolean().optional(),
-      path: z.string().optional(),
-      error: z.string().optional(),
-    }),
-  },
-  captureImageChunk: {
-    channel: CoworkSessionIpc.CaptureImageChunk,
-    args: z.tuple([z.object({ rect: CaptureRectSchema })]),
-    result: z.object({
-      success: z.boolean(),
-      width: z.number().optional(),
-      height: z.number().optional(),
-      pngBase64: z.string().optional(),
-      error: z.string().optional(),
-    }),
-  },
-  saveResultImage: {
-    channel: CoworkSessionIpc.SaveResultImage,
-    args: z.tuple([z.object({ pngBase64: z.string(), defaultFileName: z.string().optional() })]),
-    result: z.object({
-      success: z.boolean(),
-      canceled: z.boolean().optional(),
-      path: z.string().optional(),
-      error: z.string().optional(),
-    }),
-  },
-  exportSessionText: {
-    channel: CoworkSessionIpc.ExportText,
-    args: z.tuple([
-      z.object({
-        content: z.string(),
-        defaultFileName: z.string().optional(),
-        fileExtension: z.string().optional(),
-      }),
-    ]),
-    result: z.object({
-      success: z.boolean(),
-      canceled: z.boolean().optional(),
-      path: z.string().optional(),
-      error: z.string().optional(),
-    }),
-  },
-  respondToPermission: {
-    channel: CoworkPermissionIpc.Respond,
-    args: z.tuple([z.object({ requestId: z.string(), result: CoworkPermissionResultSchema })]),
-    result: z.object({ success: z.boolean(), error: z.string().optional() }),
   },
 });
 
@@ -651,7 +538,6 @@ export const coworkContract = defineIpcContract({
   ...workspaceContract,
   ...coworkSessionLifecycleContract,
   ...coworkSessionAdminContract,
-  ...coworkExportContract,
   ...coworkQueueContract,
   ...coworkConfigContract,
 });

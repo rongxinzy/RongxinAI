@@ -1,16 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 
-import { SKILL_FILE_NAME, SKILLS_DIR_NAME } from './constants';
+import { SKILL_FILE_NAME, SKILLS_DIR_NAME, SkillCatalogLimit } from './constants';
 
-export const listSkillDirs = (root: string): string[] => {
+export const listSkillDirs = (
+  root: string,
+  readEntries: (directory: string) => string[] = directory => fs.readdirSync(directory),
+): string[] => {
   if (!fs.existsSync(root)) return [];
   const skillFile = path.join(root, SKILL_FILE_NAME);
   if (fs.existsSync(skillFile)) {
     return [root];
   }
 
-  const entries = fs.readdirSync(root);
+  const entries = readEntries(root);
   return entries
     .map(entry => path.join(root, entry))
     .filter(entryPath => {
@@ -28,27 +31,46 @@ export const listSkillDirs = (root: string): string[] => {
 
 export const collectSkillDirsFromSource = (source: string): string[] => {
   const resolved = path.resolve(source);
+  const scanLimit = new Error('Skill source directory exceeds the supported scan limit');
+  let entriesRead = 0;
+  const readEntries = (dir: string): string[] => {
+    const directory = fs.opendirSync(dir);
+    const entries: string[] = [];
+    try {
+      for (let entry = directory.readSync(); entry; entry = directory.readSync()) {
+        if (++entriesRead > SkillCatalogLimit.SourceEntries) throw scanLimit;
+        entries.push(entry.name);
+      }
+    } finally {
+      directory.closeSync();
+    }
+    return entries.sort();
+  };
   if (fs.existsSync(path.join(resolved, SKILL_FILE_NAME))) {
     return [resolved];
   }
 
   const nestedRoot = path.join(resolved, SKILLS_DIR_NAME);
   if (fs.existsSync(nestedRoot) && fs.statSync(nestedRoot).isDirectory()) {
-    const nestedSkills = listSkillDirs(nestedRoot);
+    const nestedSkills = listSkillDirs(nestedRoot, readEntries);
     if (nestedSkills.length > 0) {
       return nestedSkills;
     }
   }
 
-  const directSkills = listSkillDirs(resolved);
+  const directSkills = listSkillDirs(resolved, readEntries);
   if (directSkills.length > 0) {
     return directSkills;
   }
 
-  return collectSkillDirsRecursively(resolved);
+  return collectSkillDirsRecursively(resolved, readEntries, scanLimit);
 };
 
-const collectSkillDirsRecursively = (root: string): string[] => {
+const collectSkillDirsRecursively = (
+  root: string,
+  readEntries: (directory: string) => string[],
+  scanLimit: Error,
+): string[] => {
   const resolvedRoot = path.resolve(root);
   if (!fs.existsSync(resolvedRoot)) return [];
 
@@ -56,9 +78,8 @@ const collectSkillDirsRecursively = (root: string): string[] => {
   const queue: string[] = [resolvedRoot];
   const seen = new Set<string>();
 
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current) continue;
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
     const normalized = path.resolve(current);
     if (seen.has(normalized)) continue;
     seen.add(normalized);
@@ -78,8 +99,9 @@ const collectSkillDirsRecursively = (root: string): string[] => {
 
     let entries: string[] = [];
     try {
-      entries = fs.readdirSync(normalized);
-    } catch {
+      entries = readEntries(normalized);
+    } catch (error) {
+      if (error === scanLimit) throw error;
       continue;
     }
 

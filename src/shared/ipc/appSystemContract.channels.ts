@@ -1,9 +1,5 @@
-/**
- * Channel map for the system IPC contract, importable by the sandboxed
- * preload. Kept in a separate zod-free module because the preload bundle must
- * not require zod; the type argument locks the map to the contract's channels.
- */
-import type { IpcContractChannels } from './contract';
+/** Zod-free channel maps keyed by their public preload method names. */
+import type { IpcContractApi } from './contract';
 import type { appSystemContract } from './appSystemContract';
 import {
   AppIpc,
@@ -18,57 +14,95 @@ import {
 } from './channels';
 import { AppUpdateIpc } from '../appUpdate/constants';
 
-export const appSystemContractChannels: IpcContractChannels<typeof appSystemContract> = {
-  storeGet: StoreIpc.Get,
-  storeSet: StoreIpc.Set,
-  storeRemove: StoreIpc.Remove,
-  permissionsCheckCalendar: PermissionsIpc.CheckCalendar,
-  permissionsRequestCalendar: PermissionsIpc.RequestCalendar,
-  windowIsMaximized: WindowIpc.IsMaximized,
-  windowToggleDevTools: WindowIpc.ToggleDevTools,
-  windowOpenDevTools: WindowIpc.OpenDevTools,
+type MethodByChannel = {
+  [K in keyof typeof appSystemContract as (typeof appSystemContract)[K]['channel']]: IpcContractApi<
+    typeof appSystemContract
+  >[K];
+};
+
+export type AppSystemInvokers<Channels extends Record<string, keyof MethodByChannel>> = {
+  [K in keyof Channels]: MethodByChannel[Channels[K]];
+};
+
+export const storeChannels = {
+  get: StoreIpc.Get,
+  set: StoreIpc.Set,
+  remove: StoreIpc.Remove,
+} as const satisfies Record<string, keyof MethodByChannel>;
+
+export const permissionsChannels = {
+  checkCalendar: PermissionsIpc.CheckCalendar,
+  requestCalendar: PermissionsIpc.RequestCalendar,
+} as const satisfies Record<string, keyof MethodByChannel>;
+
+export const windowChannels = {
+  isMaximized: WindowIpc.IsMaximized,
+  openDevTools: WindowIpc.OpenDevTools,
+} as const satisfies Record<string, keyof MethodByChannel>;
+
+export const dialogChannels = {
+  selectDirectory: DialogIpc.SelectDirectory,
+  selectFiles: DialogIpc.SelectFiles,
+  saveInlineFile: DialogIpc.SaveInlineFile,
+  readFileAsDataUrl: DialogIpc.ReadFileAsDataUrl,
+  checkArtifactFile: DialogIpc.CheckArtifactFile,
+} as const satisfies Record<string, keyof MethodByChannel>;
+
+export const projectChannels = {
+  getDefaultBaseDir: ProjectIpc.GetDefaultBaseDir,
+  ensureScratchDir: ProjectIpc.EnsureScratchDir,
+  createRandomWorkspace: ProjectIpc.CreateRandomWorkspace,
+} as const satisfies Record<string, keyof MethodByChannel>;
+
+export const shellChannels = {
+  openPath: ShellIpc.OpenPath,
+  showItemInFolder: ShellIpc.ShowItemInFolder,
+  openExternal: ShellIpc.OpenExternal,
+  openHtmlInBrowser: ShellIpc.OpenHtmlInBrowser,
+  resolveLocalPath: ShellIpc.ResolveLocalPath,
+} as const satisfies Record<string, keyof MethodByChannel>;
+
+export const autoLaunchChannels = {
+  get: AppIpc.GetAutoLaunch,
+  set: AppIpc.SetAutoLaunch,
+} as const satisfies Record<string, keyof MethodByChannel>;
+
+export const preventSleepChannels = {
+  get: AppIpc.GetPreventSleep,
+  set: AppIpc.SetPreventSleep,
+} as const satisfies Record<string, keyof MethodByChannel>;
+
+export const appInfoChannels = {
+  getVersion: AppIpc.GetVersion,
+  isDev: AppIpc.IsDev,
+  isEnterprise: AppIpc.IsEnterprise,
+  getSystemLocale: AppIpc.GetSystemLocale,
+  getInferenceEdition: AppIpc.GetInferenceEdition,
+  usesBundledLlamaCppRuntime: AppIpc.UsesBundledLlamaCppRuntime,
+  relaunch: AppIpc.Relaunch,
+} as const satisfies Record<string, keyof MethodByChannel>;
+
+export const appUpdateChannels = {
+  getChannel: AppUpdateIpc.GetChannel,
+  setChannel: AppUpdateIpc.SetChannel,
+  getState: AppUpdateIpc.GetState,
+  checkNow: AppUpdateIpc.CheckNow,
+  retryDownload: AppUpdateIpc.RetryDownload,
+  pauseDownload: AppUpdateIpc.PauseDownload,
+  resumeDownload: AppUpdateIpc.ResumeDownload,
+  cancelDownload: AppUpdateIpc.CancelDownload,
+  installReady: AppUpdateIpc.InstallReady,
+  revealDownload: AppUpdateIpc.RevealDownload,
+} as const satisfies Record<string, keyof MethodByChannel>;
+
+export const logChannels = {
+  getPath: LogIpc.GetPath,
+  openFolder: LogIpc.OpenFolder,
+  exportZip: LogIpc.ExportZip,
+} as const satisfies Record<string, keyof MethodByChannel>;
+
+export const appConfigChannels = {
   checkApiConfig: AppConfigIpc.CheckApiConfig,
   generateSessionTitle: AppConfigIpc.GenerateSessionTitle,
   getRecentCwds: AppConfigIpc.GetRecentCwds,
-  dialogSelectDirectory: DialogIpc.SelectDirectory,
-  dialogSelectFile: DialogIpc.SelectFile,
-  dialogSelectFiles: DialogIpc.SelectFiles,
-  dialogSaveInlineFile: DialogIpc.SaveInlineFile,
-  dialogReadFileAsDataUrl: DialogIpc.ReadFileAsDataUrl,
-  dialogCheckArtifactFile: DialogIpc.CheckArtifactFile,
-  dialogGenerateThumbnail: DialogIpc.GenerateThumbnail,
-  dialogShowMessageBox: DialogIpc.ShowMessageBox,
-  projectGetDefaultBaseDir: ProjectIpc.GetDefaultBaseDir,
-  projectCreateDirectory: ProjectIpc.CreateDirectory,
-  projectEnsureScratchDir: ProjectIpc.EnsureScratchDir,
-  projectCreateRandomWorkspace: ProjectIpc.CreateRandomWorkspace,
-  shellOpenPath: ShellIpc.OpenPath,
-  shellShowItemInFolder: ShellIpc.ShowItemInFolder,
-  shellOpenExternal: ShellIpc.OpenExternal,
-  shellOpenHtmlInBrowser: ShellIpc.OpenHtmlInBrowser,
-  shellResolveLocalPath: ShellIpc.ResolveLocalPath,
-  autoLaunchGet: AppIpc.GetAutoLaunch,
-  autoLaunchSet: AppIpc.SetAutoLaunch,
-  preventSleepGet: AppIpc.GetPreventSleep,
-  preventSleepSet: AppIpc.SetPreventSleep,
-  appGetVersion: AppIpc.GetVersion,
-  appIsDev: AppIpc.IsDev,
-  appIsEnterprise: AppIpc.IsEnterprise,
-  appGetSystemLocale: AppIpc.GetSystemLocale,
-  appGetInferenceEdition: AppIpc.GetInferenceEdition,
-  appUsesBundledLlamaCppRuntime: AppIpc.UsesBundledLlamaCppRuntime,
-  appRelaunch: AppIpc.Relaunch,
-  appUpdateGetChannel: AppUpdateIpc.GetChannel,
-  appUpdateSetChannel: AppUpdateIpc.SetChannel,
-  appUpdateGetState: AppUpdateIpc.GetState,
-  appUpdateCheckNow: AppUpdateIpc.CheckNow,
-  appUpdateRetryDownload: AppUpdateIpc.RetryDownload,
-  appUpdatePauseDownload: AppUpdateIpc.PauseDownload,
-  appUpdateResumeDownload: AppUpdateIpc.ResumeDownload,
-  appUpdateCancelDownload: AppUpdateIpc.CancelDownload,
-  appUpdateInstallReady: AppUpdateIpc.InstallReady,
-  appUpdateRevealDownload: AppUpdateIpc.RevealDownload,
-  logGetPath: LogIpc.GetPath,
-  logOpenFolder: LogIpc.OpenFolder,
-  logExportZip: LogIpc.ExportZip,
-} as const;
+} as const satisfies Record<string, keyof MethodByChannel>;

@@ -1,4 +1,13 @@
-import { SecurityRule } from './skillSecurityTypes';
+import type { FindingSeverity, SecurityDimension } from '../../../shared/skills/securityTypes';
+
+interface SecurityRule {
+  id: string;
+  dimension: SecurityDimension;
+  severity: FindingSeverity;
+  filePatterns: string[];
+  patterns: RegExp[];
+  description: string;
+}
 
 // ── Dimension 1: File Access ──────────────────────────────────────────────────
 

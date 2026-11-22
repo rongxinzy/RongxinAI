@@ -602,15 +602,16 @@ test('brokers ACP filesystem and terminal requests inside the lane workspace', a
   const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), 'acp-coding-driver-'));
   const nodeExecutable = JSON.stringify(execPath);
   const script = [
-    "let buffer=''; let promptId=null;",
+    "let buffer=''; let promptId=null; let terminalId=null;",
     "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
     "if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n');",
     "if (request.method === 'session/new') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { sessionId: 'remote-session' } }) + '\\n');",
     "if (request.method === 'session/prompt') { promptId = request.id; process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 11, method: 'fs/write_text_file', params: { sessionId: 'remote-session', path: 'result.txt', content: 'safe output' } }) + '\\n'); }",
     "if (request.id === 11) process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 12, method: 'fs/read_text_file', params: { sessionId: 'remote-session', path: 'result.txt' } }) + '\\n');",
     `if (request.id === 12) process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 13, method: 'terminal/create', params: { sessionId: 'remote-session', command: ${nodeExecutable}, args: ['-e', \"process.stdout.write('verified')\"] } }) + '\\n');`,
-    "if (request.id === 13) process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 14, method: 'terminal/wait_for_exit', params: { sessionId: 'remote-session', terminalId: request.result.terminalId } }) + '\\n');",
-    "if (request.id === 14) process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: promptId, result: { stopReason: 'end_turn' } }) + '\\n');",
+    "if (request.id === 13) { terminalId = request.result.terminalId; process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 14, method: 'terminal/wait_for_exit', params: { sessionId: 'remote-session', terminalId } }) + '\\n'); }",
+    "if (request.id === 14) process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 15, method: 'terminal/release', params: { sessionId: 'remote-session', terminalId } }) + '\\n');",
+    "if (request.id === 15) process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: promptId, result: { stopReason: request.error ? 'refusal' : 'end_turn' } }) + '\\n');",
     '} });',
   ].join('');
   const driver = new AcpCodingDriver({

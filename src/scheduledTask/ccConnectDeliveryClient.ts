@@ -7,12 +7,10 @@ export class CcConnectDeliveryClient {
     private readonly token: string,
   ) {}
 
-  async send(input: {
-    accountId: string;
-    platform: string;
-    sessionKey: string;
-    content: string;
-  }): Promise<void> {
+  async send(
+    input: { accountId: string; platform: string; sessionKey: string; content: string },
+    signal?: AbortSignal,
+  ): Promise<void> {
     const response = await fetch(new URL('/v1/cc-connect/deliver', this.baseUrl), {
       method: 'POST',
       headers: {
@@ -21,6 +19,7 @@ export class CcConnectDeliveryClient {
         ...createCcConnectProtocolHeaders(),
       },
       body: JSON.stringify(input),
+      signal,
     });
     if (response.status !== 204) {
       throw new Error(`cc-connect delivery control returned HTTP ${response.status}`);

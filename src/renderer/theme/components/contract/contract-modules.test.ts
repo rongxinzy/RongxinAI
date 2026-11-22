@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { zenithLight } from '../../themes/zenith-light';
+import { zenithLight } from '../../themes';
 import { COMPONENT_SELECTORS, EXTERNAL_COMPONENTS } from '../contract';
 import { APP_SELECTORS } from './selectors-app';
 import { COMPONENT_STATES } from './component-states';

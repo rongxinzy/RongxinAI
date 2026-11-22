@@ -13,6 +13,7 @@ import { isSkillDefinitionChange, SkillWatcher } from './skillWatcher';
 const tempDirs: string[] = [];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const dir of tempDirs.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -166,25 +167,62 @@ describe('isSkillDefinitionChange', () => {
 });
 
 describe('SkillWatcher recursive watching', () => {
+  test('keeps watches for unchanged roots and closes only removed roots', () => {
+    const first = makeRootDir();
+    const second = makeRootDir();
+    let roots = [first];
+    const watchSpy = vi.spyOn(fs, 'watch');
+    const watcher = new SkillWatcher(() => roots);
+    try {
+      watcher.startWatching();
+      const closeFirst = vi.spyOn(watchSpy.mock.results[0].value as fs.FSWatcher, 'close');
+      roots = [first, second];
+      watcher.startWatching();
+      expect(closeFirst).not.toHaveBeenCalled();
+      expect(watchSpy.mock.calls.filter(([root]) => root === first)).toHaveLength(1);
+      expect(watchSpy.mock.calls.filter(([root]) => root === second)).toHaveLength(1);
+      roots = [second];
+      watcher.startWatching();
+      expect(closeFirst).toHaveBeenCalledOnce();
+      expect(watchSpy.mock.calls.filter(([root]) => root === second)).toHaveLength(1);
+    } finally {
+      watcher.stopWatching();
+    }
+  });
+
   // Which events notify is covered by the isSkillDefinitionChange table above;
   // these tests only prove the real recursive watcher is wired to it.
   test('notifies when a new skill dir with SKILL.md is created under the root', async () => {
     const root = makeRootDir();
+    const watch = vi.spyOn(fs, 'watch');
     const watcher = new SkillWatcher(() => [root]);
     const listener = vi.fn();
     watcher.onSkillsChanged(listener);
     watcher.startWatching();
 
-    fs.mkdirSync(path.join(root, 'my-skill'));
-    fs.writeFileSync(path.join(root, 'my-skill', 'SKILL.md'), '# my skill');
-
-    await vi.waitFor(
-      () => {
-        expect(listener).toHaveBeenCalled();
-      },
-      { timeout: 10_000, interval: 50 },
-    );
-    watcher.stopWatching();
+    try {
+      // Native recursive registration can miss events before it reports its first change.
+      const ready = vi.fn();
+      const probe = '.watch-probe';
+      (watch.mock.results[0].value as fs.FSWatcher).on('change', (_event, name) => {
+        if (name === probe) ready();
+      });
+      await vi.waitFor(
+        () => {
+          fs.writeFileSync(path.join(root, probe), String(Date.now()));
+          expect(ready).toHaveBeenCalled();
+        },
+        { timeout: 10_000, interval: 50 },
+      );
+      fs.mkdirSync(path.join(root, 'my-skill'));
+      fs.writeFileSync(path.join(root, 'my-skill', 'SKILL.md'), '# my skill');
+      await vi.waitFor(() => expect(listener).toHaveBeenCalled(), {
+        timeout: 10_000,
+        interval: 50,
+      });
+    } finally {
+      watcher.stopWatching();
+    }
   });
 
   test('opens one recursive watcher per existing root and closes it on stop', () => {
@@ -200,7 +238,8 @@ describe('SkillWatcher recursive watching', () => {
     // internally for subdirectories, so only the watcher's own call (first)
     // and the absence of a call for the missing root are asserted.
     expect(watchSpy.mock.calls[0][0]).toBe(root);
-    expect(watchSpy.mock.calls.some(call => call[0] === missingRoot)).toBe(false);
+    const missing = watchSpy.mock.calls.findIndex(call => call[0] === missingRoot);
+    expect(watchSpy.mock.results[missing]?.type).toBe('throw');
     expect(watchSpy.mock.calls[0][1]).toEqual({ recursive: true });
     const fsWatcher = watchSpy.mock.results[0].value as fs.FSWatcher;
     const closeSpy = vi.spyOn(fsWatcher, 'close');
@@ -208,5 +247,84 @@ describe('SkillWatcher recursive watching', () => {
     watcher.stopWatching();
     expect(closeSpy).toHaveBeenCalledTimes(1);
     watchSpy.mockRestore();
+  });
+
+  test('reclaims Windows tombstones asynchronously and preserves Skill definitions and unrelated files', async () => {
+    const root = makeRootDir();
+    const tombstone = path.join(root, 'removed.deleted.123');
+    const installed = path.join(root, 'active.deleted.123');
+    const ordinaryFile = path.join(root, 'note.deleted.123');
+    fs.mkdirSync(path.join(tombstone, 'nested'), { recursive: true });
+    fs.writeFileSync(path.join(tombstone, 'nested', 'output'), 'stale');
+    fs.mkdirSync(installed);
+    fs.writeFileSync(path.join(installed, 'SKILL.md'), '# Active skill');
+    fs.writeFileSync(ordinaryFile, 'keep');
+    const watcher = new SkillWatcher(() => [root], 'win32');
+
+    try {
+      watcher.startWatching();
+      expect(fs.existsSync(tombstone)).toBe(true);
+      await vi.waitFor(() => expect(fs.existsSync(tombstone)).toBe(false));
+      expect(fs.existsSync(installed)).toBe(true);
+      expect(fs.readFileSync(ordinaryFile, 'utf8')).toBe('keep');
+    } finally {
+      watcher.stopWatching();
+    }
+  });
+
+  test('only sweeps the latest roots after rebinding and stops after the in-flight deletion on shutdown', async () => {
+    const first = makeRootDir();
+    const superseded = makeRootDir();
+    const last = makeRootDir();
+    for (const root of [first, superseded, last]) {
+      fs.mkdirSync(path.join(root, 'undone.deleted.1'));
+    }
+    const removing = Promise.withResolvers<void>();
+    const deleted = Promise.withResolvers<void>();
+    const reading = Promise.withResolvers<void>();
+    const opened = Promise.withResolvers<void>();
+    const rm = fs.promises.rm;
+    const opendir = fs.promises.opendir;
+    const remove = vi.spyOn(fs.promises, 'rm').mockImplementationOnce(async (...args) => {
+      removing.resolve();
+      await deleted.promise;
+      await rm(...args);
+    });
+    const scan = vi.spyOn(fs.promises, 'opendir').mockImplementation(async (root, options) => {
+      if (root === last) {
+        reading.resolve();
+        await opened.promise;
+      }
+      return opendir(root, options);
+    });
+    let roots = [first];
+    const watcher = new SkillWatcher(() => roots, 'win32');
+    const notify = vi.fn();
+    watcher.onSkillsChanged(notify);
+
+    try {
+      watcher.startWatching();
+      await removing.promise;
+      roots = [superseded];
+      watcher.startWatching();
+      roots = [last];
+      watcher.startWatching();
+      expect(scan.mock.calls.map(([root]) => root)).toEqual([first]);
+      deleted.resolve();
+      await reading.promise;
+      expect(scan.mock.calls.map(([root]) => root)).toEqual([first, last]);
+      const shutdown = watcher.shutdown();
+      watcher.handleWorkingDirectoryChange();
+      opened.resolve();
+      await shutdown;
+      expect(remove).toHaveBeenCalledOnce();
+      expect(notify).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(superseded, 'undone.deleted.1'))).toBe(true);
+      expect(fs.existsSync(path.join(last, 'undone.deleted.1'))).toBe(true);
+    } finally {
+      deleted.resolve();
+      opened.resolve();
+      await watcher.shutdown();
+    }
   });
 });

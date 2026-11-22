@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { afterEach, expect, test } from 'vitest';
 
+import { initializeCompanionSchema } from '../companion/schema';
 import type { ProjectIdentity } from '../memory/projectIdentity';
 import { ConversationHistoryExcludedMessageType, ConversationHistoryRole } from './constants';
 import { ConversationHistoryService } from './service';
@@ -87,6 +88,41 @@ test('returns bounded excerpts instead of full assistant messages', () => {
   expect(match.snippet.length).toBeLessThanOrEqual(606);
 });
 
+test('filters hidden thinking before applying the limit and accepts legacy metadata', () => {
+  const database = createDatabase();
+  const sessionId = 'session-a';
+  const query = 'project decision';
+  insertSession(database, sessionId, 'Alpha session', '/workspace/alpha');
+  insertMessage(
+    database,
+    'numeric',
+    sessionId,
+    ConversationHistoryRole.Assistant,
+    query,
+    '{"isThinking":1}',
+    1,
+  );
+  insertMessage(database, 'malformed', sessionId, ConversationHistoryRole.Assistant, query, '{', 2);
+  for (let index = 0; index < 18; index++) {
+    insertMessage(
+      database,
+      `hidden-${index}`,
+      sessionId,
+      ConversationHistoryRole.Assistant,
+      query,
+      '{"isThinking":true}',
+      index + 3,
+    );
+  }
+  const service = new ConversationHistoryService(database, identityFor);
+
+  expect(
+    service
+      .search({ workingDirectory: '/workspace/alpha', query, limit: 2 })
+      .map(match => match.messageId),
+  ).toEqual(['malformed', 'numeric']);
+});
+
 function createDatabase(): Database.Database {
   const database = new Database(':memory:');
   databases.push(database);
@@ -106,6 +142,7 @@ function createDatabase(): Database.Database {
       sequence INTEGER
     );
   `);
+  initializeCompanionSchema(database);
   return database;
 }
 

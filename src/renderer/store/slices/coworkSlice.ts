@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, nanoid, PayloadAction } from '@reduxjs/toolkit';
 
 import {
   type CoworkConfig,
@@ -29,6 +29,13 @@ export interface DraftAttachment {
   dataUrl?: string;
 }
 
+interface PromptFocusRequest {
+  draftKey: string;
+  clear?: boolean;
+  clearExperts?: boolean;
+  text?: string;
+}
+
 interface CoworkState {
   sessions: CoworkSessionSummary[];
   /** Whether more sessions exist on the server beyond what is currently loaded. */
@@ -43,6 +50,7 @@ interface CoworkState {
   draftPromptDocs: Record<string, Record<string, unknown>>;
   /** Keyed by draftKey (sessionId or '__home__'), stores pending attachments */
   draftAttachments: Record<string, DraftAttachment[]>;
+  promptFocusRequest: (PromptFocusRequest & { id: string }) | null;
   unreadSessionIds: string[];
   /** Session-scoped streaming state survives stale SQLite reloads during a live stream. */
   streamingSessionIds: string[];
@@ -51,7 +59,6 @@ interface CoworkState {
   /** Non-persistent tool preparation state, isolated by session and tool call. */
   toolActivitiesBySession: Record<string, Record<string, CoworkToolActivity>>;
   isCoworkActive: boolean;
-  remoteManaged: boolean;
   pendingPermissions: CoworkPermissionRequest[];
   config: CoworkConfig;
 }
@@ -67,12 +74,12 @@ const initialState: CoworkState = {
   draftPrompts: {},
   draftPromptDocs: {},
   draftAttachments: {},
+  promptFocusRequest: null,
   unreadSessionIds: [],
   streamingSessionIds: [],
   streamingSessions: {},
   toolActivitiesBySession: {},
   isCoworkActive: false,
-  remoteManaged: false,
   pendingPermissions: [],
   config: {
     workingDirectory: '',
@@ -135,6 +142,7 @@ const mergeSessionWithLiveSnapshot = (
   return {
     ...session,
     ...liveSession,
+    remoteManaged: session.remoteManaged ?? liveSession.remoteManaged,
     messages: mergedMessages,
     messagesOffset: Math.min(session.messagesOffset ?? 0, liveSession.messagesOffset ?? 0),
     totalMessages: Math.max(
@@ -380,6 +388,7 @@ const coworkSlice = createSlice({
               lastMatch &&
               prev.status === session.status &&
               prev.title === session.title &&
+              prev.remoteManaged === session.remoteManaged &&
               prev.messagesOffset === (session.messagesOffset ?? 0) &&
               prev.totalMessages === (session.totalMessages ?? session.messages.length)
             ) {
@@ -442,6 +451,19 @@ const coworkSlice = createSlice({
         delete state.draftPrompts[sessionId];
         delete state.draftPromptDocs[sessionId];
       }
+    },
+
+    requestPromptFocus: {
+      prepare(request: PromptFocusRequest) {
+        return { payload: { ...request, id: nanoid() } };
+      },
+      reducer(state, action: PayloadAction<PromptFocusRequest & { id: string }>) {
+        state.promptFocusRequest = action.payload;
+      },
+    },
+
+    consumePromptFocus(state, action: PayloadAction<string>) {
+      if (state.promptFocusRequest?.id === action.payload) state.promptFocusRequest = null;
     },
 
     recoverSession(
@@ -698,10 +720,6 @@ const coworkSlice = createSlice({
       state.toolActivitiesBySession[sessionId] = sessionActivities;
     },
 
-    setRemoteManaged(state, action: PayloadAction<boolean>) {
-      state.remoteManaged = action.payload;
-    },
-
     updateSessionPinned(
       state,
       action: PayloadAction<{ sessionId: string; pinned: boolean; pinOrder?: number | null }>,
@@ -788,13 +806,11 @@ const coworkSlice = createSlice({
       state.currentSessionId = null;
       state.currentSession = null;
       state.loadingSessionId = null;
-      state.remoteManaged = false;
     },
 
     clearCurrentSessionForWorkspaceChange(state) {
       state.currentSessionId = null;
       state.currentSession = null;
-      state.remoteManaged = false;
     },
 
     setDraftAttachments(
@@ -835,6 +851,8 @@ export const {
   clearLoadingSessionId,
   setCurrentSession,
   setDraftPrompt,
+  requestPromptFocus,
+  consumePromptFocus,
   recoverSession,
   setDraftAttachments,
   addDraftAttachment,
@@ -848,7 +866,6 @@ export const {
   updateMessageContents,
   removeMessage,
   updateToolActivity,
-  setRemoteManaged,
   updateSessionPinned,
   updateSessionTitle,
   updateCurrentSessionModelOverride,

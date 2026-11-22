@@ -24,10 +24,12 @@ const brandingScanRoots = [...productionRoots, 'SKILLs', 'public'];
 const forbiddenPublicAssets = ['public/popo.png', 'public/love.png', 'public/hand.png'];
 
 const buildRoots = ['scripts', 'resources'];
+const magpieBuildAction = '.github/actions/prepare-magpie-runtime/action.yml';
 const workflowFiles = [
   '.github/workflows/linux-install-pr.yml',
   '.github/workflows/release.yml',
   '.github/workflows/windows-installer-pr.yml',
+  magpieBuildAction,
 ];
 
 const forbiddenPaths = [
@@ -150,17 +152,15 @@ checkFile('vite.config.ts', [forbiddenRuntimePattern, forbiddenStoragePattern]);
 
 for (const workflowFile of workflowFiles) {
   const content = fs.readFileSync(path.join(root, workflowFile), 'utf8');
-  const magpieGatewayReleaseBuild =
-    workflowFile === '.github/workflows/release.yml' && /magpie:build/.test(content);
   // Installation preflight builds the same pinned gateway as signed releases.
   // This toolchain is independent of the published channel transport runtime.
   const pinnedMagpieGatewayBuild =
+    workflowFile === magpieBuildAction &&
     /resources\/magpie\/upstream\.json/.test(content) &&
-    /bun run magpie:build -- --target (?:linux|win32)-x64/.test(content) &&
-    /bun run magpie:verify -- --target (?:linux|win32)-x64/.test(content) &&
-    /go-version: \$\{\{ steps\.magpie-toolchain\.outputs\.go-version \}\}/.test(content);
-  const forbiddenGoSetup =
-    /actions\/setup-go/.test(content) && !magpieGatewayReleaseBuild && !pinnedMagpieGatewayBuild;
+    content.includes('bun run magpie:build -- --target "$MAGPIE_TARGET"') &&
+    content.includes('bun run magpie:verify -- --target "$MAGPIE_TARGET"') &&
+    content.includes('go-version: ${{ steps.toolchain.outputs.go-version }}');
+  const forbiddenGoSetup = /actions\/setup-go/.test(content) && !pinnedMagpieGatewayBuild;
   if (
     /repository:\s*rongxinzy\/pi-connect|ZHIYUAN_CC_CONNECT_SOURCE/.test(content) ||
     forbiddenGoSetup

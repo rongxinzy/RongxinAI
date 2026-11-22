@@ -1,4 +1,4 @@
-import { zenithLight } from '../../theme/themes/zenith-light';
+import { zenithLight } from '../../theme/themes';
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';

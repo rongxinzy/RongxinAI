@@ -9,8 +9,19 @@ import type {
   SurfaceDisplay,
   WindowSurfaceSnapshot,
 } from '../../../shared/desktopPet/surfaces/types';
+import { settleWithin } from '../../libs/startupGate';
 import { windowSensorConfig, windowSensorSnapshot, windowSensorError } from './protocol';
 import { WindowSensorFailure } from './constants';
+
+const SENSOR_STOP_GRACE_MS = 250;
+const SENSOR_EXIT_WAIT_MS = SENSOR_STOP_GRACE_MS + 1000;
+const sensorExits = new Set<Promise<void>>();
+
+export async function drainDesktopPetSensors(): Promise<void> {
+  if (sensorExits.size && !(await settleWithin(Promise.all(sensorExits), SENSOR_EXIT_WAIT_MS))) {
+    throw new Error('Desktop window sensors did not exit before the shutdown deadline.');
+  }
+}
 
 interface Child {
   process: UtilityProcess;
@@ -125,7 +136,13 @@ export class DesktopWindowObserver {
       });
       processChild.on('message', message => this.receive(child, message));
       processChild.on('error', () => this.fail(child, WindowSensorFailure.Native));
-      processChild.once('exit', () => this.exited(child));
+      const exit = Promise.withResolvers<void>();
+      sensorExits.add(exit.promise);
+      processChild.once('exit', () => {
+        sensorExits.delete(exit.promise);
+        exit.resolve();
+        this.exited(child);
+      });
       child.startup = setTimeout(() => this.fail(child, WindowSensorFailure.Timeout), 5000);
     } catch {
       console.warn(`[WindowSurface] Failed to start sensor for window ${this.window.id}`);
@@ -183,7 +200,7 @@ export class DesktopWindowObserver {
     } catch {
       /* Exiting. */
     }
-    child.shutdown = setTimeout(() => child.process.kill(), 250);
+    child.shutdown = setTimeout(() => child.process.kill(), SENSOR_STOP_GRACE_MS);
   }
 
   private exited(child: Child): void {
@@ -210,7 +227,7 @@ export class DesktopWindowObserver {
     this.disposed = true;
     this.wanted = false;
     clearTimeout(this.retry);
-    this.publish(null);
     this.stop();
+    this.publish(null);
   }
 }

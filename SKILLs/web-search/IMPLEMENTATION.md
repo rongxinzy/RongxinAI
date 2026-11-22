@@ -1,5 +1,7 @@
 # Web Search Skill - Implementation Complete
 
+This document records the original implementation. See [the current usage guide](SKILL.md) for desktop and standalone startup behavior.
+
 ## 🎉 Implementation Summary
 
 The Web Search Skill has been successfully implemented and integrated into ZhiYuan Agent. This skill enables Claude to perform real-time web searches using a Playwright-controlled browser, providing access to current information beyond the knowledge cutoff.
@@ -353,7 +355,7 @@ rm SKILLs/web-search/.connection
 
 # Full reset
 node SKILLs/web-search/scripts/stop-server.mjs
-rm SKILLs/web-search/{.connection,.server.pid,.server.log}
+rm SKILLs/web-search/{.connection,.server.log}
 node SKILLs/web-search/scripts/start-server.mjs
 ```
 

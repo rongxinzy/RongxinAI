@@ -15,15 +15,12 @@ import {
 } from './skills/skillConfig';
 import { confirmPendingInstallImpl, downloadSkillImpl } from './skills/skillInstaller';
 import { deleteSkillImpl } from './skills/skillDeleter';
-import { upgradeSkillImpl } from './skills/skillUpgrader';
-import { collectBuiltInSkillIds, loadSkillsDefaults, parseSkillDir } from './skills/skillRecords';
+import { collectBuiltInSkillIds } from './skills/skillRecords';
+import { readSkillCatalogAsync } from './workbenchTask/artifactWorkerPool';
 import { SKILLS_DIR_NAME, SKILL_FILE_NAME, SKILL_STATE_KEY } from './skills/constants';
 import { listSkillDirs } from './skills/skillDirs';
 import { SkillWatcher } from './skills/skillWatcher';
-import type {
-  SecurityReportAction,
-  SkillSecurityReport,
-} from './libs/skillSecurity/skillSecurityTypes';
+import type { SecurityReportAction, SkillSecurityReport } from '../shared/skills/securityTypes';
 import type {
   EmailConnectivityTestResult,
   PendingSkillInstall,
@@ -47,12 +44,17 @@ export type { SkillRecord } from './skills/types';
 
 export class SkillManager implements SkillManagerContext {
   readonly pendingInstalls = new Map<string, PendingSkillInstall>();
-  readonly upgradingSkillIds = new Set<string>();
   readonly deletingSkillIds = new Set<string>();
   private readonly watcher: SkillWatcher;
+  private bundledSkillsReady?: Promise<void>;
+  private catalogRevision = 0;
+  private pendingCatalog?: { key: string; result: Promise<SkillRecord[]> };
 
   constructor(private getStore: () => SqliteStore) {
     this.watcher = new SkillWatcher(() => this.getSkillRoots(this.ensureSkillsRoot()));
+    this.watcher.onSkillsChanged(() => {
+      this.catalogRevision += 1;
+    });
   }
 
   private getModelScopeApiToken(): string | null {
@@ -79,58 +81,47 @@ export class SkillManager implements SkillManagerContext {
     return root;
   }
 
-  recoverInterruptedUpgrades(): void {
-    recoverInterruptedUpgrades(this.getSkillsRoot());
+  prepareBundledSkills(): Promise<void> {
+    return (this.bundledSkillsReady ??= this.syncBundledSkills());
   }
 
-  syncBundledSkillsToUserData(): void {
-    if (!app.isPackaged) {
-      return;
+  private async syncBundledSkills(): Promise<void> {
+    await recoverInterruptedUpgrades(this.getSkillsRoot());
+    if (app.isPackaged) {
+      await syncBundledSkillsToUserData(this.ensureSkillsRoot(), this.getBundledSkillsRoot());
     }
-
-    syncBundledSkillsToUserData(this.ensureSkillsRoot(), this.getBundledSkillsRoot());
   }
 
-  listSkills(): SkillRecord[] {
-    const primaryRoot = this.ensureSkillsRoot();
-    const state = this.loadSkillStateMap();
-    const roots = this.getSkillRoots(primaryRoot);
-    const orderedRoots = roots.filter(root => root !== primaryRoot).concat(primaryRoot);
-    const defaults = loadSkillsDefaults(roots);
-    const builtInSkillIds = collectBuiltInSkillIds(this.getBundledSkillsRoot());
-    const skillMap = new Map<string, SkillRecord>();
-
-    orderedRoots.forEach(root => {
-      if (!fs.existsSync(root)) return;
-      const skillDirs = listSkillDirs(root);
-      skillDirs.forEach(dir => {
-        const skill = parseSkillDir(
-          dir,
-          state,
-          defaults,
-          builtInSkillIds.has(path.basename(dir)) &&
-            !state[path.basename(dir)]?.userInstalled &&
-            !state[path.basename(dir)]?.iconUrl,
-        );
-        if (!skill) return;
-        skillMap.set(skill.id, skill);
-      });
-    });
-
-    const skills = Array.from(skillMap.values());
-
-    skills.sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      const orderA = defaults[a.id]?.order ?? 999;
-      const orderB = defaults[b.id]?.order ?? 999;
-      if (orderA !== orderB) return orderA - orderB;
-      return a.name.localeCompare(b.name);
-    });
-    return skills;
+  async listSkills(): Promise<SkillRecord[]> {
+    for (;;) {
+      const primaryRoot = this.getSkillsRoot();
+      const bundledRoot = this.getBundledSkillsRoot();
+      const roots = this.getSkillRoots(primaryRoot);
+      const revision = this.catalogRevision;
+      const key = JSON.stringify([revision, primaryRoot, bundledRoot, roots]);
+      if (this.pendingCatalog?.key !== key) {
+        const state = this.loadSkillStateMap();
+        const result = fs.promises
+          .mkdir(primaryRoot, { recursive: true })
+          .then(() => readSkillCatalogAsync({ primaryRoot, bundledRoot, roots, state }))
+          .finally(() => {
+            if (this.pendingCatalog?.result === result) this.pendingCatalog = undefined;
+          });
+        this.pendingCatalog = { key, result };
+      }
+      const skills = await this.pendingCatalog.result;
+      if (
+        revision === this.catalogRevision &&
+        primaryRoot === this.getSkillsRoot() &&
+        bundledRoot === this.getBundledSkillsRoot() &&
+        JSON.stringify(roots) === JSON.stringify(this.getSkillRoots(primaryRoot))
+      )
+        return skills;
+    }
   }
 
-  buildAutoRoutingPrompt(): string | null {
-    const skills = this.listSkills();
+  async buildAutoRoutingPrompt(): Promise<string | null> {
+    const skills = await this.listSkills();
     const enabled = skills.filter(s => s.enabled && s.prompt);
     if (enabled.length === 0) return null;
 
@@ -158,7 +149,7 @@ export class SkillManager implements SkillManagerContext {
     ].join('\n');
   }
 
-  setSkillEnabled(id: string, enabled: boolean): SkillRecord[] {
+  async setSkillEnabled(id: string, enabled: boolean): Promise<SkillRecord[]> {
     // Core skills cannot be disabled; ignore attempts to turn them off.
     if (isCoreSkill(id) && !enabled) {
       return this.listSkills();
@@ -179,7 +170,7 @@ export class SkillManager implements SkillManagerContext {
     return this.listSkills();
   }
 
-  setSkillsEnabled(ids: string[], enabled: boolean): SkillRecord[] {
+  async setSkillsEnabled(ids: string[], enabled: boolean): Promise<SkillRecord[]> {
     const known = this.knownSkillIds();
     const state = this.loadSkillStateMap();
     let changed = false;
@@ -221,7 +212,7 @@ export class SkillManager implements SkillManagerContext {
     }
   }
 
-  setSkillPinned(id: string, pinned: boolean): SkillRecord[] {
+  async setSkillPinned(id: string, pinned: boolean): Promise<SkillRecord[]> {
     const known = this.knownSkillIds();
     if (!known.has(id)) {
       return this.listSkills();
@@ -279,7 +270,7 @@ ${params.content.trim()}
       this.saveSkillStateMap(state);
       this.notifySkillsChanged();
 
-      const skills = this.listSkills();
+      const skills = await this.listSkills();
       const created = skills.find(s => s.id === sanitizedId);
       return { success: true, skill: created };
     } catch (error) {
@@ -308,19 +299,6 @@ ${params.content.trim()}
     return downloadSkillImpl(this, source, options);
   }
 
-  async upgradeSkill(
-    skillId: string,
-    downloadUrl: string,
-  ): Promise<{
-    success: boolean;
-    skills?: SkillRecord[];
-    error?: string;
-    auditReport?: SkillSecurityReport;
-    pendingInstallId?: string;
-  }> {
-    return upgradeSkillImpl(this, skillId, downloadUrl);
-  }
-
   async confirmPendingInstall(
     pendingId: string,
     action: SecurityReportAction,
@@ -334,6 +312,10 @@ ${params.content.trim()}
 
   stopWatching(): void {
     this.watcher.stopWatching();
+  }
+
+  shutdown(): Promise<void> {
+    return this.watcher.shutdown();
   }
 
   handleWorkingDirectoryChange(): void {
@@ -395,6 +377,7 @@ ${params.content.trim()}
 
   saveSkillStateMap(map: SkillStateMap): void {
     this.getStore().set(SKILL_STATE_KEY, map);
+    this.catalogRevision += 1;
   }
 
   persistSkillInstallState(
@@ -442,13 +425,13 @@ ${params.content.trim()}
     return path.resolve(projectRoot, SKILLS_DIR_NAME);
   }
 
-  getSkillConfig(skillId: string): {
+  async getSkillConfig(skillId: string): Promise<{
     success: boolean;
     config?: Record<string, string>;
     error?: string;
-  } {
+  }> {
     try {
-      return getSkillConfigFromDir(this.resolveSkillDir(skillId));
+      return getSkillConfigFromDir(await this.resolveSkillDir(skillId));
     } catch (error) {
       return {
         success: false,
@@ -457,12 +440,12 @@ ${params.content.trim()}
     }
   }
 
-  setSkillConfig(
+  async setSkillConfig(
     skillId: string,
     config: Record<string, string>,
-  ): { success: boolean; error?: string } {
+  ): Promise<{ success: boolean; error?: string }> {
     try {
-      return setSkillConfigToDir(this.resolveSkillDir(skillId), config);
+      return setSkillConfigToDir(await this.resolveSkillDir(skillId), config);
     } catch (error) {
       return {
         success: false,
@@ -482,8 +465,8 @@ ${params.content.trim()}
     return testEmailConnectivityImpl(this, skillId, config);
   }
 
-  resolveSkillDir(skillId: string): string {
-    const skills = this.listSkills();
+  async resolveSkillDir(skillId: string): Promise<string> {
+    const skills = await this.listSkills();
     const skill = skills.find(s => s.id === skillId);
     if (!skill) {
       throw new Error('Skill not found');

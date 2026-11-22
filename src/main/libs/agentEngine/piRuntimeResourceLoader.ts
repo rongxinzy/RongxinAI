@@ -41,8 +41,6 @@ import type {
 } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
 import { filterExpertMcpRecords } from './expertMcpFilter';
-import { createPiEnterpriseProviderExtension } from '../../enterpriseExtension/piEnterpriseProviderExtension';
-import { zhiyuanManagedProviderBridge } from '../../enterpriseExtension/managedProviderBridge';
 
 export interface PiResourceLoaderApprovalContext {
   sessionId: string;
@@ -139,6 +137,23 @@ export async function createPiRuntimeResourceLoader(
   additionalExtensionFactories: PiExtensionFactory[] = [],
 ): Promise<PiResourceLoader> {
   const settingsManager = approvalContext?.settingsManager ?? createPiSettingsManager(pi, cwd);
+  if (resourceState.companionChat) {
+    const resourceLoader = new pi.DefaultResourceLoader({
+      cwd,
+      agentDir: pi.getAgentDir(),
+      ...(settingsManager ? { settingsManager } : {}),
+      noExtensions: true,
+      noSkills: true,
+      noContextFiles: true,
+      noPromptTemplates: true,
+      noThemes: true,
+      systemPrompt: '',
+      systemPromptOverride: () => resourceState.systemPrompt,
+      appendSystemPrompt: [],
+    });
+    await resourceLoader.reload();
+    return resourceLoader;
+  }
   const mcpSource = host.getMcpServerSource();
   let mcpRecords: McpServerRecord[] = [];
   type DiscoveredSkill = Skill & { id?: string };
@@ -385,7 +400,6 @@ export async function createPiRuntimeResourceLoader(
             }),
           ]
         : []),
-      createPiEnterpriseProviderExtension(zhiyuanManagedProviderBridge),
       ...additionalExtensionFactories,
     ],
   });

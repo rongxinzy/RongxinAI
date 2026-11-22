@@ -5,6 +5,7 @@ import {
   migrateLegacyScheduledTaskRunsToCanonical,
   migrateLegacyScheduledTasksToCanonical,
 } from './migrate';
+import { initializeScheduledTaskSchema } from './schema';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 
 test('imports legacy tasks into canonical SQLite and preserves past at tasks', async () => {
@@ -22,6 +23,7 @@ test('imports legacy tasks into canonical SQLite and preserves past at tasks', a
     '[]',
   );
   const values = new Map<string, string>();
+  initializeScheduledTaskSchema(db);
   const store = new SqliteScheduledTaskStore(db);
   await migrateLegacyScheduledTasksToCanonical({
     db,
@@ -53,6 +55,7 @@ test('imports legacy Run history into canonical SQLite', async () => {
     null,
   );
   const values = new Map<string, string>();
+  initializeScheduledTaskSchema(db);
   const store = new SqliteScheduledTaskStore(db);
   await migrateLegacyScheduledTaskRunsToCanonical({
     db,
@@ -83,6 +86,7 @@ test('rolls back the canonical import and completion marker when any ZhiYuan tas
   );
   insert.run('invalid', 'Invalid', '', 1, '{broken', 'run', '[]');
   const values = new Map<string, string>();
+  initializeScheduledTaskSchema(db);
   const store = new SqliteScheduledTaskStore(db);
   await expect(
     migrateLegacyScheduledTasksToCanonical({

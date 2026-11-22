@@ -3,13 +3,13 @@ import * as path from 'path';
 
 import { scanPromptInjection } from './skillSecurityPromptAudit';
 import { getRulesForFile } from './skillSecurityRules';
-import {
+import type {
   FindingSeverity,
   SecurityDimension,
   SecurityFinding,
   SecurityRiskLevel,
   SkillSecurityReport,
-} from './skillSecurityTypes';
+} from '../../../shared/skills/securityTypes';
 
 const MAX_FILES = 500;
 const MAX_FILE_SIZE_BYTES = 512 * 1024;

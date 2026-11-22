@@ -9,12 +9,13 @@ import type { WorkbenchTaskService } from './taskService';
 
 export function registerWorkbenchTaskIpcHandlers(options: {
   getService: () => WorkbenchTaskService;
+  getMainWindow: () => BrowserWindow | null;
 }): void {
   const service = options.getService();
   service.on('changed', (event: WorkbenchTaskChangedEvent) => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(WorkbenchTaskIpc.Changed, event);
-    }
+    const window = options.getMainWindow();
+    if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
+    window.webContents.send(WorkbenchTaskIpc.Changed, event);
   });
 
   handleIpcContract(workbenchTaskContract, {

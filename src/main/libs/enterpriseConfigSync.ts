@@ -1,5 +1,5 @@
 import { app } from 'electron';
-import fs from 'fs';
+import * as fs from 'node:fs/promises';
 import path from 'path';
 
 import type { SqliteStore } from '../sqliteStore';
@@ -30,12 +30,21 @@ function resolveMergeMode(
   return value === 'overwrite' ? 'overwrite' : 'merge';
 }
 
-export function resolveEnterpriseConfigPath(): string | null {
-  const configPath = path.join(app.getPath('userData'), ENTERPRISE_CONFIG_DIR);
-  return fs.existsSync(path.join(configPath, MANIFEST_FILE)) ? configPath : null;
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export function syncEnterpriseConfig(
+export async function resolveEnterpriseConfigPath(): Promise<string | null> {
+  const configPath = path.join(app.getPath('userData'), ENTERPRISE_CONFIG_DIR);
+  return (await pathExists(path.join(configPath, MANIFEST_FILE))) ? configPath : null;
+}
+
+export async function syncEnterpriseConfig(
   configPath: string,
   store: SqliteStore,
   mcpUpsertByName: (server: {
@@ -48,11 +57,11 @@ export function syncEnterpriseConfig(
   }) => void,
   mcpClearAll: () => void,
   getWorkingDirectory: () => string | undefined,
-): EnterpriseManifest | null {
+): Promise<EnterpriseManifest | null> {
   let manifest: EnterpriseManifest;
   try {
     manifest = JSON.parse(
-      fs.readFileSync(path.join(configPath, MANIFEST_FILE), 'utf-8'),
+      await fs.readFile(path.join(configPath, MANIFEST_FILE), 'utf-8'),
     ) as EnterpriseManifest;
   } catch (error) {
     console.error('[Enterprise] failed to parse manifest.json, skipping enterprise config:', error);
@@ -62,44 +71,46 @@ export function syncEnterpriseConfig(
   console.log(`[Enterprise] detected enterprise config ${manifest.name} v${manifest.version}`);
   const previousManifest = store.get<EnterpriseManifest>('enterprise_config');
   const versionChanged = previousManifest?.version !== manifest.version;
-  store.set('enterprise_config', manifest);
-
-  if (manifest.autoAcceptPrivacy) store.set('privacy_agreed', true);
-
   const agentsForce = manifest.sync.agents === 'force';
   if (versionChanged) {
     const skillsMode = resolveMergeMode(manifest.sync.skills);
-    if (skillsMode) syncSkills(configPath, store, skillsMode);
-    if (manifest.sync.agents) syncAgents(configPath, getWorkingDirectory(), agentsForce);
+    if (skillsMode) await syncSkills(configPath, store, skillsMode);
+    if (manifest.sync.agents) await syncAgents(configPath, getWorkingDirectory(), agentsForce);
     const pluginsMode = resolveMergeMode(manifest.sync.plugins);
-    if (pluginsMode) syncPlugins(configPath, pluginsMode);
+    if (pluginsMode) await syncPlugins(configPath, pluginsMode);
     const mcpMode = resolveMergeMode(manifest.sync.mcp);
-    if (mcpMode) syncMcpServers(configPath, mcpUpsertByName, mcpClearAll, mcpMode);
+    if (mcpMode) await syncMcpServers(configPath, mcpUpsertByName, mcpClearAll, mcpMode);
   } else {
-    if (manifest.sync.agents) syncAgents(configPath, getWorkingDirectory(), agentsForce);
+    if (manifest.sync.agents) await syncAgents(configPath, getWorkingDirectory(), agentsForce);
     const pluginsMode = resolveMergeMode(manifest.sync.plugins);
-    if (pluginsMode) syncPlugins(configPath, pluginsMode);
+    if (pluginsMode) await syncPlugins(configPath, pluginsMode);
     console.log('[Enterprise] version unchanged, skipping immutable package content');
   }
 
+  store.set('enterprise_config', manifest);
+  if (manifest.autoAcceptPrivacy) store.set('privacy_agreed', true);
   console.log('[Enterprise] config sync completed');
   return manifest;
 }
 
-function syncSkills(configPath: string, store: SqliteStore, mode: 'merge' | 'overwrite'): void {
+async function syncSkills(
+  configPath: string,
+  store: SqliteStore,
+  mode: 'merge' | 'overwrite',
+): Promise<void> {
   const sourceDir = path.join(configPath, 'skills');
-  if (!fs.existsSync(sourceDir)) {
+  if (!(await pathExists(sourceDir))) {
     console.log('[Enterprise] no skills directory found, skipping skills sync');
     return;
   }
 
   const targetDir = path.join(app.getPath('userData'), 'SKILLs');
-  fs.mkdirSync(targetDir, { recursive: true });
+  await fs.mkdir(targetDir, { recursive: true });
   if (mode === 'overwrite') {
-    for (const entry of fs.readdirSync(targetDir, { withFileTypes: true })) {
+    for (const entry of await fs.readdir(targetDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       try {
-        fs.rmSync(path.join(targetDir, entry.name), { recursive: true, force: true });
+        await fs.rm(path.join(targetDir, entry.name), { recursive: true, force: true });
       } catch (error) {
         console.warn(`[Enterprise] failed to remove existing skill "${entry.name}":`, error);
       }
@@ -107,10 +118,10 @@ function syncSkills(configPath: string, store: SqliteStore, mode: 'merge' | 'ove
   }
 
   const skillNames: string[] = [];
-  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+  for (const entry of await fs.readdir(sourceDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     try {
-      copyDirRecursive(path.join(sourceDir, entry.name), path.join(targetDir, entry.name));
+      await copyDirRecursive(path.join(sourceDir, entry.name), path.join(targetDir, entry.name));
       skillNames.push(entry.name);
     } catch (error) {
       console.warn(`[Enterprise] failed to copy skill "${entry.name}":`, error);
@@ -126,19 +137,23 @@ function syncSkills(configPath: string, store: SqliteStore, mode: 'merge' | 'ove
   console.log(`[Enterprise] synced ${skillNames.length} skills in ${mode} mode`);
 }
 
-function copyDirRecursive(source: string, target: string): void {
-  fs.mkdirSync(target, { recursive: true });
-  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+async function copyDirRecursive(source: string, target: string): Promise<void> {
+  await fs.mkdir(target, { recursive: true });
+  for (const entry of await fs.readdir(source, { withFileTypes: true })) {
     const sourcePath = path.join(source, entry.name);
     const targetPath = path.join(target, entry.name);
-    if (entry.isDirectory()) copyDirRecursive(sourcePath, targetPath);
-    else fs.copyFileSync(sourcePath, targetPath);
+    if (entry.isDirectory()) await copyDirRecursive(sourcePath, targetPath);
+    else await fs.copyFile(sourcePath, targetPath);
   }
 }
 
-function syncAgents(configPath: string, workspaceDir: string | undefined, force: boolean): void {
+async function syncAgents(
+  configPath: string,
+  workspaceDir: string | undefined,
+  force: boolean,
+): Promise<void> {
   const sourceDir = path.join(configPath, 'agents');
-  if (!fs.existsSync(sourceDir)) {
+  if (!(await pathExists(sourceDir))) {
     console.log('[Enterprise] no agents directory found, skipping agents sync');
     return;
   }
@@ -148,20 +163,20 @@ function syncAgents(configPath: string, workspaceDir: string | undefined, force:
   }
 
   try {
-    fs.mkdirSync(workspaceDir, { recursive: true });
+    await fs.mkdir(workspaceDir, { recursive: true });
   } catch (error) {
     console.warn(`[Enterprise] failed to prepare agent workspace at ${workspaceDir}:`, error);
     return;
   }
 
   let copiedCount = 0;
-  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+  for (const entry of await fs.readdir(sourceDir, { withFileTypes: true })) {
     const sourcePath = path.join(sourceDir, entry.name);
     const targetPath = path.join(workspaceDir, entry.name);
-    if (!force && fs.existsSync(targetPath)) continue;
+    if (!force && (await pathExists(targetPath))) continue;
     try {
-      if (entry.isDirectory()) copyDirRecursive(sourcePath, targetPath);
-      else fs.copyFileSync(sourcePath, targetPath);
+      if (entry.isDirectory()) await copyDirRecursive(sourcePath, targetPath);
+      else await fs.copyFile(sourcePath, targetPath);
       copiedCount += 1;
     } catch (error) {
       console.warn(`[Enterprise] failed to copy agent file "${entry.name}":`, error);
@@ -170,7 +185,7 @@ function syncAgents(configPath: string, workspaceDir: string | undefined, force:
   console.log(`[Enterprise] synced ${copiedCount} agent files to ${workspaceDir}`);
 }
 
-function syncMcpServers(
+async function syncMcpServers(
   configPath: string,
   upsertByName: (server: {
     name: string;
@@ -182,15 +197,15 @@ function syncMcpServers(
   }) => void,
   clearAll: () => void,
   mode: 'merge' | 'overwrite',
-): void {
+): Promise<void> {
   const serversPath = path.join(configPath, 'mcp', 'servers.json');
-  if (!fs.existsSync(serversPath)) {
+  if (!(await pathExists(serversPath))) {
     console.log('[Enterprise] no MCP server file found, skipping MCP sync');
     return;
   }
 
   try {
-    const servers = JSON.parse(fs.readFileSync(serversPath, 'utf-8')) as Array<{
+    const servers = JSON.parse(await fs.readFile(serversPath, 'utf-8')) as Array<{
       name: string;
       description?: string;
       transportType?: string;
@@ -222,14 +237,13 @@ function syncMcpServers(
   }
 }
 
-function syncPlugins(configPath: string, mode: 'merge' | 'overwrite'): void {
+async function syncPlugins(configPath: string, mode: 'merge' | 'overwrite'): Promise<void> {
   const pluginsDir = path.join(configPath, 'plugins');
-  if (!fs.existsSync(pluginsDir)) {
+  if (!(await pathExists(pluginsDir))) {
     console.log('[Enterprise] no plugins directory found, skipping plugin sync');
     return;
   }
-  const pluginCount = fs
-    .readdirSync(pluginsDir, { withFileTypes: true })
-    .filter(entry => entry.isDirectory()).length;
+  const entries = await fs.readdir(pluginsDir, { withFileTypes: true });
+  const pluginCount = entries.filter(entry => entry.isDirectory()).length;
   console.log(`[Enterprise] registered ${pluginCount} plugin packages in ${mode} mode`);
 }

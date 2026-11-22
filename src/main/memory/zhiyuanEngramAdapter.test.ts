@@ -9,8 +9,7 @@ afterEach(() => {
 
 test('keeps candidates local until they are explicitly confirmed', async () => {
   const manager = {
-    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
-    start: vi.fn(),
+    start: async () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
   };
   const requests: Array<{ pathname: string; init?: RequestInit }> = [];
   vi.stubGlobal(
@@ -47,8 +46,7 @@ test('includes the failed request method and path in runtime errors', async () =
     vi.fn(async () => new Response('{"error":"not found"}', { status: 404 })),
   );
   const adapter = new ZhiYuanEngramAdapter({
-    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
-    start: vi.fn(),
+    start: async () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
   } as never);
   const candidate = adapter.saveCandidate({
     sessionId: 'session-1',
@@ -66,7 +64,6 @@ test('includes the failed request method and path in runtime errors', async () =
 
 test('recall degrades to an empty result when the runtime is unavailable', async () => {
   const adapter = new ZhiYuanEngramAdapter({
-    getConnection: () => null,
     start: async () => null,
   } as never);
 
@@ -82,8 +79,7 @@ test('normalizes the runtime null search response after the last memory is forgo
     ),
   );
   const adapter = new ZhiYuanEngramAdapter({
-    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
-    start: vi.fn(),
+    start: async () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
   } as never);
 
   await expect(adapter.recall({ query: 'decision', project: 'project-a' })).resolves.toEqual([]);
@@ -102,8 +98,7 @@ test('forwards the requested match mode and supports bounded recent observations
     }),
   );
   const adapter = new ZhiYuanEngramAdapter({
-    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
-    start: vi.fn(),
+    start: async () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
   } as never);
 
   await adapter.recall({

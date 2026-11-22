@@ -48,7 +48,10 @@ test('a hidden prepared bubble loads no conversation until shown and stops refre
     const observer = new MutationObserver(records => {
       window.preparedThemeMutations += records.length;
     });
-    observer.observe(document.getElementById('zhiyuan-theme-styles'), { childList: true });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme', 'data-main-background', 'style'],
+    });
     window.preparedChanged();
   });
   await expect.poll(() => page.evaluate(() => window.preparedLoads)).toBe(2);

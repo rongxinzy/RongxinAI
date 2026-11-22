@@ -118,13 +118,6 @@ export interface CoworkMessage {
   metadata?: CoworkMessageMetadata;
 }
 
-export interface CoworkConversationReplacementEntry {
-  role: 'user' | 'assistant';
-  text: string;
-  metadata?: Record<string, unknown>;
-  timestamp?: number;
-}
-
 export interface CoworkSession {
   id: string;
   title: string;

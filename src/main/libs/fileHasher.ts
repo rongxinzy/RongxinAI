@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 
-/** Defaults for the shared streaming SHA-256 worker. */
+/** Defaults for the shared streaming file hash worker. */
 const FILE_HASHER_LIMITS = {
   MaxBytes: 512 * 1024 * 1024,
   TimeoutMs: 120_000,
@@ -18,13 +18,13 @@ type HasherOptions = {
   workerPath?: string;
 };
 
-/**
- * Stream a file through the shared SHA-256 worker (src/main/libs/hashWorker.ts).
- * Spawn-per-job like the app-update hasher: jobs are rare, so pool reuse
- * would only add lifecycle complexity. The main thread never reads the file.
- */
-export async function sha256FileStream(
+export function sha256FileStream(filePath: string, options?: HasherOptions): Promise<string> {
+  return hashFileStream(filePath, 'sha256', options);
+}
+
+export async function hashFileStream(
   filePath: string,
+  algorithm: 'sha256' | 'sha512',
   options: HasherOptions = {},
 ): Promise<string> {
   const {
@@ -48,7 +48,7 @@ export async function sha256FileStream(
   return new Promise((resolve, reject) => {
     let worker: Worker;
     try {
-      worker = new Worker(workerPath, { workerData: { file: filePath, maxBytes } });
+      worker = new Worker(workerPath, { workerData: { file: filePath, algorithm, maxBytes } });
     } catch (error) {
       reject(error instanceof Error ? error : new Error('Unable to start file hash worker'));
       return;
@@ -73,7 +73,8 @@ export async function sha256FileStream(
     worker.once('error', () => finish(new Error('File hash worker failed')));
     worker.once('exit', () => finish(new Error('File hash worker exited before a digest')));
     worker.once('message', (message: { digest?: string; error?: string; runMs?: number }) => {
-      if (message.error || !/^[a-f0-9]{64}$/.test(message.digest ?? '')) {
+      const digestFormat = algorithm === 'sha512' ? /^[A-Za-z0-9+/]{86}==$/ : /^[a-f0-9]{64}$/;
+      if (message.error || !digestFormat.test(message.digest ?? '')) {
         finish(new Error(message.error || 'Invalid file hash digest'));
       } else {
         console.debug(

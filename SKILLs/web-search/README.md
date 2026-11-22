@@ -1,10 +1,10 @@
 # Web Search Skill
 
-Real-time web search capability for ZhiYuan Agent using Playwright-controlled browser automation.
+Real-time search for ZhiYuan Agent and standalone CLI users.
 
 ## Overview
 
-The Web Search Skill enables ZhiYuan Agent to perform live web searches using Google and Bing, with automatic fallback when one provider is unavailable. The skill uses Playwright to control a local Chrome browser instance. It runs headless first to avoid interrupting the desktop, then retries once with a visible browser when headless search appears blocked.
+ZhiYuan runs hosted search through its built-in tools. The standalone CLI uses Playwright to control a local Chrome instance and searches Google or Bing. It runs headless first, then retries once with a visible browser when headless search appears blocked.
 
 ## Features
 
@@ -13,7 +13,7 @@ The Web Search Skill enables ZhiYuan Agent to perform live web searches using Go
 - ✅ **Playwright-Powered** - Robust browser automation using playwright-core
 - ✅ **Simple CLI** - Easy-to-use command-line interface for Claude
 - ✅ **HTTP API** - RESTful Bridge Server for advanced integrations
-- ✅ **Auto-Managed** - Electron automatically starts/stops the service
+- ✅ **On-Demand CLI** - The standalone search command starts its bridge as needed
 - ✅ **Connection Caching** - Reuses browser connections for performance
 - ✅ **Localhost Only** - Secure by design, no external exposure
 
@@ -30,7 +30,6 @@ Claude → Bash Tool → CLI Scripts → Bridge Server (localhost:8923) → Play
 3. **Browser Launcher** - Chrome lifecycle management
 4. **Search Engines** - Google primary and Bing fallback
 5. **CLI Scripts** - Simplified command-line interface
-6. **Electron Integration** - Automatic service management
 
 ## Quick Start
 
@@ -111,7 +110,6 @@ Default configuration in `server/config.ts`:
 ```typescript
 {
   browser: {
-    cdpPort: 9222,
     headless: true,
     fallbackToHeadful: true,
     chromeFlags: [/* ... */]
@@ -129,6 +127,8 @@ Default configuration in `server/config.ts`:
   }
 }
 ```
+
+Managed Chrome uses a temporary profile and a dynamically assigned CDP port. Optional `browser.userDataDir` sets the parent directory for those profiles.
 
 ## How Claude Uses This Skill
 
@@ -158,8 +158,8 @@ Claude: [Calls: node SKILLs/web-search/scripts/search.mjs "Next.js 14 features" 
 
 ### Browser Management
 
-- `POST /api/browser/launch` - Launch Chrome
-- `POST /api/browser/connect` - Connect to browser
+- `POST /api/browser/launch` - Launch managed Chrome and return its assigned CDP port
+- `POST /api/browser/connect` - Connect to managed Chrome, or pass `cdpPort` for an explicitly selected external browser
 - `POST /api/browser/disconnect` - Disconnect
 - `GET /api/browser/status` - Get status
 
@@ -272,7 +272,7 @@ Install Chrome:
 ```bash
 # Clean up
 node scripts/stop-server.mjs
-rm .connection .server.pid
+rm .connection
 
 # Restart
 node scripts/start-server.mjs

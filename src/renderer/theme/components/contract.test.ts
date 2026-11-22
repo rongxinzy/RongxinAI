@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { recipe } from './recipe';
-import { zenithLight } from '../themes/zenith-light';
+import { zenithLight } from '../themes';
 import { generateThemeCSS } from '../engine/css-generator';
 import { validateComponentAppearances } from './contract';
 

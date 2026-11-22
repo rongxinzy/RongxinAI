@@ -6,8 +6,6 @@ import { TOKEN_CONTRACT } from '../tokens/contract';
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const variables = new Set<string>(Object.values(TOKEN_CONTRACT));
 const exceptions: Record<string, string> = {
-  'src/renderer/components/cowork/helpers/exportUtils.ts':
-    'Portable conversation exports use print-oriented document styling.',
   'src/renderer/components/artifacts/ArtifactPanel.tsx':
     'Standalone exported documents preserve portable content styling.',
   'src/renderer/components/expert/expertAvatars.tsx':

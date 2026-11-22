@@ -1,12 +1,17 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import {
   AISphere,
   AISphereError,
   AISphereStatus,
   type AISphereSnapshot,
 } from '../../../shared/aisphere';
-import { ManagedProviderAccessMode } from '../../../shared/managedProviders';
-import type { ProviderConfig } from '../../../shared/providers';
+import {
+  ManagedProviderAccessMode,
+  type ManagedProviderCatalogModel,
+} from '../../../shared/managedProviders';
+import { ModelCapabilityStatus } from '../../../shared/providers';
+import type { MagpieHostProvider } from '../../magpie/hostProviders';
+import { MAGPIE_DEFAULT_MODEL_ID_KEY } from '../../magpie/modelService';
 import {
   normalizePlatformAddress,
   parsePlatformModels,
@@ -19,16 +24,10 @@ interface Store {
   get<T>(key: string): T | undefined;
   set(key: string, value: unknown): void;
 }
-interface ModelSelection {
-  defaultModel?: string;
-  defaultModelProvider?: string;
+interface Gateway {
+  baseUrl: string;
+  close: () => Promise<void>;
 }
-interface Config {
-  model?: ModelSelection;
-  providers?: Record<string, unknown>;
-  api?: unknown;
-}
-
 /** Owns real endpoints and credentials. Only a safe gateway projection leaves the main process. */
 export class AISphereService {
   private store?: Store;
@@ -39,7 +38,9 @@ export class AISphereService {
   private pending?: Promise<void>;
   private changing = false;
   private active = 0;
-  private gateway = '';
+  private gateway?: Gateway;
+  private openingGateway?: Promise<Gateway>;
+  private startGateway?: () => Promise<Gateway>;
   private readonly listeners = new Set<() => void>();
   private gatewayToken = randomBytes(32).toString('hex');
   get token(): string {
@@ -49,9 +50,9 @@ export class AISphereService {
 
   constructor(private readonly fetcher: PlatformFetch = platformFetch) {}
 
-  async initialize(store: Store, gateway: string): Promise<void> {
+  async initialize(store: Store, startGateway: () => Promise<Gateway>): Promise<void> {
     this.store = store;
-    this.gateway = gateway;
+    this.startGateway = startGateway;
     const stored = store.get<string>(AISphere.StoreKey);
     if (stored) {
       try {
@@ -61,6 +62,33 @@ export class AISphereService {
       }
     }
     await this.refresh().catch((): void => {});
+  }
+
+  private async ensureGateway(): Promise<void> {
+    const start = this.startGateway;
+    if (!start) throw new Error(AISphereError.Unavailable);
+    if (this.gateway) return;
+    const opening = (this.openingGateway ??= start());
+    try {
+      const gateway = await opening;
+      if (this.openingGateway !== opening) throw new Error(AISphereError.Unavailable);
+      this.gateway = gateway;
+    } finally {
+      if (this.openingGateway === opening) this.openingGateway = undefined;
+    }
+  }
+
+  private async closeGateway(): Promise<void> {
+    const { gateway, openingGateway } = this;
+    this.gateway = undefined;
+    this.openingGateway = undefined;
+    const opened = gateway ?? (await openingGateway?.catch((): undefined => undefined));
+    await opened?.close();
+  }
+
+  async shutdown(): Promise<void> {
+    this.startGateway = undefined;
+    await this.closeGateway();
   }
 
   snapshot(): AISphereSnapshot {
@@ -76,7 +104,71 @@ export class AISphereService {
   }
 
   policy() {
-    return { mode: ManagedProviderAccessMode.Exclusive, providerKeys: [AISphere.Provider] };
+    const providerId = this.providerId;
+    return {
+      mode: ManagedProviderAccessMode.Exclusive,
+      providerKeys: providerId ? [providerId] : [],
+    };
+  }
+
+  private get providerId(): string | null {
+    if (!this.address) return null;
+    const origin = createHash('sha256').update(this.address).digest('hex').slice(0, 24);
+    return `${AISphere.HostProviderPrefix}${origin}`;
+  }
+
+  allowedModel(modelRef: string, owner: string | undefined): boolean {
+    return (
+      this.ready &&
+      owner?.startsWith(AISphere.HostProviderPrefix) &&
+      owner === this.providerId &&
+      this.models.some(model => modelRef === `${owner}/${model.id}`)
+    );
+  }
+
+  defaultModelRef(): string {
+    const providerId = this.providerId;
+    if (!this.ready || !providerId || !this.models.length) return '';
+    const selection = this.store?.get<string>(MAGPIE_DEFAULT_MODEL_ID_KEY)?.trim() ?? '';
+    return this.allowedModel(selection, providerId)
+      ? selection
+      : `${providerId}/${this.models[0].id}`;
+  }
+
+  catalog(): ManagedProviderCatalogModel[] {
+    const providerId = this.providerId;
+    if (!this.ready || !providerId) return [];
+    const defaultModel = this.defaultModelRef();
+    return this.models.map(model => ({
+      ...publicModel(model),
+      id: `${providerId}/${model.id}`,
+      displayName: model.name,
+      providerKey: providerId,
+      providerDisplayName: 'AISphere',
+      isDefault: defaultModel === `${providerId}/${model.id}`,
+    }));
+  }
+
+  hostProvider(): MagpieHostProvider | null {
+    const providerId = this.providerId;
+    if (!this.ready || !providerId || !this.gateway || !this.models.length) return null;
+    return {
+      id: providerId,
+      name: 'AISphere',
+      api: 'openai-completions',
+      baseUrl: `${this.gateway.baseUrl}/v1`,
+      apiKey: this.token,
+      models: this.models.map(model => ({
+        id: model.id,
+        name: model.name,
+        contextWindow: model.contextWindow,
+        maxTokens: model.maxTokens,
+        input:
+          model.capabilities.imageInput === ModelCapabilityStatus.Supported
+            ? ['text', 'image']
+            : ['text'],
+      })),
+    };
   }
 
   onChanged(callback: () => void): () => void {
@@ -143,28 +235,16 @@ export class AISphereService {
       await this.pending?.catch((): void => {});
       const models = await this.discover(address);
       if (this.active || this.busy()) throw new Error(AISphereError.Busy);
+      if (!this.startGateway) throw new Error(AISphereError.Unavailable);
       const switching = address !== this.address;
+      if (models.length) await this.ensureGateway();
       this.store?.set(AISphere.StoreKey, address);
       if (switching) this.gatewayToken = randomBytes(32).toString('hex');
       this.address = address;
       this.models = models;
       this.ready = true;
       this.checkedAt = Date.now();
-      // A new binding must not retain an old platform's default selection.
-      const current = this.store?.get<Config>(AISphere.AppConfigKey) ?? {};
-      this.store?.set(
-        AISphere.AppConfigKey,
-        this.project({
-          ...current,
-          model: {
-            ...current.model,
-            defaultModel: switching
-              ? (models[0]?.id ?? '')
-              : (current.model?.defaultModel ?? models[0]?.id ?? ''),
-            defaultModelProvider: AISphere.Provider,
-          },
-        }),
-      );
+      if (switching) this.store?.set(MAGPIE_DEFAULT_MODEL_ID_KEY, this.defaultModelRef());
       this.notify();
       return this.snapshot();
     } finally {
@@ -179,18 +259,15 @@ export class AISphereService {
       await this.pending?.catch((): void => {});
       if (this.active || this.busy()) throw new Error(AISphereError.Busy);
       this.store?.set(AISphere.StoreKey, '');
+      const selection = this.store?.get<string>(MAGPIE_DEFAULT_MODEL_ID_KEY);
+      if (selection?.startsWith(AISphere.HostProviderPrefix))
+        this.store?.set(MAGPIE_DEFAULT_MODEL_ID_KEY, '');
       this.gatewayToken = randomBytes(32).toString('hex');
       this.address = '';
       this.models = [];
       this.ready = false;
       this.checkedAt = 0;
-      const current = this.store?.get<Config>(AISphere.AppConfigKey) ?? {};
-      if (current.model?.defaultModelProvider === AISphere.Provider) {
-        this.store?.set(AISphere.AppConfigKey, {
-          ...current,
-          model: { ...current.model, defaultModel: '', defaultModelProvider: '' },
-        });
-      }
+      await this.closeGateway();
       this.notify();
       return this.snapshot();
     } finally {
@@ -204,7 +281,9 @@ export class AISphereService {
     if (!this.address) return;
     this.pending = (async () => {
       try {
-        this.models = await this.discover(this.address);
+        const models = await this.discover(this.address);
+        if (models.length) await this.ensureGateway();
+        this.models = models;
         this.ready = true;
         this.checkedAt = Date.now();
       } catch (error) {
@@ -217,44 +296,6 @@ export class AISphereService {
       this.pending = undefined;
     });
     return this.pending;
-  }
-
-  provider(): ProviderConfig {
-    return {
-      enabled: true,
-      userEnabled: true,
-      displayName: 'AISphere',
-      apiFormat: 'openai',
-      baseUrl: this.gateway + '/v1',
-      apiKey: this.token,
-      models: this.ready ? this.models.map(publicModel) : [],
-    };
-  }
-
-  project<T extends Config>(config: T): T {
-    return {
-      ...config,
-      api: { key: this.token, baseUrl: this.gateway + '/v1', apiFormat: 'openai' },
-      providers: { [AISphere.Provider]: this.provider() },
-    };
-  }
-
-  selection(model?: string, provider?: string): { model: string; config: ProviderConfig } {
-    if (
-      !this.ready ||
-      !model ||
-      (provider && provider !== AISphere.Provider) ||
-      !this.models.some(item => item.id === model)
-    ) {
-      throw new Error(AISphereError.MissingModel);
-    }
-    return { model, config: this.provider() };
-  }
-
-  assertGateway(url: string, method: string): void {
-    if (!this.gateway || url !== this.gateway + AISphere.ChatPath || method !== 'POST') {
-      throw new Error(AISphereError.RequestRejected);
-    }
   }
 
   async acquire(model: string): Promise<{ model: PlatformModel; release: () => void }> {

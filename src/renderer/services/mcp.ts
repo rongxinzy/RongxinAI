@@ -209,22 +209,6 @@ class McpService {
     }
   }
 
-  /**
-   * Refresh the MCP Bridge: restarts MCP servers, re-discovers tools,
-   * refreshes the in-process MCP server connections.
-   * Returns the number of tools discovered.
-   */
-  async refreshBridge(): Promise<{ success: boolean; tools: number; error?: string }> {
-    try {
-      return await window.electron.mcp.refreshBridge();
-    } catch (error) {
-      const rawMessage = error instanceof Error ? error.message : 'Failed to refresh MCP bridge';
-      const message = normalizeMcpErrorMessage(rawMessage);
-      console.error('Failed to refresh MCP bridge:', error);
-      return { success: false, tools: 0, error: message };
-    }
-  }
-
   async authorize(
     data: McpServerFormData,
     requestId: string,

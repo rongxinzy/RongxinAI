@@ -26,12 +26,10 @@ test('streams a mock reply in the default scenario', async ({ page, baseURL }) =
 
   const problem = await page.evaluate(async () => {
     const directory = await window.electron.dialog.selectDirectory();
-    const file = await window.electron.dialog.selectFile();
-    const box = await window.electron.dialog.showMessageBox({ message: 'Preview' });
+    const files = await window.electron.dialog.selectFiles({ multiple: false });
     if (!directory.success || directory.path !== '/home/user/projects/preview')
       return 'selectDirectory';
-    if (!file.success || !file.path) return 'selectFile';
-    if (box.response !== 0) return 'showMessageBox';
+    if (!files.success || files.paths.length !== 1) return 'selectFiles';
     return '';
   });
   expect(problem).toBe('');
@@ -59,3 +57,34 @@ test('switches work and chat modes', async ({ page, baseURL }) => {
     throw new Error(failures.join('\n'));
   }
 });
+
+for (const colorScheme of ['light', 'dark']) {
+  test(`opens task search from the keyboard with a collapsed sidebar in ${colorScheme}`, async ({
+    page,
+    baseURL,
+  }) => {
+    const failures = [];
+    attachConsoleGuards(page, failures, 'task-search');
+    await applyDeterministicRendering(page);
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await home(page, baseURL, previewSearch({ scenario: PreviewScenario.Default, skipBoot: true }));
+    await expect(page).toHaveTitle('ZhiYuan Agent');
+    await expect
+      .poll(() => page.locator('html').evaluate(root => root.classList.contains('dark')))
+      .toBe(colorScheme === 'dark');
+
+    await page.getByRole('button', { name: 'Collapse', exact: true }).click();
+    const editor = page.getByRole('textbox').last();
+    await editor.fill('Keep this search draft');
+    await page.keyboard.press('ControlOrMeta+K');
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('combobox', { name: 'Search tasks...' })).toBeFocused();
+    await expect(dialog).toHaveCSS('border-radius', '16px');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(editor).toBeFocused();
+    await expect(editor).toHaveText('Keep this search draft');
+    expect(failures).toEqual([]);
+  });
+}

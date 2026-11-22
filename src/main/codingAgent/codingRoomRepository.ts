@@ -2,7 +2,9 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import type Database from 'better-sqlite3';
 
+import { ArtifactLedger } from '../artifactLedger/artifactLedger';
 import { recordCodingLaneArtifact } from '../artifactLedger/codingLaneArtifacts';
+import { prepareBuiltinLaneLookup, rowLane } from './laneRows';
 
 import {
   CodingErrorMessage,
@@ -46,25 +48,6 @@ const rowMission = (row: Record<string, unknown>): CodingMission => ({
   status: row.status as CodingMissionStatus,
   createdAt: Number(row.created_at),
   updatedAt: Number(row.updated_at),
-});
-const rowLane = (row: Record<string, unknown>): CodingAgentLane => ({
-  id: String(row.id),
-  missionId: String(row.mission_id),
-  profileId: String(row.profile_id),
-  modelOverride: (row.model_override as string | null) ?? null,
-  sourceRoot: String(row.source_root || row.execution_root || ''),
-  executionRoot: String(row.execution_root ?? ''),
-  configOptions: JSON.parse(String(row.config_options_json ?? '[]')) as CodingAgentConfigOption[],
-  availableCommands: JSON.parse(
-    String(row.available_commands_json ?? '[]'),
-  ) as CodingAgentAvailableCommand[],
-  localSessionId: String(row.local_session_id),
-  remoteSessionId: row.remote_session_id as string | null,
-  status: row.status as CodingLaneStatus,
-  draft: String(row.draft),
-  scrollPosition: Number(row.scroll_position),
-  pendingRecoveryPrompt: (row.pending_recovery_prompt as string | null) ?? null,
-  pendingRecoveryContext: (row.pending_recovery_context as string | null) ?? null,
 });
 const rowAssignment = (row: Record<string, unknown>): CodingAssignment => ({
   id: String(row.id),
@@ -134,7 +117,17 @@ export class CodingRoomRepository {
   private static readonly STREAM_FLUSH_THROTTLE_MS = 500;
   private static readonly STREAM_FLUSH_MAX_BACKOFF_MS = 30_000;
 
-  constructor(private readonly db: Database.Database) {}
+  private readonly builtinLaneBySession: ReturnType<typeof prepareBuiltinLaneLookup>;
+  private readonly builtinLaneExists: Database.Statement<[string, string]>;
+  constructor(
+    private readonly db: Database.Database,
+    private readonly artifactLedger = new ArtifactLedger(db),
+  ) {
+    this.builtinLaneBySession = prepareBuiltinLaneLookup(db);
+    this.builtinLaneExists = db.prepare(
+      'SELECT 1 FROM coding_agent_lanes WHERE local_session_id = ? AND profile_id = ?',
+    );
+  }
 
   getDatabase(): Database.Database {
     return this.db;
@@ -333,11 +326,18 @@ export class CodingRoomRepository {
       .get(laneId) as Record<string, unknown> | undefined;
     return row ? rowAssignment(row) : null;
   }
-  getLaneById(laneId: string): CodingAgentLane | null {
-    const row = this.db.prepare('SELECT * FROM coding_agent_lanes WHERE id = ?').get(laneId) as
-      | Record<string, unknown>
-      | undefined;
-    return row ? rowLane(row) : null;
+  hasBuiltinLaneSession(sessionId: string): boolean {
+    return Boolean(this.builtinLaneExists.get(sessionId, CodingAgentProfileId.Builtin));
+  }
+  getBuiltinLaneSession(sessionId: string) {
+    const row = this.builtinLaneBySession.get(sessionId);
+    return (
+      row && {
+        lane: rowLane(row),
+        roomId: String(row.room_id),
+        workspaceRoot: String(row.workspace_root),
+      }
+    );
   }
   getRoomByLaneId(laneId: string): CodingRoom | null {
     const row = this.db
@@ -706,7 +706,7 @@ export class CodingRoomRepository {
     this.db
       .prepare('INSERT INTO coding_events VALUES (?, ?, ?, ?, ?, ?)')
       .run(event.id, laneId, sequence, kind, JSON.stringify(payload), event.createdAt);
-    recordCodingLaneArtifact(this.db, laneId, kind, payload);
+    recordCodingLaneArtifact(this.db, this.artifactLedger, laneId, kind, payload);
     return event;
   }
   appendOrMergeStreamEvent(
@@ -714,15 +714,14 @@ export class CodingRoomRepository {
     kind: CodingEvent['kind'],
     payload: Record<string, unknown>,
   ): CodingEvent {
-    const streamId =
-      kind === CodingEventKind.MessageDelta
-        ? typeof payload.messageId === 'string'
-          ? payload.messageId
-          : null
-        : kind === CodingEventKind.ToolCall && typeof payload.toolCallId === 'string'
-          ? payload.toolCallId
+    const idKey =
+      kind === CodingEventKind.ToolCall
+        ? 'toolCallId'
+        : kind === CodingEventKind.MessageDelta || kind === CodingEventKind.Reasoning
+          ? 'messageId'
           : null;
-    if (!streamId || (kind !== CodingEventKind.MessageDelta && kind !== CodingEventKind.ToolCall)) {
+    const streamId = idKey && payload[idKey];
+    if (!idKey || typeof streamId !== 'string' || !streamId) {
       return this.appendEvent(laneId, kind, payload);
     }
     const key = `${laneId}:${kind}:${streamId}`;
@@ -741,12 +740,11 @@ export class CodingRoomRepository {
         createdAt: pending.createdAt,
       };
     }
-    const payloadIdPath = kind === CodingEventKind.MessageDelta ? '$.messageId' : '$.toolCallId';
     const previous = this.db
       .prepare(
-        `SELECT * FROM coding_events WHERE lane_id = ? AND kind = ? AND json_extract(payload_json, '${payloadIdPath}') = ? ORDER BY sequence DESC LIMIT 1`,
+        `SELECT * FROM coding_events WHERE lane_id = ? AND kind = ? AND json_extract(payload_json, ?) = ? ORDER BY sequence DESC LIMIT 1`,
       )
-      .get(laneId, kind, streamId) as Record<string, unknown> | undefined;
+      .get(laneId, kind, `$.${idKey}`, streamId) as Record<string, unknown> | undefined;
     if (previous) {
       // The stream row already exists (written before this process saw it);
       // take it over and continue merging in memory.
@@ -827,10 +825,10 @@ export class CodingRoomRepository {
       }
       this.pendingStreamWrites.delete(key);
       this.streamFlushBackoffMs.delete(entry.laneId);
-      // Streamed tool calls merge their full payload over time; re-evaluate
-      // the artifact rule when the merged payload reaches SQLite. Idempotent.
-      if (entry.kind === CodingEventKind.ToolCall) {
-        recordCodingLaneArtifact(this.db, entry.laneId, entry.kind, entry.payload);
+      // Re-evaluate artifacts when the merged tool payload reaches SQLite.
+      const { laneId: eventLaneId, kind, payload } = entry;
+      if (kind === CodingEventKind.ToolCall) {
+        recordCodingLaneArtifact(this.db, this.artifactLedger, eventLaneId, kind, payload);
       }
     }
     // Keep a lane's retry timer alive while it still has buffered writes.
@@ -938,13 +936,20 @@ export class CodingRoomRepository {
           CodingLaneStatus.WaitingElicitation,
         ) as Record<string, unknown>[]
     ).map(rowLane);
-    if (!interrupted.length) return [];
-    const laneIds = interrupted.map(lane => lane.id);
-    const missionIds = [...new Set(interrupted.map(lane => lane.missionId))];
-    const laneMarks = laneIds.map(() => '?').join(',');
-    const missionMarks = missionIds.map(() => '?').join(',');
-    const now = Date.now();
-    const recover = this.db.transaction(() => {
+    this.db.transaction(() => {
+      // A lease can outlive a crash before its lane becomes running or after it settles.
+      this.db
+        .prepare('UPDATE coding_workspace_leases SET lane_id = NULL, acquired_at = NULL')
+        .run();
+      this.db
+        .prepare('UPDATE coding_source_writer_leases SET lane_id = NULL, acquired_at = NULL')
+        .run();
+      if (!interrupted.length) return;
+      const laneIds = interrupted.map(lane => lane.id);
+      const missionIds = [...new Set(interrupted.map(lane => lane.missionId))];
+      const laneMarks = laneIds.map(() => '?').join(',');
+      const missionMarks = missionIds.map(() => '?').join(',');
+      const now = Date.now();
       this.db
         .prepare(
           `UPDATE coding_agent_lanes SET status = ?, updated_at = ? WHERE id IN (${laneMarks})`,
@@ -974,14 +979,7 @@ export class CodingRoomRepository {
           CodingMissionStatus.WaitingApproval,
           CodingMissionStatus.WaitingElicitation,
         );
-      this.db
-        .prepare('UPDATE coding_workspace_leases SET lane_id = NULL, acquired_at = NULL')
-        .run();
-      this.db
-        .prepare('UPDATE coding_source_writer_leases SET lane_id = NULL, acquired_at = NULL')
-        .run();
-    });
-    recover();
+    })();
     return interrupted;
   }
   createHandoff(

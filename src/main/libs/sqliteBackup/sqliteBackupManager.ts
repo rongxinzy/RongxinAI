@@ -4,6 +4,10 @@ import fs from 'fs';
 import path from 'path';
 
 import { DB_FILENAME } from '../../appConstants';
+import {
+  PI_COMPANION_SESSIONS_ROOT_DIR,
+  PI_SESSIONS_ROOT_DIR,
+} from '../agentEngine/piSessionStore';
 import { sha256FileStream } from '../fileHasher';
 import {
   SQLITE_BACKUP_ALWAYS_ON_STARTUP_ENV,
@@ -56,12 +60,17 @@ const applyRecommendedPragmas = (db: Database.Database): void => {
   db.pragma('wal_autocheckpoint = 1000'); // checkpoint every ~4 MB of WAL writes
 };
 
+const isSqliteCorruptionCode = (error: unknown): boolean => {
+  if (!(error instanceof Error) || !('code' in error)) return false;
+  return (
+    typeof error.code === 'string' && /^(SQLITE_CORRUPT(?:_|$)|SQLITE_NOTADB$)/.test(error.code)
+  );
+};
+
 const isRecoverableSqliteStartupError = (error: unknown): boolean => {
   if (!error || typeof error !== 'object') return false;
-  const candidate = error as { code?: string; message?: string };
-  if (candidate.code === 'SQLITE_CORRUPT' || candidate.code === 'SQLITE_NOTADB') {
-    return true;
-  }
+  const candidate = error as { message?: string };
+  if (isSqliteCorruptionCode(error)) return true;
   const message = typeof candidate.message === 'string' ? candidate.message.toLowerCase() : '';
   return (
     message.includes('database disk image is malformed') ||
@@ -85,11 +94,6 @@ const removeFileIfExists = (filePath: string): void => {
 
 const ensureDir = (dirPath: string): void => {
   fs.mkdirSync(dirPath, { recursive: true });
-};
-
-const copyFile = (sourcePath: string, destinationPath: string): void => {
-  ensureDir(path.dirname(destinationPath));
-  fs.copyFileSync(sourcePath, destinationPath);
 };
 
 const padTimestampSegment = (value: number, width = 2): string => {
@@ -118,11 +122,6 @@ export const formatTimestampForLocalPath = (value: number): string => {
 /** Streaming hash in the shared worker; the main thread never reads the file. */
 const computeFileSha256 = (filePath: string): Promise<string> =>
   sha256FileStream(filePath, { maxBytes: SQLITE_BACKUP_MAX_SNAPSHOT_BYTES });
-
-const readQuickCheck = (db: Database.Database): string => {
-  const row = db.prepare('PRAGMA quick_check').pluck().get() as string | undefined;
-  return typeof row === 'string' ? row : '';
-};
 
 export const buildSqliteBackupPaths = (userDataPath: string): SqliteBackupPaths => {
   const backupDir = path.join(userDataPath, SQLITE_BACKUP_DIR_NAME);
@@ -174,39 +173,12 @@ const resolveBackupRestorePath = (backupFilePath: string): string | null => {
   return null;
 };
 
-const publishBackupFile = (tempFilePath: string, finalFilePath: string): void => {
-  const swapFilePath = buildBackupSwapPath(finalFilePath);
-
-  if (!fileExists(finalFilePath)) {
-    fs.renameSync(tempFilePath, finalFilePath);
-    removeFileIfExists(swapFilePath);
-    return;
-  }
-
-  removeFileIfExists(swapFilePath);
-  fs.renameSync(finalFilePath, swapFilePath);
-
-  try {
-    fs.renameSync(tempFilePath, finalFilePath);
-    removeFileIfExists(swapFilePath);
-  } catch (error) {
-    if (!fileExists(finalFilePath) && fileExists(swapFilePath)) {
-      try {
-        fs.renameSync(swapFilePath, finalFilePath);
-      } catch (restoreError) {
-        console.error(
-          '[SqliteBackup] Failed to restore previous backup after publish error:',
-          restoreError,
-        );
-      }
-    }
-    throw error;
-  }
-};
-
 export class SqliteBackupManager {
   private userDataPath: string;
   private periodicTimer: NodeJS.Timeout | null = null;
+  private periodicBackup: Promise<SqliteBackupRecord> | null = null;
+  private readonly sourceCopies = new Set<Promise<Database.BackupMetadata>>();
+  private shuttingDown = false;
 
   constructor(userDataPath: string) {
     this.userDataPath = userDataPath;
@@ -242,14 +214,15 @@ export class SqliteBackupManager {
     }
   }
 
-  verifyDatabaseHealth(db: Database.Database): SqliteHealthCheckResult {
+  async verifyDatabaseHealth(dbFilePath: string): Promise<SqliteHealthCheckResult> {
     try {
-      const quickCheck = readQuickCheck(db);
+      const { check: quickCheck } = await verifySqliteFile(dbFilePath, 'quick_check');
       if (quickCheck === SQLITE_BACKUP_HEALTH_OK) {
         return { ok: true };
       }
       return { ok: false, reason: quickCheck || 'quick_check returned an empty result' };
     } catch (error) {
+      if (!isSqliteCorruptionCode(error)) throw error;
       return {
         ok: false,
         reason: error instanceof Error ? error.message : 'quick_check failed',
@@ -261,6 +234,7 @@ export class SqliteBackupManager {
     db: Database.Database;
     trigger: SqliteBackupTriggerType;
   }): Promise<SqliteBackupRecord> {
+    if (this.shuttingDown) throw new Error('SQLite backup is shutting down.');
     const { snapshotsDir } = this.getPaths();
     ensureDir(snapshotsDir);
 
@@ -274,7 +248,7 @@ export class SqliteBackupManager {
     console.log(`[SqliteBackup] Starting ${input.trigger} backup to ${finalFileName}`);
 
     try {
-      await input.db.backup(tempFilePath, {
+      const copying = input.db.backup(tempFilePath, {
         progress: (progress: SqliteBackupProgress) => {
           const transferredPages = Math.max(0, progress.totalPages - progress.remainingPages);
           console.debug(
@@ -283,6 +257,12 @@ export class SqliteBackupManager {
           return SQLITE_BACKUP_PROGRESS_PAGE_RATE;
         },
       });
+      this.sourceCopies.add(copying);
+      try {
+        await copying;
+      } finally {
+        this.sourceCopies.delete(copying);
+      }
 
       // Off-thread verification: quick_check walks every page of the temp
       // snapshot, which must not block the main-process event loop.
@@ -297,31 +277,22 @@ export class SqliteBackupManager {
         throw new Error(`Backup quick_check failed: ${quickCheck}`);
       }
 
-      publishBackupFile(tempFilePath, finalFilePath);
-
-      const stat = fs.statSync(finalFilePath);
+      const stat = await fs.promises.stat(tempFilePath);
       const record = buildSingleBackupRecord({
         id,
         fileName: finalFileName,
         createdAt,
         trigger: input.trigger,
         sizeBytes: stat.size,
-        checksumSha256: await computeFileSha256(finalFilePath),
+        checksumSha256: await computeFileSha256(tempFilePath),
         quickCheck: 'ok',
         sourceUserVersion,
         sourceSchemaVersion,
         restoreTested: false,
       });
 
-      const nextManifest = this.writeManifest({
-        version: SQLITE_BACKUP_MANIFEST_VERSION,
-        snapshots: [record],
-        updatedAt: Date.now(),
-      });
-
-      console.log(
-        `[SqliteBackup] Completed ${input.trigger} backup with ${nextManifest.snapshots.length} retained snapshot(s)`,
-      );
+      this.publishBackup(tempFilePath, finalFilePath, record);
+      console.log(`[SqliteBackup] Completed ${input.trigger} backup to ${finalFileName}`);
       return record;
     } catch (error) {
       removeFileIfExists(tempFilePath);
@@ -334,8 +305,9 @@ export class SqliteBackupManager {
     const manifest = this.readManifest();
     const { snapshotsDir, quarantineDir } = this.getPaths();
     const quarantineStamp = formatTimestampForLocalPath(Date.now());
-    const quarantineTargetDir = path.join(quarantineDir, quarantineStamp);
-    let hasQuarantinedCurrentFiles = false;
+    ensureDir(quarantineDir);
+    const quarantineTargetDir = fs.mkdtempSync(path.join(quarantineDir, `${quarantineStamp}-`));
+    this.quarantineRecoveryFiles(dbFilePath, quarantineTargetDir);
 
     for (const snapshot of manifest.snapshots.sort(
       (left, right) => right.createdAt - left.createdAt,
@@ -344,12 +316,8 @@ export class SqliteBackupManager {
       if (!snapshotPath) continue;
 
       try {
-        if (!hasQuarantinedCurrentFiles) {
-          ensureDir(quarantineTargetDir);
-          this.quarantineDatabaseFiles(dbFilePath, quarantineTargetDir);
-          hasQuarantinedCurrentFiles = true;
-        }
-        copyFile(snapshotPath, dbFilePath);
+        await fs.promises.mkdir(path.dirname(dbFilePath), { recursive: true });
+        await fs.promises.copyFile(snapshotPath, dbFilePath);
         removeFileIfExists(`${dbFilePath}-wal`);
         removeFileIfExists(`${dbFilePath}-shm`);
 
@@ -381,10 +349,6 @@ export class SqliteBackupManager {
       }
     }
 
-    if (!hasQuarantinedCurrentFiles) {
-      ensureDir(quarantineTargetDir);
-      this.quarantineDatabaseFiles(dbFilePath, quarantineTargetDir);
-    }
     return { restored: false };
   }
 
@@ -406,18 +370,15 @@ export class SqliteBackupManager {
   }
 
   async startPeriodicBackupLoop(getDb: () => Database.Database): Promise<void> {
-    if (this.shouldCreatePeriodicBackup()) {
-      await this.createBackup({ db: getDb(), trigger: SqliteBackupTrigger.Periodic });
-    }
+    if (this.shuttingDown) return;
     this.stopPeriodicBackupLoop();
     this.periodicTimer = setInterval(() => {
       if (!this.shouldCreatePeriodicBackup()) return;
-      void this.createBackup({ db: getDb(), trigger: SqliteBackupTrigger.Periodic }).catch(
-        error => {
-          console.error('[SqliteBackup] Periodic backup failed:', error);
-        },
-      );
+      void this.runPeriodicBackup(getDb).catch(error => {
+        console.error('[SqliteBackup] Periodic backup failed:', error);
+      });
     }, SQLITE_BACKUP_INTERVAL_MS);
+    if (this.shouldCreatePeriodicBackup()) await this.runPeriodicBackup(getDb);
   }
 
   stopPeriodicBackupLoop(): void {
@@ -427,7 +388,64 @@ export class SqliteBackupManager {
     }
   }
 
-  private writeManifest(manifest: SqliteBackupManifest): SqliteBackupManifest {
+  shutdown() {
+    this.shuttingDown = true;
+    this.stopPeriodicBackupLoop();
+    return {
+      sourceReleased: Promise.allSettled(this.sourceCopies),
+      finished: this.periodicBackup ?? undefined,
+    };
+  }
+
+  private runPeriodicBackup(getDb: () => Database.Database): Promise<SqliteBackupRecord> {
+    this.periodicBackup ??= this.createBackup({
+      db: getDb(),
+      trigger: SqliteBackupTrigger.Periodic,
+    }).finally(() => {
+      this.periodicBackup = null;
+    });
+    return this.periodicBackup;
+  }
+
+  private publishBackup(
+    tempFilePath: string,
+    finalFilePath: string,
+    record: SqliteBackupRecord,
+  ): void {
+    const swapFilePath = buildBackupSwapPath(finalFilePath);
+    if (fileExists(finalFilePath)) {
+      removeFileIfExists(swapFilePath);
+      fs.renameSync(finalFilePath, swapFilePath);
+    }
+
+    try {
+      fs.renameSync(tempFilePath, finalFilePath);
+      this.writeManifest({
+        version: SQLITE_BACKUP_MANIFEST_VERSION,
+        snapshots: [record],
+        updatedAt: Date.now(),
+      });
+    } catch (error) {
+      try {
+        removeFileIfExists(finalFilePath);
+        if (fileExists(swapFilePath)) fs.renameSync(swapFilePath, finalFilePath);
+      } catch (restoreError) {
+        console.error(
+          '[SqliteBackup] Failed to restore previous backup after publish error:',
+          restoreError,
+        );
+      }
+      throw error;
+    }
+
+    try {
+      removeFileIfExists(swapFilePath);
+    } catch (error) {
+      console.warn('[SqliteBackup] Failed to remove previous snapshot after publish:', error);
+    }
+  }
+
+  private writeManifest(manifest: SqliteBackupManifest): void {
     const { backupDir, manifestPath, snapshotsDir } = this.getPaths();
     ensureDir(backupDir);
     ensureDir(snapshotsDir);
@@ -446,14 +464,34 @@ export class SqliteBackupManager {
         removeFileIfExists(path.join(snapshotsDir, record.fileName));
       }
     }
-    return nextManifest;
   }
 
-  private quarantineDatabaseFiles(dbFilePath: string, quarantineTargetDir: string): void {
-    const candidates = [dbFilePath, `${dbFilePath}-wal`, `${dbFilePath}-shm`];
-    for (const candidate of candidates) {
-      if (!fileExists(candidate)) continue;
-      fs.renameSync(candidate, path.join(quarantineTargetDir, path.basename(candidate)));
+  private quarantineRecoveryFiles(dbFilePath: string, quarantineTargetDir: string): void {
+    const candidates = [`${dbFilePath}-wal`, `${dbFilePath}-shm`, dbFilePath];
+    if (path.resolve(dbFilePath) === path.resolve(this.userDataPath, DB_FILENAME)) {
+      // Keep native histories from being paired with an older or empty display database.
+      candidates.unshift(
+        path.join(this.userDataPath, PI_SESSIONS_ROOT_DIR),
+        path.join(this.userDataPath, PI_COMPANION_SESSIONS_ROOT_DIR),
+      );
+    }
+    const moved: Array<{ original: string; archived: string }> = [];
+    for (const original of candidates) {
+      const archived = path.join(quarantineTargetDir, path.basename(original));
+      try {
+        fs.renameSync(original, archived);
+        moved.push({ original, archived });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+        for (const entry of moved.reverse()) {
+          try {
+            fs.renameSync(entry.archived, entry.original);
+          } catch (rollbackError) {
+            console.error('[SqliteBackup] Failed to roll back a quarantined path:', rollbackError);
+          }
+        }
+        throw error;
+      }
     }
   }
 

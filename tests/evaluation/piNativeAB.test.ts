@@ -4,7 +4,7 @@ import { provider } from './piNativeABProvider';
 import { reportEvaluationRow, runEvaluationArm } from './piNativeABRunner';
 
 // Opt in to network and possible provider charges. Use PI_AB_USE_ZHIYUAN_FREE=1,
-// PI_AB_USE_ZHIYUAN_INTRANET=1, or PI_AB_BASE_URL/PI_AB_MODEL/optional PI_AB_API_KEY.
+// PI_AB_USE_ZHIYUAN_INTRANET=1 with PI_AB_API_KEY, or PI_AB_BASE_URL and PI_AB_MODEL.
 // PI_AB_STRESS=1 runs one pair with 1,050 additional records that should be excluded.
 // PI_AB=1 bunx --no-install vitest run tests/evaluation/piNativeAB.test.ts
 test.skipIf(process.env.PI_AB !== '1')(

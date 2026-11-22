@@ -5,14 +5,18 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 
+export const LLAMACPP_MODEL_DAEMON_HANDOFF = 'llamacpp-daemon-handoff';
+
 export const LlamaCppModelDaemonCommand = {
   Status: 'status',
   ListRunningModels: 'list-running-models',
   EnsureModel: 'ensure-model',
   StopModel: 'stop-model',
+  DeleteModelFile: 'delete-model-file',
   StopAll: 'stop-all',
   ApplyConfig: 'apply-config',
   Shutdown: 'shutdown',
+  ShutdownIfIdle: 'shutdown-if-idle',
 } as const;
 
 export type LlamaCppModelDaemonCommand =
@@ -45,12 +49,21 @@ export type LlamaCppModelDaemonRequest =
       input: LlamaCppModelLaunchInput;
     }
   | { command: typeof LlamaCppModelDaemonCommand.StopModel; modelName: string }
+  | {
+      command: typeof LlamaCppModelDaemonCommand.DeleteModelFile;
+      modelName: string;
+      modelPath: string;
+    }
   | { command: typeof LlamaCppModelDaemonCommand.StopAll }
   | {
       command: typeof LlamaCppModelDaemonCommand.ApplyConfig;
       serviceConfig: LlamaCppServiceConfig;
     }
-  | { command: typeof LlamaCppModelDaemonCommand.Shutdown };
+  | {
+      command:
+        | typeof LlamaCppModelDaemonCommand.Shutdown
+        | typeof LlamaCppModelDaemonCommand.ShutdownIfIdle;
+    };
 
 export type LlamaCppModelDaemonResponse =
   | { success: true; status: LlamaCppModelDaemonStatus }

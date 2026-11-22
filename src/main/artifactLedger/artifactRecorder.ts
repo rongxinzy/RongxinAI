@@ -19,7 +19,7 @@ import {
 } from '../../shared/cowork/artifactPreview';
 import { getRecordedArtifactClassification } from '../../shared/cowork/artifactClassification';
 import type { CoworkArtifactRole, CoworkArtifactType } from '../../shared/cowork/artifacts';
-import { CoworkArtifactRole as ArtifactRole } from '../../shared/cowork/artifacts';
+import { NATIVE_READ_ONLY_TOOLS } from '../workbenchTask/riskClassifier';
 import {
   artifactKeyForPath,
   ArtifactLedger,
@@ -28,6 +28,7 @@ import {
 } from './artifactLedger';
 import { publishArtifactUpsert } from './publisher';
 import { isInternalWorkflowStatePath } from './summaryWork';
+import type { WorkspaceObservations } from './workspaceObservations';
 import {
   takeWorkspaceSnapshot,
   type WorkspaceSnapshot,
@@ -76,11 +77,12 @@ export class ArtifactRecorder {
   private readonly recordedMtimes = new Map<string, number>();
   private readonly pendingMtimeReads = new Set<Promise<void>>();
   private workVersion = 0;
-  private baseline: WorkspaceSnapshot | null = null;
   private latest: WorkspaceSnapshot | null = null;
   private baselinePromise: Promise<WorkspaceSnapshot | null> | null = null;
+  private observation: ReturnType<WorkspaceObservations['begin']> | null = null;
   private diffTimer: ReturnType<typeof setTimeout> | null = null;
   private lastDiff: Promise<void> | null = null;
+  private finalCapture: Promise<number> | null = null;
   private diffAnchor = '';
   private warnedTruncated = false;
   private runGeneration = 0;
@@ -96,20 +98,22 @@ export class ArtifactRecorder {
   /** New agent run: reset per-run state and capture the workspace baseline. */
   onRunStart(runId: string | null): void {
     if (this.disposed) return;
+    // Pi can start another loop while recovering the same Workbench run.
+    if (runId !== null && this.runId === runId) return;
     this.runId = runId;
     this.runGeneration += 1;
     this.recordedKeys = new Set();
     this.recordedMtimes.clear();
     this.workVersion = 0;
-    this.baseline = null;
     this.latest = null;
+    this.observation?.release();
+    this.observation = this.ledger.workspaceObservations.begin(this.workspaceRoot);
     const generation = this.runGeneration;
     this.baselinePromise = takeWorkspaceSnapshot(this.workspaceRoot, {
       ...this.snapshotOptions,
       signal: this.lifecycle.signal,
     }).then(snapshot => {
       if (this.disposed || generation !== this.runGeneration || !snapshot) return snapshot;
-      this.baseline = snapshot;
       this.latest = snapshot;
       this.warnOnceIfTruncated(snapshot);
       return snapshot;
@@ -149,28 +153,42 @@ export class ArtifactRecorder {
       return;
     }
 
-    // Any other tool may still have produced files (bash, python, skills).
-    this.scheduleDiff(input.resultMessageId);
+    // Shell, Python and other tools may write files without a known target.
+    if (!NATIVE_READ_ONLY_TOOLS.has(toolName)) this.scheduleDiff(input.resultMessageId);
   }
 
   /** Run settled: flush the final workspace diff anchored to the final answer. */
-  onRunSettled(finalAnswerMessageId: string | null): void {
-    if (this.disposed) return;
+  onRunSettled(finalAnswerMessageId: string | null): Promise<number> {
+    const generation = this.runGeneration;
+    const observation = this.observation;
+    const workVersion = this.workVersion;
+    if (this.disposed) return Promise.resolve(workVersion);
     if (this.diffTimer) {
       clearTimeout(this.diffTimer);
       this.diffTimer = null;
     }
     const anchor = finalAnswerMessageId ?? this.diffAnchor;
-    this.lastDiff = this.runDiff(anchor, true);
+    this.enqueueDiff(anchor, true);
+    const capture = this.settled()
+      .then(() => (generation === this.runGeneration ? this.workVersion : workVersion))
+      .finally(() => {
+        observation?.release();
+        if (this.finalCapture === capture) this.finalCapture = null;
+      });
+    this.finalCapture = capture;
+    return capture;
   }
 
-  /** Resolves once the settle-time workspace diff has landed in the ledger;
-   * task delivery reads the run's rows only after this. Never rejects. */
+  get pendingFinalCapture(): Promise<number> | null {
+    return this.finalCapture;
+  }
+
+  /** Resolves after the last requested diff, including the final ledger writes. */
   async settled(): Promise<void> {
     try {
       await this.lastDiff;
     } catch {
-      // A failed diff leaves the rows recorded so far; delivery still proceeds.
+      // A failed diff leaves the rows recorded so far.
     }
   }
 
@@ -184,7 +202,7 @@ export class ArtifactRecorder {
     if (this.diffTimer) {
       clearTimeout(this.diffTimer);
       this.diffTimer = null;
-      this.lastDiff = this.runDiff(this.diffAnchor, false);
+      this.enqueueDiff(this.diffAnchor, false);
     }
     await this.lastDiff;
   }
@@ -193,6 +211,8 @@ export class ArtifactRecorder {
     if (this.disposed) return;
     this.disposed = true;
     this.lifecycle.abort();
+    this.observation?.release();
+    this.observation = null;
     if (this.diffTimer) {
       clearTimeout(this.diffTimer);
       this.diffTimer = null;
@@ -298,8 +318,17 @@ export class ArtifactRecorder {
     this.diffAnchor = anchorMessageId;
     this.diffTimer = setTimeout(() => {
       this.diffTimer = null;
-      this.lastDiff = this.runDiff(anchorMessageId, false);
+      this.enqueueDiff(anchorMessageId, false);
     }, DIFF_DEBOUNCE_MS);
+  }
+
+  private enqueueDiff(anchorMessageId: string, isFinal: boolean): void {
+    const generation = this.runGeneration;
+    this.lastDiff = this.settled().then(async () => {
+      if (generation !== this.runGeneration) return;
+      if (!isFinal && anchorMessageId !== this.diffAnchor) return;
+      await this.runDiff(anchorMessageId, isFinal);
+    });
   }
 
   private async runDiff(anchorMessageId: string, isFinal: boolean): Promise<void> {
@@ -307,6 +336,8 @@ export class ArtifactRecorder {
     // A diff that outlives its run must not stamp the next run with stale
     // baselines or attribute records to the wrong run.
     const generation = this.runGeneration;
+    const observation = this.observation;
+    if (!observation) return;
     const base = this.latest ?? (await this.baselinePromise);
     if (this.disposed || generation !== this.runGeneration || !base) return;
     const next = await takeWorkspaceSnapshot(this.workspaceRoot, {
@@ -319,9 +350,11 @@ export class ArtifactRecorder {
       return;
     }
     await Promise.all([...this.pendingMtimeReads]);
+    await observation.compareRoots();
     if (this.disposed || generation !== this.runGeneration) return;
     for (const [key, entry] of next.byKey) {
       if (base.byKey.get(key)?.mtimeMs === entry.mtimeMs) continue;
+      if (!observation.canAttribute(entry.path)) continue;
       const artifactKey = artifactKeyForPath(entry.path);
       if (this.recordedKeys.has(artifactKey)) {
         if (

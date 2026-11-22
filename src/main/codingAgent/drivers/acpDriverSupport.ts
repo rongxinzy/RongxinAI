@@ -9,14 +9,11 @@ import { AcpEventQueue } from '../acp/acpEventQueue';
 /** Driver event shape before the coding room stamps identity and ordering. */
 export type DriverEvent = Omit<CodingEvent, 'id' | 'laneId' | 'sequence' | 'createdAt'>;
 
-/** Authentication method advertised by an ACP agent in its initialize result. */
-export type AcpAuthMethod = { id: string; type?: string };
-
 export type AcpInitializeResult = {
   protocolVersion?: unknown;
   agentCapabilities?: Record<string, unknown>;
   capabilities?: Record<string, unknown>;
-  authMethods?: AcpAuthMethod[];
+  authMethods?: unknown;
 };
 
 export type AcpSessionResult = { sessionId?: string; configOptions?: unknown };

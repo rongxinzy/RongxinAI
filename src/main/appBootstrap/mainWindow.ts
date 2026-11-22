@@ -7,7 +7,6 @@ import { app, nativeImage, shell, BrowserWindow } from 'electron';
 import { DEV_SERVER_URL, isDev, isLinuxRendererSmoke, isMac } from './appEnv';
 import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { PRELOAD_PATH, applyWindowsWindowIcon } from './windowBranding';
-import { emitWindowState, schedulePersistAppWindowState } from './windowManagement';
 import { openDevToolsWindow, toggleDevToolsForSender } from '../appIpc';
 import { isWecomAuthUrl } from './windowSecurity';
 import { logAppQuitContextOnce } from './appLifecycle';
@@ -27,27 +26,23 @@ import { setLanguage } from '../i18n';
 import { createTray, updateTrayMenu } from '../trayManager';
 import {
   initializeDesktopPet,
-  setDesktopPetAppearance,
   getDesktopPetWindow,
-  setDesktopPetBubbleVisible,
-  observeDesktopPetCompanionActivity,
+  refreshDesktopPetState,
 } from '../desktopPet/controller';
 import { initializeCompanionWindow } from '../companion/window';
-import { getCompanionTasks } from './companionTasks';
-import { openDesktopPetSession } from '../desktopPet/controller';
+import { getCompanionServices } from './companionTasks';
 import { getPiRuntimeAdapter } from './sessionServices';
+import { openDesktopPetSession } from '../desktopPet/controller';
 import {
+  cancelPersistAppWindowState,
+  emitWindowState,
   getDisplayWorkAreas,
   getTitleBarOverlayOptions,
   persistAppWindowState,
+  schedulePersistAppWindowState,
   scheduleReload,
 } from './windowManagement';
 import { getInitialTheme } from './appConfigSettings';
-import {
-  migrateLegacyScheduledTasksToCanonical,
-  migrateLegacyScheduledTaskRunsToCanonical,
-} from '../../scheduledTask/migrate';
-import { SqliteScheduledTaskStore } from '../../scheduledTask/sqliteScheduledTaskStore';
 
 export const createMainWindow = (): void => {
   // 创建主窗口
@@ -184,10 +179,6 @@ export const createMainWindow = (): void => {
 
     // 处理窗口关闭
     lifecycleRuntime.mainWindow.on('close', e => {
-      if (lifecycleRuntime.windowStateSaveTimer) {
-        clearTimeout(lifecycleRuntime.windowStateSaveTimer);
-        lifecycleRuntime.windowStateSaveTimer = null;
-      }
       persistAppWindowState();
 
       // In development, close should actually quit so `npm run electron:dev`
@@ -263,10 +254,7 @@ export const createMainWindow = (): void => {
     // 当窗口关闭时，清除引用
     lifecycleRuntime.mainWindow.on('closed', () => {
       unregisterContextMenu();
-      if (lifecycleRuntime.windowStateSaveTimer) {
-        clearTimeout(lifecycleRuntime.windowStateSaveTimer);
-        lifecycleRuntime.windowStateSaveTimer = null;
-      }
+      cancelPersistAppWindowState();
       lifecycleRuntime.mainWindow = null;
       // Hidden companion/pet/tray surfaces keep the event loop alive, so a
       // destroyed main window used to leave a windowless process holding the
@@ -301,6 +289,7 @@ export const createMainWindow = (): void => {
     // Show the loaded window so the first launch does not remain hidden until a second click.
     lifecycleRuntime.mainWindow.webContents.once('did-finish-load', () => {
       if (
+        !lifecycleRuntime.isQuitting &&
         lifecycleRuntime.mainWindow &&
         !lifecycleRuntime.mainWindow.isDestroyed() &&
         !lifecycleRuntime.mainWindow.isVisible() &&
@@ -315,6 +304,7 @@ export const createMainWindow = (): void => {
 
     // 等待内容加载完成后再显示窗口
     lifecycleRuntime.mainWindow.once('ready-to-show', () => {
+      if (lifecycleRuntime.isQuitting) return;
       // 2026/09/20 lixiang  显示前再套一次图标，避免 Windows 任务栏仍缓存 electron 默认图标
       if (lifecycleRuntime.mainWindow && !lifecycleRuntime.mainWindow.isDestroyed()) {
         applyWindowsWindowIcon(lifecycleRuntime.mainWindow);
@@ -332,41 +322,23 @@ export const createMainWindow = (): void => {
       setLanguage(initLang === 'en' ? 'en' : 'zh');
       // 窗口就绪后创建系统托盘
       createTray(focusOrCreateMainWindow);
-      initializeDesktopPet(getStore(), focusOrCreateMainWindow, () =>
-        updateTrayMenu(focusOrCreateMainWindow),
+      const { companions, tasks } = getCompanionServices();
+      initializeDesktopPet(
+        getStore(),
+        focusOrCreateMainWindow,
+        () => updateTrayMenu(focusOrCreateMainWindow),
+        companions,
+        getPiRuntimeAdapter(),
       );
       initializeCompanionWindow({
         store: getStore(),
         getMainWindow: () => lifecycleRuntime.mainWindow,
         getPetWindow: getDesktopPetWindow,
-        onBubbleVisibility: setDesktopPetBubbleVisible,
-        onActivity: observeDesktopPetCompanionActivity,
-        getCompanions: () => getPiRuntimeAdapter().getCompanions(),
-        getTasks: getCompanionTasks,
+        onVisibilityChanged: refreshDesktopPetState,
+        getCompanions: () => companions,
+        getTasks: () => tasks,
         openTask: openDesktopPetSession,
-        onProfileChanged: profile => setDesktopPetAppearance(profile.characterId),
       });
-
-      (async () => {
-        // One-time migration: import legacy SQLite task records into the
-        // canonical scheduler. No task is delegated to another runtime.
-        migrateLegacyScheduledTasksToCanonical({
-          db: getStore().getDatabase(),
-          getKv: key => getStore().get(key),
-          setKv: (key, value) => getStore().set(key, value),
-          store: new SqliteScheduledTaskStore(getStore().getDatabase()),
-        }).catch(err => {
-          console.warn('[Main] Canonical scheduled-task migration failed:', err);
-        });
-        migrateLegacyScheduledTaskRunsToCanonical({
-          db: getStore().getDatabase(),
-          getKv: key => getStore().get(key),
-          setKv: (key, value) => getStore().set(key, value),
-          store: new SqliteScheduledTaskStore(getStore().getDatabase()),
-        }).catch(err => {
-          console.warn('[Main] Canonical scheduled-task Run migration failed:', err);
-        });
-      })();
     });
   };
 

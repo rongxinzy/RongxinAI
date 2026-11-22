@@ -42,7 +42,6 @@ jobs:
           restore-keys: |
             copy-v2-bun-${{ runner.os }}-1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
-      - run: bun run apply:patches
       - name: Bundle the independent Runner
         run: bun build src/main/pythonRuntime/runner.ts --target=node --format=cjs --outfile=dist-electron/python-runtime-runner.js
       - name: Restore the bundled managed runtime cache
@@ -89,7 +88,6 @@ jobs:
           restore-keys: |
             copy-v2-bun-${{ runner.os }}-1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
-      - run: bun run apply:patches
       - name: Bundle the independent Runner
         run: bun build src/main/pythonRuntime/runner.ts --target=node --format=cjs --outfile=dist-electron/python-runtime-runner.js
       - name: Restore the bundled managed runtime cache

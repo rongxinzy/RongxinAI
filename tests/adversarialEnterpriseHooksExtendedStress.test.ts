@@ -1,447 +1,208 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { startEnterpriseModelGateway } from '../src/main/enterpriseExtension/modelGateway';
+import { ModelRuntime } from '@earendil-works/pi-coding-agent';
+import type { Model } from '@earendil-works/pi-ai';
 import { describe, expect, it, vi } from 'vitest';
-import { ZhiyuanModelPoolHeader } from '../src/shared/modelPool/constants';
-import { createPiEnterpriseProviderExtension } from '../src/main/enterpriseExtension/piEnterpriseProviderExtension';
-import type {
-  ZhiyuanManagedProviderBridge,
-  ManagedEnterpriseModelRuntimeConfig,
-} from '../src/main/enterpriseExtension/managedProviderBridge';
-import { PiExtensionEventType } from '../src/main/libs/agentEngine/piExtensionTypes';
+import { zhiyuanManagedProviderBridge } from '../src/main/enterpriseExtension/managedProviderBridge';
+import { resolvePiModel } from '../src/main/libs/agentEngine/piMagpiePiModel';
+import { getPiModules } from '../src/main/libs/agentEngine/piRuntimeSessionState';
+import {
+  MAGPIE_RUNTIME_API_KEY,
+  MAGPIE_ENTERPRISE_CHAT_WORKLOAD,
+  MagpieWorkHeader,
+  MagpieModelService,
+} from '../src/main/magpie/modelService';
+import {
+  ZhiyuanModelPoolHeader,
+  ZhiyuanModelPoolWorkload,
+} from '../src/shared/modelPool/constants';
+import { ApiFormat } from '../src/shared/providers';
 
-function setupHarness(options?: {
-  isManaged?: boolean;
-  token?: string;
-  api?: string;
-  headers?: Record<string, string>;
-  modelId?: string;
-  provider?: string;
-}) {
-  const handlers: Record<string, (event: any, ctx?: any) => Promise<any> | any> = {};
-  const mockExtensionApi = {
-    on: vi.fn((event: string, handler: any) => {
-      handlers[event] = handler;
-    }),
-  };
-
-  let cachedToken = options?.token ?? 'active-token-001';
-  let tokenInvalidated = false;
-
-  const mockBridge = {
-    isManagedProvider: vi.fn((provider: string) =>
-      options?.isManaged !== undefined
-        ? options.isManaged
-        : provider.startsWith('zhiyuan-host-enterprise-'),
-    ),
-    getEnterpriseModelConfig: vi.fn((modelId: string) =>
-      modelId === (options?.modelId ?? 'ent-model')
-        ? ({
-            modelId: options?.modelId ?? 'ent-model',
-            providerKey: options?.provider ?? 'zhiyuan-host-enterprise-1',
-            baseUrl: 'https://api.enterprise.com/v1',
-            api: (options?.api ?? 'openai-completions') as any,
-            apiKey: cachedToken,
-          } as ManagedEnterpriseModelRuntimeConfig)
-        : null,
-    ),
-    getToken: vi.fn(async () => {
-      if (tokenInvalidated) {
-        cachedToken = 'refreshed-token-002';
-        tokenInvalidated = false;
-      }
-      return cachedToken;
-    }),
-    invalidateToken: vi.fn(() => {
-      tokenInvalidated = true;
-    }),
-  } as unknown as ZhiyuanManagedProviderBridge;
-
-  const extensionFactory = createPiEnterpriseProviderExtension(mockBridge);
-  extensionFactory(mockExtensionApi as any);
-
-  const ctx = {
-    model: {
-      id: options?.modelId ?? 'ent-model',
-      provider: options?.provider ?? 'zhiyuan-host-enterprise-1',
-      api: options?.api ?? 'openai-completions',
-      headers: options?.headers ?? {
-        [ZhiyuanModelPoolHeader.ConversationId]: 'conv-test-999',
-        [ZhiyuanModelPoolHeader.Workload]: 'workload-batch',
-      },
-    },
-  };
-
-  return { handlers, mockBridge, mockExtensionApi, ctx };
-}
-
-describe('Adversarial Enterprise Hooks Extended Stress Harness', () => {
-  describe('Dimension 1: Deep Freeze & Immutability Stress', () => {
-    it('handles deeply frozen payload, arrays, and nested message objects without throwing', () => {
-      const { handlers, ctx } = setupHarness();
-      const fn = handlers[PiExtensionEventType.BeforeProviderRequest];
-
-      const deepFrozenDevMsg = Object.freeze({
-        role: 'developer',
-        content: Object.freeze([{ type: 'text', text: 'strictly frozen text' }]),
-        metadata: Object.freeze({ strict: true }),
-      });
-      const deepFrozenUserMsg = Object.freeze({
-        role: 'user',
-        content: Object.freeze([{ type: 'text', text: 'user input' }]),
-      });
-      const deepFrozenPayload = Object.freeze({
-        model: 'ent-model',
-        temperature: 0.7,
-        messages: Object.freeze([deepFrozenDevMsg, deepFrozenUserMsg]),
-      });
-
-      let result: any;
-      expect(() => {
-        result = fn({ type: 'before_provider_request', payload: deepFrozenPayload }, ctx);
-      }).not.toThrow();
-
-      // Original objects remain frozen and untouched
-      expect(Object.isFrozen(deepFrozenPayload)).toBe(true);
-      expect(Object.isFrozen(deepFrozenDevMsg)).toBe(true);
-      expect(deepFrozenDevMsg.role).toBe('developer');
-
-      // Transformed result has role: 'system' for developer message
-      expect(result.messages[0].role).toBe('system');
-      expect(result.messages[0].metadata).toBe(deepFrozenDevMsg.metadata);
-      expect(result.messages[0].content).toBe(deepFrozenDevMsg.content);
-
-      // Non-developer message is reference-identical
-      expect(result.messages[1]).toBe(deepFrozenUserMsg);
-    });
-
-    it('handles getter-backed and sealed message objects', () => {
-      const { handlers, ctx } = setupHarness();
-      const fn = handlers[PiExtensionEventType.BeforeProviderRequest];
-
-      const sealedDevMsg = Object.seal({
-        role: 'developer',
-        get content() {
-          return 'getter-content';
-        },
-      });
-
-      const payload = {
-        model: 'ent-model',
-        messages: [sealedDevMsg],
-      };
-
-      let result: any;
-      expect(() => {
-        result = fn({ type: 'before_provider_request', payload }, ctx);
-      }).not.toThrow();
-
-      expect(result.messages[0].role).toBe('system');
-      expect(result.messages[0].content).toBe('getter-content');
-      expect(sealedDevMsg.role).toBe('developer');
-    });
-  });
-
-  describe('Dimension 2: Reference Identity Preservation for Non-Developer Messages', () => {
-    it('preserves exact object references (===) for all non-developer messages across 100 interleaved messages', () => {
-      const { handlers, ctx } = setupHarness();
-      const fn = handlers[PiExtensionEventType.BeforeProviderRequest];
-
-      const messages: any[] = [];
-      const roles = ['user', 'assistant', 'system', 'tool', 'developer'];
-      for (let i = 0; i < 100; i++) {
-        const role = roles[i % roles.length];
-        messages.push({
-          id: `msg-${i}`,
-          role,
-          content: `Content for ${role} #${i}`,
-          extra: { index: i },
+describe('Enterprise native provider wire contract', () => {
+  it.each([ApiFormat.OpenAI, ApiFormat.Anthropic])(
+    'keeps %s instructions and token rotation through the enterprise transport',
+    async apiFormat => {
+      const openai = apiFormat === ApiFormat.OpenAI;
+      const calls: Array<{
+        path?: string;
+        bearer?: string;
+        apiKey?: string | string[];
+        conversation?: string | string[];
+      }> = [];
+      const instructionRoles: string[] = [];
+      const instructions = 'Enterprise provider system instructions';
+      const instructionBodies: string[] = [];
+      const upstream = createServer(async (request, response) => {
+        calls.push({
+          path: request.url,
+          bearer: request.headers.authorization,
+          apiKey: request.headers['x-api-key'],
+          conversation: request.headers[ZhiyuanModelPoolHeader.ConversationId],
         });
-      }
-
-      const payload = {
-        model: 'ent-model',
-        messages,
-      };
-
-      const result = fn({ type: 'before_provider_request', payload }, ctx);
-
-      expect(result.messages).toHaveLength(100);
-
-      for (let i = 0; i < 100; i++) {
-        const original = messages[i];
-        const transformed = result.messages[i];
-
-        if (original.role === 'developer') {
-          expect(transformed.role).toBe('system');
-          expect(transformed.content).toBe(original.content);
-          expect(transformed.id).toBe(original.id);
-          expect(transformed.extra).toBe(original.extra);
-          expect(transformed).not.toBe(original); // Cloned
-          expect(original.role).toBe('developer'); // Original not mutated
-        } else {
-          // MUST BE EXACT SAME REFERENCE
-          expect(transformed).toBe(original);
-        }
-      }
-    });
-
-    it('returns exact same payload reference when no developer messages exist (zero unnecessary allocation)', () => {
-      const { handlers, ctx } = setupHarness();
-      const fn = handlers[PiExtensionEventType.BeforeProviderRequest];
-
-      const payload = {
-        model: 'ent-model',
-        messages: [
-          { role: 'system', content: 'system prompt' },
-          { role: 'user', content: 'user question' },
-          { role: 'assistant', content: 'assistant answer' },
-        ],
-      };
-
-      const result = fn({ type: 'before_provider_request', payload }, ctx);
-
-      // Must return identical payload instance
-      expect(result).toBe(payload);
-      expect(result.messages).toBe(payload.messages);
-    });
-  });
-
-  describe('Dimension 3: Strict Enterprise Model Scoping', () => {
-    it('does NOT transform role: developer for non-enterprise models (e.g. OpenAI o1/o3-mini)', () => {
-      const { handlers } = setupHarness();
-      const fn = handlers[PiExtensionEventType.BeforeProviderRequest];
-
-      const o1Ctx = {
-        model: {
-          id: 'o1-preview',
-          provider: 'openai',
-          api: 'openai-completions',
-        },
-      };
-
-      const devMessage = { role: 'developer', content: 'Instructions for reasoning' };
-      const payload = {
-        model: 'o1-preview',
-        messages: [devMessage, { role: 'user', content: 'Solve this puzzle' }],
-      };
-
-      const result = fn({ type: 'before_provider_request', payload }, o1Ctx);
-
-      // Must return exact same payload reference untouched
-      expect(result).toBe(payload);
-      expect(result.messages[0].role).toBe('developer');
-      expect(devMessage.role).toBe('developer');
-    });
-
-    it('does NOT inject headers for non-enterprise models in before_provider_headers', async () => {
-      const { handlers, mockBridge } = setupHarness();
-      const fn = handlers[PiExtensionEventType.BeforeProviderHeaders];
-
-      const nonEnterpriseCtx = {
-        model: {
-          id: 'claude-3-5-sonnet-20241022',
-          provider: 'anthropic',
-          api: 'anthropic-messages',
-          headers: {
-            'x-custom-test': 'should-not-be-injected',
-          },
-        },
-      };
-
-      const event = {
-        type: 'before_provider_headers' as const,
-        headers: {} as Record<string, string | null>,
-      };
-
-      await fn(event, nonEnterpriseCtx);
-
-      expect(mockBridge.getToken).not.toHaveBeenCalled();
-      expect(event.headers).toEqual({});
-    });
-
-    it('does NOT invalidate token for non-enterprise models in after_provider_response', () => {
-      const { handlers, mockBridge } = setupHarness();
-      const fn = handlers[PiExtensionEventType.AfterProviderResponse];
-
-      const nonEnterpriseCtx = {
-        model: {
-          id: 'gpt-4o',
-          provider: 'openai',
-          api: 'openai-completions',
-        },
-      };
-
-      fn({ type: 'after_provider_response', status: 401, headers: {} }, nonEnterpriseCtx);
-      fn({ type: 'after_provider_response', status: 403, headers: {} }, nonEnterpriseCtx);
-
-      expect(mockBridge.invalidateToken).not.toHaveBeenCalled();
-    });
-
-    it('gracefully handles missing, null, undefined, or empty context objects across all hooks', async () => {
-      const { handlers, mockBridge } = setupHarness();
-
-      const nullCtxs = [
-        undefined,
-        null,
-        {},
-        { model: undefined },
-        { model: { id: 'unknown-model', provider: 'other-provider' } },
-      ];
-
-      for (const ctx of nullCtxs) {
-        // 1. BeforeProviderHeaders
-        const headerEvent = {
-          type: 'before_provider_headers' as const,
-          headers: {} as Record<string, string | null>,
-        };
-        await expect(
-          handlers[PiExtensionEventType.BeforeProviderHeaders](headerEvent, ctx),
-        ).resolves.not.toThrow();
-        expect(mockBridge.getToken).not.toHaveBeenCalled();
-
-        // 2. BeforeProviderRequest
-        const payload = { messages: [{ role: 'developer', content: 'test' }] };
-        const reqResult = handlers[PiExtensionEventType.BeforeProviderRequest](
-          { type: 'before_provider_request', payload },
-          ctx,
-        );
-        expect(reqResult).toBe(payload);
-        expect(payload.messages[0].role).toBe('developer');
-
-        // 3. AfterProviderResponse
-        expect(() => {
-          handlers[PiExtensionEventType.AfterProviderResponse](
-            { type: 'after_provider_response', status: 401, headers: {} },
-            ctx,
-          );
-        }).not.toThrow();
-        expect(mockBridge.invalidateToken).not.toHaveBeenCalled();
-      }
-    });
-
-    it('identifies enterprise models by provider === "enterprise"', async () => {
-      const { handlers, mockBridge } = setupHarness({
-        isManaged: false, // bridge says false for isManagedProvider
-        modelId: 'some-other-id', // bridge config returns null
+        let body = '';
+        for await (const chunk of request) body += chunk.toString();
+        const payload = JSON.parse(body) as { messages: { role: string }[]; system?: unknown };
+        instructionRoles.push(payload.messages[0].role);
+        instructionBodies.push(JSON.stringify(payload.system ?? payload.messages[0]));
+        response.writeHead([401, 403][calls.length - 1] ?? 400, {
+          'Content-Type': 'application/json',
+        });
+        response.end(JSON.stringify({ error: { message: 'auth wire fixture' } }));
       });
-
-      const enterpriseCtx = {
-        model: {
-          id: 'unregistered-id',
-          provider: 'enterprise', // matches provider === 'enterprise'
-          api: 'openai-completions',
-        },
-      };
-
-      const event = {
-        type: 'before_provider_headers' as const,
-        headers: {} as Record<string, string | null>,
-      };
-
-      await handlers[PiExtensionEventType.BeforeProviderHeaders](event, enterpriseCtx);
-      expect(mockBridge.getToken).toHaveBeenCalled();
-      expect(event.headers['authorization']).toBe('Bearer active-token-001');
-    });
-  });
-
-  describe('Dimension 4: Header Hygiene & Case Normalization', () => {
-    it('cleans pre-existing uppercase Authorization and produces single lowercase authorization header', async () => {
-      const { handlers, ctx } = setupHarness();
-      const fn = handlers[PiExtensionEventType.BeforeProviderHeaders];
-
-      const event = {
-        type: 'before_provider_headers' as const,
-        headers: {
-          Authorization: 'Bearer stale-upper-token',
-          'content-type': 'application/json',
-        } as Record<string, string | null>,
-      };
-
-      await fn(event, ctx);
-
-      // Check key presence
-      expect(event.headers['authorization']).toBe('Bearer active-token-001');
-      expect(event.headers['Authorization']).toBeUndefined();
-      expect('Authorization' in event.headers).toBe(false);
-
-      // Verify no other casing exists in Object.keys
-      const authKeys = Object.keys(event.headers).filter(k => k.toLowerCase() === 'authorization');
-      expect(authKeys).toEqual(['authorization']);
-    });
-
-    it('injects x-api-key without authorization header for Anthropic enterprise models', async () => {
-      const { handlers, ctx } = setupHarness({ api: 'anthropic-messages' });
-      const fn = handlers[PiExtensionEventType.BeforeProviderHeaders];
-
-      const event = {
-        type: 'before_provider_headers' as const,
-        headers: {
-          'user-agent': 'zhiyuan-client',
-        } as Record<string, string | null>,
-      };
-
-      await fn(event, ctx);
-
-      expect(event.headers['x-api-key']).toBe('active-token-001');
-      expect(event.headers['authorization']).toBeUndefined();
-      expect(event.headers['Authorization']).toBeUndefined();
-    });
-
-    it('updates existing x-api-key if present on OpenAI-compatible enterprise models', async () => {
-      const { handlers, ctx } = setupHarness({ api: 'openai-completions' });
-      const fn = handlers[PiExtensionEventType.BeforeProviderHeaders];
-
-      const event = {
-        type: 'before_provider_headers' as const,
-        headers: {
-          'x-api-key': 'old-key',
-        } as Record<string, string | null>,
-      };
-
-      await fn(event, ctx);
-
-      expect(event.headers['authorization']).toBe('Bearer active-token-001');
-      expect(event.headers['x-api-key']).toBe('active-token-001');
-    });
-  });
-
-  describe('Dimension 5: Exotic & Malformed Request Bodies', () => {
-    it('handles legacy prompt payloads, non-array messages, and corrupted message entries', () => {
-      const { handlers, ctx } = setupHarness();
-      const fn = handlers[PiExtensionEventType.BeforeProviderRequest];
-
-      const cases = [
-        { payload: { prompt: 'Translate hello to French' } },
-        { payload: { messages: 42 } },
-        { payload: { messages: 'invalid-string' } },
-        { payload: { messages: {} } },
-        { payload: { messages: [null, undefined, 123, 'plain-text', {}] } },
-        {
-          payload: {
-            messages: [
-              null,
-              { role: 'developer', content: 'system 1' },
-              undefined,
-              { role: 'user', content: 'hello' },
-              { role: 'developer', content: 'system 2' },
+      const scopedKey = 'scoped-fixture-key';
+      const router = createServer(async (request, response) => {
+        const upstreamAddress = upstream.address() as { port: number };
+        let endpoint = `http://127.0.0.1:${upstreamAddress.port}${request.url}`;
+        const headers: Record<string, string> = { 'content-type': 'application/json' };
+        if (
+          request.headers[MagpieWorkHeader.Workload.toLowerCase()] ===
+          MAGPIE_ENTERPRISE_CHAT_WORKLOAD
+        ) {
+          const callerKey =
+            request.headers.authorization?.replace(/^Bearer /, '') ?? request.headers['x-api-key'];
+          if (callerKey !== scopedKey || !transport) {
+            response.writeHead(401).end();
+            return;
+          }
+          const [provider] = zhiyuanManagedProviderBridge.hostProviders(transport.origin);
+          const scope = JSON.parse(String(request.headers[MagpieWorkHeader.Models.toLowerCase()]));
+          expect(scope).toEqual([`${provider.id}/shared`]);
+          endpoint = `${provider.baseUrl}${openai ? '/chat/completions' : '/v1/messages'}`;
+          headers.authorization = `Bearer ${provider.apiKey}`;
+          headers['x-zhiyuan-enterprise-forward'] = transport.key;
+          headers[ZhiyuanModelPoolHeader.ConversationId] = String(
+            request.headers[ZhiyuanModelPoolHeader.ConversationId],
+          );
+        } else {
+          headers.authorization = request.headers.authorization ?? '';
+        }
+        let body = '';
+        for await (const chunk of request) body += chunk.toString();
+        const result = await fetch(endpoint, { method: 'POST', headers, body });
+        response.writeHead(result.status, { 'content-type': 'application/json' });
+        response.end(await result.text());
+      });
+      const root = await mkdtemp(join(tmpdir(), 'enterprise-native-auth-'));
+      let unbind: (() => void) | undefined;
+      let transport: Awaited<ReturnType<typeof startEnterpriseModelGateway>> | undefined;
+      try {
+        for (const server of [upstream, router]) {
+          await new Promise<void>((resolve, reject) => {
+            server.once('error', reject);
+            server.listen(0, '127.0.0.1', resolve);
+          });
+        }
+        const upstreamUrl = `http://127.0.0.1:${(upstream.address() as { port: number }).port}`;
+        const gatewayUrl = `http://127.0.0.1:${(router.address() as { port: number }).port}`;
+        const baseUrl = openai ? `${upstreamUrl}/v1` : upstreamUrl;
+        const ordinaryRef = 'ordinary/shared';
+        let key = 'active-token-001';
+        let notifySourceChanged = () => {};
+        const bridge = zhiyuanManagedProviderBridge;
+        unbind = bridge.registerSource({
+          providerKey: 'custom_enterprise_stress',
+          exclusive: false,
+          snapshot: async () => ({
+            enabled: true,
+            apiKey: key,
+            baseUrl,
+            apiFormat,
+            models: [{ id: 'shared', name: 'Shared model' }],
+          }),
+          onDidChange: listener => {
+            notifySourceChanged = listener;
+            return () => {};
+          },
+        });
+        await bridge.refresh();
+        transport = await startEnterpriseModelGateway(bridge);
+        const binding = bridge.hostProviders(transport.origin)[0];
+        const provider = binding.id;
+        const enterpriseRef = `${provider}/shared`;
+        const modelService = new MagpieModelService(
+          {
+            status: () => ({ state: 'running', version: 'test', gatewayUrl }),
+            workKeyResolver: () => () => scopedKey,
+            models: async () => [
+              {
+                id: enterpriseRef,
+                owned_by: provider,
+                reasoning: true,
+                native_endpoints: openai ? ['/v1/chat/completions'] : ['/v1/messages'],
+              },
+              { id: ordinaryRef, owned_by: 'ordinary' },
             ],
           },
-        },
-      ];
-
-      for (const testCase of cases) {
-        let result: any;
-        expect(() => {
-          result = fn({ type: 'before_provider_request', payload: testCase.payload }, ctx);
-        }).not.toThrow();
-
-        if (Array.isArray((testCase.payload as any).messages)) {
-          const msgs = (testCase.payload as any).messages;
-          if (msgs.some((m: any) => m?.role === 'developer')) {
-            expect(result.messages[1].role).toBe('system');
-            expect(result.messages[3].role).toBe('user');
-            expect(result.messages[4].role).toBe('system');
-          }
+          { readDefaultModelId: () => enterpriseRef, writeDefaultModelId: () => {} },
+        );
+        const runtime = await ModelRuntime.create({
+          authPath: join(root, 'auth.json'),
+          modelsPath: null,
+          allowModelNetwork: false,
+        });
+        const createRuntime = vi.fn(async () => runtime);
+        const pi = { ...(await getPiModules()), ModelRuntime: { create: createRuntime } };
+        const chosen = await resolvePiModel(pi, modelService, enterpriseRef, undefined, {
+          conversationId: 'conversation-fixture',
+          workload: ZhiyuanModelPoolWorkload.Chat,
+        });
+        expect(chosen.requestOptions).toBeUndefined();
+        expect(chosen.model.provider).toBe('magpie');
+        const onResponse = vi.fn();
+        const send = async (model: Record<string, unknown>) => {
+          const result = await runtime.completeSimple(
+            model as unknown as Model,
+            {
+              systemPrompt: instructions,
+              messages: [{ role: 'user', content: 'Hello', timestamp: 0 }],
+            },
+            { onResponse },
+          );
+          expect(result.errorMessage).toContain('auth wire fixture');
+        };
+        await send(chosen.model);
+        key = 'rotated-token-002';
+        await send(chosen.model);
+        expect(onResponse).not.toHaveBeenCalled();
+        notifySourceChanged();
+        await vi.waitFor(async () =>
+          expect((await bridge.resolveTransport(provider, binding.apiKey!))?.token).toBe(
+            'rotated-token-002',
+          ),
+        );
+        await send(chosen.model);
+        const ordinary = await resolvePiModel(pi, modelService, ordinaryRef, runtime);
+        await send(ordinary.model);
+        expect(calls).toEqual([
+          ...['active-token-001', 'active-token-001', 'rotated-token-002'].map(token => ({
+            path: openai ? '/v1/chat/completions' : expect.stringMatching(/^\/v1\/messages\b/),
+            bearer: openai ? `Bearer ${token}` : undefined,
+            apiKey: openai ? undefined : token,
+            conversation: 'conversation-fixture',
+          })),
+          {
+            path: '/v1/chat/completions',
+            bearer: `Bearer ${MAGPIE_RUNTIME_API_KEY}`,
+            apiKey: undefined,
+            conversation: undefined,
+          },
+        ]);
+        expect(instructionRoles).toEqual([...Array(3).fill(openai ? 'system' : 'user'), 'system']);
+        for (const instructionBody of instructionBodies)
+          expect(instructionBody).toContain(instructions);
+        expect(createRuntime).toHaveBeenCalledExactlyOnceWith({ allowModelNetwork: false });
+      } finally {
+        unbind?.();
+        await transport?.close();
+        for (const server of [router, upstream]) {
+          server.closeAllConnections();
+          await new Promise<void>(resolve => server.close(() => resolve()));
         }
+        await rm(root, { recursive: true, force: true });
       }
-    });
-  });
+    },
+  );
 });

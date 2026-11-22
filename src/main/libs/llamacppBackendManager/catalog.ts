@@ -7,7 +7,6 @@ import type {
   LlamaCppBackendManifest,
   LlamaCppBackendManifestEntry,
   LlamaCppBackendRef,
-  LlamaCppInstallProgress,
   LlamaCppServiceConfig,
 } from '../../../shared/llamacpp';
 import {
@@ -24,19 +23,15 @@ import {
 } from '../llamacppFallbackManifest';
 import {
   getLlamaCppBackendDir,
-  getLlamaCppBackendExecutablePath,
   getLlamaCppBackendsRoot,
   getLlamaCppCurrentBackendDir,
-  getLlamaCppCurrentExecutablePath,
   removeCurrentBackendLink,
   resolveManagedBackendExecutablePath,
   toBackendRef,
 } from './paths';
 import {
-  backendDownloadSizeCache,
   BUILD_INFO_FILE,
   compareBackendInfo,
-  compareVersionDesc,
   fetchManifestFromUrl,
   findManifestEntry,
   inferBackendAccelerator,
@@ -44,20 +39,11 @@ import {
   normalizeArch,
   normalizeManifest,
   normalizePlatform,
-  resolveArchiveUrl,
   resolveBundledManifestUrl,
-  resolvePartUrl,
   setHasLoggedManifestFallback,
   shouldLogManifestFallbackWarning,
   validateBackendForMachine,
 } from './support';
-
-type LlamaCppBackendSelectionInput = {
-  platform: NodeJS.Platform;
-  arch: string;
-  hasNvidiaGpu: boolean;
-  config?: LlamaCppServiceConfig;
-};
 
 export async function fetchLlamaCppBackendManifest(
   env: NodeJS.ProcessEnv = process.env,
@@ -170,60 +156,6 @@ function getBackendDownloadSizeBytes(entry: LlamaCppBackendManifestEntry): numbe
   const sizes = [archiveSize(entry.archive), ...(entry.companions ?? []).map(archiveSize)];
   if (sizes.some(size => size === undefined)) return undefined;
   return (sizes as number[]).reduce((sum, size) => sum + size, 0);
-}
-
-export async function resolveLlamaCppBackendDownloadSize(input: {
-  ref: LlamaCppBackendRef;
-  manifest?: LlamaCppBackendManifest;
-}): Promise<number | undefined> {
-  const manifest = input.manifest ?? (await fetchLlamaCppBackendManifest());
-  const entry = findManifestEntry(manifest, input.ref);
-  if (!entry) return undefined;
-  const declaredSize = getBackendDownloadSizeBytes(entry);
-  if (declaredSize !== undefined) return declaredSize;
-
-  const archives = [entry.archive, ...(entry.companions ?? [])].filter(
-    (archive): archive is NonNullable<typeof archive> => Boolean(archive),
-  );
-  const archiveSizes = await Promise.all(
-    archives.map(async archive => {
-      if (archive.parts?.length) {
-        const partSizes = await Promise.all(
-          archive.parts.map(part =>
-            resolveRemoteContentLength(resolvePartUrl(part, manifest), part.size),
-          ),
-        );
-        return partSizes.every((size): size is number => size !== undefined)
-          ? partSizes.reduce((sum, size) => sum + size, 0)
-          : undefined;
-      }
-      return resolveRemoteContentLength(resolveArchiveUrl(archive, manifest), archive.size);
-    }),
-  );
-  return archiveSizes.every((size): size is number => size !== undefined)
-    ? archiveSizes.reduce((sum, size) => sum + size, 0)
-    : undefined;
-}
-
-async function resolveRemoteContentLength(
-  url: string,
-  declaredSize?: number,
-): Promise<number | undefined> {
-  if (typeof declaredSize === 'number' && Number.isFinite(declaredSize)) return declaredSize;
-  const cached = backendDownloadSizeCache.get(url);
-  if (cached !== undefined) return cached;
-  try {
-    const response = await fetch(url, {
-      method: 'HEAD',
-      headers: { 'User-Agent': 'ZhiYuanAgent/llamacpp-backend-manager' },
-    });
-    const size = Number(response.headers.get('content-length'));
-    if (!response.ok || !Number.isFinite(size) || size <= 0) return undefined;
-    backendDownloadSizeCache.set(url, size);
-    return size;
-  } catch {
-    return undefined;
-  }
 }
 
 export async function getLlamaCppBackendCompatibilityError(input: {

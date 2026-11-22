@@ -7,23 +7,14 @@
  */
 
 import type { Platform } from '../../../shared/platform';
-import type { CoworkMessage } from '../../coworkStore';
 import type { PermissionRequest } from '../../libs/agentEngine/types';
-
-/** Outbound scheduled-task delivery target for a cron-triggered turn. */
-export interface IMCoworkBackgroundDelivery {
-  conversationId: string;
-  platform: Platform;
-}
 
 export interface MessageAccumulator {
   runId: string;
-  messages: CoworkMessage[];
   storeMessageCountAtStart?: number;
   resolve?: (text: string) => void;
   reject?: (error: Error) => void;
   timeoutId?: NodeJS.Timeout;
-  backgroundDelivery?: IMCoworkBackgroundDelivery;
 }
 
 export interface PendingIMPermission {
@@ -35,5 +26,4 @@ export interface PendingIMPermission {
   platform: Platform;
   createdAt: number;
   timeoutId?: NodeJS.Timeout;
-  backgroundDelivery?: IMCoworkBackgroundDelivery;
 }

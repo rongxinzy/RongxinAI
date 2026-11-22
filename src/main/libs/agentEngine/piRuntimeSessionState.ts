@@ -6,8 +6,15 @@
  * gateway model resolution can share one shape.
  */
 
+import { randomUUID } from 'node:crypto';
 import { readCoworkImageBase64 } from '../../coworkImageAttachments';
+import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkError } from '../../../common/coworkError';
+import { CoworkMessageType } from '../../../shared/cowork/constants';
+import type {
+  CoworkPendingMessage,
+  CoworkQueueDelivery,
+} from '../../../shared/cowork/pendingMessageQueue';
 import type { CoworkMessageExpertIdentity } from '../../../shared/cowork/sessionExperts';
 import type { HarnessModelProfileInput } from '../../../shared/harness';
 import type { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
@@ -18,6 +25,13 @@ import type {
   CreateAgentSessionOptions,
   formatSkillsForPrompt,
 } from '@earendil-works/pi-coding-agent';
+import type { Provider } from '@earendil-works/pi-ai';
+import type {
+  anthropicMessagesApi,
+  createProvider,
+  openAICompletionsApi,
+  openAIResponsesApi,
+} from '@earendil-works/pi-ai/compat';
 import {
   buildPiBackgroundCompletionContext,
   type PiBackgroundCompletionResult,
@@ -32,7 +46,48 @@ import { PiStreamAccumulator } from './piStreamAccumulator';
 import type { PiTranslatorState } from './piTranslate/piTranslateUiMessageChunk';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import type { PiStartOptions } from './piRuntimeTypes';
+import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
 import { ToolActivityTracker } from './toolActivity';
+
+/** Commit the user transcript before publishing it to live consumers. */
+export function persistPiUserMessage(
+  host: Pick<PiRuntimeAdapterHost, 'getStore' | 'emit'>,
+  sessionId: string,
+  text: string,
+  {
+    skillIds,
+    imageAttachments,
+    fileAttachments,
+    experts,
+    queueDelivery,
+  }: Pick<CoworkPendingMessage, 'skillIds' | 'imageAttachments' | 'fileAttachments'> & {
+    experts?: CoworkMessageExpertIdentity[];
+    queueDelivery?: CoworkQueueDelivery;
+  },
+): void {
+  const message: CoworkMessage = {
+    id: randomUUID(),
+    type: CoworkMessageType.User,
+    content: text,
+    timestamp: Date.now(),
+    metadata:
+      skillIds?.length ||
+      imageAttachments?.length ||
+      fileAttachments?.length ||
+      experts ||
+      queueDelivery
+        ? {
+            ...(skillIds?.length ? { skillIds } : {}),
+            ...(imageAttachments?.length ? { imageAttachments } : {}),
+            ...(fileAttachments?.length ? { fileAttachments } : {}),
+            ...(experts ? { experts } : {}),
+            ...(queueDelivery ? { queueDelivery } : {}),
+          }
+        : undefined,
+  };
+  const store = host.getStore(sessionId);
+  host.emit('message', sessionId, store ? store.messages.addMessage(sessionId, message) : message);
+}
 
 /** Minimal type for the Pi AgentSession — only the methods used by this adapter. */
 export interface PiSession {
@@ -61,19 +116,6 @@ export interface PiSession {
         percent: number | null;
       }
     | undefined;
-  getSessionStats?(): unknown;
-  navigateTree?(
-    targetId: string,
-    options?: {
-      summarize?: boolean;
-      customInstructions?: string;
-      replaceInstructions?: boolean;
-      label?: string;
-    },
-  ): Promise<{ editorText?: string; cancelled?: boolean; aborted?: boolean }>;
-  readonly sessionManager?: {
-    appendContextEdit?(targetId: string, replacement: unknown): string;
-  };
   subscribe(listener: (event: PiEvent) => void): () => void;
 }
 
@@ -140,8 +182,10 @@ export interface ActivePiSession {
   piSession: PiSession;
   abortController: AbortController;
   model: Record<string, unknown>;
-  modelRuntime: PiModelRuntime | null;
-  modelRequestOptions?: { apiKey?: string };
+  modelRuntime: PiModelRuntime;
+  isCurrentModelRoute: () => boolean;
+  revalidateModelScope?: () => Promise<void>;
+  revalidatingModelScope?: boolean;
   /** Whether this session runs with the pi 1.0 codemode tool active. */
   codemodeEnabled: boolean;
   capabilities: ModelCapabilities;
@@ -270,7 +314,10 @@ export interface PiModules {
     inMemory?(): PiSettingsManager;
   };
   getAgentDir: () => string;
-  getModel: (provider: string, modelId: string) => unknown;
+  createProvider: typeof createProvider;
+  anthropicMessagesApi: typeof anthropicMessagesApi;
+  openAICompletionsApi: typeof openAICompletionsApi;
+  openAIResponsesApi: typeof openAIResponsesApi;
   ModelRuntime: {
     create(options?: PiModelRuntimeCreateOptions): Promise<PiModelRuntime>;
   };
@@ -280,11 +327,6 @@ export interface PiModules {
   createToolSearchExtension?: () => unknown;
   /** Registers the builtin MCP extension (config/transport injectable). */
   createMcpExtension?: (options?: Record<string, unknown>) => unknown;
-  completeSimple: (
-    model: unknown,
-    context: ReturnType<typeof buildPiBackgroundCompletionContext>,
-    options?: { apiKey?: string },
-  ) => Promise<PiBackgroundCompletionResult>;
 }
 
 export interface PiResourceLoader {
@@ -310,6 +352,7 @@ export interface PiSettingsManager {
 }
 
 export interface PiResourceState {
+  companionChat?: true;
   systemPrompt: string;
   skillIds: string[] | undefined;
   maxOutputTokens: number;
@@ -340,14 +383,14 @@ export interface PiStartupLatency {
 export interface InitializingPiSession {
   abortController: AbortController;
   generation: symbol;
+  nativeAcquisition?: Promise<void>;
   onSettled?: PiStartOptions['onSettled'];
+  workbenchRunId?: string;
 }
 
 export interface PiModelRuntime {
-  registerProvider(provider: string, config: Record<string, unknown>): void;
-  setRuntimeApiKey(provider: string, apiKey: string): Promise<void>;
-  getModel(provider: string, modelId: string): unknown;
-  completeSimple?(
+  registerNativeProvider(provider: Provider): void;
+  completeSimple(
     model: unknown,
     context: ReturnType<typeof buildPiBackgroundCompletionContext>,
   ): Promise<PiBackgroundCompletionResult>;
@@ -358,16 +401,13 @@ interface PiModelRuntimeCreateOptions {
 }
 
 export type PiResolvedModel = {
-  /** Base URL identity of the endpoint the model was resolved against. */
-  endpointKey: string;
+  isCurrentModelRoute: () => boolean;
   model: Record<string, unknown>;
-  modelRuntime: PiModelRuntime | null;
+  modelRuntime: PiModelRuntime;
   maxOutputTokens: number;
   providerName: string;
   capabilities?: Partial<ModelCapabilities>;
-  requestOptions?: {
-    apiKey?: string;
-  };
+  revalidateModelScope?: () => Promise<void>;
 };
 
 export function preparePiPrompt(
@@ -376,14 +416,8 @@ export function preparePiPrompt(
   verdict: ImageInputVerdict,
   ocrCommandFor?: (imagePath: string) => string,
   pathImageReferences: readonly ImageInputAttachmentRef[] = [],
-): {
-  content:
-    | string
-    | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
-  hasImages: boolean;
-  sentImages: ImageInputAttachmentRef[];
-  omittedImages: ImageInputAttachmentRef[];
-} {
+  signal?: AbortSignal,
+): PreparedPiPrompt | Promise<PreparedPiPrompt> {
   const sendImages = verdict === ImageInputVerdict.Supported;
   // A path-only image is only worth explaining when the model cannot open it as
   // an image: a vision-capable model just reads the file.
@@ -393,37 +427,58 @@ export function preparePiPrompt(
   }
   const imageAttachments = (attachments ?? []).filter(item => item.mimeType.startsWith('image/'));
   const references = imageAttachments.map(item => ({ name: item.name, path: item.path }));
-  if (sendImages) {
-    const images = imageAttachments
-      .filter(item => item.base64Data || item.path)
-      .map(item => ({
-        type: 'image' as const,
-        data: readCoworkImageBase64(item),
-        mimeType: item.mimeType,
-      }))
-      .filter(item => item.data.length > 0);
-    if (images.length > 0) {
-      return {
-        content: [{ type: 'text', text }, ...images],
-        hasImages: true,
-        sentImages: references,
-        omittedImages: [],
-      };
-    }
-  }
   // Pi answers a non-vision model's `read` with an in-band note instead of a
   // failed request; Cowork images never pass through `read`, so the same facts
   // (why the picture is absent, plus the file paths) have to travel with the
   // prompt itself. Images withheld by capability and images the UI could only
   // attach by path share one note: in both cases the model holds a path, not
   // pixels.
-  const notice = buildImageOmittedNotice([...references, ...pathOnly], { verdict, ocrCommandFor });
-  return {
-    content: text.trim() ? `${text}\n\n${notice}` : notice,
-    hasImages: false,
-    sentImages: [],
-    omittedImages: references,
+  const withoutImages = (): PreparedPiPrompt => {
+    const notice = buildImageOmittedNotice([...references, ...pathOnly], {
+      verdict,
+      ocrCommandFor,
+    });
+    return {
+      content: text.trim() ? `${text}\n\n${notice}` : notice,
+      hasImages: false,
+      sentImages: [],
+      omittedImages: references,
+    };
   };
+  if (!sendImages) return withoutImages();
+
+  const load = (item: (typeof imageAttachments)[number]) => {
+    const part = (data: string) => ({ type: 'image' as const, data, mimeType: item.mimeType });
+    const data = readCoworkImageBase64(item, signal);
+    return typeof data === 'string' ? part(data) : data.then(part);
+  };
+  const finish = (
+    parts: Array<{ type: 'image'; data: string; mimeType: string }>,
+  ): PreparedPiPrompt => {
+    const images = parts.filter(part => part.data.length > 0);
+    return images.length > 0
+      ? {
+          content: [{ type: 'text', text }, ...images],
+          hasImages: true,
+          sentImages: references,
+          omittedImages: [],
+        }
+      : withoutImages();
+  };
+  const parts: Array<{ type: 'image'; data: string; mimeType: string }> = [];
+  for (const [index, item] of imageAttachments.entries()) {
+    const loaded = load(item);
+    if (!(loaded instanceof Promise)) {
+      parts.push(loaded);
+      continue;
+    }
+    return loaded.then(async firstFile => {
+      parts.push(firstFile);
+      for (const remaining of imageAttachments.slice(index + 1)) parts.push(await load(remaining));
+      return finish(parts);
+    });
+  }
+  return finish(parts);
 }
 
 /**
@@ -521,9 +576,10 @@ export async function getPiModules(): Promise<PiModules> {
               }
             ).createMcpExtension as PiModules['createMcpExtension'])
           : undefined,
-        // getModel is the current API (deprecated but functional); will migrate to createModels() later
-        getModel: compat.getModel as unknown as PiModules['getModel'],
-        completeSimple: compat.completeSimple as unknown as PiModules['completeSimple'],
+        createProvider: compat.createProvider,
+        anthropicMessagesApi: compat.anthropicMessagesApi,
+        openAICompletionsApi: compat.openAICompletionsApi,
+        openAIResponsesApi: compat.openAIResponsesApi,
       };
     } catch (err) {
       throw new Error(

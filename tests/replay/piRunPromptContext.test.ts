@@ -24,7 +24,7 @@ import {
 import { ScheduledTaskResultGuidance } from '../../src/scheduledTask/enginePrompt';
 import { PiScheduledTaskExecutor } from '../../src/scheduledTask/piScheduledTaskExecutor';
 import type { ScheduledTask, ScheduledTaskRun } from '../../src/scheduledTask/types';
-import { installTestMagpie } from '../helpers/installTestMagpie';
+import { createTestMagpie } from '../helpers/createTestMagpie';
 
 const mutableApp = app as unknown as Record<string, unknown>;
 if (typeof mutableApp.getAppPath !== 'function') mutableApp.getAppPath = () => process.cwd();
@@ -54,7 +54,10 @@ function messageText(message: CapturedMessage): string {
 
 async function withPiPromptContext(
   run: (context: PromptContext) => Promise<void>,
-  tokensForRequest: (requestCount: number) => number = () => 100,
+  options: {
+    tokensForRequest?: (requestCount: number) => number;
+    projectMemoryService?: ProjectMemoryService;
+  } = {},
 ): Promise<void> {
   const directory = await mkdtemp(path.join(tmpdir(), 'pi-run-prompt-'));
   const model = 'offline-prompt-context';
@@ -73,7 +76,7 @@ async function withPiPromptContext(
         .map(messageText)
         .join('\n'),
     );
-    const promptTokens = tokensForRequest(systemPrompts.length);
+    const promptTokens = options.tokensForRequest?.(systemPrompts.length) ?? 100;
     const chunk = (delta: object, finishReason: string | null, usage?: object) =>
       `data: ${JSON.stringify({
         id: 'offline',
@@ -94,25 +97,28 @@ async function withPiPromptContext(
     );
   });
   await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
-  const gateway = installTestMagpie({
+  const gateway = createTestMagpie({
     gatewayUrl: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`,
     defaultModelId: model,
   });
   gateway.upsert(model, { context_window: 65_536, max_output_tokens: 4_096 });
   let database: SqliteStore | undefined;
-  const adapter = new PiRuntimeAdapter();
-  adapter.setPiSessionStoreRoot(directory);
+  let adapter: PiRuntimeAdapter | undefined;
   const error = vi.fn();
-  adapter.on('error', error);
   try {
     database = await SqliteStore.create(directory);
     const store = new CoworkStore(database.getDatabase());
-    adapter.setCoworkStore(store);
+    adapter = new PiRuntimeAdapter({
+      modelService: gateway.modelService,
+      coworkStore: store,
+      piSessionStoreRoot: directory,
+      projectMemoryService: options.projectMemoryService,
+    });
+    adapter.on('error', error);
     await run({ adapter, directory, store, systemPrompts, requestMessages });
     expect(error).not.toHaveBeenCalled();
   } finally {
-    adapter.stopAllSessions();
-    gateway.dispose();
+    adapter?.stopAllSessions();
     database?.close();
     await new Promise<void>(resolve => {
       upstream.close(() => resolve());
@@ -126,6 +132,7 @@ test(
   'the native request keeps system prompt immutable and preserves revised memory across preflight compaction',
   { timeout: 60_000 },
   async () => {
+    const buildProjectContext = vi.fn<ProjectMemoryService['buildProjectContext']>();
     await withPiPromptContext(
       async ({ adapter, directory, store, systemPrompts, requestMessages }) => {
         const oldFact = 'Original internal release sequence is peach-tulip.';
@@ -147,22 +154,19 @@ test(
             completedCompactionAt.push(systemPrompts.length);
           }
         });
-        const buildProjectContext: ProjectMemoryService['buildProjectContext'] = vi.fn(
-          async ({ query }) => {
-            if (query === firstPrompt) return `${projectFact(oldFact)}\n- [memory:42] ${otherFact}`;
-            if (query === currentPrompt) {
-              const settings = adapter.activeSessions.get(session.id)?.settingsManager;
-              expect(settings).toBeDefined();
-              // Apply pressure only after recall starts, so native compaction runs
-              // between receipt of the unchanged fact and before_agent_start.
-              settings?.applyOverrides({
-                compaction: { reserveTokens: 29_000, keepRecentTokens: 300 },
-              });
-            }
-            return projectFact(revisedFact);
-          },
-        );
-        adapter.setProjectMemoryService({ buildProjectContext } as ProjectMemoryService);
+        buildProjectContext.mockImplementation(async ({ query }) => {
+          if (query === firstPrompt) return `${projectFact(oldFact)}\n- [memory:42] ${otherFact}`;
+          if (query === currentPrompt) {
+            const settings = adapter.activeSessions.get(session.id)?.settingsManager;
+            expect(settings).toBeDefined();
+            // Apply pressure only after recall starts, so native compaction runs
+            // between receipt of the unchanged fact and before_agent_start.
+            settings?.applyOverrides({
+              compaction: { reserveTokens: 29_000, keepRecentTokens: 300 },
+            });
+          }
+          return projectFact(revisedFact);
+        });
         await adapter.startSession(session.id, firstPrompt, {
           workspaceRoot: directory,
           sessionMode: 'work',
@@ -199,7 +203,10 @@ test(
         expect(req3InjectedMemory).not.toContain(oldFact);
         expect(buildProjectContext).toHaveBeenCalledTimes(3);
       },
-      requestCount => (requestCount === 2 ? 45_000 : 100),
+      {
+        tokensForRequest: requestCount => (requestCount === 2 ? 45_000 : 100),
+        projectMemoryService: { buildProjectContext } as ProjectMemoryService,
+      },
     );
   },
 );

@@ -1,4 +1,4 @@
-import { SecurityFinding } from './skillSecurityTypes';
+import type { SecurityFinding } from '../../../shared/skills/securityTypes';
 
 /**
  * Prompt injection detection rules for SKILL.md files.

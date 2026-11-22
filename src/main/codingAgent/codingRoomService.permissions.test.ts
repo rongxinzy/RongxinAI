@@ -11,6 +11,7 @@ import {
 import { CoworkInterruptionCause } from '../../shared/cowork/interruption';
 import { CodingAgentRegistry } from './codingAgentRegistry';
 import { CodingRoomRepository } from './codingRoomRepository';
+import { recoverInterruptedCodingRoom } from '../appBootstrap/recoverInterruptedWork';
 import { createService, openCodingRoomDatabase } from './codingRoomServiceTestHarness';
 
 test('projects builtin permission requests into the coding room status', async () => {
@@ -23,7 +24,7 @@ test('projects builtin permission requests into the coding room status', async (
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const snapshot = await service.createMission({
+  const snapshot = await service.seedSession({
     workspaceRoot,
     profileId: 'builtin-zhiyuan-coding',
   });
@@ -50,7 +51,7 @@ test('responds to builtin coding permissions through the in-process runtime', as
     respondBuiltinPermission,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: 'builtin-zhiyuan-coding',
   });
@@ -98,7 +99,7 @@ test('pauses a builtin lane when its runtime reports a recoverable interruption'
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: 'builtin-zhiyuan-coding',
   });
@@ -138,7 +139,7 @@ test('cancels a running turn and retains the mission and lane', async () => {
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: 'builtin-zhiyuan-coding',
   });
@@ -169,7 +170,7 @@ test('cancel leaves a lane without an active turn untouched', async () => {
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: 'builtin-zhiyuan-coding',
   });
@@ -195,7 +196,7 @@ test('reports a failed automatic collaboration stage without changing assignment
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: 'builtin-zhiyuan-coding',
   });
@@ -234,7 +235,8 @@ test('reports a failed automatic collaboration stage without changing assignment
 
 test('recovers stale running lanes after an application restart without losing the mission', async () => {
   const db = openCodingRoomDatabase();
-  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const repository = new CodingRoomRepository(db);
+  const service = createService(repository, new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -242,7 +244,7 @@ test('recovers stale running lanes after an application restart without losing t
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: 'builtin-zhiyuan-coding',
   });
@@ -251,7 +253,7 @@ test('recovers stale running lanes after an application restart without losing t
     prompt: 'Implement the change.',
   });
 
-  expect(service.recoverInterruptedState()).toBe(1);
+  expect(db.transaction(() => recoverInterruptedCodingRoom(repository))()).toBe(1);
   const recovered = service.bootstrap(workspaceRoot);
   expect(recovered.missions[0].status).toBe(CodingMissionStatus.NeedsReview);
   expect(recovered.lanes[0].status).toBe(CodingLaneStatus.Idle);

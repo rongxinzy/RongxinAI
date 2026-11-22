@@ -1,9 +1,8 @@
-import { BrowserWindow } from 'electron';
-import { CoworkStreamIpc } from '../shared/ipc/channels';
 import {
   CoworkRunPhase,
   CoworkRunPolicy,
   type CoworkContentPatch,
+  type CoworkRunSnapshot,
 } from '../shared/cowork/runState';
 import { PiRunStateTracker } from './libs/agentEngine/piRunState';
 import type { PiRuntimeAdapter } from './libs/agentEngine/piRuntimeAdapter';
@@ -14,19 +13,13 @@ import { coworkRunSnapshotContract } from '../shared/ipc/coworkContract';
 export function bindCoworkRunBridge(
   runtime: PiRuntimeAdapter,
   publishPatch: (patch: CoworkContentPatch) => void,
+  publishSnapshot: (snapshot: CoworkRunSnapshot) => void,
 ): CoworkContentProjection {
   const projection = new CoworkContentProjection();
-  const tracker = new PiRunStateTracker(snapshot => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (window.isDestroyed()) continue;
-      try {
-        window.webContents.send(CoworkStreamIpc.RunState, snapshot);
-      } catch (error) {
-        console.debug('[CoworkRunBridge] window closed during status delivery:', error);
-      }
-    }
-  });
-  runtime.on('executionEvent', (sessionId, event) => tracker.observe(sessionId, event));
+  const tracker = new PiRunStateTracker(publishSnapshot);
+  runtime.on('executionEvent', (sessionId, event, workbenchRunId) =>
+    tracker.observe(sessionId, event, workbenchRunId),
+  );
   runtime.on('permissionRequest', sessionId =>
     tracker.setPhase(sessionId, CoworkRunPhase.Approval),
   );

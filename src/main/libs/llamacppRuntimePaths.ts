@@ -12,8 +12,7 @@ import type {
 } from '../../shared/llamacpp';
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import { isPathInside } from './llamacppModelCatalog';
-import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
-import { resolveLlamaCppRuntimeTargetId } from './llamacppRuntimeInstaller';
+import { LlamaCppRuntimeTargetId, resolveLlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import { usesBundledLlamaCppRuntime } from './inferenceEditionPolicy';
 import { readBundledLlamaCppRuntimeManifest } from './llamacppBundledRuntime';
 import { resolveBundledEditionRuntime } from './llamacppBundledRuntimeSelection';

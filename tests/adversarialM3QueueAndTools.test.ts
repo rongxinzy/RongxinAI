@@ -13,7 +13,6 @@ import { ImageInputVerdict } from '../src/main/libs/agentEngine/piImageInputFall
 import { PiRuntimeQueueController } from '../src/main/libs/agentEngine/piRuntimeQueueController';
 import type { ActivePiSession } from '../src/main/libs/agentEngine/piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from '../src/main/libs/agentEngine/piRuntimeAdapterHost';
-import { PiRuntimeAdapter } from '../src/main/libs/agentEngine/piRuntimeAdapter';
 import {
   buildPiDocumentReaderTool,
   PiDocumentReaderAnnotations,
@@ -25,7 +24,7 @@ vi.mock('../src/main/documentReader/officeDocument', importOriginal =>
   documentReaderWorkerMock(importOriginal),
 );
 
-describe('Adversarial M3 Verification: Queue Thinning, Session Stats, Context Edit, Document Reader', () => {
+describe('Adversarial M3 Verification: Queue Thinning and Document Reader', () => {
   describe('Integrity & Facade Checks', () => {
     it('verifies that duplicate prompt maps (pendingDirectUserPrompts, dispatchedNativeFollowUpIds) are completely removed', () => {
       const controller = new PiRuntimeQueueController({} as any);
@@ -191,7 +190,7 @@ describe('Adversarial M3 Verification: Queue Thinning, Session Stats, Context Ed
       } as unknown as ActivePiSession;
 
       mockStore = {
-        addMessage: vi.fn((_id: string, msg: any) => msg),
+        messages: { addMessage: vi.fn((_id: string, msg: any) => msg) },
       };
 
       mockHost = {
@@ -228,79 +227,6 @@ describe('Adversarial M3 Verification: Queue Thinning, Session Stats, Context Ed
 
       expect(controlActionExecuted).toBe(false);
       expect(queueController.hasQueuedControlActions(sessionId)).toBe(false);
-    });
-  });
-
-  describe('Adversarial Context Edit, Tree Navigation, & Session Stats', () => {
-    let adapter: PiRuntimeAdapter;
-    let mockPiSession: any;
-    let mockSessionManager: any;
-    let mockStore: any;
-    const sessionId = 'adv-tree-stats-session';
-
-    beforeEach(() => {
-      adapter = new PiRuntimeAdapter();
-
-      mockSessionManager = {
-        appendContextEdit: vi.fn((targetId: string, _replacement: any) => `entry-${targetId}`),
-      };
-
-      mockPiSession = {
-        sessionManager: mockSessionManager,
-        navigateTree: vi.fn(async (targetId: string) => ({
-          cancelled: false,
-          editorText: `Branch at ${targetId}`,
-        })),
-        getSessionStats: vi.fn(() => ({
-          sessionId,
-          tokens: { input: 1000, output: 250, total: 1250 },
-          cost: 0.015,
-        })),
-      };
-
-      mockStore = {
-        updateMessageMetadata: vi.fn(),
-        getMessages: vi.fn(() => []),
-      };
-
-      adapter.setCoworkStore(mockStore);
-
-      (adapter as any).activeSessions.set(sessionId, {
-        sessionId,
-        piSession: mockPiSession,
-        isRunning: false,
-      });
-    });
-
-    it('rejects appendContextEdit and navigateSessionTree if session is busy running', async () => {
-      (adapter as any).activeSessions.get(sessionId)!.isRunning = true;
-
-      const editResult = adapter.appendContextEdit(sessionId, 'target-msg', null);
-      expect(editResult.success).toBe(false);
-      expect(editResult.error).toContain('running');
-
-      const navResult = await adapter.navigateSessionTree(sessionId, 'target-msg');
-      expect(navResult.success).toBe(false);
-      expect(navResult.error).toContain('running');
-
-      expect(mockSessionManager.appendContextEdit).not.toHaveBeenCalled();
-      expect(mockPiSession.navigateTree).not.toHaveBeenCalled();
-    });
-
-    it('handles navigateSessionTree failure exceptions without crashing the adapter', async () => {
-      mockPiSession.navigateTree.mockRejectedValueOnce(new Error('Corrupt JSONL entry'));
-
-      const result = await adapter.navigateSessionTree(sessionId, 'target-msg');
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Corrupt JSONL entry');
-    });
-
-    it('retrieves session stats directly from Pi native runtime without synthetic fabrication', () => {
-      const stats = adapter.getSessionStats(sessionId);
-      expect(stats).toBeDefined();
-      expect(stats?.tokens.total).toBe(1250);
-      expect(stats?.cost).toBe(0.015);
-      expect(mockPiSession.getSessionStats).toHaveBeenCalledTimes(1);
     });
   });
 });

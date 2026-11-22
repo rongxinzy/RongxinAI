@@ -35,6 +35,10 @@ test('secret and map filenames are rejected without treating code modules as tok
   expect(isForbiddenPackagedBasename('tokens.json')).toBe(true);
   expect(isForbiddenPackagedBasename('.env')).toBe(true);
   expect(isForbiddenPackagedBasename('.env.local')).toBe(true);
+  expect(isForbiddenPackagedBasename('.connection')).toBe(true);
+  expect(isForbiddenPackagedBasename('.server.log')).toBe(true);
+  expect(isForbiddenPackagedBasename('.server.pid')).toBe(true);
+  expect(isForbiddenPackagedBasename('.server-control.local.json')).toBe(true);
   expect(isForbiddenPackagedBasename('main.js.map')).toBe(true);
   expect(isForbiddenPackagedBasename('tokens.py')).toBe(false);
   expect(isForbiddenPackagedBasename('tokens.pyi')).toBe(false);
@@ -135,6 +139,9 @@ test('packaging excludes stay on existing filesets and do not add ignore-only pa
   expect(dist.filter).toContain('!**/*.map');
   expect(dist.filter).toContain('!*.map');
   expect(dist.filter).toContain('!**/*.local.json');
+  expect(dist.filter).toEqual(
+    expect.arrayContaining(['!**/.connection', '!**/.server.log', '!**/.server.pid']),
+  );
   expect(config.extraResources[0].filter).toContain('!**/*.local.json');
   expect(config.linux.extraResources[0].filter).toContain('!**/tokens.json');
 });

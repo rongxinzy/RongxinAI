@@ -238,7 +238,7 @@ test('is tolerant to missing fields, unknown status values, and entries without 
         'not-an-object',
       ],
     }),
-  ).toEqual([{ id: 'unknown-state', state: 'unloaded', modelPath: '/models/a.gguf' }]);
+  ).toEqual([{ id: 'unknown-state', state: 'unknown', modelPath: '/models/a.gguf' }]);
 
   expect(parseLlamaCppRouterModelsPayload(null)).toEqual([]);
   expect(parseLlamaCppRouterModelsPayload({})).toEqual([]);

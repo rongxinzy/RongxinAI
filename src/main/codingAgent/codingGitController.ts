@@ -9,7 +9,6 @@ import {
   type CodingGitBranchInput,
   type CodingGitPullRequestInput,
   type CodingGitDiffInput,
-  type CodingGitPathActionInput,
   type CodingGitStatus,
   type CodingGitTargetInput,
 } from '../../shared/codingAgent';
@@ -36,18 +35,6 @@ export class CodingGitController {
   async getDiff(input: CodingGitDiffInput): Promise<string> {
     const target = this.resolveTarget(input);
     return await this.git.getDiff({ ...input, targetRoot: target.targetRoot });
-  }
-
-  async stage(input: CodingGitPathActionInput): Promise<CodingGitStatus> {
-    const target = this.resolveMutableTarget(input);
-    await this.git.stage(target.targetRoot, input.paths);
-    return await this.git.getStatus(target.targetRoot, target);
-  }
-
-  async unstage(input: CodingGitPathActionInput): Promise<CodingGitStatus> {
-    const target = this.resolveMutableTarget(input);
-    await this.git.unstage(target.targetRoot, input.paths);
-    return await this.git.getStatus(target.targetRoot, target);
   }
 
   async commit(input: CodingGitCommitInput): Promise<CodingGitStatus> {

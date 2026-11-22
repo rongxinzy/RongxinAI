@@ -12,17 +12,17 @@ import {
   type CodingAgentLane,
   type CodingAgentProfile,
   type CodingRoom,
-  type CreateCodingSessionInput,
   type StartCodingSessionInput,
 } from '../../shared/codingAgent';
 import { t } from '../i18n';
-import { ensureAcpModelFromMagpie } from './acpMagpieModel';
+import { isAcpAuthenticationRequired } from './acp/authMethods';
 import { CodingAgentRegistry } from './codingAgentRegistry';
 import { CodingRoomRepository } from './codingRoomRepository';
 import type { CodingAgentDriver, CodingAgentSession } from './drivers/codingAgentDriver';
 import { CodingDriverFactory } from './drivers/driverFactory';
+import type { CodingDriverPool } from './codingRoom/codingDriverPool';
 
-export interface ResolvedSessionTarget {
+interface ResolvedSessionTarget {
   room: CodingRoom;
   profile: CodingAgentProfile;
   sourceRoot: string;
@@ -36,17 +36,20 @@ export interface PreparedCodingSession {
   driverSession: CodingAgentSession;
 }
 
-export const resolveSessionTarget = (
+const resolveSessionTarget = (
   repository: CodingRoomRepository,
   registry: CodingAgentRegistry,
-  input: CreateCodingSessionInput,
+  input: StartCodingSessionInput,
 ): ResolvedSessionTarget => {
   registry.refreshBuiltinReadiness();
   const room = repository.getRoomById(input.workspaceId);
   if (!room) throw new Error(CodingErrorMessage.WorkspaceNotFound);
   const profile = registry.get(input.profileId);
   if (!profile) throw new Error(CodingErrorMessage.ProfileNotFound);
-  if (profile.status !== CodingAgentProfileStatus.Ready) {
+  const canProbe =
+    profile.driverKind === CodingAgentDriverKind.Acp &&
+    profile.status === CodingAgentProfileStatus.Detected;
+  if (profile.status !== CodingAgentProfileStatus.Ready && !canProbe) {
     if (profile.id === CodingAgentProfileId.Builtin) {
       throw new Error(
         `${CodingErrorDetailMessage.AgentNotReadyDetail} Enable the unified model service and choose a default model in model settings before starting a task.`,
@@ -61,22 +64,24 @@ export const resolveSessionTarget = (
   return { room, profile, sourceRoot };
 };
 
-export const persistCodingSessionRecord = async (input: {
+export const persistCodingSessionRecord = (input: {
   repository: CodingRoomRepository;
   target: ResolvedSessionTarget;
   title: string;
   laneId?: string;
   localSessionId?: string;
   modelOverride?: string | null;
-  getWorkspaceBaseline: (sourceRoot: string) => Promise<string | null>;
-}): Promise<CodingAgentLane> => {
-  const { repository, target } = input;
-  const mission = repository.createMission(
-    target.room.id,
-    input.title.trim() || t('codingAgentDefaultMissionTitle'),
-    await input.getWorkspaceBaseline(target.sourceRoot),
-  );
-  try {
+  gitBaseline: string | null;
+  driverSession?: CodingAgentSession;
+  generatedTitle?: string | null;
+}): CodingAgentLane => {
+  const { repository, target, driverSession } = input;
+  return repository.getDatabase().transaction(() => {
+    const mission = repository.createMission(
+      target.room.id,
+      input.title.trim() || t('codingAgentDefaultMissionTitle'),
+      input.gitBaseline,
+    );
     const lane = repository.createLane(
       mission.id,
       target.profile.id,
@@ -94,18 +99,23 @@ export const persistCodingSessionRecord = async (input: {
       workflowStage: CodingWorkflowStage.Implementation,
     });
     repository.setActive(target.room.id, mission.id, lane.id);
+    if (driverSession) {
+      repository.updateLaneRemoteSession(lane.id, driverSession.remoteSessionId);
+      repository.updateLaneConfigOptions(lane.id, driverSession.configOptions);
+      repository.updateLaneAvailableCommands(lane.id, driverSession.availableCommands);
+    }
+    if (input.generatedTitle) repository.updateMissionTitle(mission.id, input.generatedTitle);
     return lane;
-  } catch (error) {
-    repository.deleteMission(target.room.id, mission.id);
-    throw error;
-  }
+  })();
 };
 
 const disposeUnboundDriver = async (
+  pool: CodingDriverPool,
+  laneId: string,
   driver: CodingAgentDriver,
   sessionId: string | null,
 ): Promise<void> => {
-  if (sessionId) {
+  if (sessionId && pool.driverFor(laneId) === driver) {
     try {
       await driver.disposeSession(sessionId);
     } catch {
@@ -113,7 +123,7 @@ const disposeUnboundDriver = async (
     }
   }
   try {
-    await driver.dispose();
+    await pool.retire(laneId);
   } catch {
     // The session was never published, so local cleanup can continue.
   }
@@ -125,21 +135,22 @@ export const prepareCodingSession = async (input: {
   repository: CodingRoomRepository;
   registry: CodingAgentRegistry;
   driverFactory: CodingDriverFactory;
+  driverPool: CodingDriverPool;
   validateBuiltinModel?: () => Promise<void>;
   getWorkspaceBaseline: (sourceRoot: string) => Promise<string | null>;
 }): Promise<PreparedCodingSession> => {
+  const { driverPool } = input;
+  driverPool.assertOpen();
   const target = resolveSessionTarget(input.repository, input.registry, input.request);
   if (target.profile.driverKind === CodingAgentDriverKind.Builtin && !input.request.modelOverride) {
     await input.validateBuiltinModel?.();
   }
-
-  if (target.profile.driverKind === CodingAgentDriverKind.Acp) {
-    await ensureAcpModelFromMagpie();
-  }
+  driverPool.assertOpen();
 
   const laneId = randomUUID();
   const localSessionId = randomUUID();
   const driver = input.driverFactory.create(target.profile);
+  driverPool.register(laneId, driver, target.profile.id);
   let generatedTitle: string | null = null;
   const removeTitleListener = driver.onSessionTitleChanged((_sessionId, title) => {
     generatedTitle = title;
@@ -164,14 +175,17 @@ export const prepareCodingSession = async (input: {
       }
     }
   } catch (error) {
-    await disposeUnboundDriver(driver, null);
+    const metadata = driver.getProfileMetadata?.();
+    await disposeUnboundDriver(driverPool, laneId, driver, null);
+    driverPool.assertOpen();
     // When the agent rejects session creation because authentication is
     // required (e.g. Kimi Code CLI "Authentication required"), surface that
     // state immediately instead of leaving the profile stuck at Ready.
-    const message = error instanceof Error ? error.message : String(error);
-    if (
+    if (metadata && target.profile.status === CodingAgentProfileStatus.Detected) {
+      input.registry.recordFirstSessionCheck(target.profile, metadata, { success: false, error });
+    } else if (
       target.profile.driverKind === CodingAgentDriverKind.Acp &&
-      /auth_required|authentication(?:\s+is)?\s+required|login required/i.test(message)
+      isAcpAuthenticationRequired(error)
     ) {
       input.registry.markNeedsAuth(target.profile.id);
     }
@@ -180,9 +194,10 @@ export const prepareCodingSession = async (input: {
     removeTitleListener();
   }
 
-  let lane: CodingAgentLane | null = null;
   try {
-    lane = await persistCodingSessionRecord({
+    const gitBaseline = await input.getWorkspaceBaseline(target.sourceRoot);
+    driverPool.assertOpen();
+    const lane = persistCodingSessionRecord({
       repository: input.repository,
       target,
       title:
@@ -191,16 +206,13 @@ export const prepareCodingSession = async (input: {
       laneId,
       localSessionId,
       modelOverride: input.request.modelOverride,
-      getWorkspaceBaseline: input.getWorkspaceBaseline,
+      gitBaseline,
+      driverSession,
+      generatedTitle,
     });
-    input.repository.updateLaneRemoteSession(lane.id, driverSession.remoteSessionId);
-    input.repository.updateLaneConfigOptions(lane.id, driverSession.configOptions);
-    input.repository.updateLaneAvailableCommands(lane.id, driverSession.availableCommands);
-    if (generatedTitle) input.repository.updateMissionTitle(lane.missionId, generatedTitle);
     return { ...target, lane, driver, driverSession };
   } catch (error) {
-    if (lane) input.repository.deleteMission(target.room.id, lane.missionId);
-    await disposeUnboundDriver(driver, driverSession.id);
+    await disposeUnboundDriver(driverPool, laneId, driver, driverSession.id);
     throw error;
   }
 };

@@ -9,10 +9,11 @@ import type {
 } from '../../shared/llamacpp';
 import { resolveGgufModelDownloadUrls } from '../../shared/llamacpp/modelDownloadUrls';
 import { resolveInstalledModelName } from './llamacppModelCatalog';
-import { MarketplaceService } from './marketplaceService';
+import type { MarketplaceService } from './marketplaceService';
 import type { MarketplaceModelFile } from '../../shared/marketplace';
 import { isRecord } from '../../shared/lib/isRecord';
-import { assertValidGgufFile, downloadLocalModelFile, sha256File } from './localModelDownload';
+import { downloadLocalModelFile } from './localModelDownload';
+import { removeEmptyParentDirs } from './llamacppManager/fileUtils';
 
 type RequestOptions = { signal?: AbortSignal };
 
@@ -46,7 +47,7 @@ export function collectSplitVariantFiles(
 
 export async function prefillInstallInputFromMarketplace(
   input: LlamaCppInstallModelInput,
-  marketplaceService: MarketplaceService,
+  marketplaceService: Pick<MarketplaceService, 'resolveModel'>,
 ): Promise<LlamaCppInstallModelInput> {
   if (input.downloadUrl?.trim() && input.sha256?.trim()) {
     return input;
@@ -91,187 +92,93 @@ export async function installModelOnce(input: {
   modelsDir: string;
   onProgress?: (progress: LlamaCppInstallProgress) => void;
   options?: RequestOptions;
-  refreshModelsAfterInstall: () => Promise<void>;
 }): Promise<LlamaCppModel> {
   const { request, safeModelDir, modelsDir, onProgress, options = {} } = input;
   const modelId = request.modelId.trim();
   const resolved = await resolveModelScopeInstallRequest(request);
-  const filePath = resolved.filePath;
-  const downloadUrls = resolveGgufModelDownloadUrls({
-    modelId,
-    filePath,
-    revision: request.revision,
-    downloadUrl: resolved.downloadUrl,
-  });
-  const targetPath = resolveModelScopeTargetPath(safeModelDir, filePath);
-  const installedThisAttempt = new Set<string>();
-  // Split-GGUF variants download every sibling part; the primary file is the
-  // first part and llama.cpp loads the sharded model from the whole set.
-  const extraFiles = (request.extraFiles ?? []).map(extra => ({
-    ...extra,
-    targetPath: resolveModelScopeTargetPath(safeModelDir, extra.path),
-  }));
-
-  const primaryPresent = fs.existsSync(targetPath) && fs.statSync(targetPath).size > 0;
-  const extrasPresent = extraFiles.every(extra => {
-    if (!fs.existsSync(extra.targetPath)) return false;
-    const actualSize = fs.statSync(extra.targetPath).size;
-    if (actualSize <= 0) return false;
-    // Mirror the download-time byte-size check so a truncated or corrupted
-    // part is not silently accepted just because a previous run touched it.
-    return !extra.sizeBytes || actualSize === extra.sizeBytes;
-  });
-  if (primaryPresent && extrasPresent) {
-    const actualSize = fs.statSync(targetPath).size;
-    const actualSha256 = await sha256File(targetPath);
-    if (
-      actualSha256.toLowerCase() === request.sha256?.trim().toLowerCase() &&
-      (!request.fileSizeBytes || actualSize === request.fileSizeBytes) &&
-      isValidGgufFile(targetPath)
-    ) {
-      onProgress?.({
-        phase: 'done',
-        modelId,
-        modelName: request.displayName ?? modelId,
-        percent: 100,
-        targetPath,
-      });
-      await input.refreshModelsAfterInstall();
-      return buildInstalledModelRecord(modelsDir, targetPath);
+  const targetPath = resolveModelScopeTargetPath(safeModelDir, resolved.filePath);
+  const files: LlamaCppInstallExtraFile[] = [
+    {
+      path: resolved.filePath,
+      downloadUrl: resolved.downloadUrl,
+      sha256: request.sha256,
+      sizeBytes: request.fileSizeBytes,
+    },
+    ...(request.extraFiles ?? []),
+  ];
+  for (const extra of request.extraFiles ?? []) {
+    if (!extra.sha256?.trim()) {
+      throw new Error(
+        'The cloud catalogue did not provide a SHA-256 checksum for every split part of this model.',
+      );
     }
-    for (const extra of extraFiles) fs.rmSync(extra.targetPath, { force: true });
-    fs.rmSync(targetPath, { force: true });
+  }
+  if (request.mmprojFilePath?.trim()) {
+    if (!request.mmprojSha256?.trim()) {
+      throw new Error(
+        'The cloud catalogue did not provide a SHA-256 checksum for the mmproj file.',
+      );
+    }
+    files.push({
+      path: request.mmprojFilePath.trim(),
+      downloadUrl: request.mmprojDownloadUrl,
+      sha256: request.mmprojSha256,
+    });
   }
 
-  onProgress?.({
-    phase: 'downloading',
-    modelId,
-    modelName: request.displayName ?? modelId,
-    targetPath,
-  });
-
+  const installedThisAttempt = new Set<string>();
+  const modelName = request.displayName ?? modelId;
   try {
-    await downloadLocalModelFile(
-      downloadUrls,
-      targetPath,
-      (completed, total, speed) => {
-        onProgress?.({
-          phase: 'downloading-progress',
-          modelId,
-          modelName: request.displayName ?? modelId,
-          completed,
-          total,
-          speed,
-          percent: total ? Math.round((completed / total) * 100) : undefined,
-          targetPath,
-        });
-      },
-      options.signal,
-      request.sha256,
-      request.fileSizeBytes,
-    );
-    installedThisAttempt.add(targetPath);
-
-    for (const extra of extraFiles) {
-      if (!extra.sha256?.trim()) {
-        throw new Error(
-          'The cloud catalogue did not provide a SHA-256 checksum for every split part of this model.',
-        );
-      }
-      const extraUrls = resolveGgufModelDownloadUrls({
+    for (const file of files) {
+      const destination = resolveModelScopeTargetPath(safeModelDir, file.path);
+      const urls = resolveGgufModelDownloadUrls({
         modelId,
-        filePath: extra.path,
-        revision: extra.revision ?? request.revision,
-        downloadUrl: extra.downloadUrl,
+        filePath: file.path,
+        revision: file.revision ?? request.revision,
+        downloadUrl: file.downloadUrl,
       });
-      onProgress?.({
-        phase: 'downloading',
-        modelId,
-        modelName: request.displayName ?? modelId,
-        targetPath: extra.targetPath,
-      });
-      await downloadLocalModelFile(
-        extraUrls,
-        extra.targetPath,
+      await fs.promises.mkdir(path.dirname(destination), { recursive: true });
+      onProgress?.({ phase: 'downloading', modelId, modelName, targetPath: destination });
+      const downloaded = await downloadLocalModelFile(
+        urls,
+        destination,
         (completed, total, speed) => {
           onProgress?.({
             phase: 'downloading-progress',
             modelId,
-            modelName: request.displayName ?? modelId,
+            modelName,
             completed,
             total,
             speed,
             percent: total ? Math.round((completed / total) * 100) : undefined,
-            targetPath: extra.targetPath,
+            targetPath: destination,
           });
         },
         options.signal,
-        extra.sha256,
-        extra.sizeBytes,
+        file.sha256,
+        file.sizeBytes,
       );
-      installedThisAttempt.add(extra.targetPath);
-    }
-
-    if (request.mmprojFilePath?.trim()) {
-      const mmprojFilePath = request.mmprojFilePath.trim();
-      if (!request.mmprojSha256?.trim()) {
-        throw new Error(
-          'The cloud catalogue did not provide a SHA-256 checksum for the mmproj file.',
-        );
-      }
-      const mmprojUrls = resolveGgufModelDownloadUrls({
-        modelId,
-        filePath: mmprojFilePath,
-        revision: request.revision,
-        downloadUrl: request.mmprojDownloadUrl,
-      });
-      const mmprojTargetPath = resolveModelScopeTargetPath(safeModelDir, mmprojFilePath);
-      onProgress?.({
-        phase: 'downloading',
-        modelId,
-        modelName: request.displayName ?? modelId,
-        targetPath: mmprojTargetPath,
-      });
-      await downloadLocalModelFile(
-        mmprojUrls,
-        mmprojTargetPath,
-        (completed, total, speed) => {
-          onProgress?.({
-            phase: 'downloading-progress',
-            modelId,
-            modelName: request.displayName ?? modelId,
-            completed,
-            total,
-            speed,
-            percent: total ? Math.round((completed / total) * 100) : undefined,
-            targetPath: mmprojTargetPath,
-          });
-        },
-        options.signal,
-        request.mmprojSha256,
-      );
-      installedThisAttempt.add(mmprojTargetPath);
+      if (downloaded) installedThisAttempt.add(destination);
     }
   } catch (error) {
-    cleanupInstallArtifacts(installedThisAttempt, modelsDir);
-    removeEmptyParentDirs(safeModelDir, modelsDir);
+    await cleanupInstallArtifacts(installedThisAttempt, modelsDir);
+    await removeEmptyParentDirs(safeModelDir, modelsDir);
     throw error;
   }
 
   onProgress?.({
     phase: 'done',
     modelId,
-    modelName: request.displayName ?? modelId,
+    modelName,
     percent: 100,
     targetPath,
   });
-  await input.refreshModelsAfterInstall();
   return buildInstalledModelRecord(modelsDir, targetPath);
 }
 
 export async function refreshInstallInputFromMarketplace(
   input: LlamaCppInstallModelInput,
-  marketplaceService: MarketplaceService,
+  marketplaceService: Pick<MarketplaceService, 'resolveModel'>,
 ): Promise<LlamaCppInstallModelInput | null> {
   const model = await marketplaceService.resolveModel(input.modelId.trim()).catch((): null => null);
   const selectedFile = model?.files?.find(file => file.isRecommended);
@@ -421,34 +328,13 @@ function isGgufPath(value: string): boolean {
   return pathname.toLowerCase().endsWith('.gguf');
 }
 
-function removeEmptyParentDirs(startDir: string, stopDir: string): void {
-  let currentDir = path.resolve(startDir);
-  const resolvedStopDir = path.resolve(stopDir);
-
-  while (currentDir.startsWith(resolvedStopDir + path.sep)) {
-    if (!safeIsDirectoryEmpty(currentDir)) return;
-    fs.rmdirSync(currentDir);
-    currentDir = path.dirname(currentDir);
-  }
-}
-
-function cleanupInstallArtifacts(paths: Iterable<string>, rootDir: string): void {
+async function cleanupInstallArtifacts(paths: Iterable<string>, rootDir: string): Promise<void> {
   const resolvedRootDir = path.resolve(rootDir);
   for (const candidate of paths) {
     const target = path.resolve(candidate);
-    if (!target.startsWith(resolvedRootDir + path.sep) && target !== resolvedRootDir) continue;
-    if (fs.existsSync(target)) {
-      fs.rmSync(target, { force: true, recursive: true });
-    }
-    removeEmptyParentDirs(path.dirname(target), resolvedRootDir);
-  }
-}
-
-function safeIsDirectoryEmpty(target: string): boolean {
-  try {
-    return fs.readdirSync(target).length === 0;
-  } catch {
-    return false;
+    if (!target.startsWith(resolvedRootDir + path.sep)) continue;
+    await fs.promises.rm(target, { force: true });
+    await removeEmptyParentDirs(path.dirname(target), resolvedRootDir);
   }
 }
 
@@ -461,32 +347,24 @@ function resolveModelScopeTargetPath(modelDir: string, filePath: string): string
   const normalizedFileName = fileName.toLowerCase().endsWith('.gguf')
     ? fileName
     : `${fileName}.gguf`;
-  const targetDir = path.join(modelDir, ...segments);
-  fs.mkdirSync(targetDir, { recursive: true });
-  return path.join(targetDir, normalizedFileName);
+  return path.join(modelDir, ...segments, normalizedFileName);
 }
 
-function buildInstalledModelRecord(modelsDir: string, targetPath: string): LlamaCppModel {
+async function buildInstalledModelRecord(
+  modelsDir: string,
+  targetPath: string,
+): Promise<LlamaCppModel> {
   const modelName = resolveInstalledModelName(modelsDir, targetPath);
   return {
     name: modelName,
     id: modelName,
     model: modelName,
     path: targetPath,
-    size: fs.statSync(targetPath).size,
+    size: (await fs.promises.stat(targetPath)).size,
     source: 'modelscope',
     status: 'unloaded',
     details: { format: 'gguf' },
   };
-}
-
-function isValidGgufFile(filePath: string): boolean {
-  try {
-    assertValidGgufFile(filePath);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function sanitizePathSegment(value: string): string {

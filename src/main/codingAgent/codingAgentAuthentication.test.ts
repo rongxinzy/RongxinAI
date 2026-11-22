@@ -8,6 +8,7 @@ import { AuthTerminalService } from './authTerminalService';
 import { CodingAgentRegistry } from './codingAgentRegistry';
 import { CodingRoomRepository } from './codingRoomRepository';
 import { CodingRoomService } from './codingRoomService';
+import { AcpCodingDriver } from './drivers/acpCodingDriver';
 import { initializeCodingAgentSchema } from './schema';
 
 let db: Database.Database | undefined;
@@ -19,6 +20,54 @@ afterEach(async () => {
   db?.close();
   db = undefined;
   vi.restoreAllMocks();
+});
+
+test('shutdown retires an in-flight authentication driver and rejects new login requests', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const registry = new CodingAgentRegistry();
+  const profile = registry.addUntrustedProfile({
+    name: 'Fixture',
+    description: '',
+    command: execPath,
+    args: [],
+  });
+  profile.authMethods.push(
+    { id: 'login', name: 'Login' },
+    { id: 'terminal', name: 'Terminal', type: 'terminal' },
+  );
+  registry.trust(profile.id);
+  registry.markNeedsAuth(profile.id);
+  service = new CodingRoomService(new CodingRoomRepository(db), registry, {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => null,
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const pending = Promise.withResolvers<void>();
+  vi.spyOn(AcpCodingDriver.prototype, 'authenticate').mockReturnValue(pending.promise);
+  const stop = vi.spyOn(AcpCodingDriver.prototype, 'dispose').mockImplementation(async () => {
+    pending.reject(new Error('Authentication driver retired'));
+  });
+  const login = expect(
+    service.authenticateProfile(process.cwd(), profile.id, 'login'),
+  ).rejects.toThrow('Authentication driver retired');
+
+  try {
+    await service.dispose();
+    expect(stop).toHaveBeenCalledOnce();
+    await login;
+    await expect(service.authenticateProfile(process.cwd(), profile.id, 'login')).rejects.toThrow(
+      'shutting down',
+    );
+    expect(() =>
+      service!.startTerminalAuthentication(process.cwd(), profile.id, 'terminal'),
+    ).toThrow('shutting down');
+  } finally {
+    pending.reject(new Error('Authentication driver retired'));
+    await login;
+  }
 });
 
 test.each([

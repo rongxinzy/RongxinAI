@@ -9,35 +9,35 @@ import path from 'path';
 
 import { WorkspaceStoreKey } from '../../shared/workspace';
 import { getDefaultProjectBaseDir, isInternalWorkspacePath } from './workspacePaths';
-import { forgetCoworkSession, listAllMatchingSessionIds } from './coworkSessionImages';
 import { handleIpcContract } from '../ipc/handleIpcContract';
-import { demoteStaleRunningSessions } from '../coworkSessionRuntimeState';
 import { getPiRuntimeAdapter } from './sessionServices';
 import { workspaceContract } from '../../shared/ipc/coworkContract';
 
-export const registerWorkspaceIpc = (): void => {
+export const registerWorkspaceIpc = (
+  deleteWorkspaceWithSessions: (workspaceId: string) => Promise<string[] | null>,
+): void => {
   handleIpcContract(workspaceContract, {
     listWorkspaces: async () => {
       try {
-        const store = getCoworkStore();
-        let workspaces = store.listWorkspaces();
+        const workspaceStore = getCoworkStore().workspaces;
+        let workspaces = workspaceStore.listWorkspaces();
         for (const workspace of workspaces) {
           if (isDefaultConversationWorkspacePath(workspace.path)) {
-            if (workspace.isHidden) store.setWorkspaceHidden(workspace.id, false);
+            if (workspace.isHidden) workspaceStore.setWorkspaceHidden(workspace.id, false);
             continue;
           }
           if (!workspace.isHidden && isInternalWorkspacePath(workspace.path)) {
-            store.setWorkspaceHidden(workspace.id, true);
+            workspaceStore.setWorkspaceHidden(workspace.id, true);
           }
         }
-        workspaces = store.listWorkspaces();
+        workspaces = workspaceStore.listWorkspaces();
         if (getStore().get<boolean>(WorkspaceStoreKey.DefaultConversationInitialized) !== true) {
           const defaultWorkspacePath = getDefaultConversationWorkspacePath();
           await fs.promises.mkdir(defaultWorkspacePath, { recursive: true });
-          const defaultWorkspace = store.ensureWorkspace(defaultWorkspacePath);
-          store.setWorkspaceHidden(defaultWorkspace.id, false);
+          const defaultWorkspace = workspaceStore.ensureWorkspace(defaultWorkspacePath);
+          workspaceStore.setWorkspaceHidden(defaultWorkspace.id, false);
           getStore().set(WorkspaceStoreKey.DefaultConversationInitialized, true);
-          workspaces = store.listWorkspaces();
+          workspaces = workspaceStore.listWorkspaces();
         }
         return { success: true as const, workspaces };
       } catch (error) {
@@ -69,7 +69,10 @@ export const registerWorkspaceIpc = (): void => {
         if (!stat.isDirectory())
           return { success: false as const, error: 'Workspace path is not a directory' };
 
-        const workspace = getCoworkStore().createWorkspace(resolvedWorkspacePath, workspaceName);
+        const workspace = getCoworkStore().workspaces.createWorkspace(
+          resolvedWorkspacePath,
+          workspaceName,
+        );
         return { success: true as const, workspace };
       } catch (error) {
         return {
@@ -83,7 +86,7 @@ export const registerWorkspaceIpc = (): void => {
       try {
         const workspacePath = options.path.trim();
         if (!workspacePath) return { success: false as const, error: 'Workspace path is required' };
-        const workspace = getCoworkStore().ensureWorkspace(
+        const workspace = getCoworkStore().workspaces.ensureWorkspace(
           workspacePath,
           options.name,
           options.isHidden === true,
@@ -97,38 +100,13 @@ export const registerWorkspaceIpc = (): void => {
       }
     },
 
-    renameWorkspace: async (_event, id, name) => {
-      try {
-        const normalizedName = name.trim();
-        if (!normalizedName)
-          return { success: false as const, error: 'Workspace name is required' };
-
-        const localCoworkStore = getCoworkStore();
-        const workspace = localCoworkStore.getWorkspace(id);
-        if (!workspace) return { success: false as const, error: 'Workspace not found' };
-        if (isDefaultConversationWorkspacePath(workspace.path)) {
-          return {
-            success: false as const,
-            error: 'The default conversation workspace cannot be renamed',
-          };
-        }
-        const renamedWorkspace = localCoworkStore.renameWorkspace(id, normalizedName);
-        if (!renamedWorkspace) return { success: false as const, error: 'Workspace not found' };
-        return { success: true as const, workspace: renamedWorkspace };
-      } catch (error) {
-        return {
-          success: false as const,
-          error: error instanceof Error ? error.message : 'Failed to rename workspace',
-        };
-      }
-    },
-
     updateWorkspace: async (_event, options) => {
       try {
         const id = options.id.trim();
         if (!id) return { success: false as const, error: 'Workspace id is required' };
         const localCoworkStore = getCoworkStore();
-        const workspace = localCoworkStore.getWorkspace(id);
+        const workspaceStore = localCoworkStore.workspaces;
+        const workspace = workspaceStore.getWorkspace(id);
         if (!workspace) return { success: false as const, error: 'Workspace not found' };
 
         const requestedName = options.name?.trim();
@@ -156,30 +134,23 @@ export const registerWorkspaceIpc = (): void => {
           if (!stat?.isDirectory()) {
             return { success: false as const, error: 'Workspace path is not a directory' };
           }
-          // The store's guard reads the raw status column; demote 'running'
-          // rows the runtime no longer runs so a stale projection cannot
-          // block relocation forever (read paths only derive, never heal).
-          demoteStaleRunningSessions(
-            localCoworkStore,
-            sessionId => getPiRuntimeAdapter().isSessionRunning(sessionId),
-            localCoworkStore.listSessions(1000, 0, undefined, id),
-          );
-          const relocated = localCoworkStore.relocateWorkspace(
+          const relocated = workspaceStore.relocateWorkspace(
             id,
             resolvedPath,
             requestedName || workspace.name,
+            getPiRuntimeAdapter().getRunningSessionIds(),
           );
           if (!relocated) return { success: false as const, error: 'Workspace not found' };
           if (options.folders) {
-            localCoworkStore.setWorkspaceFolders(
+            workspaceStore.setWorkspaceFolders(
               relocated.id,
               (resolvedFolders ?? []).filter(folder => !pathsEqual(folder, resolvedPath)),
             );
-            localCoworkStore.touchWorkspace(relocated.id);
+            workspaceStore.touchWorkspace(relocated.id);
           }
           return {
             success: true as const,
-            workspace: localCoworkStore.getWorkspace(relocated.id),
+            workspace: workspaceStore.getWorkspace(relocated.id),
           };
         }
 
@@ -190,19 +161,19 @@ export const registerWorkspaceIpc = (): void => {
               error: 'The default conversation workspace cannot be renamed',
             };
           }
-          const renamed = localCoworkStore.renameWorkspace(id, requestedName);
+          const renamed = workspaceStore.renameWorkspace(id, requestedName);
           if (!renamed) return { success: false as const, error: 'Workspace not found' };
         }
         if (options.folders) {
-          localCoworkStore.setWorkspaceFolders(
+          workspaceStore.setWorkspaceFolders(
             id,
             (resolvedFolders ?? []).filter(
               folder => !pathsEqual(folder, path.resolve(workspace.path)),
             ),
           );
-          localCoworkStore.touchWorkspace(id);
+          workspaceStore.touchWorkspace(id);
         }
-        return { success: true as const, workspace: localCoworkStore.getWorkspace(id) };
+        return { success: true as const, workspace: workspaceStore.getWorkspace(id) };
       } catch (error) {
         return {
           success: false as const,
@@ -213,8 +184,8 @@ export const registerWorkspaceIpc = (): void => {
 
     deleteWorkspace: async (_event, id) => {
       try {
-        const localCoworkStore = getCoworkStore();
-        const workspace = localCoworkStore.getWorkspace(id);
+        const workspaceStore = getCoworkStore().workspaces;
+        const workspace = workspaceStore.getWorkspace(id);
         if (!workspace) return { success: false as const, error: 'Workspace not found' };
         if (isDefaultConversationWorkspacePath(workspace.path)) {
           return {
@@ -222,10 +193,8 @@ export const registerWorkspaceIpc = (): void => {
             error: 'The default conversation workspace cannot be removed',
           };
         }
-        for (const sessionId of listAllMatchingSessionIds({ workspaceId: id })) {
-          forgetCoworkSession(sessionId);
-        }
-        const deletedSessionIds = localCoworkStore.deleteWorkspace(id);
+        const deletedSessionIds = await deleteWorkspaceWithSessions(id);
+        if (!deletedSessionIds) return { success: false as const, error: 'Workspace not found' };
         console.log(
           `[CoworkStore] removed a workspace along with ${deletedSessionIds.length} session(s)`,
         );

@@ -88,47 +88,18 @@ jobs:
           restore-keys: |
             copy-v3-packaging-Windows-win-x64-node24-bun1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
-      - run: bun run apply:patches
-      - name: Verify optional enterprise extension
+      - name: Test optional enterprise extension
         if: ${{ inputs.enterprise-extension }}
         run: |
           bun run typecheck:enterprise
           bun run test:enterprise
-          bun run build:enterprise
-          bun run verify:enterprise:bundle
-      - name: Read pinned Magpie Go toolchain
-        id: magpie-toolchain
-        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
-      - uses: actions/setup-go@v6
+      - uses: ./.github/actions/prepare-magpie-runtime
         with:
-          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
-          cache: false
-      - name: Cache Magpie module and build scratch
-        uses: actions/cache@v5
-        with:
-          path: |
-            .cache/magpie
-            resources/magpie
-          key: magpie-Windows-win-x64-go${{ steps.magpie-toolchain.outputs.go-version }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs', 'scripts/magpie-runtime.cjs') }}
-      - name: Build and verify pinned Magpie gateway
-        env:
-          MAGPIE_TARGET: win32-x64
-        run: |
-          bun run magpie:build -- --target win32-x64
-          bun run magpie:verify -- --target win32-x64
+          target: win32-x64
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '8.0.x'
-      - run: |
-          bun run setup:uv-runtime
-          bun run setup:python-runtime
-          bun run engram:runtime:win-x64
-      - uses: ilammy/msvc-dev-cmd@v1
-      - name: Build and verify the Windows Python job helper
-        shell: pwsh
-        run: |
-          ./scripts/python-runtime/build-job-runner.ps1
-          node --test scripts/python-runtime/job-runner.test.cjs
+      - uses: ./.github/actions/prepare-windows-packaging-runtime
       - run: node scripts/sync-vendor-llamacpp-cpu-edition.cjs
         if: ${{ !inputs.enterprise-extension }}
         env:
@@ -270,7 +241,6 @@ jobs:
         with:
           bun-version: '1.4.0'
       - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
-      - run: bun run apply:patches
       - uses: actions/download-artifact@v8
         with:
           name: windows-acceptance-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.edition }}

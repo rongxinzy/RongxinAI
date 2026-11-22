@@ -8,6 +8,7 @@ const path = require('node:path');
 const FORBIDDEN_BASENAME_PATTERNS = [
   /^\.env$/i,
   /^\.env\./i,
+  /^(\.connection|\.server\.(log|pid))$/i,
   /\.local\.json$/i,
   /\.map$/i,
   /(?:^|[._-])tokens?\.json$/i,
@@ -20,6 +21,9 @@ const PACKAGING_EXCLUDES = [
   '!**/*.local.json',
   '!**/.env',
   '!**/.env.*',
+  '!**/.connection',
+  '!**/.server.log',
+  '!**/.server.pid',
   '!**/*.token.json',
   '!**/*.tokens.json',
   '!**/token.json',

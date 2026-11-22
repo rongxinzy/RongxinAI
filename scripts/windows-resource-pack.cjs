@@ -3,45 +3,29 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { isForbiddenPackagedBasename } = require('./packaging/assert-package-contents.cjs');
 
-const EXCLUDED_FILE_PATTERNS = [
-  /\.map$/i,
-  /\.local\.json$/i,
-  /(?:^|[._-])tokens?\.json$/i,
-  /^modelscope\.tokens.*\.json$/i,
-  /\.d\.(ts|cts|mts)$/i,
-  /^(readme|changelog|history)(\.(md|txt|rst))?$/i,
-  /^(license|licence|authors|contributors)(\.(md|txt))?$/i,
-  /^\.(eslintrc|prettierrc|editorconfig|npmignore|gitignore|gitattributes)/i,
-  /^tsconfig(\..+)?\.json$/i,
-  /^(jest|vitest)\.config/i,
-  /^\.babelrc/i,
-  /^babel\.config/i,
-  /\.(test|spec)\.\w+$/i,
-];
-const EXCLUDED_DIRECTORIES = new Set([
-  'test',
-  'tests',
-  '__tests__',
-  '__mocks__',
+const TRANSIENT_DIRECTORIES = new Set([
+  '.cache',
+  '.git',
   '.github',
-  'example',
-  'examples',
-  'coverage',
+  '.mypy_cache',
+  '.pytest_cache',
+  '.ruff_cache',
   '.venv',
-  '.bin',
+  '__pycache__',
 ]);
 
 function shouldExclude(entryPath) {
   if (/^feishu[/\\]runtime(?:[/\\]|$)/i.test(entryPath)) return true;
   const segments = entryPath.split(/[/\\]/);
-  if (segments.some(segment => EXCLUDED_DIRECTORIES.has(segment.toLowerCase()))) return true;
-  const basename = path.basename(entryPath);
-  if (/^\.env(\..+)?$/i.test(basename)) return true;
-  return EXCLUDED_FILE_PATTERNS.some(pattern => pattern.test(basename));
+  return (
+    segments.some(segment => TRANSIENT_DIRECTORIES.has(segment.toLowerCase())) ||
+    isForbiddenPackagedBasename(segments.at(-1))
+  );
 }
 
-const WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION = 4;
+const WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION = 5;
 const WINDOWS_RESOURCE_ARCHIVE_EXTENSION = '.7z';
 const WINDOWS_RESOURCE_ARCHIVE_FORMAT = '7z';
 // mx=5 keeps solid LZMA2 within ~4% of mx=9 while compressing more than twice as
@@ -125,10 +109,19 @@ function getWindowsResourceComponents(projectRoot) {
   return components;
 }
 
-function computeWindowsResourceComponentId(component) {
+function listWindowsResourceComponentFiles(component) {
   if (!fs.existsSync(component.dir)) {
     throw new Error('[windows-resource-pack] Missing ' + component.label + ': ' + component.dir);
   }
+  const files = [];
+  collectFiles(files, component.dir, '');
+  return files.sort();
+}
+
+function computeWindowsResourceComponentId(
+  component,
+  files = listWindowsResourceComponentFiles(component),
+) {
   const hash = crypto.createHash('sha256');
   hash.update(
     'zhiyuan-windows-resource-component-v' + WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION + '\0',
@@ -136,38 +129,12 @@ function computeWindowsResourceComponentId(component) {
   hash.update(
     'component\0' + component.key + '\0' + component.prefix + '\0' + component.sentinel + '\0',
   );
-  hashDirectory(hash, component.dir, '');
-  return hash.digest('hex');
-}
-
-function hashDirectory(hash, directory, relativeDirectory, ancestorDirectories = new Set()) {
-  const realDirectory = fs.realpathSync(directory);
-  if (ancestorDirectories.has(realDirectory)) {
-    throw new Error('[windows-resource-pack] Symlink cycle detected at ' + directory);
-  }
-  const nextAncestors = new Set(ancestorDirectories);
-  nextAncestors.add(realDirectory);
-  const entries = fs
-    .readdirSync(directory, { withFileTypes: true })
-    .sort((left, right) => left.name.localeCompare(right.name, 'en'));
-
-  for (const entry of entries) {
-    const relativePath = relativeDirectory ? relativeDirectory + '/' + entry.name : entry.name;
-    if (shouldExclude(relativePath)) continue;
-
-    const absolutePath = path.join(directory, entry.name);
-    const stat = fs.statSync(absolutePath);
-    if (stat.isDirectory()) {
-      hash.update('directory\0' + relativePath + '\0');
-      hashDirectory(hash, absolutePath, relativePath, nextAncestors);
-      continue;
-    }
-    if (!stat.isFile()) continue;
-
-    hash.update('file\0' + relativePath + '\0' + stat.size + '\0');
-    const fileDescriptor = fs.openSync(absolutePath, 'r');
-    const buffer = Buffer.allocUnsafe(1024 * 1024);
+  const buffer = Buffer.allocUnsafe(1024 * 1024);
+  for (const relativePath of files) {
+    const fileDescriptor = fs.openSync(path.join(component.dir, relativePath), 'r');
     try {
+      const { size } = fs.fstatSync(fileDescriptor);
+      hash.update('file\0' + relativePath + '\0' + size + '\0');
       let bytesRead = 0;
       do {
         bytesRead = fs.readSync(fileDescriptor, buffer, 0, buffer.length, null);
@@ -177,6 +144,30 @@ function hashDirectory(hash, directory, relativeDirectory, ancestorDirectories =
       fs.closeSync(fileDescriptor);
     }
     hash.update('\0');
+  }
+  return hash.digest('hex');
+}
+
+function collectFiles(files, directory, relativeDirectory, ancestorDirectories = new Set()) {
+  const realDirectory = fs.realpathSync(directory);
+  if (ancestorDirectories.has(realDirectory)) {
+    throw new Error('[windows-resource-pack] Symlink cycle detected at ' + directory);
+  }
+  const nextAncestors = new Set(ancestorDirectories).add(realDirectory);
+  for (const entry of fs.readdirSync(directory)) {
+    const relativePath = relativeDirectory ? relativeDirectory + '/' + entry : entry;
+    if (shouldExclude(relativePath)) continue;
+
+    const absolutePath = path.join(directory, entry);
+    const stat = fs.statSync(absolutePath);
+    if (stat.isDirectory()) {
+      collectFiles(files, absolutePath, relativePath, nextAncestors);
+    } else if (stat.isFile()) {
+      if (/[\r\n]/.test(relativePath)) {
+        throw new Error('[windows-resource-pack] A resource filename contains a line break');
+      }
+      files.push(relativePath);
+    }
   }
 }
 
@@ -259,6 +250,7 @@ module.exports = {
   getWindowsResourceComponents,
   getWindowsResourceArchiveCompression,
   isWindowsResourceComponentReusable,
+  listWindowsResourceComponentFiles,
   sha256File,
   shouldExclude,
 };

@@ -1,6 +1,6 @@
 # Live Pi harness comparisons
 
-The comparisons are opt-in. Both arms use the installed Pi SDK and the same OpenAI-compatible endpoint, model, context window and output cap. Use the office endpoint with `PI_AB_USE_ZHIYUAN_INTRANET=1`, the public guest route with `PI_AB_USE_ZHIYUAN_FREE=1`, or set `PI_AB_BASE_URL` and `PI_AB_MODEL` for another endpoint. If required, set `PI_AB_API_KEY` in the environment. The default model window and output cap are 65,536 and 4,096 respectively, configurable with `PI_AB_CONTEXT_WINDOW` and `PI_AB_MAX_OUTPUT`.
+The comparisons are opt-in. Both arms use the installed Pi SDK and the same OpenAI-compatible endpoint, model, context window and output cap. For the office endpoint, set `PI_AB_USE_ZHIYUAN_INTRANET=1` and supply `PI_AB_API_KEY` in the environment. Use the public guest route with `PI_AB_USE_ZHIYUAN_FREE=1`, or set `PI_AB_BASE_URL` and `PI_AB_MODEL` for another endpoint and provide its key if required. The default model window and output cap are 65,536 and 4,096 respectively, configurable with `PI_AB_CONTEXT_WINDOW` and `PI_AB_MAX_OUTPUT`.
 
 ```sh
 PI_AB=1 PI_AB_USE_ZHIYUAN_INTRANET=1 bunx --no-install vitest run --maxWorkers=1 tests/evaluation/piNativeAB.test.ts

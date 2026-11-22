@@ -1,7 +1,8 @@
 import { randomUUID } from 'crypto';
-import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 
 import { CodingErrorMessage } from '../../shared/codingAgent';
+import { terminateProcessTree } from '../libs/ownedProcessStop';
 
 const MAX_OUTPUT_BYTES = 1_048_576;
 
@@ -22,14 +23,16 @@ export interface CodingTerminalResult {
 }
 
 type ActiveTerminal = {
-  child: ChildProcessWithoutNullStreams;
+  child: ChildProcess;
   result: CodingTerminalResult;
   completed: Promise<CodingTerminalResult>;
+  stopping?: Promise<void>;
 };
 
 /** Executes non-interactive ACP terminal commands with bounded captured output. */
 export class TerminalBroker {
   private readonly terminals = new Map<string, ActiveTerminal>();
+  private closing = false;
 
   async run(input: {
     command: string;
@@ -49,11 +52,14 @@ export class TerminalBroker {
     env: Record<string, string>;
     outputByteLimit?: number;
   }): CodingTerminalResult {
+    if (this.closing) throw new Error(CodingErrorMessage.RoomShuttingDown);
     const id = randomUUID();
     const child = spawn(input.command, input.args, {
       cwd: input.cwd,
       env: input.env,
       shell: false,
+      detached: process.platform !== 'win32',
+      windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const result: CodingTerminalResult = {
@@ -86,6 +92,8 @@ export class TerminalBroker {
         resolve(result);
       });
     });
+    // A failed spawn can precede the agent's wait request.
+    void completed.catch((): undefined => undefined);
     this.terminals.set(id, { child, result, completed });
     return result;
   }
@@ -100,18 +108,36 @@ export class TerminalBroker {
     return await active.completed;
   }
 
-  kill(id: string): boolean {
+  async kill(id: string): Promise<void> {
     const active = this.terminals.get(id);
-    return active?.child.kill() ?? false;
+    if (!active) return;
+    const { child } = active;
+    // Windows tree termination resolves the current process by PID.
+    if (
+      !active.stopping &&
+      process.platform === 'win32' &&
+      (child.exitCode !== null || child.signalCode !== null)
+    )
+      return;
+    await (active.stopping ??= terminateProcessTree(child).catch(error => {
+      active.stopping = undefined;
+      throw error;
+    }));
   }
-  release(id: string): void {
+
+  async release(id: string): Promise<void> {
+    await this.kill(id);
     this.terminals.delete(id);
   }
 
-  dispose(): void {
-    for (const { child } of this.terminals.values()) {
-      if (!child.killed) child.kill();
-    }
-    this.terminals.clear();
+  async dispose(): Promise<void> {
+    this.closing = true;
+    const results = await Promise.allSettled(
+      Array.from(this.terminals.keys(), id => this.release(id)),
+    );
+    const failures = results.flatMap(result =>
+      result.status === 'rejected' ? [result.reason] : [],
+    );
+    if (failures.length) throw new AggregateError(failures, 'Failed to stop ACP terminals.');
   }
 }

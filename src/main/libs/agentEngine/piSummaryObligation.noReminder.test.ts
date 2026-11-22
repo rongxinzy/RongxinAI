@@ -16,13 +16,17 @@ test('deterministic omission fallback never starts another model turn', async ()
   }));
   Object.assign(adapter, { projectMemoryService: { saveSessionSummary } });
 
-  await adapter.recordSummaryOmission('session-1', {
-    workspaceRoot: '/work',
-    workbenchRunId: 'run-1',
-    lastCompletedAnswerMessageId: 'message-1',
-    lastCompletedAnswerText: 'Created the workbook.',
-    turnFailed: false,
-  } as never);
+  await adapter.recordSummaryOmission(
+    'session-1',
+    {
+      workspaceRoot: '/work',
+      workbenchRunId: 'run-1',
+      lastCompletedAnswerMessageId: 'message-1',
+      lastCompletedAnswerText: 'Created the workbook.',
+      turnFailed: false,
+    },
+    [],
+  );
 
   expect(saveSessionSummary).toHaveBeenCalledWith(
     expect.objectContaining({ linkId: 'session-1:fallback:message-1' }),

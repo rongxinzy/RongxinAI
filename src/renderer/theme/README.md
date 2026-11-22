@@ -1,28 +1,26 @@
 # Theme plugins
 
-The desktop theme is presentation data. App routes, React state, focus, IPC and persistence remain owned by existing components and services. `theme` selects light/dark/system; the optional `themeStyle` config property selects a registered style, falling back to `zenith` (`DEFAULT_THEME_PLUGIN_ID`) when the saved id is missing or removed.
+The desktop theme is presentation data. App routes, React state, focus, IPC and persistence remain owned by existing components and services. `theme` selects light/dark/system; the optional `themeStyle` config property selects a registered style, falling back to the first style, `zenith`, when the saved id is missing or removed.
 
 ## Add a style
 
-1. Create a module alongside `themes/zenith-light.ts`. Export a `ThemePlugin` with `version: THEME_PLUGIN_VERSION`, a unique kebab-case ID, localized name and both appearances.
+1. Create a module alongside `themes/zenith-light.ts`. Export a `ThemePlugin` with version `1`, a unique kebab-case ID, localized name and both appearances.
 2. Derive tokens from the built-in appearance and override the relevant semantic roles. Assign unique appearance IDs. `ThemeDefinition.tokens` is a complete typed contract: colors, typography, radii, shadows, editor and syntax roles. The compatibility palette keeps existing utility classes theme-controlled; new components should use semantic names.
 3. Add the plugin to `themePlugins` in `themes/plugins.ts`. The settings style selector appears when multiple plugins exist. This is a bundled plugin API, not an arbitrary JavaScript loader or external theme marketplace.
 4. Run `bun run theme:generate`, `bun run lint`, renderer tests and browser checks in both appearances.
 
 ```ts
 const paper: ThemePlugin = {
-  version: THEME_PLUGIN_VERSION,
+  version: 1,
   id: 'paper',
   name: { zh: '纸白', en: 'Paper' },
   appearances: {
     light: {
       meta: { ...zenithLight.meta, id: 'paper-light', name: 'Paper', appearance: 'light' },
-      components: structuredClone(zenithLight.components),
       tokens: { ...zenithLight.tokens /* override semantic roles here */ },
     },
     dark: {
       meta: { ...zenithDark.meta, id: 'paper-dark', name: 'Paper Dark', appearance: 'dark' },
-      components: structuredClone(zenithDark.components),
       tokens: { ...zenithDark.tokens /* matching dark roles */ },
     },
   },
@@ -31,10 +29,10 @@ const paper: ThemePlugin = {
 
 ## Source boundaries
 
-- `tokens/contract.ts`: exhaustive variable names; `themes/*.ts`: values. `themes.css` is generated and checked for drift by lint.
+- `tokens/contract.ts`: exhaustive variable names; `themes/*.ts`: values. `themes/index.ts` combines both palettes with the shared recipes at build time. `theme:generate` emits `themes.css` for the root and previews, plus `themes/presentations.generated.ts` with style and appearance IDs, names, and background data used by the renderer. Lint checks both outputs for drift.
 - `css/tailwind.css`: utility-to-token adapter, no per-theme values. `css/components.css`: shared control, typography, motion and layout rules. Layout dimensions and state selectors remain structural CSS; they are not separate runtime component implementations.
 - `syntax/`: static CodeMirror and Prism scope adapters; Shiki emits semantic variables. Switching style does not require re-highlighting to update colors.
-- `ThemeManager`: replaces one generated stylesheet and updates the root appearance class in place. Settings cancel restores both style and appearance; saving writes only changed configuration fields.
+- `src/renderer/services/theme.ts`: switches the bundled stylesheet's root selector and background in place. The stylesheet is compiled when the registered themes change. Settings cancel restores style and appearance, and saving writes only changed configuration fields.
 - Brand/provider/file-type logos, avatar artwork, sampled boot-logo particles, user-authored artifacts and portable document exports retain content colors. Theme plugins do not rewrite user documents or execute code inside artifact sandboxes.
 
 ## Verification boundaries
@@ -64,7 +62,7 @@ Images must be bundled assets (Vite imports or public theme assets) or inline ra
 
 ## Component appearance recipes
 
-`ThemeDefinition.components` supplies structured appearance data for the six control families: buttons, input fields, selectors, badges, cards and overlays. Their variants, fixed size scales, typography, decorations and applicable visual states belong to the package. Every registered hook declares all `COMPONENT_STATES`; an empty object inherits the base appearance.
+`themes/index.ts` assembles the shared recipes for the six control families. Buttons, input fields, selectors, badges, cards and overlays keep their variants, size scales, typography and visual states in the theme package. Every registered hook declares all `COMPONENT_STATES`. An empty object inherits the base appearance.
 
 The integration covers shared primitives and their business compositions: local-inference actions and model cards, permission/model menus, command search, joined controls, native fields/buttons, legacy modals, composer effects, clickable/editable surfaces, generated skill tokens, CodeMirror search, forwarded prompt/fold triggers, message/queue/reasoning surfaces, and Tabs/PageTabs. Each light/dark appearance supplies the complete contract. Structural layout and interaction behavior remain in the components.
 
@@ -134,4 +132,4 @@ The source inventories are heuristics, not a substitute for rendered verificatio
 
 ### Bundled Zenith plugin
 
-`themes/plugins.ts` registers a single plugin, `zenith`, with `zenith-light` and `zenith-dark` appearances. Visual rules follow [DESIGN.md](../../../DESIGN.md) v4.0 Quiet Studio. Removed legacy theme ids resolve to Zenith through `resolveThemePlugin()`. Appearance settings screenshots live under `docs/theme-previews/`; regenerate with `bun run preview:doc-screenshots` after UI changes.
+`themes/plugins.ts` registers a single plugin, `zenith`, with `zenith-light` and `zenith-dark` appearances. Visual rules follow [DESIGN.md](../../../DESIGN.md) v4.0 Quiet Studio. Removed legacy theme ids resolve to Zenith through `resolveThemePresentation()`. Appearance settings screenshots live under `docs/theme-previews/`; regenerate with `bun run preview:doc-screenshots` after UI changes.

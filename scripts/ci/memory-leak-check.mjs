@@ -149,7 +149,6 @@ try {
       XDG_CACHE_HOME: path.join(isolatedHome, '.cache'),
       XDG_CONFIG_HOME: path.join(isolatedHome, '.config'),
       XDG_DATA_HOME: path.join(isolatedHome, '.local', 'share'),
-      ZHIYUAN_MEMORY_LEAK_TEST: '1',
       ZHIYUAN_MEMORY_LEAK_TEST_USER_DATA: path.join(isolatedHome, 'user-data'),
     },
   });

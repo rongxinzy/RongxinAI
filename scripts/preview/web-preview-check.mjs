@@ -239,12 +239,10 @@ async function walk(browser, scheme, out, failures) {
     await step('dialogs', async () => {
       const problem = await page.evaluate(async () => {
         const directory = await window.electron.dialog.selectDirectory();
-        const file = await window.electron.dialog.selectFile();
-        const box = await window.electron.dialog.showMessageBox({ message: 'Preview' });
+        const files = await window.electron.dialog.selectFiles({ multiple: false });
         if (!directory.success || directory.path !== '/home/user/projects/preview')
           return 'selectDirectory';
-        if (!file.success || !file.path) return 'selectFile';
-        if (box.response !== 0) return 'showMessageBox';
+        if (!files.success || files.paths.length !== 1) return 'selectFiles';
         return '';
       });
       if (problem) throw new Error(problem);

@@ -13,7 +13,5 @@ export type { ProviderConfig } from './types';
 export {
   clampRuntimeContextWindow,
   createLlamaCppRuntimeSnapshot,
-  createOllamaRuntimeSnapshot,
-  parseLlamaCppRuntimeCapabilities,
   resolveModelEndpoint,
 } from './modelEndpoint';

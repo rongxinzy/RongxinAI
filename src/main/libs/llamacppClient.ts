@@ -6,6 +6,7 @@ import type {
   LlamaCppModelLaunchResult,
   LlamaCppRunningModel,
 } from '../../shared/llamacpp';
+import { LlamaCppModelStatus } from '../../shared/llamacpp';
 import type { LlamaCppRouterModelSnapshot, LlamaCppRouterModelSlots } from './llamacppRouterStatus';
 import {
   parseLlamaCppRouterModelsPayload,
@@ -16,19 +17,10 @@ type LlamaCppClientOptions = {
   loadTimeoutMs?: number;
 };
 
-const LlamaCppModelStatus = {
-  Loaded: 'loaded',
-  Loading: 'loading',
-  Unloaded: 'unloaded',
-  Sleeping: 'sleeping',
-  Error: 'error',
-} as const;
-
 const LLAMACPP_MODEL_LOAD_TIMEOUT_MS = 300_000;
 const LLAMACPP_MODEL_READY_POLL_INTERVAL_MS = 250;
 const LLAMACPP_MODEL_READY_POLL_REQUEST_TIMEOUT_MS = 10_000;
 const LLAMACPP_MODEL_INFERENCE_PROBE_TIMEOUT_MS = 30_000;
-const LLAMACPP_MODEL_PROPERTIES_TIMEOUT_MS = 2_000;
 const LlamaCppInferenceProbeMessage = {
   Role: 'user',
   Content: 'ping',
@@ -67,11 +59,6 @@ export class LlamaCppClient {
     return await this.requestJson('/health', { method: 'GET', timeoutMs });
   }
 
-  async version(timeoutMs = 300): Promise<{ version?: string }> {
-    await this.health(timeoutMs);
-    return { version: 'llama.cpp' };
-  }
-
   async listModels(options: { signal?: AbortSignal } = {}): Promise<LlamaCppModel[]> {
     const payload = await this.requestJson<{ data?: LlamaCppRouterModel[] }>('/models?reload=1', {
       method: 'GET',
@@ -90,11 +77,6 @@ export class LlamaCppClient {
     return await this.listModelsWithTimeout(timeoutMs);
   }
 
-  async runningModels(timeoutMs = 30_000): Promise<LlamaCppRunningModel[]> {
-    const models = await this.listModelsSnapshot(timeoutMs);
-    return models.filter(isRunningModel);
-  }
-
   /**
    * Typed router-mode model snapshot from GET /models (b9244): per-model state
    * with failed/exit_code and the child port from status.args.
@@ -104,6 +86,9 @@ export class LlamaCppClient {
       method: 'GET',
       timeoutMs: timeoutMs || this.loadTimeoutMs || 30_000,
     });
+    if (!Array.isArray((payload as { data?: unknown } | null)?.data)) {
+      throw new Error('The local inference router returned an invalid model list.');
+    }
     return parseLlamaCppRouterModelsPayload(payload);
   }
 
@@ -125,17 +110,6 @@ export class LlamaCppClient {
         totalSlots: 0,
       };
     }
-  }
-
-  async showModel(name: string): Promise<unknown> {
-    return await this.requestJson(`/props?model=${encodeURIComponent(name)}`, {
-      method: 'GET',
-      timeoutMs: LLAMACPP_MODEL_PROPERTIES_TIMEOUT_MS,
-    });
-  }
-
-  async deleteModel(_name: string): Promise<void> {
-    throw new Error('Model file deletion is managed by the llama.cpp manager.');
   }
 
   async loadModel(

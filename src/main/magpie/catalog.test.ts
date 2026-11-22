@@ -57,6 +57,27 @@ describe('public gateway catalog', () => {
     expect(model.max_output_tokens).toBeUndefined();
     expect(model.reasoning).toBe(false);
   });
+  it('identifies a bare alias only when its canonical row uniquely matches the native metadata', () => {
+    const group = { owned_by: 'cloud', display_name: 'Policy', magpie_label: 'Policy · Group' };
+    const direct = { ...group, magpie_label: 'Policy · Cloud' };
+    const data = [
+      { id: 'group/policy-alias', ...group },
+      { id: 'cloud/policy.alias', ...direct },
+      { id: 'policy.alias', ...group },
+    ];
+    expect(projectMagpieCatalog({ data }).at(-1)).toMatchObject({
+      id: 'policy.alias',
+      canonical_id: 'group/policy-alias',
+    });
+    expect(
+      projectMagpieCatalog({ data: [{ id: `group/${'x'.repeat(500)}`, ...group }, ...data] }).at(
+        -1,
+      ),
+    ).not.toHaveProperty('canonical_id');
+    expect(projectMagpieCatalog({ data: [data[1], data[2], data[0]] })[1]).not.toHaveProperty(
+      'canonical_id',
+    );
+  });
   it('bounds the response while streaming before JSON parse', async () => {
     await expect(
       readBoundedCatalog(new Response('x'.repeat(2_000_001)), new AbortController().signal),

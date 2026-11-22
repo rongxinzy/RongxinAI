@@ -14,7 +14,7 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import { createPiPromptOverrides, getZhiyuanProductPreamble } from './piPromptOverrides';
 
-test.each(['threshold', 'overflow'] as const)(
+test.each(['threshold', 'overflow', 'missing usage'] as const)(
   'native SDK finishes 32 tool steps across %s compaction without harness continuation',
   async reason => {
     const cwd = await mkdtemp(path.join(tmpdir(), 'pi-native-long-task-'));
@@ -62,6 +62,7 @@ test.each(['threshold', 'overflow'] as const)(
     let overflowSent = false;
     const events: string[] = [];
     const compactions: string[] = [];
+    const tokensAfterCompaction: Array<number | null | undefined> = [];
     const { session } = await createAgentSession({
       cwd,
       model,
@@ -92,7 +93,10 @@ test.each(['threshold', 'overflow'] as const)(
     });
     session.subscribe(event => {
       events.push(event.type);
-      if (event.type === 'compaction_end' && event.result) compactions.push(event.reason);
+      if (event.type === 'compaction_end' && event.result) {
+        compactions.push(event.reason);
+        tokensAfterCompaction.push(session.getContextUsage()?.tokens);
+      }
     });
     session.agent.streamFunction = (_model, context) => {
       const stream = createAssistantMessageEventStream();
@@ -128,8 +132,13 @@ test.each(['threshold', 'overflow'] as const)(
           ? { errorMessage: 'context_length_exceeded: maximum context length exceeded' }
           : {}),
         usage: {
-          input: summary ? 100 : Math.ceil(JSON.stringify(context).length / 4),
-          output: 64,
+          input:
+            reason === 'missing usage'
+              ? 0
+              : summary
+                ? 100
+                : Math.ceil(JSON.stringify(context).length / 4),
+          output: reason === 'missing usage' ? 0 : 64,
           cacheRead: 0,
           cacheWrite: 0,
           totalTokens: 0,
@@ -157,7 +166,8 @@ test.each(['threshold', 'overflow'] as const)(
       expect(session.agent.state.systemPrompt).toContain('You are the assigned specialist.');
       expect(completed).toBe(32);
       expect(summaries).toBeGreaterThan(1);
-      expect(compactions).toContain(reason);
+      expect(compactions).toContain(reason === 'overflow' ? 'overflow' : 'threshold');
+      expect(tokensAfterCompaction).toEqual(compactions.map(() => null));
       expect(events.filter(event => event === 'agent_settled')).toHaveLength(1);
       expect((await readdir(cwd)).filter(name => /^step-\d+\.txt$/.test(name))).toHaveLength(32);
       expect(await readFile(path.join(cwd, 'step-32.txt'), 'utf8')).toBe('verified 32');

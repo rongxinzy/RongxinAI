@@ -1,8 +1,8 @@
 /**
  * Provider definitions — China region (registry order part 1).
  *
- * ZhiYuan first, then China providers, then local runtimes (Ollama,
- * llama.cpp). Array order = Chinese UI display order; providerDefinitions.ts
+ * ZhiYuan first, then China providers, then the built-in local runtime.
+ * Array order = Chinese UI display order; providerDefinitions.ts
  * concatenates this list with the Global list to build registry order.
  */
 
@@ -621,22 +621,6 @@ export const CHINA_PROVIDER_DEFINITIONS = [
         verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
     ],
-  },
-  {
-    id: ProviderName.Ollama,
-    label: 'Ollama',
-    website: 'https://ollama.com',
-    agentProviderId: AgentProviderId.Ollama,
-    defaultBaseUrl: 'http://localhost:11434/v1',
-    defaultApiFormat: ApiFormat.OpenAI,
-    codingPlanSupported: false,
-    switchableBaseUrls: {
-      anthropic: 'http://localhost:11434',
-      openai: 'http://localhost:11434/v1',
-    },
-    region: 'china',
-    enPriority: 0,
-    defaultModels: [],
   },
   {
     id: ProviderName.LlamaCpp,

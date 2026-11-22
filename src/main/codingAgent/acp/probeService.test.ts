@@ -170,6 +170,44 @@ test('ready agents can be rechecked with real phase updates and duplicate checks
   expect(registry.get(added.id)?.connectionCheck?.checkedAt).toBeGreaterThan(0);
 });
 
+test('shutdown cancels an ACP handshake without changing the profile status', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'acp-probe-shutdown-'));
+  const pidFile = path.join(root, 'agent.pid');
+  const registry = new CodingAgentRegistry();
+  const profile = registry.addUntrustedProfile({
+    name: 'Pending probe',
+    description: '',
+    command: execPath,
+    args: [
+      '-e',
+      "process.stdin.once('data', () => require('node:fs').writeFileSync(process.argv[1], String(process.pid))); setInterval(() => {}, 1000);",
+      pidFile,
+    ],
+  });
+  const original = registry.trust(profile.id);
+  const checking = registry.probe(profile.id, root).catch((error: unknown) => error);
+  try {
+    let pid = 0;
+    await expect
+      .poll(async () => {
+        pid = Number(await readFile(pidFile, 'utf8').catch(() => ''));
+        return pid;
+      })
+      .toBeGreaterThan(0);
+    await registry.shutdown();
+    expect(await checking).toMatchObject({ message: CodingErrorMessage.RoomShuttingDown });
+    expect(registry.get(profile.id)).toEqual(original);
+    expect(() => process.kill(pid, 0)).toThrow(/ESRCH/);
+    await expect(registry.probe(profile.id, root)).rejects.toThrow(
+      CodingErrorMessage.RoomShuttingDown,
+    );
+  } finally {
+    await registry.shutdown();
+    await checking;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test.runIf(process.platform === 'win32')(
   'manually added batch agents support paths and arguments with spaces after trust',
   async () => {

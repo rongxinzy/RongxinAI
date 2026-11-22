@@ -8,9 +8,8 @@ import {
 import type { ProviderConfig } from './types';
 import { resolveCodingPlanBaseUrl } from './codingPlan';
 import { findConfiguredProviderModel } from './configuredModels';
-import { isRecord } from '../lib/isRecord';
 
-type RuntimeModelKind = 'cloud' | 'ollama' | 'llamacpp';
+type RuntimeModelKind = 'cloud' | 'llamacpp';
 type RuntimeModelStatus = 'unknown' | 'stopped' | 'running' | 'loaded';
 
 export interface RuntimeModelSnapshot {
@@ -68,41 +67,6 @@ const UNKNOWN_CAPABILITIES: ModelCapabilities = {
 const positiveNumber = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 
-const capabilityStatus = (supported: boolean): ModelCapabilityStatus =>
-  supported ? ModelCapabilityStatus.Supported : ModelCapabilityStatus.Unsupported;
-
-export function parseLlamaCppRuntimeCapabilities(payload: unknown): Partial<ModelCapabilities> {
-  if (!isRecord(payload)) return {};
-  const capabilities = {} as {
-    -readonly [Key in keyof ModelCapabilities]?: ModelCapabilities[Key];
-  };
-  const templateCapabilities = isRecord(payload.chat_template_caps)
-    ? payload.chat_template_caps
-    : undefined;
-  const toolCapabilityKeys = ['supports_tools', 'supports_tool_calls', 'tools', 'tool_use'];
-  const declaredToolCapabilities = toolCapabilityKeys
-    .map(key => templateCapabilities?.[key])
-    .filter((value): value is boolean => typeof value === 'boolean');
-  if (typeof payload.chat_template_tool_use === 'string' && payload.chat_template_tool_use.trim()) {
-    capabilities.toolCalling = ModelCapabilityStatus.Supported;
-  } else if (declaredToolCapabilities.some(Boolean)) {
-    capabilities.toolCalling = ModelCapabilityStatus.Supported;
-  } else if (declaredToolCapabilities.length > 0) {
-    capabilities.toolCalling = ModelCapabilityStatus.Unsupported;
-  }
-  const modalities = isRecord(payload.modalities) ? payload.modalities : undefined;
-  if (typeof modalities?.vision === 'boolean') {
-    capabilities.imageInput = capabilityStatus(modalities.vision);
-  }
-  if (typeof modalities?.video === 'boolean') {
-    capabilities.videoInput = capabilityStatus(modalities.video);
-  }
-  if (typeof modalities?.audio === 'boolean') {
-    capabilities.audioInput = capabilityStatus(modalities.audio);
-  }
-  return capabilities;
-}
-
 const normalizeProtocol = (
   providerId: string,
   value: unknown,
@@ -121,9 +85,7 @@ const normalizeRuntime = (
   providerId: string,
   runtime?: RuntimeModelSnapshot,
 ): RuntimeModelSnapshot => ({
-  kind:
-    runtime?.kind ??
-    (providerId === 'ollama' ? 'ollama' : providerId === 'llamacpp' ? 'llamacpp' : 'cloud'),
+  kind: runtime?.kind ?? (providerId === ProviderName.LlamaCpp ? 'llamacpp' : 'cloud'),
   status: runtime?.status ?? 'unknown',
   ...(runtime?.runtimeModelId ? { runtimeModelId: runtime.runtimeModelId } : {}),
   ...(positiveNumber(runtime?.runtimeContextWindow)
@@ -252,41 +214,6 @@ export function resolveModelEndpoint(
     ...(contextWindow ? { contextWindow } : {}),
     ...(maxTokens ? { maxTokens } : {}),
     runtime,
-  };
-}
-
-export function createOllamaRuntimeSnapshot(input: {
-  serviceStatus?: string;
-  modelId?: string;
-  runningModel?: { name?: string; model?: string; context_length?: number };
-  showModel?: {
-    capabilities?: string[];
-    details?: { families?: string[] };
-    model_info?: Record<string, unknown>;
-  };
-}): RuntimeModelSnapshot {
-  const runningModelId = input.runningModel?.name || input.runningModel?.model;
-  const capabilities: Record<string, ModelCapabilityStatus> = {};
-  const detected = new Set((input.showModel?.capabilities ?? []).map(value => value.toLowerCase()));
-  if (detected.has('tools')) capabilities.toolCalling = ModelCapabilityStatus.Supported;
-  if (detected.has('vision')) capabilities.imageInput = ModelCapabilityStatus.Supported;
-  if (detected.has('thinking')) capabilities.reasoning = ModelCapabilityStatus.Supported;
-  return {
-    kind: 'ollama',
-    status: runningModelId
-      ? 'loaded'
-      : input.serviceStatus === 'running'
-        ? 'running'
-        : input.serviceStatus === 'stopped'
-          ? 'stopped'
-          : 'unknown',
-    ...(input.modelId ? { runtimeModelId: input.modelId } : {}),
-    ...(positiveNumber(input.runningModel?.context_length)
-      ? { runtimeContextWindow: input.runningModel?.context_length }
-      : {}),
-    ...(Object.keys(capabilities).length
-      ? { detectedCapabilities: capabilities as Partial<ModelCapabilities> }
-      : {}),
   };
 }
 

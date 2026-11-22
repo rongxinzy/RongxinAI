@@ -1,6 +1,8 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { unlink } from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 import type {
   LlamaCppModelLaunchInput,
@@ -11,10 +13,13 @@ import type {
 import { DEFAULT_LLAMACPP_SERVICE_CONFIG } from '../../shared/llamacpp/defaults';
 import {
   readLlamaCppModelDaemonRegistry,
+  removeLlamaCppModelDaemonRegistry,
   writeLlamaCppModelDaemonRegistry,
+  type LlamaCppModelDaemonRegistryIdentity,
 } from './llamacppModelDaemonRegistry';
 import {
   LlamaCppModelDaemonCommand,
+  LLAMACPP_MODEL_DAEMON_HANDOFF,
   type LlamaCppModelDaemonBootstrap,
   type LlamaCppModelDaemonRequest,
   type LlamaCppModelDaemonResponse,
@@ -23,7 +28,7 @@ import {
 import { LlamaCppGatewayCredentialVault } from './llamacppGatewayCredentialVault';
 import type { LlamaCppModelOrchestrator } from './llamacppModelOrchestrator';
 import { findLlamaCppExecutable } from './llamacppRuntimePaths';
-import { LLAMACPP_MODEL_STOP_TIMEOUT_MS } from './llamacppModelProcessStop';
+import { OWNED_PROCESS_STOP_TIMEOUT_MS, stopOwnedProcess } from './ownedProcessStop';
 
 const CONTROL_CONNECT_TIMEOUT_MS = 1_000;
 const MODEL_STARTUP_CONTROL_REQUEST_GRACE_MS = 5_000;
@@ -33,9 +38,10 @@ const DAEMON_STOP_TIMEOUT_MS = 10_000;
 const DAEMON_STOP_POLL_INTERVAL_MS = 150;
 const MAX_DAEMON_STARTUP_OUTPUT_LENGTH = 4_000;
 
-type LlamaCppModelDaemonRegistryIdentity = {
-  pid: number;
-  startedAt: string;
+type PendingDaemon = {
+  child: ChildProcess;
+  startup: AbortController;
+  stopped?: Promise<void>;
 };
 
 export function resolveLlamaCppModelDaemonEntryPath(bundleDirectory: string): string {
@@ -64,9 +70,10 @@ export function resolveLlamaCppModelDaemonRequestTimeoutMs(
 ): number {
   if (
     command === LlamaCppModelDaemonCommand.StopModel ||
-    command === LlamaCppModelDaemonCommand.StopAll
+    command === LlamaCppModelDaemonCommand.StopAll ||
+    command === LlamaCppModelDaemonCommand.DeleteModelFile
   ) {
-    return LLAMACPP_MODEL_STOP_TIMEOUT_MS + CONTROL_CONNECT_TIMEOUT_MS;
+    return OWNED_PROCESS_STOP_TIMEOUT_MS + CONTROL_CONNECT_TIMEOUT_MS;
   }
   if (command !== LlamaCppModelDaemonCommand.EnsureModel) {
     return CONTROL_CONNECT_TIMEOUT_MS;
@@ -91,7 +98,9 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
   private lastStatus: LlamaCppModelDaemonStatus | null = null;
   private lastError: string | undefined;
   private starting: Promise<LlamaCppModelDaemonStatus> | null = null;
+  private pendingDaemon: PendingDaemon | null = null;
   private stopping: Promise<void> | null = null;
+  private quitting = false;
 
   constructor(
     private readonly options: {
@@ -103,24 +112,42 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
     this.credentials = new LlamaCppGatewayCredentialVault(options.getStore());
   }
 
-  async reconnect(): Promise<LlamaCppModelDaemonStatus | null> {
+  async reconnect(options?: {
+    requireResponsive?: boolean;
+  }): Promise<LlamaCppModelDaemonStatus | null> {
     if (this.stopping) await this.stopping;
-    return await this.tryReconnect();
+    if (this.starting) {
+      return options?.requireResponsive
+        ? await this.starting
+        : await this.starting.catch((): null => null);
+    }
+    return await this.tryReconnect(options?.requireResponsive);
   }
 
-  private async tryReconnect(): Promise<LlamaCppModelDaemonStatus | null> {
+  private async tryReconnect(
+    requireResponsive = false,
+    controlToken?: string,
+  ): Promise<LlamaCppModelDaemonStatus | null> {
     const registry = await readLlamaCppModelDaemonRegistry(this.options.userDataPath);
     if (!registry) return null;
     this.controlPort = registry.controlPort;
     try {
-      return await this.request({ command: LlamaCppModelDaemonCommand.Status });
-    } catch {
+      return await this.request({ command: LlamaCppModelDaemonCommand.Status }, { controlToken });
+    } catch (error) {
       this.controlPort = null;
+      if (requireResponsive) {
+        try {
+          process.kill(registry.pid, 0);
+        } catch (probeError) {
+          if ((probeError as NodeJS.ErrnoException).code === 'ESRCH') return null;
+        }
+        throw error;
+      }
       return null;
     }
   }
 
-  async status(): Promise<LlamaCppStatusSnapshot> {
+  async start(): Promise<LlamaCppStatusSnapshot> {
     try {
       const status = await this.ensureStarted();
       return status.status;
@@ -161,6 +188,18 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
     return await this.request({ command: LlamaCppModelDaemonCommand.StopAll });
   }
 
+  async deleteModelFile(modelName: string, modelPath: string): Promise<void> {
+    if (!(await this.reconnect({ requireResponsive: true }))) {
+      await unlink(modelPath);
+      return;
+    }
+    await this.request({
+      command: LlamaCppModelDaemonCommand.DeleteModelFile,
+      modelName,
+      modelPath,
+    });
+  }
+
   async applyConfig(config: LlamaCppServiceConfig): Promise<LlamaCppModelDaemonStatus> {
     await this.ensureStarted();
     return await this.request({
@@ -181,14 +220,19 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
   }
 
   async restart(config: LlamaCppServiceConfig): Promise<LlamaCppStatusSnapshot> {
+    this.assertCanStart();
     await this.stopService();
     await this.applyConfig(config);
     return (await this.ensureStarted()).status;
   }
 
-  async stopService(): Promise<void> {
+  async stopService(options?: { requireIdle?: boolean }): Promise<void> {
+    return await this.stop(options?.requireIdle);
+  }
+
+  private async stop(requireIdle?: boolean, quitToken?: string | null): Promise<void> {
     if (this.stopping) return await this.stopping;
-    this.stopping = this.stopCurrentService().finally(() => {
+    this.stopping = this.stopCurrentService(requireIdle, quitToken).finally(() => {
       this.stopping = null;
     });
     return await this.stopping;
@@ -199,8 +243,11 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
   }
 
   async shutdownForQuit(): Promise<void> {
+    this.quitting = true;
     if (this.options.getServiceConfig().keepRunningOnAppQuit !== false) return;
-    await this.stopService();
+    // Control requests during process teardown must not access SQLite.
+    const controlToken = this.credentials.readControlToken() ?? null;
+    await this.stop(false, controlToken);
   }
 
   gatewayBaseUrl(): string | null {
@@ -218,7 +265,9 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
   }
 
   private async ensureStarted(): Promise<LlamaCppModelDaemonStatus> {
+    this.assertCanStart();
     if (this.stopping) await this.stopping;
+    this.assertCanStart();
     if (this.starting) return await this.starting;
     if (this.controlPort) {
       try {
@@ -227,7 +276,8 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
         this.controlPort = null;
       }
     }
-    this.starting = this.reconnectOrStart().finally(() => {
+    this.assertCanStart();
+    this.starting ??= this.reconnectOrStart().finally(() => {
       this.starting = null;
     });
     return await this.starting;
@@ -238,22 +288,33 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
     return reconnected ?? (await this.startNewDaemon());
   }
 
-  private async stopCurrentService(): Promise<void> {
+  private async stopCurrentService(requireIdle = false, quitToken?: string | null): Promise<void> {
+    const pending = this.pendingDaemon;
+    if (pending) {
+      pending.startup.abort(new Error('Local inference daemon startup was stopped.'));
+      await stopPendingDaemon(pending);
+      await this.starting?.catch((): undefined => undefined);
+      this.lastStatus = null;
+      return;
+    }
     if (this.starting) await this.starting.catch((): undefined => undefined);
-    if (!this.controlPort) await this.tryReconnect();
+    if (quitToken === null) return;
+    if (!this.controlPort) await this.tryReconnect(requireIdle, quitToken);
     if (!this.controlPort) {
       this.lastStatus = null;
       return;
     }
 
     const controlPort = this.controlPort;
-    await this.request({ command: LlamaCppModelDaemonCommand.StopAll }).catch(
-      (): undefined => undefined,
-    );
-    await this.request({ command: LlamaCppModelDaemonCommand.Shutdown }).catch(
-      (): undefined => undefined,
-    );
-    await this.waitForControlPortToClose(controlPort);
+    const controlToken = quitToken ?? this.credentials.ensureControlToken();
+    if (requireIdle) {
+      await this.request({ command: LlamaCppModelDaemonCommand.ShutdownIfIdle }, { controlToken });
+    } else {
+      await this.request({ command: LlamaCppModelDaemonCommand.Shutdown }, { controlToken }).catch(
+        (): undefined => undefined,
+      );
+    }
+    await this.waitForControlPortToClose(controlPort, controlToken);
     if (this.controlPort === controlPort) this.controlPort = null;
     this.lastStatus = null;
   }
@@ -272,9 +333,12 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
   }
 
   private async startNewDaemon(): Promise<LlamaCppModelDaemonStatus> {
+    this.assertCanStart();
     const controlPort = await findAvailableLoopbackPort();
+    this.assertCanStart();
     const serviceConfig = this.options.getServiceConfig();
     const executablePath = await findLlamaCppExecutable(serviceConfig);
+    this.assertCanStart();
     if (!executablePath) throw new Error('llama.cpp runtime is not installed.');
     const bootstrap: LlamaCppModelDaemonBootstrap = {
       controlPort,
@@ -286,7 +350,7 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
     const entryPath = resolveLlamaCppModelDaemonEntryPath(__dirname);
     const child = spawn(process.execPath, [entryPath], {
       detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
       windowsHide: true,
       env: {
         ...process.env,
@@ -315,16 +379,17 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
       exitSignal = signal;
     });
     child.unref();
-    this.controlPort = controlPort;
-    const registryIdentity: LlamaCppModelDaemonRegistryIdentity = {
-      pid: child.pid ?? process.pid,
-      startedAt: new Date().toISOString(),
-    };
+    const pending = { child, startup: new AbortController() };
+    this.pendingDaemon = pending;
+    const { signal } = pending.startup;
+    let publishing: LlamaCppModelDaemonRegistryIdentity | undefined;
 
     try {
       const deadline = Date.now() + DAEMON_START_TIMEOUT_MS;
       let latestError = 'Local inference daemon did not become ready.';
+      let status: LlamaCppModelDaemonStatus | undefined;
       while (Date.now() < deadline) {
+        signal.throwIfAborted();
         if (startupError || exitCode !== undefined) {
           throw new Error(
             formatLlamaCppDaemonStartupFailure({
@@ -336,44 +401,84 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
           );
         }
         try {
-          return await this.request(
+          status = await this.request(
             { command: LlamaCppModelDaemonCommand.Status },
-            registryIdentity,
+            {
+              controlPort,
+              signal,
+            },
           );
+          break;
         } catch (error) {
+          signal.throwIfAborted();
           latestError = toErrorMessage(error);
-          await wait(DAEMON_START_POLL_INTERVAL_MS);
+          await sleep(DAEMON_START_POLL_INTERVAL_MS, undefined, { signal });
         }
       }
-      throw new Error(
-        formatLlamaCppDaemonStartupFailure({
-          message: latestError,
-          output: startupOutput,
-          exitCode,
-          signal: exitSignal,
-        }),
-      );
+      if (!status || !child.pid || !child.connected) {
+        throw new Error(
+          formatLlamaCppDaemonStartupFailure({
+            message: latestError,
+            output: startupOutput,
+            exitCode,
+            signal: exitSignal,
+          }),
+        );
+      }
+      signal.throwIfAborted();
+      publishing = { controlPort, pid: child.pid, startedAt: new Date().toISOString() };
+      await writeLlamaCppModelDaemonRegistry(this.options.userDataPath, publishing);
+      signal.throwIfAborted();
+      if (!child.connected) throw new Error('Local inference daemon disconnected during startup.');
+      child.send(LLAMACPP_MODEL_DAEMON_HANDOFF);
+      child.disconnect();
+      this.controlPort = controlPort;
+      this.lastStatus = status;
+      this.lastError = undefined;
+      return status;
     } catch (error) {
-      if (this.controlPort === controlPort) this.controlPort = null;
+      try {
+        await stopPendingDaemon(pending);
+        if (publishing) {
+          await removeLlamaCppModelDaemonRegistry(this.options.userDataPath, publishing);
+        }
+      } catch (cleanupError) {
+        console.warn('[LlamaCppDaemon] could not clean up a failed startup:', cleanupError);
+      }
       throw error;
+    } finally {
+      this.pendingDaemon = null;
     }
   }
 
   private async request(
     input: LlamaCppModelDaemonRequest,
-    registryIdentity?: LlamaCppModelDaemonRegistryIdentity,
+    transport?: { controlPort?: number; signal?: AbortSignal; controlToken?: string },
   ): Promise<LlamaCppModelDaemonStatus> {
-    if (!this.controlPort) throw new Error('Local inference daemon is unavailable.');
-    const response = await fetch(`http://127.0.0.1:${this.controlPort}/control`, {
+    if (
+      input.command === LlamaCppModelDaemonCommand.EnsureModel ||
+      input.command === LlamaCppModelDaemonCommand.ApplyConfig
+    ) {
+      this.assertCanStart();
+    }
+    const controlPort = transport?.controlPort ?? this.controlPort;
+    if (!controlPort) throw new Error('Local inference daemon is unavailable.');
+    const timeout = AbortSignal.timeout(
+      resolveLlamaCppModelDaemonRequestTimeoutMs(
+        input.command,
+        input.command === LlamaCppModelDaemonCommand.EnsureModel
+          ? this.options.getServiceConfig()
+          : {},
+      ),
+    );
+    const response = await fetch(`http://127.0.0.1:${controlPort}/control`, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${this.credentials.ensureControlToken()}`,
+        authorization: `Bearer ${transport?.controlToken ?? this.credentials.ensureControlToken()}`,
         'content-type': 'application/json',
       },
       body: JSON.stringify(input),
-      signal: AbortSignal.timeout(
-        resolveLlamaCppModelDaemonRequestTimeoutMs(input.command, this.options.getServiceConfig()),
-      ),
+      signal: transport?.signal ? AbortSignal.any([transport.signal, timeout]) : timeout,
     });
     const payload = (await response.json()) as LlamaCppModelDaemonResponse;
     if (!response.ok || payload.success === false) {
@@ -381,53 +486,49 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
         payload.success === false ? payload.error : 'Local inference daemon request failed.',
       );
     }
+    if (transport?.signal) return payload.status;
     this.lastStatus = payload.status;
     this.lastError = undefined;
-    await this.persistRegistry(registryIdentity, payload.status);
     return payload.status;
   }
 
-  private async persistRegistry(
-    identity: LlamaCppModelDaemonRegistryIdentity | undefined,
-    status: LlamaCppModelDaemonStatus,
-  ): Promise<void> {
-    if (!this.controlPort) return;
-    const existing = await readLlamaCppModelDaemonRegistry(this.options.userDataPath);
-    await writeLlamaCppModelDaemonRegistry(this.options.userDataPath, {
-      version: 1,
-      pid: identity?.pid ?? existing?.pid ?? process.pid,
-      controlPort: this.controlPort,
-      gatewayPort: Number.parseInt(this.options.getServiceConfig().port ?? '8080', 10) || 8080,
-      startedAt: identity?.startedAt ?? existing?.startedAt ?? new Date().toISOString(),
-      models: status.modelProcesses.map(model => ({
-        modelName: model.modelName,
-        modelPath: model.modelPath,
-        port: model.port,
-        logSessionId: '',
-      })),
-    });
+  private assertCanStart(): void {
+    if (this.quitting) throw new Error('The local inference controller is shutting down.');
   }
 
-  private async waitForControlPortToClose(controlPort: number): Promise<void> {
+  private async waitForControlPortToClose(
+    controlPort: number,
+    controlToken: string,
+  ): Promise<void> {
     const deadline = Date.now() + DAEMON_STOP_TIMEOUT_MS;
     while (Date.now() < deadline) {
       try {
         await fetch(`http://127.0.0.1:${controlPort}/control`, {
           method: 'POST',
           headers: {
-            authorization: `Bearer ${this.credentials.ensureControlToken()}`,
+            authorization: `Bearer ${controlToken}`,
             'content-type': 'application/json',
           },
           body: JSON.stringify({ command: LlamaCppModelDaemonCommand.Status }),
           signal: AbortSignal.timeout(CONTROL_CONNECT_TIMEOUT_MS),
         });
-      } catch {
-        return;
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          (error.cause as NodeJS.ErrnoException)?.code === 'ECONNREFUSED'
+        ) {
+          return;
+        }
       }
       await wait(DAEMON_STOP_POLL_INTERVAL_MS);
     }
     throw new Error('Local inference daemon did not stop before timeout.');
   }
+}
+
+function stopPendingDaemon(pending: PendingDaemon): Promise<void> {
+  pending.stopped ??= pending.child.pid ? stopOwnedProcess(pending.child) : Promise.resolve();
+  return pending.stopped;
 }
 
 async function findAvailableLoopbackPort(): Promise<number> {

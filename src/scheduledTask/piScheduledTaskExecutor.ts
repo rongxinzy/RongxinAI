@@ -12,18 +12,21 @@ import { WorkbenchApprovalMode } from '../shared/workbenchTask';
 import { PayloadKind, SessionTarget } from './constants';
 import type { ScheduledTask, ScheduledTaskRun } from './types';
 
+type ScheduledPiRuntime = Pick<PiRuntime, 'continueSession' | 'isSessionRunning' | 'stopSession'>;
+
 /** Executes one canonical task through the embedded Pi runtime only. */
 export class PiScheduledTaskExecutor {
   private readonly executionLocks = new Map<string, Promise<void>>();
 
   constructor(
-    private readonly runtime: PiRuntime,
+    private readonly runtime: ScheduledPiRuntime,
     private readonly coworkStore: CoworkStore,
   ) {}
 
   async execute(
     task: ScheduledTask,
     _run: ScheduledTaskRun,
+    signal?: AbortSignal,
   ): Promise<{ sessionId: string; output: string | null }> {
     const sessionId = this.getBoundSessionId(task);
     const lockKey = sessionId ? `session:${sessionId}` : `task:${task.id}`;
@@ -36,6 +39,7 @@ export class PiScheduledTaskExecutor {
     this.executionLocks.set(lockKey, queued);
     await previous;
     try {
+      signal?.throwIfAborted();
       return await this.executeUnlocked(task, sessionId);
     } finally {
       release();
@@ -79,9 +83,7 @@ export class PiScheduledTaskExecutor {
       onSettled: completion.settle,
     };
     try {
-      const execution = this.runtime.isSessionActive(session.id)
-        ? this.runtime.continueSession(session.id, prompt, options)
-        : this.runtime.startSession(session.id, prompt, options);
+      const execution = this.runtime.continueSession(session.id, prompt, options);
       const [, output] = await Promise.all([execution, completion.promise]);
       return { sessionId: session.id, output };
     } catch (error) {
@@ -102,7 +104,9 @@ export class PiScheduledTaskExecutor {
 
   private createScheduledSession(task: ScheduledTask, id?: string) {
     const config = this.coworkStore.getConfig();
-    const workspace = task.workspaceId ? this.coworkStore.getWorkspace(task.workspaceId) : null;
+    const workspace = task.workspaceId
+      ? this.coworkStore.workspaces.getWorkspace(task.workspaceId)
+      : null;
     return this.coworkStore.createSession(
       buildScheduledSessionTitle(task.name),
       workspace?.path || getDefaultConversationWorkspacePath(),
@@ -121,7 +125,7 @@ export class PiScheduledTaskExecutor {
 }
 
 function waitForPiCompletion(
-  runtime: PiRuntime,
+  runtime: Pick<ScheduledPiRuntime, 'stopSession'>,
   sessionId: string,
   timeoutSeconds?: number,
 ): {

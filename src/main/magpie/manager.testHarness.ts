@@ -11,6 +11,13 @@ export async function temporary() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'magpie-host-test-'));
 }
 
+export async function installJobRunnerFixture(root: string) {
+  const executable = path.join(root, 'python-runtime', 'job-runner.exe');
+  await fs.mkdir(path.dirname(executable));
+  await fs.writeFile(executable, '');
+  return executable;
+}
+
 export async function setup(
   serviceEnabled?: { read(): boolean; write(enabled: boolean): void },
   gatewayPort?: { read(): number | undefined; write(port: number): void },
@@ -70,7 +77,7 @@ export async function setup(
       options!.failAgentsTimes! -= 1;
       return new Response('warming up', { status: 500 });
     }
-    if (url.endsWith('/api/state'))
+    if (url.endsWith('/api/state') || url.endsWith('/api/set'))
       return Response.json({
         settings: { secret: 'never-project' },
         agents: options?.agents ?? [
@@ -184,7 +191,8 @@ export async function setup(
     serviceEnabled,
     ...(lanAccess ? { lanAccess } : {}),
     parseCatalog: async bytes => projectMagpieCatalog(JSON.parse(new TextDecoder().decode(bytes))),
-    resourcesRoot: root,
+    resourcesRoot: path.join(root, 'magpie'),
+    platform: 'darwin',
     privateHome: root,
     environment: { HOME: root, USERPROFILE: root },
     verify: async () => '/fake/magpie',

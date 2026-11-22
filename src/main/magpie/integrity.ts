@@ -3,7 +3,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { sha256FileStream } from '../libs/fileHasher';
 export const MAGPIE_COMMIT = 'f074996d93b87b17ea682c4b5951d52794bb28cb';
-export const MAGPIE_VERSION = 'zhiyuan-f074996d93b8';
+export const MAGPIE_VERSION = 'zhiyuan-f074996d93b8-work-caller-v3';
+export const MAGPIE_PATCH_SHA256 =
+  'a679fc09d7961640570c78d65eb444fb2e352850453a062975eb0ddf6ef1f4c3';
+export const MAGPIE_PATCHED_SOURCE_SHA256 =
+  '311e0e3078447a782f6d95449131e49fc44195def5a1bda694bb4f69e43ac89c';
 let hashing = false;
 const verifiedSignedDigests = new Set<string>();
 
@@ -191,6 +195,8 @@ export async function verifyMagpieBinary(
     manifest.arch !== process.arch ||
     manifest.binary !== name ||
     source?.commit !== MAGPIE_COMMIT ||
+    source?.patchSha256 !== MAGPIE_PATCH_SHA256 ||
+    source?.treeSha256 !== MAGPIE_PATCHED_SOURCE_SHA256 ||
     manifest.version !== MAGPIE_VERSION ||
     typeof manifest.sha256 !== 'string' ||
     !/^[a-f0-9]{64}$/.test(manifest.sha256)

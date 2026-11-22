@@ -3,8 +3,7 @@
  *
  * Covers the rebuild matrix of the persistent session store: eviction (and
  * any other rebuild) reopens the JSONL and sends only the new prompt; a
- * legacy session without a file uses the flattened text fallback exactly
- * once; transcript invalidation drops the file; session delete removes the
+ * session without a file starts with empty context; session delete removes the
  * directory; a model-override change keeps history by reopening the file.
  *
  * The shared mocks live in piRuntimeAdapter.testHarness.ts (imported first
@@ -17,6 +16,7 @@ import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  createTestPiRuntime,
   adapter,
   createTemporaryPiSessionRoot,
   createTemporaryWorkspace,
@@ -28,10 +28,10 @@ import {
   seedPersistedPiSession,
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
-import { hasPersistedPiSession, piSessionDirFor } from './piSessionStore';
+import { openPersistentPiSessionManager, piSessionDirFor } from './piSessionStore';
 import type { CoworkStore } from '../../coworkStore';
 
-/** Store double with paged tail reads, the surface history restore relies on. */
+/** SQLite transcript double used to test native history restores. */
 const createStoreWithHistory = (
   messages: Array<{ id: string; type: string; content: string; metadata?: unknown }>,
 ): { store: CoworkStore; addMessage: ReturnType<typeof vi.fn> } => {
@@ -41,14 +41,15 @@ const createStoreWithHistory = (
     return { ...message, id: `stored-${persisted.length}`, timestamp: 1 };
   });
   const store = {
-    addMessage,
-    getSessionMessagesDesc: (_sessionId: string, limit: number, offset: number) =>
-      [...persisted].reverse().slice(offset, offset + limit),
-    getSessionMessageStats: () => ({
-      messageCount: persisted.length,
-      contentBytes: persisted.reduce((total, m) => total + m.content.length, 0),
-      metadataBytes: 0,
-    }),
+    messages: {
+      addMessage,
+      getSessionMessageStats: () => ({
+        messageCount: persisted.length,
+        contentBytes: persisted.reduce((total, m) => total + m.content.length, 0),
+        metadataBytes: 0,
+      }),
+    },
+    getPiHistoryKey: () => null,
     getSession: () => ({ messages: persisted, experts: [] }),
     updateSession: vi.fn(),
   } as unknown as CoworkStore;
@@ -59,11 +60,96 @@ describe('PiRuntimeAdapter', () => {
   setupPiRuntimeAdapterSuite();
 
   describe('file-backed Pi session persistence', () => {
+    it('opens the latest JSONL file when history contains multiple candidates', async () => {
+      const root = createTemporaryPiSessionRoot();
+      const adapter = createTestPiRuntime({
+        piSessionStoreRoot: root,
+        coworkStore: createStoreWithHistory([]).store,
+      });
+      const previousFile = seedPersistedPiSession(root, 'persist-newest');
+      const newerFile = path.join(path.dirname(previousFile), 'newer.jsonl');
+      fs.copyFileSync(previousFile, newerFile);
+      fs.utimesSync(previousFile, 1, 1);
+
+      await adapter.startSession('persist-newest', 'Next prompt');
+
+      expect(mockSessionManagerOpen).toHaveBeenCalledWith(
+        newerFile,
+        path.dirname(newerFile),
+        expect.any(String),
+      );
+    });
+
+    it('does not open or recreate native history when lookup is cancelled', async () => {
+      const root = createTemporaryPiSessionRoot();
+      const workspace = createTemporaryWorkspace();
+      seedPersistedPiSession(root, 'persist-cancelled');
+      const abort = new AbortController();
+      const opening = openPersistentPiSessionManager(
+        { open: mockSessionManagerOpen, create: mockSessionManagerCreate },
+        root,
+        'persist-cancelled',
+        workspace,
+        abort.signal,
+      );
+      abort.abort();
+
+      await expect(opening).rejects.toMatchObject({ name: 'AbortError' });
+      expect(mockSessionManagerOpen).not.toHaveBeenCalled();
+      expect(mockSessionManagerCreate).not.toHaveBeenCalled();
+    });
+
+    it.each(['readdir', 'stat'] as const)(
+      'does not start a new transcript when native history %s fails',
+      async operation => {
+        const root = createTemporaryPiSessionRoot();
+        const sessionId = 'persist-unreadable';
+        const previousFile = seedPersistedPiSession(root, sessionId);
+        const adapter = createTestPiRuntime({
+          piSessionStoreRoot: root,
+          coworkStore: createStoreWithHistory([]).store,
+        });
+        const reportError = vi.fn();
+        adapter.on('error', reportError);
+        const target = operation === 'readdir' ? path.dirname(previousFile) : previousFile;
+        const failure = Object.assign(new Error('Fixture history read failure'), { code: 'EIO' });
+        const original = fs.promises[operation];
+        const read = vi
+          .spyOn(fs.promises, operation)
+          .mockImplementation(((...args: Parameters<typeof original>) =>
+            args[0] === target
+              ? Promise.reject(failure)
+              : Reflect.apply(original, fs.promises, args)) as typeof original);
+        try {
+          await expect(adapter.startSession(sessionId, 'Do not abandon history')).rejects.toBe(
+            failure,
+          );
+          expect(mockSessionManagerCreate).not.toHaveBeenCalled();
+          expect(mockSessionManagerOpen).not.toHaveBeenCalled();
+          expect(mockSession.prompt).not.toHaveBeenCalled();
+          expect(reportError).toHaveBeenCalledOnce();
+        } finally {
+          read.mockRestore();
+        }
+
+        await adapter.startSession(sessionId, 'Retry');
+        expect(mockSessionManagerOpen).toHaveBeenCalledWith(
+          previousFile,
+          path.dirname(previousFile),
+          expect.any(String),
+        );
+        expect(mockSession.prompt).toHaveBeenCalledOnce();
+        expect(mockSession.prompt.mock.calls[0]?.[0]).toBe('Retry');
+      },
+    );
+
     it('creates a persistent session manager under the session store root', async () => {
       const root = createTemporaryPiSessionRoot();
       const workspaceRoot = createTemporaryWorkspace();
-      adapter.setPiSessionStoreRoot(root);
-      adapter.setCoworkStore(createStoreWithHistory([]).store);
+      const adapter = createTestPiRuntime({
+        piSessionStoreRoot: root,
+        coworkStore: createStoreWithHistory([]).store,
+      });
 
       await adapter.startSession('persist-new', 'First prompt', { workspaceRoot });
 
@@ -89,11 +175,10 @@ describe('PiRuntimeAdapter', () => {
     it('reopens the session file on a rebuild and sends only the new prompt', async () => {
       const root = createTemporaryPiSessionRoot();
       const workspaceRoot = createTemporaryWorkspace();
-      adapter.setPiSessionStoreRoot(root);
       const { store } = createStoreWithHistory([
         { id: 'u1', type: 'user', content: 'Earlier turn' },
       ]);
-      adapter.setCoworkStore(store);
+      const adapter = createTestPiRuntime({ piSessionStoreRoot: root, coworkStore: store });
       const sessionFile = seedPersistedPiSession(root, 'persist-evict');
 
       await adapter.startSession('persist-evict', 'First prompt', { workspaceRoot });
@@ -120,12 +205,11 @@ describe('PiRuntimeAdapter', () => {
     it('starts a clean session without flattened history when no persisted JSONL file exists', async () => {
       const root = createTemporaryPiSessionRoot();
       const workspaceRoot = createTemporaryWorkspace();
-      adapter.setPiSessionStoreRoot(root);
       const { store } = createStoreWithHistory([
         { id: 'u1', type: 'user', content: 'Legacy question' },
         { id: 'a1', type: 'assistant', content: 'Legacy answer' },
       ]);
-      adapter.setCoworkStore(store);
+      const adapter = createTestPiRuntime({ piSessionStoreRoot: root, coworkStore: store });
 
       // Without a seeded JSONL file, continuation creates a new persisted session
       // directly with the new prompt rather than synthesizing flat-text history.
@@ -152,15 +236,13 @@ describe('PiRuntimeAdapter', () => {
 
     it('invalidates a corrupted persisted directory and recreates it cleanly', async () => {
       const root = createTemporaryPiSessionRoot();
-      adapter.setPiSessionStoreRoot(root);
       const { store } = createStoreWithHistory([
         { id: 'u1', type: 'user', content: 'Imported turn' },
       ]);
-      adapter.setCoworkStore(store);
+      const adapter = createTestPiRuntime({ piSessionStoreRoot: root, coworkStore: store });
       seedPersistedPiSession(root, 'persist-diverge');
 
-      adapter.invalidatePiSessionDir('persist-diverge');
-      expect(hasPersistedPiSession(root, 'persist-diverge')).toBe(false);
+      await adapter.invalidatePiSessionDir('persist-diverge');
       expect(fs.existsSync(piSessionDirFor(root, 'persist-diverge'))).toBe(false);
 
       await adapter.continueSession('persist-diverge', 'After import');
@@ -171,12 +253,14 @@ describe('PiRuntimeAdapter', () => {
 
     it('removes the directory when the cowork session is deleted', async () => {
       const root = createTemporaryPiSessionRoot();
-      adapter.setPiSessionStoreRoot(root);
-      adapter.setCoworkStore(createStoreWithHistory([]).store);
+      const adapter = createTestPiRuntime({
+        piSessionStoreRoot: root,
+        coworkStore: createStoreWithHistory([]).store,
+      });
       seedPersistedPiSession(root, 'persist-delete');
       await adapter.startSession('persist-delete', 'Hello');
 
-      adapter.onSessionDeleted('persist-delete');
+      await adapter.onSessionDeleted('persist-delete');
 
       expect(fs.existsSync(piSessionDirFor(root, 'persist-delete'))).toBe(false);
       expect(mockSession.abort).toHaveBeenCalled();
@@ -185,11 +269,10 @@ describe('PiRuntimeAdapter', () => {
     it('keeps history across a model-override change by reopening the file', async () => {
       const root = createTemporaryPiSessionRoot();
       const workspaceRoot = createTemporaryWorkspace();
-      adapter.setPiSessionStoreRoot(root);
       const { store } = createStoreWithHistory([
         { id: 'u1', type: 'user', content: 'Before model switch' },
       ]);
-      adapter.setCoworkStore(store);
+      const adapter = createTestPiRuntime({ piSessionStoreRoot: root, coworkStore: store });
       seedPersistedPiSession(root, 'persist-model');
 
       await adapter.startSession('persist-model', 'First', {

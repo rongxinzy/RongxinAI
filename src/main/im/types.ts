@@ -415,7 +415,6 @@ export interface IMSessionMapping {
   imConversationId: string;
   platform: Platform;
   coworkSessionId: string;
-  transportSessionKey?: string;
   createdAt: number;
   lastActiveAt: number;
 }

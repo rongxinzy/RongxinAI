@@ -23,6 +23,5 @@ module.exports = {
   rpm: {
     ...(base.rpm || {}),
     packageCategory: 'Applications/System',
-    priority: 'optional',
   },
 };

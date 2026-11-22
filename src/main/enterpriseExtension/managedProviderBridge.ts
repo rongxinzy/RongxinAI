@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   ManagedProviderAccessMode,
   OPEN_MANAGED_PROVIDER_ACCESS_POLICY,
@@ -16,18 +16,17 @@ import {
   type ZhiyuanManagedProviderHostCapability,
   type ZhiyuanManagedProviderSource,
 } from './contract';
-import type { MagpieHostProvider } from '../magpie/hostProviders';
+import { ENTERPRISE_HOST_PROVIDER_PREFIX, type MagpieHostProvider } from '../magpie/hostProviders';
 
 const MANAGED_PROVIDER_KEY_PATTERN = /^custom_[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/;
 const MAX_MODELS = 256;
 const MAX_TEXT_LENGTH = 16_384;
 
-export interface ManagedEnterpriseModelRuntimeConfig {
+interface EnterpriseRoute {
   modelId: string;
-  providerKey: string;
+  localKey: string;
   baseUrl: string;
   api: 'openai-completions' | 'anthropic-messages';
-  apiKey: string;
 }
 
 /** Enterprise credentials stay in the extension bridge, never in app config or the gateway catalog. */
@@ -37,14 +36,13 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
   #source: ZhiyuanManagedProviderSource | null = null;
   #disposeSourceListener: (() => void) | null = null;
   #epoch = 0;
-  #definitions: MagpieHostProvider[] = [];
-  #enterpriseModels = new Map<string, ManagedEnterpriseModelRuntimeConfig>();
+  #definitions: Omit<MagpieHostProvider, 'baseUrl'>[] = [];
+  #enterpriseModels = new Map<string, EnterpriseRoute>();
+  #routeLifetimes = new Map<string, AbortController>();
   #localKey = '';
   #currentApiKey = '';
-  #tokenInvalidated = false;
   #refreshPromise: Promise<void> | null = null;
   #refreshAgain = false;
-  #tokenRefreshPromise: Promise<string> | null = null;
 
   registerSource(source: ZhiyuanManagedProviderSource): () => void {
     if (this.#source) throw new Error('A Zhiyuan managed provider source is already registered.');
@@ -53,7 +51,7 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
     this.#localKey = randomBytes(32).toString('hex');
     this.#disposeSourceListener =
       source.onDidChange?.(() => {
-        this.#clearSnapshot();
+        this.#clearSnapshot(false);
         void this.refresh();
       }) ?? null;
     void this.refresh();
@@ -77,12 +75,12 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
     });
   }
 
-  isManagedProvider(name: string): boolean {
-    return name.startsWith('zhiyuan-host-enterprise-');
-  }
-
-  hostProviders(): readonly MagpieHostProvider[] {
-    return this.#definitions;
+  hostProviders(origin?: string): readonly MagpieHostProvider[] {
+    if (!origin) return [];
+    return this.#definitions.map(definition => ({
+      ...definition,
+      baseUrl: `${origin}/${definition.id}${definition.api === 'anthropic-messages' ? '' : '/v1'}`,
+    }));
   }
 
   allowedModel(modelRef: string): boolean {
@@ -105,48 +103,30 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
     );
   }
 
-  getEnterpriseModelConfig(modelRef: string): ManagedEnterpriseModelRuntimeConfig | null {
-    if (!modelRef) return null;
-    const direct = this.#enterpriseModels.get(modelRef);
-    if (direct) return direct;
-    // Check by stripping host provider prefix if passed like 'zhiyuan-host-enterprise-.../model-id'
-    const slashIndex = modelRef.indexOf('/');
-    if (slashIndex >= 0) {
-      const modelId = modelRef.slice(slashIndex + 1);
-      const matched = this.#enterpriseModels.get(modelId);
-      if (matched) return matched;
+  async resolveTransport(providerId: string, credential: string) {
+    const route = this.#enterpriseModels.get(providerId);
+    if (!route || !matchesEnterpriseCapability(credential, route.localKey)) return null;
+    const epoch = this.#epoch;
+    if (this.#refreshPromise) await this.#refreshPromise;
+    const current = this.#enterpriseModels.get(providerId);
+    const signal = this.#routeLifetimes.get(providerId)?.signal;
+    if (
+      epoch !== this.#epoch ||
+      !current ||
+      !signal ||
+      signal.aborted ||
+      !this.#currentApiKey ||
+      !matchesEnterpriseCapability(credential, current.localKey)
+    ) {
+      return null;
     }
-    return null;
-  }
-
-  async getToken(_providerId?: string): Promise<string> {
-    if (this.#tokenInvalidated || !this.#currentApiKey) {
-      if (this.#tokenRefreshPromise) {
-        return this.#tokenRefreshPromise;
-      }
-      this.#tokenRefreshPromise = (async () => {
-        const source = this.#source;
-        if (!source) throw new Error('No managed provider source is registered.');
-        try {
-          const snapshot = await this.#syncSnapshot(source);
-          this.#tokenInvalidated = false;
-          this.#currentApiKey = snapshot.config.apiKey;
-          this.#emitChanged();
-          return this.#currentApiKey;
-        } catch (error) {
-          if (source === this.#source) this.#clearSnapshot();
-          throw error;
-        } finally {
-          this.#tokenRefreshPromise = null;
-        }
-      })();
-      return this.#tokenRefreshPromise;
-    }
-    return this.#currentApiKey;
-  }
-
-  invalidateToken(_providerId?: string): void {
-    this.#tokenInvalidated = true;
+    return {
+      modelId: current.modelId,
+      baseUrl: current.baseUrl,
+      api: current.api,
+      token: this.#currentApiKey,
+      signal,
+    };
   }
 
   onDidChange(listener: () => void): () => void {
@@ -161,11 +141,12 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
     }
     this.#refreshPromise = (async () => {
       const source = this.#source;
+      const epoch = this.#epoch;
       if (!source) return;
       try {
         await this.#syncSnapshot(source);
       } catch {
-        if (source === this.#source) this.#clearSnapshot();
+        if (source === this.#source && epoch === this.#epoch) this.#clearSnapshot();
         return;
       }
       this.#emitChanged();
@@ -179,7 +160,7 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
     return this.#refreshPromise;
   }
 
-  async #syncSnapshot(source: ZhiyuanManagedProviderSource): Promise<ManagedProviderSnapshot> {
+  async #syncSnapshot(source: ZhiyuanManagedProviderSource): Promise<void> {
     const epoch = this.#epoch;
     const snapshot = normalizeSnapshot(
       source.providerKey,
@@ -188,8 +169,8 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
     );
     if (source !== this.#source || epoch !== this.#epoch)
       throw new Error('Managed provider source changed during refresh.');
-    const next: MagpieHostProvider[] = [];
-    const modelsMap = new Map<string, ManagedEnterpriseModelRuntimeConfig>();
+    const next: Omit<MagpieHostProvider, 'baseUrl'>[] = [];
+    const modelsMap = new Map<string, EnterpriseRoute>();
     for (const model of snapshot.config.models ?? []) {
       const baseUrl = model.baseUrl ?? snapshot.config.baseUrl;
       const api =
@@ -203,23 +184,15 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
         .update(`${source.providerKey}\n${api}\n${baseUrl}\n${model.id}`)
         .digest('hex')
         .slice(0, 20);
-      const hostProviderId = `zhiyuan-host-enterprise-${hash}`;
-      const runtimeConfig: ManagedEnterpriseModelRuntimeConfig = {
-        modelId: model.id,
-        providerKey: hostProviderId,
-        baseUrl,
-        api,
-        apiKey: snapshot.config.apiKey,
-      };
-      modelsMap.set(model.id, runtimeConfig);
-      modelsMap.set(`${hostProviderId}/${model.id}`, runtimeConfig);
-      // Supplying virtual loopback URL http://127.0.0.1:0/v1 satisfies Magpie validation without binding ports
+      const hostProviderId = `${ENTERPRISE_HOST_PROVIDER_PREFIX}${hash}`;
+      // Magpie deduplicates provider entries with the same host and key.
+      const localKey = createHmac('sha256', this.#localKey).update(hostProviderId).digest('hex');
+      modelsMap.set(hostProviderId, { modelId: model.id, localKey, baseUrl, api });
       next.push({
         id: hostProviderId,
         name: snapshot.config.displayName ?? 'Enterprise',
         api,
-        baseUrl: 'http://127.0.0.1:0/v1',
-        apiKey: this.#localKey,
+        apiKey: localKey,
         models: [
           {
             id: model.id,
@@ -231,18 +204,27 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
         ],
       });
     }
+    for (const [id, lifetime] of this.#routeLifetimes) {
+      if (modelsMap.has(id)) continue;
+      lifetime.abort();
+      this.#routeLifetimes.delete(id);
+    }
+    for (const id of modelsMap.keys()) {
+      if (!this.#routeLifetimes.has(id)) this.#routeLifetimes.set(id, new AbortController());
+    }
     this.#enterpriseModels = modelsMap;
     this.#currentApiKey = snapshot.config.apiKey;
-    this.#tokenInvalidated = false;
     this.#definitions = next;
-    return snapshot;
   }
 
-  #clearSnapshot(): void {
+  #clearSnapshot(revokeActive = true): void {
+    if (revokeActive) {
+      for (const lifetime of this.#routeLifetimes.values()) lifetime.abort();
+      this.#routeLifetimes.clear();
+    }
     this.#epoch++;
     this.#enterpriseModels.clear();
     this.#currentApiKey = '';
-    this.#tokenInvalidated = false;
     this.#definitions = [];
     this.#emitChanged();
   }
@@ -317,7 +299,13 @@ function normalizeApiFormat(value: unknown): ApiFormat {
 function normalizeHttpUrl(value: unknown): string {
   const normalized = normalizeText(value, 2048).replace(/\/+$/, '');
   const url = new URL(normalized);
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+  if (
+    (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
     throw new Error('Managed provider base URL is invalid.');
   }
   return url.toString().replace(/\/+$/, '');
@@ -334,6 +322,10 @@ function normalizeText(value: unknown, maximumLength: number): string {
     throw new Error('Managed provider text value is invalid.');
   }
   return normalized;
+}
+
+export function matchesEnterpriseCapability(value: string, expected: string): boolean {
+  return /^[0-9a-f]{64}$/.test(value) && timingSafeEqual(Buffer.from(value), Buffer.from(expected));
 }
 
 export const zhiyuanManagedProviderBridge = new ZhiyuanManagedProviderBridge();

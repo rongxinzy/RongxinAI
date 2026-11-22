@@ -2,9 +2,21 @@
 
 ## 来源与接入
 
-维护 fork：[hawkli-1994/pi](https://github.com/hawkli-1994/pi)，分支 `codex/context-pressure-recovery`，基线为上游 `v1.5.2`（`b4afdddf44e059c67ccf5097e5317d913521b470`）。首轮修复固定为提交 [`9626bbd42749243fad63bef7fbe04154bac294b9`](https://github.com/hawkli-1994/pi/commit/9626bbd42749243fad63bef7fbe04154bac294b9)。旧会话恢复的后续修复位于 `codex/restore-oversized-sessions` 工作分支，并通过应用的 `003+oversized-resume.patch` 自包含接入，详见下文。
+维护 fork：[hawkli-1994/pi](https://github.com/hawkli-1994/pi)，分支 `codex/context-pressure-recovery`，基线为上游 `v1.5.2`（`b4afdddf44e059c67ccf5097e5317d913521b470`）。首轮修复固定为提交 [`9626bbd42749243fad63bef7fbe04154bac294b9`](https://github.com/hawkli-1994/pi/commit/9626bbd42749243fad63bef7fbe04154bac294b9)。旧会话恢复的后续修复位于 `codex/restore-oversized-sessions` 工作分支，并通过应用的 `pi-coding-agent` 补丁自包含接入，详见下文。
 
-应用的 Pi 依赖从 1.4.0 升到 1.5.2；原生源码修复经现有 `patch-package` 安装机制进入 `pi-ai` 和 `pi-coding-agent`。这是一项安装时的依赖补丁，运行时仍由 Pi 自己负责压缩、重试和任务循环。补丁同时保留原有的空 content 容错和本地提供方 overflow 错误识别。
+应用的 Pi 依赖从 1.4.0 升到 1.5.2；原生源码修复由 Bun 通过根清单的 `patchedDependencies` 在安装时应用到 `pi-ai` 和 `pi-coding-agent`。本地和 CI 安装共用 `bun.lock`，包括跳过生命周期脚本的安装。这是一项安装时的依赖补丁，运行时仍由 Pi 自己负责压缩、重试和任务循环。补丁保留助手回复内容缺失时的容错，以及本地提供方 overflow 错误识别。
+
+2026-11-20 收敛了 `001+recovery.patch` 中的 `getLastAssistantText()` 容错。该方法的上游调用方是独立 CLI 的 `/copy` 和 RPC，桌面应用直接使用原生会话的消息投影。1.5.2 已在投影时把缺失或 `null` 的助手内容规范为 `[]`。锁定版本的原包、原补丁和删减后的补丁均通过了四种缺失内容的 JSONL 重开、读取与继续验证。
+
+2026-11-21 普通压缩使用原生会话投影。历史助手消息的字符串保留为文本块，缺失或无法使用的内容按空内容处理，原始 JSONL 保留。助手消息的 token 估算和摘要序列化移除了各自的容错分支。旧会话重开后仍可压缩和继续执行。
+
+普通压缩和轮次前缀压缩共用有界摘要校验。只有模型正常结束并返回非空正文，才会提交压缩。桌面端没有分支摘要生成入口，分支摘要模块和独立 CLI 的问题报告使用上游实现。摘要序列化使用原生实现，旧消息由会话投影与 token 估算共用的规则转换为原生消息形状。
+
+有界摘要处理位于 Pi 原生压缩模块内，复用上游的 `getSummarizationFailure`。`utils.js` 与分支摘要模块保持上游实现，补丁无需新增摘要模块。
+
+桌面模型由 Magpie 选路，再作为具体协议模型交给 Pi。请求前的压缩修复覆盖这条执行路径，Pi SDK 的虚拟模型路由分支沿用上游实现。
+
+2026-11-21 用 [v1.6.0 发布包](https://github.com/earendil-works/pi/releases/tag/v1.6.0) 复验当时的五个补丁。该版本仍把 1K 窗口的短请求输出压到 1 token，无法识别 llama.cpp 的 `context size has been exceeded` 流式错误。原生会话对照还复现了失败后留下历史省略条目、超限历史直接发往模型、小窗口套用宽窗口压缩预算、相同跟进消息缺少原始队列身份等差异。当前保留 1.5.2，Bun 按依赖包应用两份补丁。
 
 ## 确定性故障链
 
@@ -21,7 +33,7 @@
 - 压缩切分用真实 usage 校准历史大小的估算。自动压缩确有必要时，保留预算不能阻止选择已有的安全切分点，工具调用与结果仍保持配对。
 - 摘要规划在临时投影中运行。摘要成功后才提交 omission 和 compaction；失败或取消保留原历史、usage 和恢复机会。
 - 原生自动压缩明确区分成功、失败与取消。请求前压缩失败不会静默发送相同的过满上下文。
-- 会话投影按持久化顺序失效压缩/编辑前的 usage；原始消息仍保留计费和诊断信息。
+- 会话投影按持久化顺序失效压缩或编辑前的 usage。压缩估算、提供方输出预算和上下文用量显示共用这个投影。原始消息保留计费和诊断信息。
 - 输出预算耗尽时产生可识别的原生 overflow，不强行发出 1-token 请求。用户明确请求 1 token 且上下文足够时仍被尊重。
 - 小窗口模型的默认保留量与预留量由 Pi 在读取设置时计算。显式设置和模型覆盖仍优先；模型切换、重载与子任务不再依赖应用重复写入预算。
 
@@ -41,7 +53,7 @@ Fork 相关回归 172 项通过、43 项离线/API 测试跳过；全仓 Biome�
 
 依赖审阅包含 Pi 带入的 Undici 8.10.2 → 8.12.3：已查阅中间版本发布说明，涉及 HTTP/2 超时、代理、取消和 TLS 修复；本次真实 HTTP/SSE 回归覆盖基础传输与取消，未覆盖全部 HTTP/2、TLS 和代理部署。[Undici 8.12.3 发布说明](https://github.com/nodejs/undici/releases/tag/v8.12.3)。
 
-安装验证：`bun install --frozen-lockfile --ignore-scripts` 后运行 `bun run apply:patches`。相关测试：
+运行 `bun install --frozen-lockfile --ignore-scripts --backend copyfile` 即可安装带补丁的 Pi。相关测试：
 
 ```sh
 bun run test:unit -- src/main/libs/agentEngine src/main/companion

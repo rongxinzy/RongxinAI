@@ -4,6 +4,7 @@ import os from 'node:os';
 import { afterEach, expect, test } from 'vitest';
 
 import {
+  readPresetMemberProfiles,
   resolveBundledPresetExpertSnapshot,
   resolveBundledPresetMembers,
 } from './presetExpertSnapshot';
@@ -179,6 +180,23 @@ test('resolves live bundled member definitions for the subagent tool', () => {
   expect(members).not.toBeNull();
   expect(members?.map(member => member.id)).toEqual(['member-alpha', 'member-beta']);
   expect(members?.find(member => member.id === 'member-alpha')?.systemPrompt).toContain('研究员');
+});
+
+test('uses live bundled members before falling back to synced members for an imported team', () => {
+  const root = buildTeamPreset();
+  const piAgentsDir = path.join(root, 'pi-agents');
+  fs.mkdirSync(piAgentsDir);
+  const content = '---\ndescription: Synced member\n---\nUse the synced role.';
+  fs.writeFileSync(path.join(piAgentsDir, 'team-fixture--stale.md'), content);
+  fs.writeFileSync(path.join(piAgentsDir, 'imported-team--member.md'), content);
+  const input = { skillsRoot: root, piAgentsDir, presetId: 'team-fixture' };
+  expect(readPresetMemberProfiles(input).map(member => member.id)).toEqual([
+    'member-alpha',
+    'member-beta',
+  ]);
+  expect(readPresetMemberProfiles({ ...input, presetId: 'imported-team' })).toEqual([
+    { id: 'member', description: 'Synced member', systemPrompt: 'Use the synced role.' },
+  ]);
 });
 
 test('does not resolve members for a single-agent or unknown preset', () => {

@@ -8,6 +8,7 @@
  */
 
 import {
+  createTestPiRuntime,
   adapter,
   applyTestResolution,
   mockCreateAgentSession,
@@ -20,6 +21,7 @@ import {
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
+import { CoworkSessionStatus } from '../../../shared/cowork/constants';
 import { ScheduledTaskAvailabilityGuidance } from '../../../scheduledTask/enginePrompt';
 import type { CoworkStore } from '../../coworkStore';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
@@ -28,12 +30,19 @@ import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
 describe('PiRuntimeAdapter', () => {
   setupPiRuntimeAdapterSuite();
 
+  it('refuses new sessions and follow-ups once application shutdown starts', async () => {
+    await adapter.shutdown().drained;
+    await expect(adapter.startSession('late', 'hello')).rejects.toThrow('shutting down');
+    await expect(adapter.continueSession('late', 'hello')).rejects.toThrow('shutting down');
+    expect(mockCreateAgentSession).not.toHaveBeenCalled();
+  });
+
   describe('stopSession', () => {
     it('keeps agent-backed chat interruptions on the normal continuation path', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
+      const adapter = createTestPiRuntime({ workbenchTaskService: service });
       const interruptions: Array<{ taskId: string | null; recoverable: boolean }> = [];
       adapter.on('sessionInterrupted', event => interruptions.push(event));
 
@@ -66,6 +75,7 @@ describe('PiRuntimeAdapter', () => {
       const startPromise = adapter.startSession('initializing', 'Hello', { onSettled });
       await vi.waitFor(() => expect(mockCreateAgentSession).toHaveBeenCalledOnce());
       expect(adapter.isSessionRunning('initializing')).toBe(true);
+      expect(adapter.getRunningSessionIds()).toEqual(['initializing']);
       await expect(adapter.startSession('initializing', 'Replacement')).rejects.toThrow(
         'A Pi run is already active in this session.',
       );
@@ -76,8 +86,10 @@ describe('PiRuntimeAdapter', () => {
       resolveCreateSession?.({ session: mockSession });
       await startPromise;
 
+      expect(adapter.getRunningSessionIds()).toEqual([]);
       expect(mockSession.prompt).not.toHaveBeenCalled();
-      expect(mockSession.abort).toHaveBeenCalledOnce();
+      expect(mockSession.bindExtensions).not.toHaveBeenCalled();
+      expect(mockSession.dispose).toHaveBeenCalledOnce();
       expect(adapter.isSessionActive('initializing')).toBe(false);
       expect(onStopped).toHaveBeenCalledExactlyOnceWith('initializing');
       expect(onSettled).toHaveBeenCalledExactlyOnceWith({ ok: false, error: expect.any(String) });
@@ -93,7 +105,7 @@ describe('PiRuntimeAdapter', () => {
         onSettled: vi.fn(),
       });
 
-      expect(adapter.enqueuePendingMessage('scheduled', 'Follow up')).toMatchObject({
+      await expect(adapter.enqueuePendingMessage('scheduled', 'Follow up')).resolves.toMatchObject({
         success: false,
       });
       await expect(adapter.steerInput('scheduled', 'Interrupt')).resolves.toMatchObject({
@@ -101,6 +113,30 @@ describe('PiRuntimeAdapter', () => {
       });
       expect(adapter.listPendingMessages('scheduled')).toEqual([]);
       expect(mockSession.steer).not.toHaveBeenCalled();
+    });
+
+    it('records stopping a new initialization even when the previous turn was stopped', async () => {
+      await adapter.startSession('resume-stopped', 'First request');
+      adapter.stopSession('resume-stopped');
+      const starting = Promise.withResolvers<void>();
+      const pendingSession = Promise.withResolvers<{ session: typeof mockSession }>();
+      mockCreateAgentSession.mockImplementationOnce(() => {
+        starting.resolve();
+        return pendingSession.promise;
+      });
+      const interrupted = vi.fn();
+      adapter.on('sessionInterrupted', interrupted);
+
+      const resumed = adapter.continueSession('resume-stopped', 'New request');
+      await starting.promise;
+      adapter.stopSession('resume-stopped');
+      adapter.stopSession('resume-stopped');
+      pendingSession.resolve({ session: mockSession });
+      await resumed;
+
+      expect(interrupted).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ cause: CoworkInterruptionCause.UserStop }),
+      );
     });
 
     it('holds scheduled submission ownership during reload and drops its error after stop', async () => {
@@ -157,16 +193,22 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('should keep session entry active (preserves IM routing) but mark it aborted', async () => {
-      await adapter.startSession('test', 'Hello');
       const addMessage = vi.fn(
-        (_sessionId: string, message: Parameters<CoworkStore['addMessage']>[1]) => ({
+        (_sessionId: string, message: Parameters<CoworkStore['messages']['addMessage']>[1]) => ({
           ...message,
           id: 'persisted-interruption',
           timestamp: Date.now(),
         }),
       );
       const updateSession = vi.fn();
-      adapter.setCoworkStore({ addMessage, updateSession } as unknown as CoworkStore);
+      const adapter = createTestPiRuntime({
+        coworkStore: {
+          messages: { addMessage },
+          getSession: vi.fn(),
+          updateSession,
+        } as unknown as CoworkStore,
+      });
+      await adapter.startSession('test', 'Hello', { skipInitialUserMessage: true });
       const interruptions: Array<{ cause: string; recoverable: boolean }> = [];
       adapter.on('sessionInterrupted', event => interruptions.push(event));
       adapter.stopSession('test');
@@ -193,8 +235,10 @@ describe('PiRuntimeAdapter', () => {
             }),
           },
         }),
+        expect.any(Number),
+        CoworkSessionStatus.Idle,
       );
-      expect(updateSession).toHaveBeenCalledWith('test', { status: 'idle' });
+      expect(updateSession).not.toHaveBeenCalled();
       expect(interruptions).toEqual([
         expect.objectContaining({
           cause: CoworkInterruptionCause.UserStop,
@@ -203,27 +247,33 @@ describe('PiRuntimeAdapter', () => {
       ]);
     });
 
-    it('stopAllSessions (quit path) clears the persisted status without an interruption record', async () => {
-      await adapter.startSession('quit-session', 'Hello');
+    it('stopAllSessions (quit path) ends liveness without persisting a session status', async () => {
       const addMessage = vi.fn(
-        (_sessionId: string, message: Parameters<CoworkStore['addMessage']>[1]) => ({
+        (_sessionId: string, message: Parameters<CoworkStore['messages']['addMessage']>[1]) => ({
           ...message,
           id: 'persisted-message',
           timestamp: Date.now(),
         }),
       );
       const updateSession = vi.fn();
-      adapter.setCoworkStore({ addMessage, updateSession } as unknown as CoworkStore);
+      const adapter = createTestPiRuntime({
+        coworkStore: {
+          messages: { addMessage },
+          getSession: vi.fn(),
+          updateSession,
+        } as unknown as CoworkStore,
+      });
+      await adapter.startSession('quit-session', 'Hello', { skipInitialUserMessage: true });
       const interruptions: unknown[] = [];
       adapter.on('sessionInterrupted', event => interruptions.push(event));
+      updateSession.mockClear();
 
       adapter.stopAllSessions();
 
-      // Quit stops carry no cause, so no interruption record is written, but
-      // the status projection must not stay a zombie 'running' row.
       expect(addMessage).not.toHaveBeenCalled();
       expect(interruptions).toEqual([]);
-      expect(updateSession).toHaveBeenCalledWith('quit-session', { status: 'idle' });
+      expect(updateSession).not.toHaveBeenCalled();
+      expect(adapter.isSessionRunning('quit-session')).toBe(false);
     });
 
     it('should cause continueSession to reconstruct after stop', async () => {
@@ -237,24 +287,12 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('closes in-flight tool calls so resume does not show two running commands', async () => {
-      await adapter.startSession('paused-tools', 'Run a command');
       const messages: Array<{
         id: string;
         type: string;
         content: string;
         metadata?: Record<string, unknown>;
-      }> = [
-        {
-          id: 'tool-use-1',
-          type: 'tool_use',
-          content: 'Using tool: bash',
-          metadata: {
-            toolName: 'bash',
-            toolUseId: 'call-bash-1',
-            toolInput: { command: 'npm test' },
-          },
-        },
-      ];
+      }> = [];
       const addMessage = vi.fn(
         (_sessionId: string, message: { type: string; metadata?: unknown }) => {
           const persisted = { ...message, id: `persisted-${message.type}`, timestamp: Date.now() };
@@ -262,13 +300,30 @@ describe('PiRuntimeAdapter', () => {
           return persisted;
         },
       );
-      adapter.setCoworkStore({
-        getSessionMessagesDesc: (_sessionId: string, limit: number, offset: number) =>
-          [...messages].reverse().slice(offset, offset + limit),
-        addMessage,
-        updateSession: vi.fn(),
-      } as unknown as CoworkStore);
-
+      const adapter = createTestPiRuntime({
+        coworkStore: {
+          messages: {
+            listOpenToolUseIds: () =>
+              messages
+                .filter(message => message.type === 'tool_use')
+                .map(message => message.metadata?.toolUseId),
+            addMessage,
+          },
+          getSession: vi.fn(),
+          updateSession: vi.fn(),
+        } as unknown as CoworkStore,
+      });
+      await adapter.startSession('paused-tools', 'Run a command', { skipInitialUserMessage: true });
+      messages.push({
+        id: 'tool-use-1',
+        type: 'tool_use',
+        content: 'Using tool: bash',
+        metadata: {
+          toolName: 'bash',
+          toolUseId: 'call-bash-1',
+          toolInput: { command: 'npm test' },
+        },
+      });
       adapter.stopSession('paused-tools');
 
       const toolResults = addMessage.mock.calls
@@ -315,12 +370,13 @@ describe('PiRuntimeAdapter', () => {
           return persisted;
         },
       );
-      adapter.setCoworkStore({
-        addMessage,
-        updateMessage,
-        getSession: (sessionId: string) => ({ id: sessionId, messages }),
-        updateSession: vi.fn(),
-      } as unknown as CoworkStore);
+      const adapter = createTestPiRuntime({
+        coworkStore: {
+          messages: { addMessage, updateMessage },
+          getSession: (sessionId: string) => ({ id: sessionId, messages }),
+          updateSession: vi.fn(),
+        } as unknown as CoworkStore,
+      });
 
       await adapter.startSession('usage-stop', 'Hello');
       messages.push({
@@ -366,7 +422,8 @@ describe('PiRuntimeAdapter', () => {
       await startPromise;
 
       expect(mockSession.prompt).not.toHaveBeenCalled();
-      expect(mockSession.abort).toHaveBeenCalledOnce();
+      expect(mockSession.bindExtensions).not.toHaveBeenCalled();
+      expect(mockSession.dispose).toHaveBeenCalledOnce();
     });
 
     it('should keep all sessions active (preserves history)', async () => {
@@ -419,6 +476,26 @@ describe('PiRuntimeAdapter', () => {
   // ── Model updates ──
 
   describe('patchSession', () => {
+    it('keeps the active Work model when Magpie rejects a smaller replacement', async () => {
+      applyTestResolution({
+        config: { model: 'large-audit' },
+        providerMetadata: { contextWindow: 32768 },
+      });
+      await adapter.startSession('work-model', 'Work');
+      const active = adapter.activeSessions.get('work-model')!;
+      const originalModel = active.model;
+      applyTestResolution({
+        config: { model: 'small-audit' },
+        providerMetadata: { contextWindow: 8192 },
+      });
+
+      await expect(adapter.patchSession('work-model', { model: 'small-audit' })).rejects.toThrow(
+        /8192/,
+      );
+      expect(mockSession.setModel).not.toHaveBeenCalled();
+      expect(active.model).toBe(originalModel);
+    });
+
     it('passes a smaller model to Pi without retaining host compaction overrides', async () => {
       applyTestResolution({
         config: { model: 'large-audit' },
@@ -445,9 +522,9 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('test', 'Hello');
       await adapter.patchSession('test', { model: 'openai/gpt-5.2' });
       expect(mockSession.setModel).toHaveBeenCalled();
-      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
-        'magpie',
+      expect(mockModelRuntime.registerNativeProvider).toHaveBeenCalledWith(
         expect.objectContaining({
+          id: 'magpie',
           models: [expect.objectContaining({ id: 'openai/gpt-5.2' })],
         }),
       );

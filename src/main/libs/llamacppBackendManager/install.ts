@@ -10,10 +10,9 @@ import type {
   LlamaCppRuntimeImportResult,
   LlamaCppRuntimeInstallResult,
   LlamaCppRuntimeUninstallResult,
-  LlamaCppStatusSnapshot,
 } from '../../../shared/llamacpp';
 import { allowEndUserLlamaCppRuntimeDownload } from '../inferenceEditionPolicy';
-import { copyDirectoryContents, resolveLlamaCppExecutableName } from '../llamacppRuntimeInstaller';
+import { resolveLlamaCppExecutableName } from '../llamacppRuntimeConstants';
 import { DownloadCancelledError, throwIfDownloadCancelled } from '../resumableDownload';
 import {
   getLlamaCppBackendDir,
@@ -23,8 +22,10 @@ import {
   getManagedBackendBinDir,
   removeCurrentBackendLink,
   sanitizePathSegment,
+  toBackendRef,
 } from './paths';
 import {
+  copyDirectoryContents,
   extractArchive,
   failedInstall,
   findExecutablePath,
@@ -32,7 +33,6 @@ import {
   inferBackendAccelerator,
   inferBackendDirectoryMetadata,
   isSupportedBackendArchivePath,
-  normalizeArch,
   normalizePlatform,
   parseBackendArchiveName,
   resolveImportDirectoryFromSelectedFile,
@@ -117,6 +117,9 @@ export async function installLlamaCppBackend(input: {
 
   fs.mkdirSync(input.runtimeRoot, { recursive: true });
   const tempDir = fs.mkdtempSync(path.join(input.runtimeRoot, '.installing-'));
+  const stagedBackend = path.join(tempDir, 'backend');
+  const stagedBin = getManagedBackendBinDir(stagedBackend);
+  let published = false;
   const downloadDir = getLlamaCppBackendDownloadDir(input.runtimeRoot, input.ref);
   fs.mkdirSync(downloadDir, { recursive: true });
   const reportProgress = (progress: LlamaCppInstallProgress) => {
@@ -153,9 +156,8 @@ export async function installLlamaCppBackend(input: {
     }
 
     throwIfDownloadCancelled(input.signal);
-    fs.rmSync(backendDir, { recursive: true, force: true });
-    fs.mkdirSync(getManagedBackendBinDir(backendDir), { recursive: true });
-    copyDirectoryContents(path.dirname(extractedExecutable), getManagedBackendBinDir(backendDir));
+    await fs.promises.mkdir(stagedBin, { recursive: true });
+    await copyDirectoryContents(path.dirname(extractedExecutable), stagedBin, input.signal);
     throwIfDownloadCancelled(input.signal);
 
     for (const companion of entry.companions ?? []) {
@@ -178,27 +180,24 @@ export async function installLlamaCppBackend(input: {
       reportProgress({ phase: 'installing', message: 'extracting' });
       await extractArchive(companionPath, companionExtractDir);
       throwIfDownloadCancelled(input.signal);
-      copyDirectoryContents(
+      await copyDirectoryContents(
         findRuntimePayloadDirectory(companionExtractDir),
-        getManagedBackendBinDir(backendDir),
+        stagedBin,
+        input.signal,
       );
       throwIfDownloadCancelled(input.signal);
     }
 
     throwIfDownloadCancelled(input.signal);
     reportProgress({ phase: 'detecting', message: 'verifying' });
-    const installedExecutablePath = getLlamaCppBackendExecutablePath(
-      input.runtimeRoot,
-      input.ref,
-      input.platform,
-    );
+    const installedExecutablePath = path.join(stagedBin, executableName);
     if (!fs.existsSync(installedExecutablePath)) {
       throw new Error(`Installed backend is missing ${path.join('build', 'bin', executableName)}.`);
     }
     if (input.platform !== 'win32') fs.chmodSync(installedExecutablePath, 0o755);
 
     throwIfDownloadCancelled(input.signal);
-    writeBackendBuildInfo(backendDir, {
+    writeBackendBuildInfo(stagedBackend, {
       ...input.ref,
       target: input.ref.backend,
       source: 'gitee-manifest',
@@ -208,11 +207,16 @@ export async function installLlamaCppBackend(input: {
       cudaMajor: entry.cudaMajor,
       installedAt: new Date().toISOString(),
     });
+    await fs.promises.mkdir(path.dirname(backendDir), { recursive: true });
+    throwIfDownloadCancelled(input.signal);
+    await fs.promises.rm(backendDir, { recursive: true, force: true });
+    await fs.promises.rename(stagedBackend, backendDir);
+    published = true;
     throwIfDownloadCancelled(input.signal);
     if (input.switchCurrent !== false) syncCurrentBackend(input.runtimeRoot, input.ref);
     // Retain partial archives for a failed or cancelled resumable download, but
     // do not keep completed archives after the backend is installed.
-    fs.rmSync(downloadDir, { recursive: true, force: true });
+    await fs.promises.rm(downloadDir, { recursive: true, force: true });
     // The manager validates GPU devices after this function returns. Keep the
     // install in the verification phase until that validation succeeds.
     reportProgress({ phase: 'detecting', message: 'verifying' });
@@ -230,7 +234,7 @@ export async function installLlamaCppBackend(input: {
       },
     };
   } catch (error) {
-    fs.rmSync(backendDir, { recursive: true, force: true });
+    if (published) await fs.promises.rm(backendDir, { recursive: true, force: true });
     if (error instanceof DownloadCancelledError || input.signal?.aborted) {
       reportProgress({ phase: 'cancelled' });
       return { ...failedInstall('Download cancelled.'), cancelled: true };
@@ -241,39 +245,33 @@ export async function installLlamaCppBackend(input: {
     });
     return failedInstall(error instanceof Error ? error.message : String(error));
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
   }
 }
 
-export function uninstallLlamaCppBackend(input: {
+export async function uninstallLlamaCppBackend(input: {
   runtimeRoot: string;
   ref?: LlamaCppBackendRef;
-  status: LlamaCppStatusSnapshot;
-  stopCurrent: () => Promise<void>;
-}): Promise<LlamaCppRuntimeUninstallResult> {
-  return (async () => {
-    const ref = input.ref ?? readCurrentBackendRef(input.runtimeRoot);
-    const targetDir = ref ? getLlamaCppBackendDir(input.runtimeRoot, ref) : input.runtimeRoot;
-    const current = readCurrentBackendRef(input.runtimeRoot);
-    if (ref && current?.versionBackend === ref.versionBackend) {
-      await input.stopCurrent();
-      removeCurrentBackendLink(input.runtimeRoot);
-    }
-    const deleted = fs.existsSync(targetDir);
-    fs.rmSync(targetDir, { recursive: true, force: true });
-    if (ref)
-      fs.rmSync(getLlamaCppBackendDownloadDir(input.runtimeRoot, ref), {
-        recursive: true,
-        force: true,
-      });
-    return {
-      success: true,
-      deleted,
-      runtimeRoot: targetDir,
-      backend: ref,
-      status: input.status,
-    };
-  })();
+}): Promise<Omit<LlamaCppRuntimeUninstallResult, 'status'>> {
+  const ref = input.ref ?? readCurrentBackendRef(input.runtimeRoot);
+  const targetDir = ref ? getLlamaCppBackendDir(input.runtimeRoot, ref) : input.runtimeRoot;
+  const current = readCurrentBackendRef(input.runtimeRoot);
+  if (ref && current?.versionBackend === ref.versionBackend) {
+    removeCurrentBackendLink(input.runtimeRoot);
+  }
+  const deleted = fs.existsSync(targetDir);
+  await fs.promises.rm(targetDir, { recursive: true, force: true });
+  if (ref)
+    await fs.promises.rm(getLlamaCppBackendDownloadDir(input.runtimeRoot, ref), {
+      recursive: true,
+      force: true,
+    });
+  return {
+    success: true,
+    deleted,
+    runtimeRoot: targetDir,
+    backend: ref,
+  };
 }
 
 export async function importLlamaCppBackendArchive(input: {
@@ -282,6 +280,7 @@ export async function importLlamaCppBackendArchive(input: {
   platform: NodeJS.Platform;
   arch: string;
   hasNvidiaGpu: boolean;
+  beforeReplace?: () => Promise<void>;
 }): Promise<LlamaCppRuntimeImportResult> {
   const archiveName = path.basename(input.archivePath);
   if (/cudart-llama-bin/i.test(archiveName)) {
@@ -310,8 +309,6 @@ export async function importLlamaCppBackendArchive(input: {
   );
   if (validation) return { success: false, error: validation };
 
-  const backendDir = getLlamaCppBackendDir(input.runtimeRoot, parsed.ref);
-  const previousRef = readCurrentBackendRef(input.runtimeRoot);
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-backend-import-'));
   try {
     const extractDir = path.join(tempDir, 'extract');
@@ -322,45 +319,15 @@ export async function importLlamaCppBackendArchive(input: {
     if (!extractedExecutable) {
       throw new Error(`导入包中缺少 ${executableName}。`);
     }
-    fs.rmSync(backendDir, { recursive: true, force: true });
-    fs.mkdirSync(getManagedBackendBinDir(backendDir), { recursive: true });
-    copyDirectoryContents(path.dirname(extractedExecutable), getManagedBackendBinDir(backendDir));
-    const executablePath = getLlamaCppBackendExecutablePath(
-      input.runtimeRoot,
-      parsed.ref,
-      input.platform,
-    );
-    if (input.platform !== 'win32') fs.chmodSync(executablePath, 0o755);
-    writeBackendBuildInfo(backendDir, {
-      ...parsed.ref,
-      target: parsed.ref.backend,
-      source: 'user-import',
-      importedFrom: input.archivePath,
-      platform: normalizePlatform(entry.platform),
-      arch: entry.arch,
-      accelerator: entry.accelerator,
-      cudaMajor: entry.cudaMajor,
-      installedAt: new Date().toISOString(),
-    });
-    syncCurrentBackend(input.runtimeRoot, parsed.ref);
-
-    const deviceError = await validateImportedBackendDevices({
+    return await installImportedBackend({
       runtimeRoot: input.runtimeRoot,
-      ref: parsed.ref,
+      entry,
       platform: input.platform,
+      executable: extractedExecutable,
+      importedFrom: input.archivePath,
+      beforeReplace: input.beforeReplace,
     });
-    if (deviceError) {
-      throw new Error(deviceError);
-    }
-
-    return {
-      success: true,
-      backend: parsed.ref,
-      executablePath: getLlamaCppCurrentExecutablePath(input.runtimeRoot, input.platform),
-    };
   } catch (error) {
-    fs.rmSync(backendDir, { recursive: true, force: true });
-    restorePreviousBackend(input.runtimeRoot, previousRef);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -373,6 +340,7 @@ export async function importLlamaCppBackendPath(input: {
   platform: NodeJS.Platform;
   arch: string;
   hasNvidiaGpu: boolean;
+  beforeReplace?: () => Promise<void>;
 }): Promise<LlamaCppRuntimeImportResult> {
   const stat = fs.statSync(input.sourcePath);
   if (stat.isDirectory()) {
@@ -382,6 +350,7 @@ export async function importLlamaCppBackendPath(input: {
       platform: input.platform,
       arch: input.arch,
       hasNvidiaGpu: input.hasNvidiaGpu,
+      beforeReplace: input.beforeReplace,
     });
   }
   if (!isSupportedBackendArchivePath(input.sourcePath)) {
@@ -397,6 +366,7 @@ export async function importLlamaCppBackendPath(input: {
         platform: input.platform,
         arch: input.arch,
         hasNvidiaGpu: input.hasNvidiaGpu,
+        beforeReplace: input.beforeReplace,
       });
     }
     return {
@@ -411,6 +381,7 @@ export async function importLlamaCppBackendPath(input: {
     platform: input.platform,
     arch: input.arch,
     hasNvidiaGpu: input.hasNvidiaGpu,
+    beforeReplace: input.beforeReplace,
   });
 }
 
@@ -420,6 +391,7 @@ async function importLlamaCppBackendDirectory(input: {
   platform: NodeJS.Platform;
   arch: string;
   hasNvidiaGpu: boolean;
+  beforeReplace?: () => Promise<void>;
 }): Promise<LlamaCppRuntimeImportResult> {
   const archiveNameHint = findArchiveNameHint(input.sourceDir);
   if (archiveNameHint && /cudart-llama-bin/i.test(archiveNameHint)) {
@@ -468,48 +440,91 @@ async function importLlamaCppBackendDirectory(input: {
   );
   if (validation) return { success: false, error: validation };
 
-  const backendDir = getLlamaCppBackendDir(input.runtimeRoot, metadata.ref);
-  const previousRef = readCurrentBackendRef(input.runtimeRoot);
+  return await installImportedBackend({
+    runtimeRoot: input.runtimeRoot,
+    entry,
+    platform: input.platform,
+    executable: executablePath,
+    importedFrom: input.sourceDir,
+    beforeReplace: input.beforeReplace,
+  });
+}
+
+async function installImportedBackend(input: {
+  runtimeRoot: string;
+  entry: LlamaCppBackendManifestEntry;
+  platform: NodeJS.Platform;
+  executable: string;
+  importedFrom: string;
+  beforeReplace?: () => Promise<void>;
+}): Promise<LlamaCppRuntimeImportResult> {
+  const { runtimeRoot, entry, platform } = input;
+  const ref = toBackendRef(entry.version, entry.backend);
+  const backendDir = getLlamaCppBackendDir(runtimeRoot, ref);
+  await fs.promises.mkdir(runtimeRoot, { recursive: true });
+  const stage = await fs.promises.mkdtemp(path.join(runtimeRoot, '.backend-import-'));
+  const backup = path.join(stage, 'previous');
+  let preserveBackup = false;
   try {
-    fs.rmSync(backendDir, { recursive: true, force: true });
-    fs.mkdirSync(getManagedBackendBinDir(backendDir), { recursive: true });
-    copyDirectoryContents(path.dirname(executablePath), getManagedBackendBinDir(backendDir));
-    const installedExecutablePath = getLlamaCppBackendExecutablePath(
-      input.runtimeRoot,
-      metadata.ref,
-      input.platform,
-    );
-    if (input.platform !== 'win32') fs.chmodSync(installedExecutablePath, 0o755);
-    writeBackendBuildInfo(backendDir, {
-      ...metadata.ref,
-      target: metadata.ref.backend,
+    const stagedBackend = getLlamaCppBackendDir(stage, ref);
+    const stagedBin = getManagedBackendBinDir(stagedBackend);
+    fs.mkdirSync(stagedBin, { recursive: true });
+    await copyDirectoryContents(path.dirname(input.executable), stagedBin);
+    const stagedExecutable = getLlamaCppBackendExecutablePath(stage, ref, platform);
+    if (platform !== 'win32') fs.chmodSync(stagedExecutable, 0o755);
+    writeBackendBuildInfo(stagedBackend, {
+      version: entry.version,
+      backend: entry.backend,
+      target: entry.backend,
       source: 'user-import',
-      importedFrom: input.sourceDir,
-      platform: normalizePlatform(metadata.platform),
-      arch: metadata.arch,
-      accelerator: metadata.accelerator,
-      cudaMajor: metadata.cudaMajor,
+      importedFrom: input.importedFrom,
+      platform: normalizePlatform(entry.platform),
+      arch: entry.arch,
+      accelerator: entry.accelerator,
+      cudaMajor: entry.cudaMajor,
       installedAt: new Date().toISOString(),
     });
-    syncCurrentBackend(input.runtimeRoot, metadata.ref);
-
     const deviceError = await validateImportedBackendDevices({
-      runtimeRoot: input.runtimeRoot,
-      ref: metadata.ref,
-      platform: input.platform,
+      runtimeRoot: stage,
+      ref,
+      platform,
     });
-    if (deviceError) {
-      throw new Error(deviceError);
-    }
+    if (deviceError) throw new Error(deviceError);
 
+    await input.beforeReplace?.();
+    const previous = readCurrentBackendRef(runtimeRoot);
+    await fs.promises.mkdir(path.dirname(backendDir), { recursive: true });
+    if (fs.existsSync(backendDir)) await fs.promises.rename(backendDir, backup);
+    try {
+      await fs.promises.rename(stagedBackend, backendDir);
+      syncCurrentBackend(runtimeRoot, ref);
+    } catch (error) {
+      try {
+        await fs.promises.rm(backendDir, { recursive: true, force: true });
+        if (fs.existsSync(backup)) await fs.promises.rename(backup, backendDir);
+        restorePreviousBackend(runtimeRoot, previous);
+      } catch (restoreError) {
+        preserveBackup = fs.existsSync(backup);
+        console.error('[LlamaCpp] could not restore the imported backend backup:', restoreError);
+        throw new Error('Could not restore the previous backend.', { cause: restoreError });
+      }
+      throw error;
+    }
     return {
       success: true,
-      backend: metadata.ref,
-      executablePath: getLlamaCppCurrentExecutablePath(input.runtimeRoot, input.platform),
+      backend: ref,
+      executablePath: getLlamaCppCurrentExecutablePath(runtimeRoot, platform),
     };
   } catch (error) {
-    fs.rmSync(backendDir, { recursive: true, force: true });
-    restorePreviousBackend(input.runtimeRoot, previousRef);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
+  } finally {
+    if (!preserveBackup) {
+      await fs.promises.rm(stage, { recursive: true, force: true }).catch(error => {
+        console.warn(
+          '[LlamaCpp] could not clean up the imported backend staging directory:',
+          error,
+        );
+      });
+    }
   }
 }

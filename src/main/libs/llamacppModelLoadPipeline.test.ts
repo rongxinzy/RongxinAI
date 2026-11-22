@@ -2,11 +2,9 @@
 
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
 import type {
-  LlamaCppModel,
   LlamaCppModelLaunchInput,
   LlamaCppRunningModel,
   LlamaCppRuntimeCapabilities,
-  LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import { LlamaCppRuntimeBackend } from '../../shared/llamacpp';
 import { LlamaCppModelLoadError, LlamaCppModelLoadFailureReason } from './llamacppModelLoadErrors';
@@ -16,7 +14,7 @@ describe('llamacppModelLoadPipeline', () => {
   test('applies gpu placement before loading and returns the final launch input', async () => {
     const loadModel = vi.fn(async (input: LlamaCppModelLaunchInput) => ({
       success: true as const,
-      runningModels: [runningModel(input.model)],
+      runningModels: [{ ...runningModel(input.model), runtime_context_length: 4096 }],
     }));
 
     const result = await loadLlamaCppModelThroughPipeline({
@@ -30,9 +28,7 @@ describe('llamacppModelLoadPipeline', () => {
       nvidiaSnapshot: availableSnapshot([{ index: 0, memoryFreeMiB: 24_000 }]),
       modelSizeBytes: gib(7),
       loadModel,
-      listModels: async () => [loadedModel('qwen.gguf')],
       listRunningModels: async () => [runningModel('qwen.gguf')],
-      detectService: async () => runningService(),
     });
 
     expect(loadModel).toHaveBeenCalledWith(
@@ -44,7 +40,9 @@ describe('llamacppModelLoadPipeline', () => {
       }),
     );
     expect(result.finalInput.options?.device).toBe('CUDA0');
-    expect(result.runningModels).toHaveLength(1);
+    expect(result.runningModels).toEqual([
+      { ...runningModel('qwen.gguf'), runtime_context_length: 4096 },
+    ]);
   });
 
   test('keeps cpu launch input unchanged for cpu runtime', async () => {
@@ -63,9 +61,7 @@ describe('llamacppModelLoadPipeline', () => {
       runtimeCapabilities: gpuCapabilities(0, ['cpu']),
       nvidiaSnapshot: null,
       loadModel,
-      listModels: async () => [loadedModel('qwen.gguf')],
       listRunningModels: async () => [runningModel('qwen.gguf')],
-      detectService: async () => runningService(),
     });
 
     expect(loadModel).toHaveBeenCalledWith(launchInput);
@@ -86,9 +82,7 @@ describe('llamacppModelLoadPipeline', () => {
       launchInput: { model: 'qwen.gguf', options: { ctxSize: 8192 } },
       runtimeBackend: LlamaCppRuntimeBackend.Cpu,
       loadModel,
-      listModels: async () => [loadedModel('qwen.gguf')],
       listRunningModels: async () => [runningModel('qwen.gguf', 'loading')],
-      detectService: async () => runningService(),
       unloadModel,
     });
 
@@ -113,9 +107,7 @@ describe('llamacppModelLoadPipeline', () => {
         nvidiaSnapshot: availableSnapshot([]),
         modelSizeBytes: gib(7),
         loadModel,
-        listModels: async () => [],
         listRunningModels: async () => [],
-        detectService: async () => runningService(),
       }),
     ).rejects.toMatchObject({
       reason: LlamaCppModelLoadFailureReason.GpuNotFound,
@@ -124,16 +116,16 @@ describe('llamacppModelLoadPipeline', () => {
     expect(loadModel).not.toHaveBeenCalled();
   });
 
-  test('maps a non-loaded settle result to a startup timeout failure', async () => {
+  test('rejects a loader result that does not confirm the requested model', async () => {
     await expect(
       loadLlamaCppModelThroughPipeline({
         launchInput: { model: 'qwen.gguf', options: { ctxSize: 4096 } },
         runtimeBackend: LlamaCppRuntimeBackend.Cpu,
-        loadModel: async () => ({ success: true, runningModels: [] }),
-        listModels: async () => [loadedModel('qwen.gguf', 'loading')],
+        loadModel: async () => ({
+          success: true,
+          runningModels: [runningModel('qwen.gguf', 'loading')],
+        }),
         listRunningModels: async () => [],
-        detectService: async () => runningService(),
-        startupBudgetMs: 0,
       }),
     ).rejects.toMatchObject({
       reason: LlamaCppModelLoadFailureReason.StartupTimeout,
@@ -170,23 +162,6 @@ function availableSnapshot(
       memoryTotalMiB: gpu.memoryFreeMiB,
       memoryFreeMiB: gpu.memoryFreeMiB,
     })),
-  };
-}
-
-function runningService(): LlamaCppStatusSnapshot {
-  return {
-    status: 'running',
-    checkedAt: '2026-07-13T00:00:00.000Z',
-  };
-}
-
-function loadedModel(
-  name: string,
-  status: NonNullable<LlamaCppModel['status']> = 'loaded',
-): LlamaCppModel {
-  return {
-    name,
-    status,
   };
 }
 

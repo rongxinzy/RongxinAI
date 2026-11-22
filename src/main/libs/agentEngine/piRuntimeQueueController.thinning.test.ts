@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   CoworkQueueDelivery,
@@ -7,6 +8,9 @@ import { ImageInputVerdict } from './piImageInputFallback';
 import { PiRuntimeQueueController } from './piRuntimeQueueController';
 import type { ActivePiSession } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
+import { readCoworkImageAsync } from '../../workbenchTask/artifactWorkerPool';
+
+vi.mock('../../workbenchTask/artifactWorkerPool', () => ({ readCoworkImageAsync: vi.fn() }));
 
 describe('PiRuntimeQueueController thinning & native delegation', () => {
   let mockHost: any;
@@ -39,7 +43,7 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
     } as unknown as ActivePiSession;
 
     mockStore = {
-      addMessage: vi.fn((_id: string, msg: any) => msg),
+      messages: { addMessage: vi.fn((_id: string, msg: any) => msg) },
     };
 
     mockHost = {
@@ -47,7 +51,7 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       isSessionRunning: vi.fn((id: string) => id === sessionId && activeSession.isRunning),
       isSessionActive: vi.fn((id: string) => id === sessionId && !activeSession.aborted),
       isStoredSessionWorkMode: vi.fn(() => true),
-      persistImageAttachments: vi.fn((_id: string, imgs: any) => imgs),
+      persistImageAttachments: vi.fn(async (_id: string, imgs: unknown) => imgs),
       recovery: {
         imageInputVerdictForActive: vi.fn(() => ImageInputVerdict.Supported),
         reportOmittedImages: vi.fn(),
@@ -62,8 +66,8 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
   });
 
   describe('native delegation of follow-ups', () => {
-    it('enqueues metadata in sidecar and delegates prompt dispatch to Pi native followUp', () => {
-      const result = queueController.enqueuePendingMessage(
+    it('enqueues metadata in sidecar and delegates prompt dispatch to Pi native followUp', async () => {
+      const result = await queueController.enqueuePendingMessage(
         sessionId,
         'Process file data',
         [{ name: 'input.png', mimeType: 'image/png', base64Data: 'data' }],
@@ -88,11 +92,80 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       });
     });
 
-    it('rejects enqueue when session is not in work mode or not running', () => {
+    it('rejects enqueue before writing an image when the session is not running', async () => {
       activeSession.isRunning = false;
-      const result = queueController.enqueuePendingMessage(sessionId, 'Should fail');
+      const result = await queueController.enqueuePendingMessage(sessionId, 'Should fail', [
+        { name: 'input.png', mimeType: 'image/png', base64Data: 'data' },
+      ]);
       expect(result.success).toBe(false);
       expect(result.error).toContain('not running');
+      expect(mockHost.persistImageAttachments).not.toHaveBeenCalled();
+    });
+
+    it('dispatches a text follow-up after the preceding image finishes saving', async () => {
+      const image = { name: 'input.png', mimeType: 'image/png', base64Data: 'data' };
+      const writing = Promise.withResolvers<[typeof image]>();
+      mockHost.persistImageAttachments.mockReturnValueOnce(writing.promise);
+
+      const first = queueController.enqueuePendingMessage(sessionId, 'First image', [image]);
+      const second = queueController.enqueuePendingMessage(sessionId, 'Second text');
+      expect(mockPiSession.followUp).not.toHaveBeenCalled();
+      writing.resolve([image]);
+
+      await expect(Promise.all([first, second])).resolves.toEqual([
+        expect.objectContaining({ success: true }),
+        expect.objectContaining({ success: true }),
+      ]);
+      expect(mockPiSession.followUp.mock.calls.map(([text]: [string]) => text)).toEqual([
+        'First image',
+        'Second text',
+      ]);
+    });
+
+    it('does not send an image whose turn was stopped while saving it', async () => {
+      const image = { name: 'input.png', mimeType: 'image/png', base64Data: 'data' };
+      const writing = Promise.withResolvers<[typeof image]>();
+      mockHost.persistImageAttachments.mockReturnValueOnce(writing.promise);
+      const pending = queueController.enqueuePendingMessage(sessionId, 'Pending image', [image]);
+
+      activeSession.abortController.abort();
+      queueController.clear(sessionId);
+      writing.resolve([image]);
+
+      await expect(pending).resolves.toMatchObject({ success: false });
+      expect(mockPiSession.followUp).not.toHaveBeenCalled();
+      expect(queueController.list(sessionId)).toEqual([]);
+    });
+
+    it('keeps later text behind a pending file read and publishes only prepared queue items', async () => {
+      const image = { name: 'input.png', mimeType: 'image/png', path: path.resolve('input.png') };
+      const reading = Promise.withResolvers<void>();
+      const bytes = Promise.withResolvers<string>();
+      vi.mocked(readCoworkImageAsync).mockImplementationOnce(() => {
+        reading.resolve();
+        return bytes.promise;
+      });
+      const first = queueController.enqueuePendingMessage(sessionId, 'First image', [image]);
+      await reading.promise;
+      const second = queueController.enqueuePendingMessage(sessionId, 'Second text');
+
+      expect(mockPiSession.followUp).not.toHaveBeenCalled();
+      expect(queueController.list(sessionId)).toEqual([]);
+      bytes.resolve('aW1hZ2U=');
+
+      await Promise.all([first, second]);
+      expect(mockPiSession.followUp).toHaveBeenNthCalledWith(
+        1,
+        'First image',
+        [{ type: 'image', mimeType: 'image/png', data: 'aW1hZ2U=' }],
+        expect.any(Object),
+      );
+      expect(mockPiSession.followUp).toHaveBeenNthCalledWith(
+        2,
+        'Second text',
+        undefined,
+        expect.any(Object),
+      );
     });
 
     it('fails a draft whose native input processing finishes after its submitting turn', async () => {
@@ -102,7 +175,9 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
         options.onQueued({ role: 'user', content: text });
         return 'queued';
       });
-      expect(queueController.enqueuePendingMessage(sessionId, 'late draft').success).toBe(true);
+      expect((await queueController.enqueuePendingMessage(sessionId, 'late draft')).success).toBe(
+        true,
+      );
       activeSession.submissionToken = Symbol('next submission');
       inputProcessing.resolve();
 
@@ -111,13 +186,13 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
           expect.objectContaining({ text: 'late draft', status: CoworkQueueItemStatus.Failed }),
         ]),
       );
-      expect(mockStore.addMessage).not.toHaveBeenCalled();
+      expect(mockStore.messages.addMessage).not.toHaveBeenCalled();
     });
   });
 
   describe('onNativeUserMessageStart sidecar synchronization', () => {
-    it('pops pending follow-up from sidecar and persists to SQLite upon native user message start', () => {
-      const enqueued = queueController.enqueuePendingMessage(sessionId, 'Queued item');
+    it('pops pending follow-up from sidecar and persists to SQLite upon native user message start', async () => {
+      const enqueued = await queueController.enqueuePendingMessage(sessionId, 'Queued item');
       expect(enqueued.success).toBe(true);
 
       expect(queueController.list(sessionId)).toHaveLength(1);
@@ -129,7 +204,7 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
 
       // Sidecar item is taken and finished
       expect(queueController.list(sessionId)).toHaveLength(0);
-      expect(mockStore.addMessage).toHaveBeenCalledWith(
+      expect(mockStore.messages.addMessage).toHaveBeenCalledWith(
         sessionId,
         expect.objectContaining({
           type: 'user',
@@ -149,7 +224,7 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       });
 
       // No message added since direct prompt is already saved prior to dispatch
-      expect(mockStore.addMessage).not.toHaveBeenCalled();
+      expect(mockStore.messages.addMessage).not.toHaveBeenCalled();
     });
 
     it('keeps an accepted native input projectable when Pi drains it in the next run', () => {
@@ -160,7 +235,7 @@ describe('PiRuntimeQueueController thinning & native delegation', () => {
       queueController.onNativeUserMessageStart(sessionId, activeSession, message);
 
       expect(queueController.list(sessionId)).toEqual([]);
-      expect(mockStore.addMessage).toHaveBeenCalledExactlyOnceWith(
+      expect(mockStore.messages.addMessage).toHaveBeenCalledExactlyOnceWith(
         sessionId,
         expect.objectContaining({ content: 'retained native follow-up' }),
       );

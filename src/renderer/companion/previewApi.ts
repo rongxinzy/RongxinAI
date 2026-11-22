@@ -29,11 +29,10 @@ export function createCompanionPreviewApi(
   let active = profiles[0].petId;
   const messages = new Map<string, CompanionMessage[]>();
   const files = new Map<string, CompanionAttachment & { petId: string }>();
-  const requests = new Map<string, { receipt: CompanionReceipt; text: string; at: number }>();
+  const requests = new Map<string, CompanionReceipt>();
   const lastReplies = new Map<string, CompanionReceipt & { state: CompanionRequestState }>();
   let sequence = 0;
   const changedListeners = new Set<() => void>();
-  const workbenchListeners = new Set<() => void>();
   const changed = () => {
     for (const listener of changedListeners) listener();
   };
@@ -69,27 +68,12 @@ export function createCompanionPreviewApi(
     taskRevision: ++taskRevision,
     conversation: {
       messages: messages.get(active) ?? [],
-      pending: requests.get(active)?.receipt ?? null,
+      pending: requests.get(active) ?? null,
       lastReply: lastReplies.get(active),
     },
   });
   return {
     visibility: async () => true,
-    listMemories: async () => {
-      throw new Error('Companion memory is not connected');
-    },
-    saveMemory: async () => {
-      throw new Error('Companion memory is not connected');
-    },
-    confirmMemory: async () => {
-      throw new Error('Companion memory is not connected');
-    },
-    forgetMemory: async () => {
-      throw new Error('Companion memory is not connected');
-    },
-    shareMemory: async () => {
-      throw new Error('Companion memory is not connected');
-    },
     bootstrap: snapshot,
     select: async id => {
       if (!profiles.some(profile => profile.petId === id)) throw new Error('Unknown companion');
@@ -126,19 +110,11 @@ export function createCompanionPreviewApi(
           ...(attachments?.length ? { attachments } : {}),
         },
       ]);
-      requests.set(active, { receipt, text: request.text, at: Date.now() });
+      requests.set(active, receipt);
       lastReplies.set(active, { ...receipt, state: CompanionRequestState.Accepted });
       changed();
-      return { availability, receipt };
-    },
-    answer: async receipt => {
-      const request = requests.get(receipt.petId);
-      const settled = lastReplies.get(receipt.petId);
-      if (!request && settled?.submissionId === receipt.submissionId)
-        return { ...settled, text: '' };
-      if (request && Date.now() - request.at < 800)
-        return { ...receipt, text: '', state: CompanionRequestState.Accepted };
-      if (request) {
+      setTimeout(() => {
+        if (requests.get(receipt.petId) !== receipt) return;
         messages.set(receipt.petId, [
           ...(messages.get(receipt.petId) ?? []),
           {
@@ -152,14 +128,14 @@ export function createCompanionPreviewApi(
         ]);
         requests.delete(receipt.petId);
         lastReplies.set(receipt.petId, { ...receipt, state: CompanionRequestState.Answered });
-      }
-      return { ...receipt, text: '', state: CompanionRequestState.Answered };
+        changed();
+      }, 800);
+      return { availability, receipt };
     },
     stop: async petId => {
       if (petId !== active) throw new Error('Companion selection changed');
       const pending = requests.get(active);
-      if (pending)
-        lastReplies.set(active, { ...pending.receipt, state: CompanionRequestState.Stopped });
+      if (pending) lastReplies.set(active, { ...pending, state: CompanionRequestState.Stopped });
       requests.delete(active);
       changed();
     },
@@ -214,7 +190,6 @@ export function createCompanionPreviewApi(
     openWorkbench: async sessionId => {
       document.documentElement.dataset.companionWorkbench = 'true';
       if (sessionId) document.documentElement.dataset.companionTask = sessionId;
-      for (const listener of workbenchListeners) listener();
     },
     onFocus: listener => {
       window.addEventListener('focus', listener);
@@ -227,12 +202,6 @@ export function createCompanionPreviewApi(
       changedListeners.add(listener);
       return () => {
         changedListeners.delete(listener);
-      };
-    },
-    onWorkbench: listener => {
-      workbenchListeners.add(listener);
-      return () => {
-        workbenchListeners.delete(listener);
       };
     },
   };

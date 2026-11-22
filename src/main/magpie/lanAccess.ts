@@ -40,26 +40,27 @@ export async function syncMagpieLanAccessKey(
       Boolean(key) && typeof key === 'object' && typeof (key as MagpieCallerKey).id === 'string',
   );
   const existing = keys.filter(key => key.name === MAGPIE_LAN_KEY_NAME);
-  const active = existing.filter(key => key.off !== true);
-  if (active.length === 1) {
-    // copy-key answers {"secret": "..."} (the wrapped access.Update result).
-    const copied = await client.managementJson('/api/caller-keys/copy-key', {
+  const post = (action: string, body: Record<string, string>) =>
+    client.managementJson(`/api/caller-keys/${action}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: active[0].id }),
+      body: JSON.stringify(body),
     });
-    if (copied.secret === secret) return;
-  }
-  await client.managementJson('/api/caller-keys/add-key', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: MAGPIE_LAN_KEY_NAME, secret }),
-  });
+  let retained: MagpieCallerKey | undefined;
   for (const key of existing) {
-    await client.managementJson('/api/caller-keys/remove-key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: key.id }),
-    });
+    // copy-key answers {"secret": "..."} (the wrapped access.Update result).
+    const copied = await post('copy-key', { key: key.id });
+    if (copied.secret === secret) {
+      retained = key;
+      break;
+    }
+  }
+  if (!retained) {
+    await post('add-key', { name: MAGPIE_LAN_KEY_NAME, secret });
+  } else if (retained.off) {
+    await post('on-key', { key: retained.id });
+  }
+  for (const key of existing) {
+    if (key.id !== retained?.id) await post('remove-key', { key: key.id });
   }
 }

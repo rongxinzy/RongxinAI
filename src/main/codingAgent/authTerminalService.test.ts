@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import type { IPty } from 'node-pty';
 
 import { AuthTerminalService } from './authTerminalService';
@@ -44,4 +44,33 @@ test('keeps terminal authentication output outside the ACP stdio transport', asy
     workspaceRoot: process.cwd(),
   });
   expect(output.join('')).toContain('signed in');
+});
+
+test('disposal does not publish a login result from a stopped terminal', () => {
+  let exited: ((event: { exitCode: number; signal?: number }) => void) | undefined;
+  const kill = vi.fn(() => exited?.({ exitCode: 0 }));
+  const service = new AuthTerminalService((() => ({
+    kill,
+    onData: () => ({ dispose: () => undefined }),
+    onExit: (callback: typeof exited) => {
+      exited = callback;
+      return { dispose: () => undefined };
+    },
+  })) as typeof import('node-pty').spawn);
+  const notify = vi.fn();
+  service.on('exit', notify);
+  service.start({
+    profileId: 'agent',
+    methodId: 'login',
+    executable: '/agent',
+    baseArgs: [],
+    authArgs: [],
+    cwd: process.cwd(),
+    environment: {},
+  });
+
+  service.dispose();
+
+  expect(kill).toHaveBeenCalledOnce();
+  expect(notify).not.toHaveBeenCalled();
 });

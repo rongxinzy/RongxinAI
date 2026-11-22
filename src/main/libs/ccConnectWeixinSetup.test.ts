@@ -1,6 +1,17 @@
 import { expect, test } from 'vitest';
 
-import { formatWeixinSetupErrorForLog, isWeixinSetupTransportError } from './ccConnectWeixinSetup';
+import {
+  formatWeixinSetupErrorForLog,
+  isWeixinSetupTransportError,
+  runCcConnectWeixinSetup,
+} from './ccConnectWeixinSetup';
+
+test('does not start a setup process after channel shutdown', async () => {
+  const error = new Error('Channel runtime stopped');
+  await expect(
+    runCcConnectWeixinSetup('unused', 'start', undefined, AbortSignal.abort(error)),
+  ).rejects.toBe(error);
+});
 
 test('recognizes EOF as a temporary Weixin setup transport error', () => {
   expect(isWeixinSetupTransportError(new Error('Get "https://example.com": EOF'))).toBe(true);

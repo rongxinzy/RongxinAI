@@ -81,18 +81,14 @@ export type DeliveryStatus = (typeof DeliveryStatus)[keyof typeof DeliveryStatus
 // ─── IPC Channels ───────────────────────────────────────────────────────────
 export const IpcChannel = {
   List: 'scheduledTask:list',
-  Get: 'scheduledTask:get',
   Create: 'scheduledTask:create',
   Update: 'scheduledTask:update',
   Delete: 'scheduledTask:delete',
   Toggle: 'scheduledTask:toggle',
   RunManually: 'scheduledTask:runManually',
-  Stop: 'scheduledTask:stop',
   ListRuns: 'scheduledTask:listRuns',
   ListDeliveries: 'scheduledTask:listDeliveries',
-  CountRuns: 'scheduledTask:countRuns',
   ListAllRuns: 'scheduledTask:listAllRuns',
-  ResolveSession: 'scheduledTask:resolveSession',
   ListChannels: 'scheduledTask:listChannels',
   ListChannelConversations: 'scheduledTask:listChannelConversations',
   Preflight: 'scheduledTask:preflight',

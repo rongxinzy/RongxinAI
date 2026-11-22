@@ -95,6 +95,8 @@ function setup() {
     });
     return createElement(CodingWorkspaceSidebar, {
       selection,
+      onManageAgents: vi.fn(),
+      onCreateSession: vi.fn(),
       onSelectionChange: next => {
         onSelectionChange(next);
         setSelection(next);

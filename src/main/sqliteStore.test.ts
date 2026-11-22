@@ -20,9 +20,37 @@ vi.mock('electron', () => ({
 }));
 
 import { DB_FILENAME } from './appConstants';
+import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
 import { SqliteStore } from './sqliteStore';
 
 let tempDirs: string[] = [];
+
+test('a startup verification failure leaves the existing database in place', async () => {
+  const userDataPath = createTempUserDataPath();
+  const store = await SqliteStore.create(userDataPath);
+  store.set('app_config', { sqliteAutoBackupEnabled: true });
+  store.set('fixture', 'keep');
+  store.close();
+
+  const verify = vi.spyOn(SqliteBackupManager.prototype, 'verifyDatabaseHealth');
+  verify.mockRejectedValueOnce(new Error('worker unavailable'));
+  const restore = vi.spyOn(SqliteBackupManager.prototype, 'restoreLatestBackup');
+  try {
+    await expect(SqliteStore.create(userDataPath)).rejects.toThrow('worker unavailable');
+    expect(restore).not.toHaveBeenCalled();
+    const db = new Database(path.join(userDataPath, DB_FILENAME), { readonly: true });
+    try {
+      expect(db.prepare('SELECT value FROM kv WHERE key = ?').pluck().get('fixture')).toBe(
+        '"keep"',
+      );
+    } finally {
+      db.close();
+    }
+  } finally {
+    verify.mockRestore();
+    restore.mockRestore();
+  }
+});
 
 afterEach(() => {
   for (const dir of tempDirs) {
@@ -92,6 +120,56 @@ const createLegacyDatabase = (userDataPath: string): void => {
 
   db.close();
 };
+
+test('opens a profile with the complete companion schema before creating any consumers', async () => {
+  const store = await SqliteStore.create(createTempUserDataPath());
+  try {
+    expect(
+      store
+        .getDatabase()
+        .prepare(
+          "SELECT name FROM sqlite_schema WHERE type = 'table' AND name GLOB 'companion_*' ORDER BY name",
+        )
+        .pluck()
+        .all(),
+    ).toEqual(['companion_attachments', 'companion_chat_turns', 'companion_task_admissions']);
+  } finally {
+    store.close();
+  }
+});
+
+test('opens a profile with Cron and activity tables before creating either service', async () => {
+  const store = await SqliteStore.create(createTempUserDataPath());
+  try {
+    expect(
+      store
+        .getDatabase()
+        .prepare(
+          `SELECT name FROM sqlite_schema WHERE type = 'table'
+           AND (name = 'zhiyuan_activity_runs' OR name GLOB 'zhiyuan_scheduled_task*')
+           ORDER BY name`,
+        )
+        .pluck()
+        .all(),
+    ).toEqual([
+      'zhiyuan_activity_runs',
+      'zhiyuan_scheduled_task_deliveries',
+      'zhiyuan_scheduled_task_runs',
+      'zhiyuan_scheduled_tasks',
+    ]);
+  } finally {
+    store.close();
+  }
+});
+
+test('opens a profile with Channel receipts before any account is enabled', async () => {
+  const store = await SqliteStore.create(createTempUserDataPath());
+  try {
+    expect(store.getDatabase().prepare('SELECT count(*) FROM channel_inbox').pluck().get()).toBe(0);
+  } finally {
+    store.close();
+  }
+});
 
 test('backfills agent working directories from legacy cowork config only once', async () => {
   const userDataPath = createTempUserDataPath();

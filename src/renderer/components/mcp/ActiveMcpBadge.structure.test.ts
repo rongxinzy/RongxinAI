@@ -1,4 +1,4 @@
-import { zenithLight } from '../../theme/themes/zenith-light';
+import { zenithLight } from '../../theme/themes';
 /**
  * Source-structure guard for the compact MCP control beside the prompt plus
  * button. Rendering needs Electron IPC and browser-only renderer services, so

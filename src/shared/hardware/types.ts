@@ -1,28 +1,34 @@
-export type NvidiaGpuInfo = {
-  index: number;
-  name: string;
-  memoryTotalMiB: number;
-  memoryFreeMiB?: number;
-  driverVersion?: string;
+import { z } from 'zod';
+
+const NvidiaGpuInfoSchema = z.object({
+  index: z.number(),
+  name: z.string(),
+  memoryTotalMiB: z.number(),
+  memoryFreeMiB: z.number().optional(),
+  driverVersion: z.string().optional(),
   /** NVIDIA compute capability major.minor (e.g. 8.9 for RTX 40 series). */
-  computeCapability?: string;
-};
+  computeCapability: z.string().optional(),
+});
 
-export type NvidiaSmiSnapshot = {
-  source: 'nvidia-smi';
-  available: boolean;
-  checkedAt: string;
-  gpus: NvidiaGpuInfo[];
+export const NvidiaSmiSnapshotSchema = z.object({
+  source: z.literal('nvidia-smi'),
+  available: z.boolean(),
+  checkedAt: z.string(),
+  gpus: z.array(NvidiaGpuInfoSchema),
   /** Driver version from the first GPU row, when available. */
-  driverVersion?: string;
-  error?: string;
-};
+  driverVersion: z.string().optional(),
+  error: z.string().optional(),
+});
 
-export type SystemMemorySnapshot = {
-  source: 'system';
-  available: boolean;
-  checkedAt: string;
-  totalMemoryMiB: number;
-  freeMemoryMiB: number;
-  error?: string;
-};
+export const SystemMemorySnapshotSchema = z.object({
+  source: z.literal('system'),
+  available: z.boolean(),
+  checkedAt: z.string(),
+  totalMemoryMiB: z.number(),
+  freeMemoryMiB: z.number(),
+  error: z.string().optional(),
+});
+
+export type NvidiaGpuInfo = z.infer<typeof NvidiaGpuInfoSchema>;
+export type NvidiaSmiSnapshot = z.infer<typeof NvidiaSmiSnapshotSchema>;
+export type SystemMemorySnapshot = z.infer<typeof SystemMemorySnapshotSchema>;

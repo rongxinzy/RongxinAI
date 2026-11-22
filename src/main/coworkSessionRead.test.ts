@@ -28,7 +28,7 @@ async function setup() {
   const ledger = new ArtifactLedger(sqlite.getDatabase());
   const store = new CoworkStore(sqlite.getDatabase(), ledger);
   const session = store.createSession('metadata', directory, '', CoworkExecutionMode.Local);
-  store.addMessage(session.id, {
+  store.messages.addMessage(session.id, {
     type: CoworkMessageType.Assistant,
     content: '```artifact:html title="Report"\n<h1>report</h1>\n```',
   });

@@ -1,5 +1,5 @@
 import {
-  adapter,
+  createTestPiRuntime,
   createTemporaryWorkspace,
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
@@ -10,7 +10,6 @@ import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { createCoworkStoreHarness } from '../../coworkStore/coworkStore.testHarness';
 import type { ProjectMemoryService } from '../../memory/projectMemoryService';
 import { SessionCheckpointSyncState } from '../../memory/constants';
-import type { ActivePiSession } from './piRuntimeSessionState';
 
 describe('summary fallback goal', () => {
   setupPiRuntimeAdapterSuite();
@@ -30,17 +29,10 @@ describe('summary fallback goal', () => {
         buildProjectContext: vi.fn(async () => 'Prior memory that is not the current goal'),
         registerSession: vi.fn(async () => {}),
       } as unknown as ProjectMemoryService;
-      adapter.setCoworkStore(store);
-      adapter.setProjectMemoryService(memory);
-      const activeSession = () =>
-        (
-          adapter as unknown as {
-            activeSessions: Map<string, ActivePiSession>;
-          }
-        ).activeSessions.get(session.id)!;
+      const adapter = createTestPiRuntime({ coworkStore: store, projectMemoryService: memory });
       const checkGoal = async (goal: string) => {
-        const active = activeSession();
-        const answer = store.addMessage(session.id, {
+        const active = adapter.activeSessions.get(session.id)!;
+        const answer = store.messages.addMessage(session.id, {
           type: 'assistant',
           content: 'Task completed.',
         });
@@ -49,11 +41,14 @@ describe('summary fallback goal', () => {
         ]);
         // A queued future input must not change the goal of the settling turn.
         if (queuedInput) {
-          store.addMessage(session.id, { type: 'user', content: 'A different queued request' });
+          store.messages.addMessage(session.id, {
+            type: 'user',
+            content: 'A different queued request',
+          });
         }
         active.lastCompletedAnswerMessageId = answer.id;
         active.lastCompletedAnswerText = answer.content;
-        await adapter.recordSummaryOmission(session.id, active);
+        await adapter.recordSummaryOmission(session.id, active, []);
         const saved = saveSessionSummary.mock.calls.at(-1)![0].summary;
         expect(saved).toContain(`## Goal\n${goal}\n`);
         expect(saved).not.toContain('A different queued request');

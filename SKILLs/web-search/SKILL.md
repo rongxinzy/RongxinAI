@@ -1,8 +1,8 @@
 ---
 name: web-search
-description: Real-time web search using Playwright-controlled browser. Use this skill when you need current information, latest documentation, recent news, or any data beyond your knowledge cutoff (January 2025).
+description: Real-time web search for current information, latest documentation, recent news, or information beyond your knowledge cutoff.
 metadata:
-  version: 1.0.3
+  version: 1.0.5
 ---
 
 # Web Search Skill
@@ -26,7 +26,7 @@ Use the web-search skill when you need:
 - User: "What's the current status of the Rust async project?"
 - User: "Find recent discussions about Vue 3 performance"
 
-## How It Works
+## Standalone Browser Search
 
 ```
 ┌──────────┐    Node    ┌──────────┐    HTTP    ┌──────────────┐    CDP    ┌────────┐
@@ -42,16 +42,16 @@ Use the web-search skill when you need:
 **Architecture:**
 
 1. **CLI Script** - Cross-platform Node.js CLI for Claude
-2. **Bridge Server** - Express HTTP API (auto-started by Electron)
+2. **Bridge Server** - Express HTTP API started by the standalone CLI
 3. **Playwright Manager** - Browser connection and session management
 4. **Search Engine Layer** - Google primary, Bing fallback
 5. **Chrome Browser** - Headless by default; automatically retries once with a visible browser when headless search appears blocked
 
 ## ZhiYuan/Pi execution
 
-Inside ZhiYuan, invoke the bundled search script with `run_skill_script` and pass the query as
-an argv item. Do not build a shell command string. The app starts the service through the managed
-runtime and reports runtime failures separately from search failures.
+Inside ZhiYuan, invoke the built-in search with `run_skill_script` and pass the query as an argv
+item. The application calls its search gateway directly and returns Markdown results. Standalone
+CLI commands use the browser workflow unless the caller explicitly supplies gateway credentials.
 
 ```json
 {
@@ -61,7 +61,7 @@ runtime and reports runtime failures separately from search failures.
 }
 ```
 
-## Basic Usage
+## Standalone CLI Usage
 
 ### Simple Search (Recommended)
 
@@ -134,15 +134,13 @@ node "$SKILLS_ROOT/web-search/scripts/search.mjs" "Next.js Server Actions tutori
 
 ### Server Management
 
-The Bridge Server is **automatically managed** by Electron. You typically don't need to start/stop it manually.
-
-However, for manual control:
+The standalone search command starts the Bridge Server on demand. For manual control:
 
 ```bash
 # Start server (if not already running)
 node "$SKILLS_ROOT/web-search/scripts/start-server.mjs"
 
-# Stop server
+# Stop a server started from this Skill directory
 node "$SKILLS_ROOT/web-search/scripts/stop-server.mjs"
 
 # Check health (start script will print endpoint status)
@@ -269,7 +267,7 @@ node SKILLs/web-search/scripts/search.mjs "Playwright page.evaluate examples" 5
 
 **Solution:**
 
-- The server should auto-start with Electron
+- The standalone search command starts the server on demand
 - If manual start needed: `node SKILLs/web-search/scripts/start-server.mjs`
 - Check logs: `cat SKILLs/web-search/.server.log`
 
@@ -368,7 +366,7 @@ The search output is Markdown. Extract:
 
 ### Typical Latencies
 
-- Server startup: ~2 seconds (one-time, auto-started)
+- Server startup: ~2 seconds (first standalone CLI invocation)
 - Browser launch: ~3 seconds (one-time, persists across searches)
 - First search: ~2-3 seconds (includes browser connection setup)
 - Subsequent searches: ~1 second (browser and connection reused)
@@ -437,7 +435,7 @@ which google-chrome || which chromium || which chromium-browser
 
 | Issue            | Symptom                  | Solution                              |
 | ---------------- | ------------------------ | ------------------------------------- |
-| Server down      | `Connection refused`     | Start server or restart Electron      |
+| Server down      | `Connection refused`     | Start the standalone server      |
 | Browser missing  | `Chrome not found`       | Install Chrome/Chromium               |
 | Port conflict    | `Address already in use` | Stop conflicting process on port 8923 |
 | Stale connection | `Connection not found`   | Remove `.connection` cache file       |
@@ -454,7 +452,7 @@ cd SKILLs/web-search
 node scripts/stop-server.mjs
 
 # Clean cache and state
-rm -f .connection .server.pid .server.log
+rm -f .connection .server.log
 
 # Rebuild
 bun run build
@@ -566,7 +564,6 @@ node "$SKILLS_ROOT/web-search/scripts/search.mjs" "Vite vs webpack 2026 comparis
 
 - Server: `SKILLs/web-search/dist/server/index.js`
 - Logs: `SKILLs/web-search/.server.log`
-- PID: `SKILLs/web-search/.server.pid`
 - Connection cache: `SKILLs/web-search/.connection`
 
 ## Additional Resources

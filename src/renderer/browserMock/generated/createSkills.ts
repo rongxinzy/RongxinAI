@@ -62,21 +62,9 @@ export function createSkills(runtime: BrowserMockRuntime): Window['electron']['s
         skills: [],
       };
     },
-    getRoot: async () => {
-      runtime.warnOnce('skills.getRoot');
-      return {
-        success: true,
-      };
-    },
     getContent: async _p0 => {
       void _p0;
       runtime.warnOnce('skills.getContent');
-      return {
-        success: true,
-      };
-    },
-    autoRoutingPrompt: async () => {
-      runtime.warnOnce('skills.autoRoutingPrompt');
       return {
         success: true,
       };

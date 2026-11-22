@@ -57,28 +57,6 @@ function readProgressStatus(progress: Record<string, unknown>): string {
   return '';
 }
 
-export function normalizeInstallProgress(
-  name: string,
-  chunk: Record<string, unknown>,
-): LlamaCppInstallProgress {
-  return {
-    modelId: typeof chunk.modelId === 'string' && chunk.modelId.trim() ? chunk.modelId : name,
-    modelName:
-      typeof chunk.modelName === 'string' && chunk.modelName.trim() ? chunk.modelName : name,
-    phase:
-      typeof chunk.phase === 'string'
-        ? (chunk.phase as LlamaCppInstallProgress['phase'])
-        : 'downloading',
-    message: typeof chunk.message === 'string' ? chunk.message : undefined,
-    percent: typeof chunk.percent === 'number' ? chunk.percent : undefined,
-    completed: typeof chunk.completed === 'number' ? chunk.completed : undefined,
-    total: typeof chunk.total === 'number' ? chunk.total : undefined,
-    speed: typeof chunk.speed === 'number' ? chunk.speed : undefined,
-    targetPath: typeof chunk.targetPath === 'string' ? chunk.targetPath : undefined,
-    error: typeof chunk.error === 'string' ? chunk.error : undefined,
-  };
-}
-
 export function isInstallTerminalPhase(phase: LlamaCppInstallProgress['phase']): boolean {
   return ['done', 'failed', 'cancelled', 'needs-manual'].includes(phase);
 }

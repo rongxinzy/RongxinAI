@@ -25,8 +25,8 @@ default:
       export NPM_CONFIG_CACHE="$CI_PROJECT_DIR/.npm-cache"
       mkdir -p "$NPM_CONFIG_CACHE"
       printf "registry=%s\ncache=%s\n" "$NPM_CONFIG_REGISTRY" "$NPM_CONFIG_CACHE" > "$NPM_CONFIG_USERCONFIG"
-    - npm install -g bun --prefer-offline --no-audit
-    - bun install --ignore-scripts
+    - npm install -g bun@1.4.0 --prefer-offline --no-audit
+    - bun install --frozen-lockfile --ignore-scripts --backend copyfile
 
 stages:
   - lint
@@ -244,9 +244,7 @@ build-linux:
   timeout: 2h
   stage: build-platforms
   image: rongxinai-ci:latest
-  # 覆盖默认 before_script：build-windows 同样跳过，避免 npm install 与
-  # npm ci 重复执行。此处改为 npm install --prefer-offline，与 node_modules
-  # 缓存协同：首次全量安装，后续命中缓存仅校验增量，大幅提速。
+  # 跳过全局依赖安装，由本作业按 bun.lock 安装并缓存依赖。
   before_script: []
   variables:
     NPM_CONFIG_REGISTRY: 'https://registry.npmmirror.com'
@@ -255,7 +253,10 @@ build-linux:
     # 跳过 Electron postinstall 下载
     ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
   cache:
-    - key: 'linux-npm-release-1-0'
+    - key:
+        files:
+          - bun.lock
+        prefix: linux-bun-1-4-0-release
       paths:
         - node_modules/
     - key: 'linux-channel-runtime-zhiyuan-sidecar-v4'
@@ -269,8 +270,8 @@ build-linux:
     - apt-get update -qq && apt-get install -y -qq --no-install-recommends libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0 2>/dev/null || true
     # 安装依赖：使用 bun（lockfile 为 bun.lock）以利用 node_modules 缓存
     # --ignore-scripts 跳过 postinstall（Electron 二进制由下方步骤手动下载）
-    - npm install -g bun --prefer-offline --no-audit
-    - bun install --ignore-scripts
+    - npm install -g bun@1.4.0 --prefer-offline --no-audit
+    - bun install --frozen-lockfile --ignore-scripts --backend copyfile
     - npm install -g pnpm --registry https://registry.npmmirror.com
     - pnpm config set registry https://registry.npmmirror.com
     # 手动下载 Electron 二进制（避免 GitHub 不可达）
@@ -299,7 +300,6 @@ build-linux:
         echo "Dev build: version=$APP_BUILD_VERSION"
       fi
     # 完整打包：POSIX 运行时 → channel/engram sidecar → dist:linux（含 predist 钩子）
-    - bun run apply:patches
     - bun run setup:posix-uv-runtime
     - bun run setup:posix-python-runtime
     - DEBUG=electron-builder bun run dist:linux

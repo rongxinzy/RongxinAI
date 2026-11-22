@@ -4,6 +4,7 @@ import path from 'path';
 import type { LlamaCppModel } from '../../shared/llamacpp';
 import { ggufSupportsThinkingToggle } from './ggufMetadata';
 import { isPathInside } from '../pathContainment';
+import { LOCAL_GGUF_CATALOG_LIMIT } from './llamacppModelCatalogLimits';
 
 export { isPathInside };
 
@@ -11,68 +12,32 @@ const MMPROJ_FILE_PATTERN = /(?:^|[._-])mmproj(?:[._-]|$)/i;
 
 export function scanLocalGgufModels(modelsDir: string): LlamaCppModel[] {
   const root = path.resolve(modelsDir);
-  if (!fs.existsSync(root)) return [];
-  const files = walkGgufFiles(root).filter(filePath => {
-    const baseName = path.basename(filePath);
-    if (MMPROJ_FILE_PATTERN.test(baseName)) return false;
-    // Split-GGUF models are registered once, under their first part; later
-    // parts would otherwise show up as duplicate standalone models.
-    const shard = baseName.match(/-(\d{5})-of-\d{5}\.gguf$/i);
-    if (shard && shard[1] !== '00001') return false;
-    return true;
-  });
   const nameCounts = new Map<string, number>();
-  return files.map(filePath => {
+  return walkGgufFiles(root).flatMap<LlamaCppModel>(filePath => {
+    const stat = fs.statSync(filePath, { throwIfNoEntry: false });
+    if (!stat?.isFile()) return [];
     const baseName = resolveInstalledModelName(root, filePath);
     const count = nameCounts.get(baseName) ?? 0;
     nameCounts.set(baseName, count + 1);
     const name = count === 0 ? baseName : `${baseName}/${path.basename(filePath, '.gguf')}`;
-    const stat = fs.statSync(filePath);
-    return {
-      name,
-      id: name,
-      model: name,
-      path: filePath,
-      modified_at: stat.mtime.toISOString(),
-      size: stat.size,
-      supportsThinkingToggle: ggufSupportsThinkingToggle(filePath),
-      source: filePath.includes(`${path.sep}modelscope${path.sep}`) ? 'modelscope' : 'local',
-      status: 'unloaded',
-      details: {
-        format: 'gguf',
-        quantization_level: inferQuantizationFromFilename(path.basename(filePath)),
+    return [
+      {
+        name,
+        id: name,
+        model: name,
+        path: filePath,
+        modified_at: stat.mtime.toISOString(),
+        size: stat.size,
+        supportsThinkingToggle: ggufSupportsThinkingToggle(filePath),
+        source: filePath.includes(`${path.sep}modelscope${path.sep}`) ? 'modelscope' : 'local',
+        status: 'unloaded',
+        details: {
+          format: 'gguf',
+          quantization_level: inferQuantizationFromFilename(path.basename(filePath)),
+        },
       },
-    };
+    ];
   });
-}
-
-export function mergeLocalModels(
-  routerModels: LlamaCppModel[],
-  scannedModels: LlamaCppModel[],
-  modelsDir?: string,
-): LlamaCppModel[] {
-  const merged = new Map<string, LlamaCppModel>();
-  for (const model of scannedModels) {
-    merged.set(model.path ? `path:${path.resolve(model.path)}` : `name:${model.name}`, model);
-  }
-  for (const model of routerModels) {
-    if (!model.path || !isGgufPath(model.path)) continue;
-    const pathKey = model.path ? `path:${path.resolve(model.path)}` : undefined;
-    if (modelsDir && pathKey && !isPathInside(path.resolve(model.path), path.resolve(modelsDir))) {
-      merged.set(pathKey, model);
-      continue;
-    }
-    const existing = pathKey ? merged.get(pathKey) : undefined;
-    merged.set(pathKey ?? `name:${model.name}`, {
-      ...existing,
-      ...model,
-      path: model.path ?? existing?.path,
-      size: model.size ?? existing?.size,
-      modified_at: model.modified_at ?? existing?.modified_at,
-      details: { ...existing?.details, ...model.details },
-    });
-  }
-  return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function resolveInstalledModelName(modelsDir: string, modelPath: string): string {
@@ -86,40 +51,59 @@ export function resolveInstalledModelName(modelsDir: string, modelPath: string):
 
 function walkGgufFiles(dir: string): string[] {
   const files: string[] = [];
-  for (const entry of safeReadDir(dir)) {
-    const candidate = path.join(dir, entry);
-    if (safeIsDirectory(candidate)) {
-      files.push(...walkGgufFiles(candidate));
-    } else if (candidate.toLowerCase().endsWith('.gguf')) {
-      files.push(candidate);
+  const ancestors = new Set<string>();
+  let entries = 0;
+  function visit(directory: string): void {
+    let realDirectory: string;
+    let names: fs.Dirent[];
+    try {
+      realDirectory = fs.realpathSync(directory);
+      if (ancestors.has(realDirectory)) return;
+      names = fs.readdirSync(directory, { withFileTypes: true });
+    } catch {
+      return;
     }
+    entries += names.length;
+    if (
+      entries > LOCAL_GGUF_CATALOG_LIMIT.Entries ||
+      ancestors.size >= LOCAL_GGUF_CATALOG_LIMIT.DirectoryDepth
+    )
+      throw new Error('Local model directory scan limit exceeded.');
+
+    ancestors.add(realDirectory);
+    for (const name of names) {
+      const candidate = path.join(directory, name.name);
+      let target: fs.Dirent | fs.Stats | undefined = name;
+      if (name.isSymbolicLink()) {
+        try {
+          target = fs.statSync(candidate, { throwIfNoEntry: false });
+        } catch {
+          continue;
+        }
+      }
+      if (target?.isDirectory()) {
+        visit(candidate);
+      } else if (
+        target?.isFile() &&
+        name.name.toLowerCase().endsWith('.gguf') &&
+        !MMPROJ_FILE_PATTERN.test(name.name)
+      ) {
+        // Register a split model under its first file only.
+        const shard = name.name.match(/-(\d{5})-of-\d{5}\.gguf$/i);
+        if (shard && shard[1] !== '00001') continue;
+        if (files.length >= LOCAL_GGUF_CATALOG_LIMIT.Models)
+          throw new Error('Local model catalog limit exceeded.');
+        files.push(candidate);
+      }
+    }
+    ancestors.delete(realDirectory);
   }
+  visit(dir);
   return files;
-}
-
-function safeReadDir(dir: string): string[] {
-  try {
-    return fs.readdirSync(dir);
-  } catch {
-    return [];
-  }
-}
-
-function safeIsDirectory(target: string): boolean {
-  try {
-    return fs.statSync(target).isDirectory();
-  } catch {
-    return false;
-  }
 }
 
 function inferQuantizationFromFilename(fileName: string): string | undefined {
   return fileName
     .toUpperCase()
     .match(/\b(Q[2-8](?:_[A-Z0-9]+){0,3}|F16|F32|BF16|IQ[1-4]_[A-Z0-9_]+)\b/)?.[1];
-}
-
-function isGgufPath(value: string): boolean {
-  const pathname = /^https?:\/\//i.test(value) ? new URL(value).pathname : value;
-  return pathname.toLowerCase().endsWith('.gguf');
 }

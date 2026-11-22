@@ -24,7 +24,7 @@ export interface CodingRoomRuntime {
     expertIds?: string[];
   }): Promise<void>;
   /** Installed skills and experts advertised with the built-in command list. */
-  listCommandChoices?(): BuiltinCodingCommandChoices;
+  listCommandChoices?(): Promise<BuiltinCodingCommandChoices> | BuiltinCodingCommandChoices;
   /** Bumped when the advertised skills, experts or MCP servers change. */
   commandCatalogGeneration?(): number;
   /** Applies approval-mode changes to a live built-in session. */
@@ -34,7 +34,10 @@ export interface CodingRoomRuntime {
   respondBuiltinElicitation?(requestId: string, answer: string): boolean;
   /** Cancels a question the live built-in session asked. */
   cancelBuiltinElicitation?(requestId: string, reason: string): boolean;
-  enqueueBuiltinMessage?(sessionId: string, prompt: string): { success: boolean; error?: string };
+  enqueueBuiltinMessage?(
+    sessionId: string,
+    prompt: string,
+  ): Promise<{ success: boolean; error?: string }>;
   steerBuiltinMessage?(
     sessionId: string,
     prompt: string,
@@ -74,11 +77,6 @@ export interface CodingRoomRuntime {
   cancelExternalWorkbenchRun?(input: { sessionId: string; runId: string }): void;
   respondBuiltinPermission?(requestId: string, approved: boolean): void;
   validateBuiltinModel?(): Promise<void>;
-  createIsolatedWorkspace?(input: {
-    workspaceRoot: string;
-    laneId: string;
-    baseline: string;
-  }): Promise<string>;
   getWorkspaceBaseline?(workspaceRoot: string): Promise<string | null>;
   getWorkspaceDiff?(workspaceRoot: string): Promise<string | null>;
   getIsolatedWorkspaceDiff?(workspaceRoot: string): Promise<string>;

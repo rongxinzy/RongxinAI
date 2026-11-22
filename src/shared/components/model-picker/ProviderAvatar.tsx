@@ -8,7 +8,6 @@ import {
   GrokIcon,
   MiniMaxIcon,
   MoonshotIcon,
-  OllamaIcon,
   OpenAIIcon,
   OpenRouterIcon,
   QianfanIcon,
@@ -43,7 +42,6 @@ const PRESET_BRAND_ICONS: Record<PresetBrandKey, ComponentType<{ className?: str
   xiaomi: XiaomiIcon,
   grok: GrokIcon,
   openrouter: OpenRouterIcon,
-  ollama: OllamaIcon,
 };
 
 function getInitialLabel(name?: string, providerKey?: string): string {

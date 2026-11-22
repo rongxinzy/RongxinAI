@@ -7,7 +7,12 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { SkillManager } from './skillManager';
 import { skillRootRegistry } from './skillRootRegistry';
 import { SKILL_STATE_KEY } from './skills/constants';
+import { readSkillCatalog, type SkillCatalogInput } from './skills/skillRecords';
 import type { SqliteStore } from './sqliteStore';
+
+vi.mock('./workbenchTask/artifactWorkerPool', () => ({
+  readSkillCatalogAsync: async (input: SkillCatalogInput) => readSkillCatalog(input),
+}));
 
 const temporaryDirectories: string[] = [];
 
@@ -46,10 +51,10 @@ const persistedState = (store: SqliteStore) => {
   > | null;
 };
 
-test('enabling an unknown Skill never writes state for it', () => {
+test('enabling an unknown Skill never writes state for it', async () => {
   const { manager, store, unregister } = createManager();
   try {
-    manager.setSkillEnabled('skill-that-does-not-exist', true);
+    await manager.setSkillEnabled('skill-that-does-not-exist', true);
     expect(persistedState(store)).toBeNull();
     expect(store.set).not.toHaveBeenCalled();
   } finally {
@@ -57,80 +62,80 @@ test('enabling an unknown Skill never writes state for it', () => {
   }
 });
 
-test('pinning an unknown Skill never writes state for it', () => {
+test('pinning an unknown Skill never writes state for it', async () => {
   const { manager, store, unregister } = createManager();
   try {
-    manager.setSkillPinned('skill-that-does-not-exist', true);
+    await manager.setSkillPinned('skill-that-does-not-exist', true);
     expect(store.set).not.toHaveBeenCalled();
   } finally {
     unregister();
   }
 });
 
-test('batch enable filters unknown ids but keeps known ones', () => {
+test('batch enable filters unknown ids but keeps known ones', async () => {
   const { manager, store, unregister } = createManager();
   try {
-    manager.setSkillsEnabled(['managed-demo', 'skill-that-does-not-exist'], false);
+    await manager.setSkillsEnabled(['managed-demo', 'skill-that-does-not-exist'], false);
     expect(persistedState(store)).toEqual({ 'managed-demo': { enabled: false } });
   } finally {
     unregister();
   }
 });
 
-test('known Skills still toggle and pin', () => {
+test('known Skills still toggle and pin', async () => {
   const { manager, store, unregister } = createManager();
   try {
-    const disabled = manager.setSkillEnabled('managed-demo', false);
+    const disabled = await manager.setSkillEnabled('managed-demo', false);
     expect(disabled.find(skill => skill.id === 'managed-demo')?.enabled).toBe(false);
     expect(persistedState(store)).toEqual({ 'managed-demo': { enabled: false } });
 
-    manager.setSkillPinned('managed-demo', true);
+    await manager.setSkillPinned('managed-demo', true);
     expect(persistedState(store)).toEqual({ 'managed-demo': { enabled: false, pinned: true } });
   } finally {
     unregister();
   }
 });
 
-test('core Skills still refuse to be disabled without writing state', () => {
+test('core Skills still refuse to be disabled without writing state', async () => {
   const { manager, store, unregister } = createManager();
   try {
-    manager.setSkillEnabled('docx', false);
+    await manager.setSkillEnabled('docx', false);
     expect(store.set).not.toHaveBeenCalled();
   } finally {
     unregister();
   }
 });
 
-test('a batch of unknown ids performs no write and no broadcast', () => {
+test('a batch of unknown ids performs no write and no broadcast', async () => {
   const { manager, store, unregister } = createManager();
   try {
-    manager.setSkillsEnabled(['ghost-one', 'ghost-two'], false);
+    await manager.setSkillsEnabled(['ghost-one', 'ghost-two'], false);
     expect(store.set).not.toHaveBeenCalled();
   } finally {
     unregister();
   }
 });
 
-test('a batch that changes nothing performs no write', () => {
+test('a batch that changes nothing performs no write', async () => {
   const { manager, store, unregister } = createManager();
   try {
-    manager.setSkillsEnabled(['managed-demo'], true);
+    await manager.setSkillsEnabled(['managed-demo'], true);
     store.set.mockClear();
-    manager.setSkillsEnabled(['managed-demo'], true);
-    manager.setSkillsEnabled(['docx'], false);
+    await manager.setSkillsEnabled(['managed-demo'], true);
+    await manager.setSkillsEnabled(['docx'], false);
     expect(store.set).not.toHaveBeenCalled();
   } finally {
     unregister();
   }
 });
 
-test('a real update prunes stale state rows left by older versions', () => {
+test('a real update prunes stale state rows left by older versions', async () => {
   const { manager, store, unregister } = createManager({
     'deleted-skill': { enabled: false },
     'managed-demo': { enabled: true },
   });
   try {
-    manager.setSkillEnabled('managed-demo', false);
+    await manager.setSkillEnabled('managed-demo', false);
 
     expect(persistedState(store)).toEqual({ 'managed-demo': { enabled: false } });
   } finally {
@@ -138,7 +143,7 @@ test('a real update prunes stale state rows left by older versions', () => {
   }
 });
 
-test('a Skill whose SKILL.md fails to parse still accepts toggles', () => {
+test('a Skill whose SKILL.md fails to parse still accepts toggles', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-skill-broken-'));
   temporaryDirectories.push(root);
   const brokenDirectory = path.join(root, 'broken-skill');
@@ -154,7 +159,7 @@ test('a Skill whose SKILL.md fails to parse still accepts toggles', () => {
   const unregister = skillRootRegistry.register(root);
   const manager = new SkillManager(() => store);
   try {
-    manager.setSkillEnabled('broken-skill', false);
+    await manager.setSkillEnabled('broken-skill', false);
     expect(persistedState(store)).toEqual({ 'broken-skill': { enabled: false } });
   } finally {
     unregister();

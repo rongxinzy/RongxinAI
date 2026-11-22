@@ -1,6 +1,6 @@
-import crypto from 'crypto';
 import extractZip from 'extract-zip';
 import fs from 'fs';
+import { pipeline } from 'node:stream/promises';
 import path from 'path';
 import * as tar from 'tar';
 import { fileURLToPath } from 'url';
@@ -15,9 +15,12 @@ import type {
   LlamaCppRuntimeInstallResult,
 } from '../../../shared/llamacpp';
 import { LlamaCppBackendError } from '../../../shared/llamacpp';
+import { sha256FileStream } from '../fileHasher';
 import { listLlamaCppRuntimeDevices } from '../llamacppRuntimeDeviceProbe';
-import { LlamaCppRuntimeTargetId } from '../llamacppRuntimeConstants';
-import { resolveLlamaCppExecutableName } from '../llamacppRuntimeInstaller';
+import {
+  LlamaCppRuntimeTargetId,
+  resolveLlamaCppExecutableName,
+} from '../llamacppRuntimeConstants';
 import {
   DownloadCancelledError,
   downloadFileWithResume,
@@ -37,7 +40,6 @@ export function shouldLogManifestFallbackWarning(): boolean {
 export function setHasLoggedManifestFallback(): void {
   hasLoggedManifestFallback = true;
 }
-export const backendDownloadSizeCache = new Map<string, number>();
 
 export type BackendInstallProgressReporter = (progress: LlamaCppInstallProgress) => void;
 
@@ -278,7 +280,7 @@ export async function downloadArchive(
     const partCompleted = new Map<string, number>();
     const sumPartValues = (entries: Map<string, number>) =>
       [...entries.values()].reduce((sum, value) => sum + value, 0);
-    const buffers: Buffer[] = [];
+    const partPaths: string[] = [];
     for (const part of archive.parts) {
       const partPath = path.join(downloadDir, part.assetName);
       await downloadFile(
@@ -302,10 +304,26 @@ export async function downloadArchive(
         },
         signal,
       );
-      if (part.sha256) verifySha256(partPath, part.sha256);
-      buffers.push(fs.readFileSync(partPath));
+      if (part.sha256) await verifySha256(partPath, part.sha256, signal);
+      partPaths.push(partPath);
     }
-    fs.writeFileSync(outputPath, Buffer.concat(buffers));
+    const stagedPath = `${outputPath}.assembling`;
+    try {
+      await pipeline(
+        async function* () {
+          for (const partPath of partPaths) {
+            yield* fs.createReadStream(partPath, { signal });
+          }
+        },
+        fs.createWriteStream(stagedPath),
+        { signal },
+      );
+      if (archive.sha256) await verifySha256(stagedPath, archive.sha256, signal, outputPath);
+      throwIfDownloadCancelled(signal);
+      await fs.promises.rename(stagedPath, outputPath);
+    } finally {
+      await fs.promises.rm(stagedPath, { force: true });
+    }
   } else {
     await downloadFile(
       resolveArchiveUrl(archive, manifest),
@@ -326,8 +344,8 @@ export async function downloadArchive(
       },
       signal,
     );
+    if (archive.sha256) await verifySha256(outputPath, archive.sha256, signal);
   }
-  if (archive.sha256) verifySha256(outputPath, archive.sha256);
   return outputPath;
 }
 
@@ -425,13 +443,23 @@ export async function copyLocalFileWithProgress(
   onProgress?.(completed, total, undefined);
 }
 
-export function verifySha256(filePath: string, expected: string): void {
-  const actual = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+async function verifySha256(
+  filePath: string,
+  expected: string,
+  signal?: AbortSignal,
+  archivePath = filePath,
+): Promise<void> {
+  const { size } = await fs.promises.stat(filePath);
+  const actual = await sha256FileStream(path.resolve(filePath), {
+    signal,
+    maxBytes: size,
+    timeoutMs: 60 * 60_000,
+  });
   if (actual.toLowerCase() !== expected.toLowerCase()) {
     // A completed but corrupt cache entry cannot be resumed safely. Removing it
     // lets the next retry start clean instead of failing forever on the same file.
-    fs.rmSync(filePath, { force: true });
-    throw new Error(`SHA256 mismatch for ${path.basename(filePath)}.`);
+    await fs.promises.rm(filePath, { force: true });
+    throw new Error(`SHA256 mismatch for ${path.basename(archivePath)}.`);
   }
 }
 
@@ -449,6 +477,24 @@ export async function extractArchive(archivePath: string, extractDir: string): P
 
 export function isSupportedBackendArchivePath(sourcePath: string): boolean {
   return sourcePath.endsWith('.zip') || sourcePath.endsWith('.tar.gz');
+}
+
+export async function copyDirectoryContents(
+  source: string,
+  target: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  for (const entry of await fs.promises.readdir(source, { withFileTypes: true })) {
+    throwIfDownloadCancelled(signal);
+    const from = path.join(source, entry.name);
+    const to = path.join(target, entry.name);
+    if (entry.isDirectory()) {
+      await fs.promises.mkdir(to, { recursive: true });
+      await copyDirectoryContents(from, to, signal);
+    } else {
+      await fs.promises.copyFile(from, to);
+    }
+  }
 }
 
 export function resolveImportDirectoryFromSelectedFile(

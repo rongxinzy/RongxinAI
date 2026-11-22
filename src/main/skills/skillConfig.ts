@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { NpmCli, resolveBundledNpmRuntime } from '../libs/npmRuntime';
+import { restoreBundledSkillDependencies } from './bundledSync';
 import { buildSkillEnv } from './envUtils';
 import { runScriptWithTimeout } from './processRunner';
 
@@ -77,39 +78,31 @@ export function setSkillConfigToDir(
   }
 }
 
-function repairSkillFromBundled(bundledRoot: string, skillId: string, skillDir: string): boolean {
-  if (!app.isPackaged) return false;
-
-  if (!bundledRoot || !fs.existsSync(bundledRoot)) {
-    return false;
-  }
-
+async function repairSkillFromBundled(
+  bundledRoot: string,
+  skillId: string,
+  skillDir: string,
+): Promise<boolean> {
+  if (!app.isPackaged || !bundledRoot) return false;
   const bundledPath = path.join(bundledRoot, skillId);
-  if (!fs.existsSync(bundledPath) || bundledPath === skillDir) {
-    return false;
-  }
-
-  // Check if bundled version has node_modules
-  const bundledNodeModules = path.join(bundledPath, 'node_modules');
-  if (!fs.existsSync(bundledNodeModules)) {
-    console.log(`[skills] Bundled ${skillId} does not have node_modules, skipping repair`);
-    return false;
-  }
+  if (bundledPath === skillDir || !(await hasNodeModules(bundledPath))) return false;
 
   try {
     console.log(`[skills] Repairing ${skillId} from bundled resources...`);
-    fs.cpSync(bundledPath, skillDir, {
-      recursive: true,
-      dereference: true,
-      force: true,
-      errorOnExist: false,
-    });
+    await restoreBundledSkillDependencies(bundledPath, skillDir);
     console.log(`[skills] Repaired ${skillId} from bundled resources`);
     return true;
   } catch (error) {
     console.warn(`[skills] Failed to repair ${skillId} from bundled resources:`, error);
     return false;
   }
+}
+
+function hasNodeModules(skillDir: string): Promise<boolean> {
+  return fs.promises.stat(path.join(skillDir, 'node_modules')).then(
+    info => info.isDirectory(),
+    () => false,
+  );
 }
 
 /**
@@ -137,34 +130,30 @@ async function installSkillDirDependencies(
   skillDir: string,
   bundledRoot: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const nodeModulesPath = path.join(skillDir, 'node_modules');
   const packageJsonPath = path.join(skillDir, 'package.json');
   const skillId = path.basename(skillDir);
 
   console.log(`[skills] Checking dependencies for ${skillId}...`);
-  console.log(`[skills]   node_modules exists: ${fs.existsSync(nodeModulesPath)}`);
-  console.log(`[skills]   package.json exists: ${fs.existsSync(packageJsonPath)}`);
-  console.log(`[skills]   skillDir: ${skillDir}`);
 
   // If node_modules exists, assume dependencies are installed
-  if (fs.existsSync(nodeModulesPath)) {
+  if (await hasNodeModules(skillDir)) {
     console.log(`[skills] Dependencies already installed for ${skillId}`);
     return { success: true };
   }
 
   // If no package.json, nothing to install
-  if (!fs.existsSync(packageJsonPath)) {
+  if (
+    !(await fs.promises.access(packageJsonPath).then(
+      () => true,
+      () => false,
+    ))
+  ) {
     console.log(`[skills] No package.json found for ${skillId}, skipping install`);
     return { success: true };
   }
 
   // Try to repair from bundled resources first (works without npm)
-  if (repairSkillFromBundled(bundledRoot, skillId, skillDir)) {
-    if (fs.existsSync(nodeModulesPath)) {
-      console.log(`[skills] Dependencies restored from bundled resources for ${skillId}`);
-      return { success: true };
-    }
-  }
+  if (await repairSkillFromBundled(bundledRoot, skillId, skillDir)) return { success: true };
 
   // Build environment with user's shell PATH (crucial for packaged apps)
   const env = (await buildSkillEnv()) as NodeJS.ProcessEnv;
@@ -210,7 +199,7 @@ async function installSkillDirDependencies(
     }
 
     // Verify node_modules was created
-    if (!fs.existsSync(nodeModulesPath)) {
+    if (!(await hasNodeModules(skillDir))) {
       const errorMsg = 'npm install appeared to succeed but node_modules was not created';
       console.error(`[skills] ${errorMsg}`);
       return { success: false, error: errorMsg };

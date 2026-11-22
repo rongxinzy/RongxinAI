@@ -5,7 +5,6 @@ import coworkReducer, {
   addSession,
   recoverSession,
   setDraftPrompt,
-  setRemoteManaged,
   updateSessionStatus,
 } from '../store/slices/coworkSlice';
 import skillReducer, { setActiveSkillIds } from '../store/slices/skillSlice';
@@ -87,7 +86,6 @@ beforeEach(() => {
           deliver = listener;
           return () => {};
         },
-        onSessionsChanged: () => () => {},
         getSession,
         getRuntimeSnapshots: async (id?: string) => snapshots.read(id),
         requestStreamResync: async () => true,
@@ -115,10 +113,9 @@ test('reattaching after Started restores a quiet live session without navigating
 
 test('lost completion is recovered and background resync preserves all user selection', async () => {
   await coworkService.init();
-  state.dispatch(addSession(session('A')));
+  state.dispatch(addSession({ ...session('A'), remoteManaged: true }));
   state.dispatch(setDraftPrompt({ sessionId: 'A', draft: 'unsent' }));
   state.dispatch(setActiveSkillIds(['selected-skill']));
-  state.dispatch(setRemoteManaged(true));
   publish(sequencer.next({ type: PiUiEventType.Started, sessionId: 'B' }));
   publish(sequencer.next({ type: PiUiEventType.Completed, sessionId: 'B' }), true);
   publish(sequencer.next({ type: PiUiEventType.QueueUpdated, sessionId: 'B', items: [] }));
@@ -126,11 +123,45 @@ test('lost completion is recovered and background resync preserves all user sele
   expect(state.getState().cowork.currentSessionId).toBe('A');
   expect(state.getState().cowork.currentSession?.id).toBe('A');
   expect(state.getState().cowork.draftPrompts.A).toBe('unsent');
-  expect(state.getState().cowork.remoteManaged).toBe(true);
+  expect(state.getState().cowork.currentSession?.remoteManaged).toBe(true);
   expect(state.getState().workspace.currentWorkspaceId).toBe('workspace-A');
   expect(state.getState().agent.currentAgentId).toBe('agent-A');
   expect(state.getState().skill.activeSkillIds).toEqual(['selected-skill']);
   expect(workspaceService.selectWorkspace).not.toHaveBeenCalled();
+});
+
+test('session loading applies the ownership snapshot even when the transcript is unchanged', async () => {
+  getSession.mockResolvedValueOnce({
+    success: true,
+    session: { ...session('A'), remoteManaged: true },
+  });
+  await coworkService.loadSession('A');
+  expect(state.getState().cowork.currentSession?.remoteManaged).toBe(true);
+  getSession.mockResolvedValueOnce({
+    success: true,
+    session: { ...session('A'), remoteManaged: false },
+  });
+  await coworkService.loadSession('A');
+  expect(state.getState().cowork.currentSession?.remoteManaged).toBe(false);
+});
+
+test('a delayed workspace selection cannot publish the preceding session ownership', async () => {
+  const deferred = Promise.withResolvers<void>();
+  const selection = vi.mocked(workspaceService.selectWorkspace);
+  selection.mockClear().mockImplementationOnce(() => deferred.promise);
+  getSession.mockResolvedValueOnce({
+    success: true,
+    session: { ...session('A'), remoteManaged: true },
+  });
+
+  const channel = coworkService.loadSession('A');
+  await vi.waitFor(() => expect(selection).toHaveBeenCalledOnce());
+  await coworkService.loadSession('B');
+  deferred.resolve();
+  await channel;
+
+  expect(state.getState().cowork.currentSession).toMatchObject({ id: 'B' });
+  expect(state.getState().cowork.currentSession?.remoteManaged ?? false).toBe(false);
 });
 
 test('lost completion replaces stale live state and content in the current conversation', async () => {

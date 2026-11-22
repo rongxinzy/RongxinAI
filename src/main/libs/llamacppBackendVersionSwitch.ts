@@ -1,69 +1,37 @@
 import { LlamaCppBackendError } from '../../shared/llamacpp';
-import type {
-  LlamaCppRunningModel,
-  LlamaCppServerStatus,
-  LlamaCppStatusSnapshot,
-} from '../../shared/llamacpp';
+import type { LlamaCppModelOrchestrator } from './llamacppModelOrchestrator';
 
-export const LlamaCppBackendSwitchServiceStatus = {
-  Running: 'running',
-  Starting: 'starting',
-  Stopped: 'stopped',
-} as const;
-
-type LlamaCppBackendSwitchPreparation =
-  | { success: true; restartService: boolean }
-  | { success: false; error: string };
-
-type LlamaCppBackendSwitchRestartResult = { success: true } | { success: false; error: string };
-
-function isServiceActive(status: LlamaCppServerStatus): boolean {
-  return (
-    status === LlamaCppBackendSwitchServiceStatus.Running ||
-    status === LlamaCppBackendSwitchServiceStatus.Starting
-  );
-}
-
-function blockedSwitch(): LlamaCppBackendSwitchPreparation {
-  return { success: false, error: LlamaCppBackendError.SwitchRequiresStoppedService };
-}
-
-export async function prepareLlamaCppBackendVersionSwitch(input: {
-  serviceStatus: LlamaCppServerStatus;
-  listRunningModels: () => Promise<LlamaCppRunningModel[]>;
-  stop: () => Promise<LlamaCppStatusSnapshot>;
-}): Promise<LlamaCppBackendSwitchPreparation> {
-  if (!isServiceActive(input.serviceStatus)) {
-    return { success: true, restartService: false };
-  }
-
-  try {
-    const runningModels = await input.listRunningModels();
-    if (runningModels.length > 0) return blockedSwitch();
-
-    const stoppedStatus = await input.stop();
-    return isServiceActive(stoppedStatus.status)
-      ? blockedSwitch()
-      : { success: true, restartService: true };
-  } catch {
-    // Keep the active service untouched when its model state cannot be confirmed.
-    return blockedSwitch();
-  }
-}
-
-export async function restartLlamaCppBackendVersionService(input: {
-  start: () => Promise<LlamaCppStatusSnapshot>;
-}): Promise<LlamaCppBackendSwitchRestartResult> {
-  try {
-    const status = await input.start();
-    if (status.status === LlamaCppBackendSwitchServiceStatus.Running) {
-      return { success: true };
+export async function switchLlamaCppBackend(input: {
+  runtime: Pick<LlamaCppModelOrchestrator, 'reconnect' | 'start' | 'stopService'>;
+  busy: () => boolean;
+  activate: () => void;
+  restore: () => void;
+}): Promise<void> {
+  const { runtime } = input;
+  const start = async () => {
+    const status = await runtime.start();
+    if (status.status !== 'running') {
+      throw new Error(status.error || 'Failed to start the selected runtime version.');
     }
-    return {
-      success: false,
-      error: status.error || 'Failed to start the selected runtime version.',
-    };
+  };
+  const current = await runtime.reconnect({ requireResponsive: true }).catch(error => {
+    throw new Error(LlamaCppBackendError.SwitchRequiresStoppedService, { cause: error });
+  });
+  if (current?.modelProcesses.length || current?.runningModels.length || input.busy()) {
+    throw new Error(LlamaCppBackendError.SwitchRequiresStoppedService);
+  }
+  if (current) await runtime.stopService({ requireIdle: true });
+  try {
+    input.activate();
+    if (current) await start();
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
+    try {
+      if (current) await runtime.stopService();
+      input.restore();
+      if (current) await start();
+    } catch (restoreError) {
+      throw new AggregateError([error, restoreError], 'Could not restore the previous runtime.');
+    }
+    throw error;
   }
 }

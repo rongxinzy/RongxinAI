@@ -19,10 +19,9 @@
  * Exported API (details on each symbol below):
  *
  * - `createStreamingHarness(options): Promise<StreamingHarness>`
- *     `options: { sessionId: string; prompt?: string; delivery?: DeliveryControls | null }`
  *     Installs fake timers (`setTimeout/clearTimeout/setInterval/clearInterval/
  *     setImmediate/Date/performance`), intercepts `BrowserWindow.getAllWindows`
- *     and `ipcMain.handle`, binds the real forwarder to the suite `adapter`
+ *     and `ipcMain.handle`, binds the real forwarder to the selected runtime
  *     (memoized per adapter instance), subscribes the mock AgentSession, runs
  *     `await adapter.startSession(sessionId, prompt ?? 'Hi')`, and builds the
  *     renderer side (store + LiveTextStore + pipeline + manual rAF scheduler).
@@ -56,7 +55,7 @@
  *     - `handlers: ReadonlyMap<string, IpcHandler>` — handlers captured from
  *       `ipcMain.handle` (includes RuntimeSnapshots/UiEventReplay and, after the
  *       fix, StreamResync).
- *     - `pipeline`, `live`, `store`, `sessionId`, `dispose()`.
+ *     - `runtime`, `pipeline`, `live`, `store`, `sessionId`, `dispose()`.
  *
  * - interface `DeliveryControls` (index = position in `harness.ipcEvents`):
  *     - `dropWhen?(index, event): boolean` — do not deliver to the pipeline (IPC loss).
@@ -88,15 +87,19 @@
 
 // IMPORTANT: keep this import first — it registers the Pi SDK mocks before any
 // production module that transitively loads them is evaluated.
-import { adapter, mockSession } from '../../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
+import {
+  createTestPiRuntime,
+  adapter,
+  mockSession,
+} from '../../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
 
-import { BrowserWindow, ipcMain } from 'electron';
+import { type BrowserWindow, ipcMain } from 'electron';
 import { configureStore } from '@reduxjs/toolkit';
 import type { UnknownAction } from '@reduxjs/toolkit';
 import { vi } from 'vitest';
 
 import { forwardPiWorkbenchRuntimeToRenderer } from '../../src/main/appBootstrap/piUiForwarder';
-import type { PiRuntimeAdapter } from '../../src/main/libs/agentEngine/piRuntimeAdapter';
+import { PiRuntimeAdapter } from '../../src/main/libs/agentEngine/piRuntimeAdapter';
 import { CoworkStreamIpc } from '../../src/shared/ipc/channels';
 import { PiUiEventType } from '../../src/shared/cowork/piUiEvent';
 import type { PiUiEvent } from '../../src/shared/cowork/piUiEvent';
@@ -163,11 +166,11 @@ export type IpcHandler = (event: unknown, ...args: unknown[]) => unknown;
 
 interface FakeStreamWindow {
   isDestroyed(): boolean;
-  webContents: { send(channel: string, ...args: unknown[]): void };
+  webContents: { isDestroyed(): boolean; send(channel: string, ...args: unknown[]): void };
 }
 
 const ipcHandlers = new Map<string, IpcHandler>();
-let activeWindows: FakeStreamWindow[] = [];
+let activeWindow: FakeStreamWindow | null = null;
 let electronInterceptionInstalled = false;
 let fakeTimersInstalled = false;
 const forwardersByRuntime = new WeakMap<object, true>();
@@ -197,9 +200,6 @@ function installFakeTimersOnce(): void {
 function installElectronInterception(): void {
   if (electronInterceptionInstalled) return;
   electronInterceptionInstalled = true;
-  // The window list is indirection so each harness swaps its fake window in
-  // without re-spying (repeat spyOn on the same property is fragile).
-  vi.spyOn(BrowserWindow, 'getAllWindows').mockImplementation(() => activeWindows as never);
   vi.spyOn(ipcMain, 'handle').mockImplementation(((channel: unknown, handler: unknown) => {
     if (typeof channel === 'string' && typeof handler === 'function') {
       ipcHandlers.set(channel, handler as IpcHandler);
@@ -218,7 +218,10 @@ function ensureForwarderBound(runtime: object): void {
     runtime as { listenerCount?: (eventName: string) => number }
   ).listenerCount?.('uiStreamChunk');
   if (forwardersByRuntime.has(runtime) && (listenerCount ?? 0) > 0) return;
-  forwardPiWorkbenchRuntimeToRenderer(runtime as PiRuntimeAdapter);
+  forwardPiWorkbenchRuntimeToRenderer(
+    runtime as PiRuntimeAdapter,
+    () => activeWindow as BrowserWindow | null,
+  );
   forwardersByRuntime.set(runtime, true);
 }
 
@@ -293,17 +296,19 @@ export interface DeliveryControls {
   onDelivered?(index: number, event: PiUiEvent): void;
 }
 
-export interface CreateStreamingHarnessOptions {
+export type CreateStreamingHarnessOptions = {
   sessionId: string;
   /** Prompt passed to adapter.startSession; default 'Hi'. */
   prompt?: string;
   delivery?: DeliveryControls | null;
-  /** When true, binds a real in-memory CoworkStore (for DB assertions). */
-  useSqliteStore?: boolean;
-}
+} & (
+  | { useSqliteStore: true; runtime?: never }
+  | { useSqliteStore?: false; runtime?: PiRuntimeAdapter }
+);
 
 export class StreamingHarness {
   public readonly sessionId: string;
+  public readonly runtime: PiRuntimeAdapter;
   public readonly store: StreamingHarnessStore;
   public readonly pipeline: CoworkStreamPipeline;
   public readonly live: LiveTextStore;
@@ -323,7 +328,7 @@ export class StreamingHarness {
 
   private readonly prompt: string;
   private readonly frames = new ManualFrameQueue();
-  private readonly fakeWindow: FakeStreamWindow;
+  readonly fakeWindow: FakeStreamWindow;
   private readonly frameListeners = new Set<(frameIndex: number) => void>();
   private piListener: ((event: unknown) => void) | null = null;
   private messageUpdateCounter: { count: number } | null = null;
@@ -334,14 +339,19 @@ export class StreamingHarness {
   private frameIndex = 0;
   private disposed = false;
   private coworkStoreHandle: HarnessCoworkStoreHandle | null = null;
-  private readonly useSqliteStore: boolean;
 
   /** @internal — use createStreamingHarness(). */
   constructor(options: CreateStreamingHarnessOptions) {
     this.sessionId = options.sessionId;
     this.prompt = options.prompt ?? 'Hi';
     this.deliveryControls = options.delivery ?? null;
-    this.useSqliteStore = options.useSqliteStore === true;
+    if (options.useSqliteStore) {
+      this.coworkStoreHandle = createHarnessCoworkStore();
+      ensureHarnessCoworkSession(this.coworkStoreHandle.store, this.sessionId, 'chat');
+      this.runtime = createTestPiRuntime({ coworkStore: this.coworkStoreHandle.store });
+    } else {
+      this.runtime = options.runtime ?? adapter;
+    }
     // Live-text notifications drain in runFrames() together with the update
     // batcher, mirroring the single rAF cadence of the production renderer.
     this.live = new LiveTextStore({ schedule: callback => this.frames.request(callback) });
@@ -379,28 +389,24 @@ export class StreamingHarness {
     this.fakeWindow = {
       isDestroyed: () => false,
       webContents: {
+        isDestroyed: () => false,
         send: (channel: string, ...args: unknown[]) => {
           this.onWindowSend(channel, args[0]);
         },
       },
     };
-    activeWindows = [this.fakeWindow];
+    activeWindow = this.fakeWindow;
   }
 
   /** @internal — invoked by createStreamingHarness after construction. */
   async start(): Promise<void> {
-    ensureForwarderBound(adapter);
-    if (this.useSqliteStore) {
-      this.coworkStoreHandle = createHarnessCoworkStore();
-      ensureHarnessCoworkSession(this.coworkStoreHandle.store, this.sessionId, 'chat');
-      adapter.setCoworkStore(this.coworkStoreHandle.store);
-    }
-    this.messageUpdateCounter = messageUpdateCounterFor(adapter);
+    ensureForwarderBound(this.runtime);
+    this.messageUpdateCounter = messageUpdateCounterFor(this.runtime);
     mockSession.subscribe.mockImplementation((callback: (event: unknown) => void) => {
       this.piListener = callback;
       return () => {};
     });
-    await adapter.startSession(this.sessionId, this.prompt);
+    await this.runtime.startSession(this.sessionId, this.prompt);
     if (!this.piListener) {
       throw new Error(
         'PiRuntimeAdapter did not subscribe to the mock AgentSession during startSession',
@@ -511,10 +517,13 @@ export class StreamingHarness {
     this.disposed = true;
     this.frameListeners.clear();
     this.pipeline.dispose();
-    this.coworkStoreHandle?.cleanup();
-    this.coworkStoreHandle = null;
-    if (activeWindows[0] === this.fakeWindow) {
-      activeWindows = [];
+    if (activeWindow === this.fakeWindow) {
+      activeWindow = null;
+    }
+    if (this.coworkStoreHandle) {
+      this.runtime.stopAllSessions();
+      this.coworkStoreHandle.cleanup();
+      this.coworkStoreHandle = null;
     }
   }
 
@@ -714,8 +723,8 @@ export class StreamingHarness {
 
 /**
  * Build a full streaming harness for `options.sessionId`:
- * fake timers + electron interception + real forwarder bound to the suite
- * adapter + `await adapter.startSession(...)` + real renderer pipeline.
+ * fake timers + Electron interception + real forwarder + runtime session +
+ * real renderer pipeline.
  *
  * Must be called inside a test after `setupPiRuntimeAdapterSuite()` ran (its
  * beforeEach provides the fresh `adapter`/`mockSession` this harness drives).
@@ -730,6 +739,11 @@ export async function createStreamingHarness(
   // window or to an empty window list, never to this harness).
   vi.advanceTimersByTime(256);
   const harness = new StreamingHarness(options);
-  await harness.start();
-  return harness;
+  try {
+    await harness.start();
+    return harness;
+  } catch (error) {
+    harness.dispose();
+    throw error;
+  }
 }

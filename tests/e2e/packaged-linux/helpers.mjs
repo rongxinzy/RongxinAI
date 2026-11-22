@@ -320,16 +320,15 @@ export function waitForRunCompletion(page, sessionId, timeoutMs = 600_000) {
 export async function configureGlmProvider(page, { model }) {
   return page.evaluate(
     async ({ resolvedModel }) => {
-      if (!window.electron.magpie?.start || !window.electron.magpie?.models) {
+      if (!window.electron.magpie?.start || !window.electron.magpie?.catalog) {
         throw new Error('Magpie APIs are unavailable in renderer');
       }
       const started = await window.electron.magpie.start();
       if (started && started.state && started.state !== 'running') {
         throw new Error(`magpie.start state=${started.state} ${started.error || ''}`);
       }
-      const res = await window.electron.magpie.models();
-      const list = Array.isArray(res) ? res : (res?.data ?? res?.models ?? []);
-      const ids = list.map(entry => entry?.id ?? entry?.modelId ?? String(entry));
+      const { models } = await window.electron.magpie.catalog();
+      const ids = models.map(entry => entry.id);
       const pick = ids.find(id =>
         String(id).toLowerCase().includes(String(resolvedModel).toLowerCase()),
       );
@@ -339,8 +338,8 @@ export async function configureGlmProvider(page, { model }) {
         );
       }
       const sel = await window.electron.magpie.selectDefault(pick);
-      if (sel?.success === false) {
-        throw new Error(sel.error || `selectDefault failed for ${pick}`);
+      if (sel.defaultModelId !== pick) {
+        throw new Error(`selectDefault failed for ${pick}`);
       }
       return { modelId: pick, magpieState: started?.state ?? 'running' };
     },

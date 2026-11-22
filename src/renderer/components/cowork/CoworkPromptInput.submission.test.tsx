@@ -27,6 +27,7 @@ const fixture = vi.hoisted(() => ({
       draftPrompts: { __home__: '' },
       draftAttachments: {} as Record<string, DraftAttachment[]>,
       currentSession: null,
+      promptFocusRequest: null,
     },
     agent: { currentAgentId: 'main', agents: [] },
     model: {
@@ -45,6 +46,7 @@ vi.mock('react-redux', () => ({
   useDispatch: () => fixture.dispatch,
   useSelector: (selector: (state: RootState) => unknown) =>
     selector(fixture.state as unknown as RootState),
+  useStore: () => ({ getState: () => fixture.state }),
 }));
 vi.mock('../../services/config', () => ({
   configService: { getConfig: () => ({ shortcuts: { sendMessage: 'Enter' } }) },

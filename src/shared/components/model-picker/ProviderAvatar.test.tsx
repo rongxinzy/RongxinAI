@@ -52,6 +52,9 @@ describe('resolveProviderAvatarKind & ProviderAvatar', () => {
       'llamacpp',
     );
     expect(resolveProviderAvatarKind({ providerKey: 'custom_aisphere' })).toBe('organization');
+    expect(resolveProviderAvatarKind({ providerKey: 'zhiyuan-host-aisphere-catalog' })).toBe(
+      'organization',
+    );
     expect(resolveProviderAvatarKind({ providerKey: 'sub_codex' })).toBe('subscription');
     expect(resolveProviderAvatarKind({ providerKey: 'group' })).toBe('group');
     expect(

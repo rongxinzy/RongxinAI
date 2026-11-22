@@ -31,10 +31,10 @@ test('rejects empty images before initializing or reusing a runtime', async () =
 
 test('image-only continuation reaches the normal session restoration path', async () => {
   const adapter = new PiRuntimeAdapter();
-  const start = vi.spyOn(adapter, 'startSession').mockResolvedValue();
+  const launch = vi.spyOn(adapter, 'launchSession').mockResolvedValue();
   const options = {
     imageAttachments: [{ name: 'example.png', mimeType: 'image/png', base64Data: 'aW1hZ2U=' }],
   };
   await adapter.continueSession('session', '', options);
-  expect(start).toHaveBeenCalledWith('session', '', expect.objectContaining(options));
+  expect(launch).toHaveBeenCalledWith('session', '', expect.objectContaining(options));
 });

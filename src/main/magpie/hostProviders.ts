@@ -18,10 +18,16 @@ export interface MagpieHostProvider {
   }[];
 }
 export const HOST_PROVIDER_PREFIX = 'zhiyuan-host-';
+export const ENTERPRISE_HOST_PROVIDER_PREFIX = `${HOST_PROVIDER_PREFIX}enterprise-`;
 export const RETIRED_STRATA_HOST_PROVIDER_ID = `${HOST_PROVIDER_PREFIX}strata`;
+export const RETIRED_OLLAMA_HOST_PROVIDER_ID = `${HOST_PROVIDER_PREFIX}ollama`;
 
-export function isRetiredHostModel(modelRef: string): boolean {
-  return modelRef.startsWith(`${RETIRED_STRATA_HOST_PROVIDER_ID}/`);
+export function isRetiredHostProviderId(id?: string): boolean {
+  return id === RETIRED_STRATA_HOST_PROVIDER_ID || id === RETIRED_OLLAMA_HOST_PROVIDER_ID;
+}
+
+export function isRetiredHostModel(modelRef?: string): boolean {
+  return isRetiredHostProviderId(modelRef?.split('/', 1)[0]);
 }
 
 function assertHostProviderId(id: string): void {

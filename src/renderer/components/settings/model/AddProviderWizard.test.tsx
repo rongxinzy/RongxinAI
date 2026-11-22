@@ -89,7 +89,7 @@ describe('AddProviderWizard', () => {
     expect(screen.getByText('providerWizardSearchEmpty')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'providerWizardUseCustomFallback' }));
     expect(screen.getByText('providerWizardStep2Title')).toBeInTheDocument();
-    expect(screen.getByText('自定义服务商')).toBeInTheDocument();
+    expect(screen.getByText('providerWizardCustomCardTitle')).toBeInTheDocument();
   });
 
   test('saves discovered per-model context windows reported by the endpoint', async () => {

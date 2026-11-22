@@ -13,7 +13,7 @@ import { WorkbenchTaskService } from '../../src/main/workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../src/main/workbenchTask/schema';
 import { CoworkExecutionMode } from '../../src/shared/cowork/constants';
 import { WorkbenchApprovalMode, WorkbenchExecutionStatus } from '../../src/shared/workbenchTask';
-import { installTestMagpie } from '../helpers/installTestMagpie';
+import { createTestMagpie } from '../helpers/createTestMagpie';
 import { inspectLongTaskArtifacts } from './piLongTaskAcceptance';
 
 const mutableApp = app as unknown as Record<string, unknown>;
@@ -123,7 +123,7 @@ async function runScenario(
     );
   });
   await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
-  const gateway = installTestMagpie({
+  const gateway = createTestMagpie({
     gatewayUrl: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`,
     defaultModelId: model,
   });
@@ -133,8 +133,12 @@ async function runScenario(
   initializeWorkbenchTaskSchema(db);
   const cowork = new CoworkStore(db);
   const workbench = new WorkbenchTaskService(db);
-  const adapter = new PiRuntimeAdapter();
-  adapter.setCoworkStore(cowork);
+  const readTrace = vi.spyOn(workbench.repository, 'getDetail');
+  const adapter = new PiRuntimeAdapter({
+    modelService: gateway.modelService,
+    coworkStore: cowork,
+    workbenchTaskService: mode === ObservationMode.Off ? undefined : workbench,
+  });
   if (mode === ObservationMode.BrokenProjection) {
     adapter.on('message', (_sessionId, message) => {
       if (message.type === 'assistant') throw new Error('Display projection unavailable');
@@ -145,7 +149,6 @@ async function runScenario(
       throw new Error('Execution display unavailable');
     });
   }
-  if (mode !== ObservationMode.Off) adapter.setWorkbenchTaskService(workbench);
   if (mode === ObservationMode.BrokenStart || mode === ObservationMode.BrokenAudit) {
     const methods =
       mode === ObservationMode.BrokenStart
@@ -199,6 +202,7 @@ async function runScenario(
     expect(events.filter(event => event === 'complete')).toHaveLength(1);
     expect(events.some(event => event.startsWith('error:'))).toBe(false);
     expect(requests).toHaveLength(actions.length + (retryFirstRequest ? 2 : 1));
+    expect(readTrace).not.toHaveBeenCalled();
     const detail = mode === ObservationMode.On ? workbench.getCurrent(session.id) : null;
     if (detail) {
       expect(detail.task.status).toBe(WorkbenchExecutionStatus.Settled);
@@ -224,13 +228,12 @@ async function runScenario(
     return { requests, permissions, events };
   } finally {
     adapter.stopAllSessions();
-    const readMessage = vi.spyOn(cowork, 'getMessage');
+    const readMessage = vi.spyOn(cowork.messages, 'getMessage');
     readMessage.mockClear();
     store.close();
     // Deliberately yield only after close: no workaround timer tick is permitted.
     await new Promise(resolve => setTimeout(resolve, 10));
     expect(readMessage).not.toHaveBeenCalled();
-    gateway.dispose();
     await new Promise<void>(resolve => {
       upstream.close(() => resolve());
       upstream.closeAllConnections();

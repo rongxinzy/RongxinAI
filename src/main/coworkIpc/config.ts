@@ -19,14 +19,7 @@ export interface CoworkConfigIpcDeps {
 }
 
 export const registerCoworkConfigIpc = (deps: CoworkConfigIpcDeps): void => {
-  const VALID_EMBEDDING_PROVIDERS = [
-    'local',
-    'openai',
-    'gemini',
-    'voyage',
-    'mistral',
-    'ollama',
-  ] as const;
+  const VALID_EMBEDDING_PROVIDERS = ['local', 'openai', 'gemini', 'voyage', 'mistral'] as const;
 
   function normalizeEmbeddingConfig(config: {
     embeddingEnabled?: boolean;

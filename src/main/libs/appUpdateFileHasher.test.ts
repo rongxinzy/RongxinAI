@@ -12,11 +12,11 @@ afterEach(async () => {
 });
 
 test('rejects paths that cannot be a verified local update', async () => {
-  await expect(sha512UpdateFile('relative-update.exe')).rejects.toThrow('Invalid update file path');
+  await expect(sha512UpdateFile('relative-update.exe')).rejects.toThrow('absolute file path');
   const filePath = path.join(os.tmpdir(), `zhiyuan-empty-update-${process.pid}.exe`);
   temporaryFiles.push(filePath);
   await fs.promises.writeFile(filePath, '');
-  await expect(sha512UpdateFile(filePath)).rejects.toThrow('Update file size is invalid');
+  await expect(sha512UpdateFile(filePath)).rejects.toThrow('File size is invalid');
 });
 
 test('rejects a cancelled hash before creating a worker', async () => {

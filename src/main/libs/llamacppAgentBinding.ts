@@ -1,9 +1,9 @@
 import {
   assessLlamaCppAgentEligibility,
   type LlamaCppAgentEligibility,
+  type LlamaCppModelPreferences,
   type LlamaCppRunningModel,
 } from '../../shared/llamacpp';
-import type { ModelCapabilities } from '../../shared/providers';
 
 export type { LlamaCppAgentEligibility } from '../../shared/llamacpp';
 export {
@@ -19,13 +19,15 @@ const LLAMACPP_OUTPUT_TOKEN_RATIO = 0.25;
 export type LlamaCppRunningModelBinding = {
   id: string;
   name: string;
-  supportsImage: false;
   contextWindow?: number;
-  contextTokens?: number;
   maxTokens?: number;
-  capabilities?: Partial<ModelCapabilities>;
   agentEligibility: LlamaCppAgentEligibility;
 };
+
+export interface LocalGpuSnapshot {
+  baseUrl: string | null;
+  models: readonly LlamaCppRunningModelBinding[];
+}
 
 function normalizePositiveInteger(value: number | undefined): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
@@ -36,6 +38,7 @@ export function buildLlamaCppRunningModelBinding(
     LlamaCppRunningModel,
     'name' | 'model' | 'id' | 'runtime_context_length' | 'trained_context_length' | 'details'
   >,
+  preferences?: LlamaCppModelPreferences,
 ): LlamaCppRunningModelBinding | null {
   const modelName = model.name?.trim() || model.model?.trim() || model.id?.trim() || '';
   if (!modelName) {
@@ -45,24 +48,37 @@ export function buildLlamaCppRunningModelBinding(
   const trainedContextLength = normalizePositiveInteger(
     model.trained_context_length ?? model.details?.context_length,
   );
-  const agentEligibility = assessLlamaCppAgentEligibility({
-    runtimeContextWindow: runtimeContextLength,
-    trainedContextWindow: trainedContextLength,
-  });
+  const preference = preferences?.[modelName];
+  const contextWindow = runtimeContextLength
+    ? Math.min(runtimeContextLength, preference?.ctxSize ?? runtimeContextLength)
+    : undefined;
 
   return {
     id: modelName,
     name: modelName,
-    supportsImage: false,
-    ...(runtimeContextLength
+    ...(contextWindow
       ? {
-          contextWindow: runtimeContextLength,
-          contextTokens: runtimeContextLength,
-          maxTokens: deriveLlamaCppAgentMaxTokens(runtimeContextLength),
+          contextWindow,
+          maxTokens: Math.min(
+            preference?.maxTokens ?? deriveLlamaCppAgentMaxTokens(contextWindow),
+            contextWindow,
+          ),
         }
       : {}),
-    agentEligibility,
+    agentEligibility: assessLlamaCppAgentEligibility({
+      runtimeContextWindow: contextWindow,
+      trainedContextWindow: trainedContextLength,
+    }),
   };
+}
+
+export function buildLlamaCppRunningModelBindings(
+  models: readonly LlamaCppRunningModel[],
+  preferences: LlamaCppModelPreferences,
+): LlamaCppRunningModelBinding[] {
+  return models
+    .map(model => buildLlamaCppRunningModelBinding(model, preferences))
+    .filter((model): model is LlamaCppRunningModelBinding => model !== null);
 }
 
 export function deriveLlamaCppAgentMaxTokens(runtimeContextLength: number): number {

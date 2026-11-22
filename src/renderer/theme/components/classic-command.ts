@@ -79,7 +79,7 @@ export function classicCommand(): CommandAppearances {
     'command-separator': recipe({ base: { 'background-color': 'var(--border)' } }),
     'command-shortcut': recipe({ base: { ...muted, 'font-size': 'var(--zy-component-text-xs)' } }),
     'task-search-dialog': recipe({
-      base: { 'border-radius': 'var(--zy-style-radius-2xl)', padding: '0.25rem', gap: '0px' },
+      base: { 'border-radius': '16px', padding: '0.25rem', gap: '0px' },
     }),
   };
 }

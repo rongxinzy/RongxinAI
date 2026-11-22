@@ -8,7 +8,7 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { Input } from '@shared/components/ui/input';
 import { cn } from '@shared/lib/utils';
-import { Ellipsis, ListChecks, Loader, Pencil, Pin, Share, Trash2 } from 'lucide-react';
+import { Ellipsis, ListChecks, Loader, Pencil, Pin, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -29,7 +29,6 @@ interface AgentTaskRowProps {
   showBatchOption?: boolean;
   onSelect: () => void;
   onDelete: () => Promise<void>;
-  onShare: () => Promise<void>;
   onTogglePin: (pinned: boolean) => Promise<void>;
   onRename: (title: string) => Promise<void>;
   onToggleSelection: () => void;
@@ -44,7 +43,6 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
   showBatchOption = false,
   onSelect,
   onDelete,
-  onShare,
   onTogglePin,
   onRename,
   onToggleSelection,
@@ -237,9 +235,6 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => void onTogglePin(!task.pinned)}>
                   <Pin className="h-3.5 w-3.5" /> {pinLabel}
-                </DropdownMenuItem>
-                <DropdownMenuItem className="hidden" onClick={() => void onShare()}>
-                  <Share className="h-3.5 w-3.5" /> {i18nService.t('coworkShareSession')}
                 </DropdownMenuItem>
                 <DropdownMenuItem variant="destructive" onClick={() => setShowConfirmDelete(true)}>
                   <Trash2 className="h-3.5 w-3.5" /> {i18nService.t('deleteSession')}

@@ -162,11 +162,12 @@ class AgentService {
 
   async deleteAgent(id: string): Promise<boolean> {
     try {
-      const wasCurrentAgent = store.getState().agent.currentAgentId === id;
-      const deleted = await window.electron?.agents?.delete(id);
-      if (!deleted) {
+      const result = await window.electron?.agents?.delete(id);
+      if (!result?.success || !result.deleted) {
         return false;
       }
+      const wasCurrentAgent = store.getState().agent.currentAgentId === id;
+      coworkService.forgetSessions(result.deletedSessionIds ?? []);
       store.dispatch(removeAgent(id));
       store.dispatch(clearAgentSelectedModel(id));
       if (wasCurrentAgent) {

@@ -12,6 +12,7 @@ const isShortcutInputActive = () => {
 
 interface UseAppKeyboardShortcutsOptions {
   onNewChat: () => void;
+  onSearch?: () => void;
   onShowSettings: () => void;
 }
 
@@ -21,6 +22,7 @@ interface UseAppKeyboardShortcutsOptions {
  */
 export function useAppKeyboardShortcuts({
   onNewChat,
+  onSearch,
   onShowSettings,
 }: UseAppKeyboardShortcutsOptions): void {
   useEffect(() => {
@@ -41,7 +43,7 @@ export function useAppKeyboardShortcuts({
 
       if (matchesShortcut(event, activeShortcuts.search)) {
         event.preventDefault();
-        window.dispatchEvent(new CustomEvent('cowork:shortcut:search'));
+        onSearch?.();
         return;
       }
 
@@ -53,5 +55,5 @@ export function useAppKeyboardShortcuts({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onNewChat, onShowSettings]);
+  }, [onNewChat, onSearch, onShowSettings]);
 }

@@ -16,12 +16,13 @@ import {
 } from '../../store/selectors/coworkSelectors';
 import {
   clearLoadingSessionId,
+  requestPromptFocus,
   setCurrentSession,
   setLoadingSessionId,
 } from '../../store/slices/coworkSlice';
 import type { CoworkSessionSummary } from '../../types/cowork';
-import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from '../cowork/constants';
 import CreateProjectDialog from '../cowork/CreateProjectDialog';
+import { PromptDraftKey } from '../cowork/promptInput/constants';
 import { isProjectWorkspaceActive, isSectionWorkspaceActive } from './activeWorkspace';
 import EditProjectDialog from './EditProjectDialog';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
@@ -123,9 +124,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
     await workspaceService.selectWorkspace(workspace.id);
     coworkService.clearSession();
     onShowCowork();
-    window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: false } }));
-    }, 0);
+    dispatch(requestPromptFocus({ draftKey: PromptDraftKey.Home, clear: false }));
   };
 
   // 点击左侧项目：右侧切换到该项目工作区；再点当前项目则折叠/展开
@@ -143,9 +142,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
     coworkService.clearSession();
     onShowCowork();
     onDismissSearch?.();
-    window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: false } }));
-    }, 0);
+    dispatch(requestPromptFocus({ draftKey: PromptDraftKey.Home, clear: false }));
   };
 
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
@@ -221,17 +218,6 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   const handleRenameTask = async (task: AgentSidebarTaskNode, title: string) => {
     const renamedTitle = await coworkService.renameSession(task.id, title);
     if (renamedTitle) patchTaskPreview(task.id, { title: renamedTitle });
-  };
-
-  const handleShareTask = async (task: AgentSidebarTaskNode) => {
-    await handleSelectTask(task);
-    window.setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent<CoworkOpenShareOptionsEventDetail>(CoworkUiEvent.OpenShareOptions, {
-          detail: { sessionId: task.id },
-        }),
-      );
-    }, 0);
   };
 
   return (
@@ -311,7 +297,6 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
               onCollapseTasks={collapseTasks}
               onSelectTask={task => void handleSelectTask(task)}
               onDeleteTask={handleDeleteTask}
-              onShareTask={handleShareTask}
               onToggleTaskPin={handleToggleTaskPin}
               onRenameTask={handleRenameTask}
               onToggleSelection={onToggleSelection}
@@ -350,7 +335,6 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
                   onCollapseTasks={collapseScheduledTasks}
                   onSelectTask={task => void handleSelectTask(task)}
                   onDeleteTask={handleDeleteTask}
-                  onShareTask={handleShareTask}
                   onToggleTaskPin={handleToggleTaskPin}
                   onRenameTask={handleRenameTask}
                   onToggleSelection={onToggleSelection}

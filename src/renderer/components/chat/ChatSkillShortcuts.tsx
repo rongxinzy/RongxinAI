@@ -6,9 +6,10 @@ import { i18nService } from '../../services/i18n';
 import { showAppToast } from '../../services/toastNotification';
 import { RootState } from '../../store';
 import { selectIsStreaming } from '../../store/selectors/coworkSelectors';
-import { clearCurrentSession } from '../../store/slices/coworkSlice';
+import { clearCurrentSession, requestPromptFocus } from '../../store/slices/coworkSlice';
 import { selectAction } from '../../store/slices/quickActionSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
+import { PromptDraftKey } from '../cowork/promptInput/constants';
 import {
   CHAT_SKILL_SHORTCUTS,
   ChatSkillShortcut,
@@ -49,10 +50,7 @@ const ChatSkillShortcuts: React.FC = () => {
       selectAction(quickActions.some(action => action.id === quickActionId) ? quickActionId : null),
     );
     dispatch(clearCurrentSession());
-    window.setTimeout(() => {
-      // 2026/09/16 lixiang  切换快捷 skill 只聚焦输入框，保留已输入的 prompt，不清空
-      window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: false } }));
-    }, 0);
+    dispatch(requestPromptFocus({ draftKey: PromptDraftKey.Home, clear: false }));
   };
 
   return (

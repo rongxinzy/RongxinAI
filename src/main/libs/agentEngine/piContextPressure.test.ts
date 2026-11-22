@@ -6,7 +6,7 @@ import path from 'node:path';
 import { app } from 'electron';
 import { expect, test, vi } from 'vitest';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
-import { installTestMagpie } from '../../../../tests/helpers/installTestMagpie';
+import { createTestMagpie } from '../../../../tests/helpers/createTestMagpie';
 import { CoworkExecutionMode } from '../../../shared/cowork/constants';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { CoworkStore } from '../../coworkStore';
@@ -117,11 +117,11 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
       });
     });
     let store: SqliteStore | undefined;
-    let gateway: ReturnType<typeof installTestMagpie> | undefined;
-    const adapter = new PiRuntimeAdapter();
+    let gateway: ReturnType<typeof createTestMagpie> | undefined;
+    let adapter: PiRuntimeAdapter | undefined;
     try {
       await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
-      gateway = installTestMagpie({
+      gateway = createTestMagpie({
         gatewayUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
         defaultModelId: modelId,
         acceptUnknownModels: false,
@@ -146,10 +146,16 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
         'work',
         sessionId,
       );
-      adapter.setCoworkStore(cowork);
-      adapter.setWorkbenchTaskService(new WorkbenchTaskService(db));
-      adapter.setPiSessionStoreRoot(root);
-      const manager = SessionManager.create(root, piSessionDirFor(root, sessionId));
+      adapter = new PiRuntimeAdapter({
+        modelService: gateway.modelService,
+        coworkStore: cowork,
+        workbenchTaskService: new WorkbenchTaskService(db),
+        piSessionStoreRoot: root,
+      });
+      const manager = SessionManager.create(
+        root,
+        piSessionDirFor(root, sessionId, cowork.getPiHistoryKey(sessionId)),
+      );
       for (let i = 0; i < 18; i++) {
         manager.appendMessage({
           role: 'user',
@@ -181,7 +187,7 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
         complete++;
       });
       adapter.on('permissionRequest', (_id, request) => {
-        adapter.respondToPermission(request.requestId, { behavior: 'allow' });
+        adapter!.respondToPermission(request.requestId, { behavior: 'allow' });
       });
       vi.useFakeTimers({ toFake: ['Date'] });
       await adapter.startSession(
@@ -216,10 +222,9 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
       }
     } finally {
       vi.useRealTimers();
-      await adapter.stopAllSessions();
+      await adapter?.stopAllSessions();
       // The UI usage projection is deferred to a zero-delay timer.
       await new Promise<void>(resolve => setTimeout(resolve, 0));
-      gateway?.dispose();
       store?.close();
       server.closeAllConnections();
       await new Promise<void>(resolve => server.close(() => resolve()));

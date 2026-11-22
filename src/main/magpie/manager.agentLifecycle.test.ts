@@ -168,6 +168,57 @@ describe('Magpie agent lifecycle', () => {
     }
   });
 
+  it('terminates the gateway while draining startup reapply without a late host write', async () => {
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const { manager, root, child, fetcher } = await setup(undefined, undefined, undefined, {
+      agents: [
+        { id: 'opencode', name: 'OpenCode', wired: true },
+        { id: 'codex', name: 'Codex', wired: true },
+      ],
+      onReapply: async agentId => {
+        if (agentId === 'opencode') {
+          entered.resolve();
+          await release.promise;
+        }
+      },
+    });
+    const userFile = path.join(root, '.config', 'opencode', 'opencode.json');
+    const privateFile = path.join(root, 'config', 'opencode', 'opencode.json');
+    const original = '{"provider":{"magpie":{"baseURL":"http://127.0.0.1:1111/v1"}}}\n';
+    try {
+      await fs.mkdir(path.dirname(userFile), { recursive: true });
+      await fs.mkdir(path.dirname(privateFile), { recursive: true });
+      await fs.writeFile(userFile, original);
+      await fs.writeFile(privateFile, original.replace('1111', '2222'));
+      await manager.start();
+      await entered.promise;
+
+      const controller = new AbortController();
+      const restoration = manager.disconnectAllAgents(controller.signal);
+      controller.abort();
+      const finished = vi.fn();
+      const stop = manager.shutdown().then(finished);
+      await vi.waitFor(() => expect(child.kill).toHaveBeenCalled());
+      expect(finished).not.toHaveBeenCalled();
+
+      release.resolve();
+      await expect(restoration).rejects.toMatchObject({ name: 'AbortError' });
+      await stop;
+      expect(await fs.readFile(userFile, 'utf8')).toBe(original);
+      expect(fetcher.mock.calls.some(([url]) => url.endsWith('/api/agents/reapply/codex'))).toBe(
+        false,
+      );
+      expect(fetcher.mock.calls.some(([url]) => url.includes('/api/agents/disconnect/'))).toBe(
+        false,
+      );
+    } finally {
+      release.resolve();
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('does not call ensureRunning for disconnectAll when the service is stopped', async () => {
     const { manager, root } = await setup();
     try {
@@ -209,6 +260,63 @@ describe('Magpie agent lifecycle', () => {
       expect(fetcher.mock.calls.some(([url]) => url.includes('/api/agents/disconnect/'))).toBe(
         false,
       );
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves completed CLI restoration when cancellation interrupts the next disconnect', async () => {
+    const agents = [
+      { id: 'opencode', name: 'OpenCode', wired: true },
+      { id: 'codex', name: 'Codex', wired: true },
+    ];
+    const { manager, root, fetcher } = await setup(undefined, undefined, undefined, { agents });
+    const opencode = path.join(root, '.config', 'opencode', 'opencode.json');
+    const privateConfig = path.join(root, 'config', 'opencode', 'opencode.json');
+    const codex = path.join(root, '.codex', 'config.toml');
+    const original = { provider: { mine: { name: 'Mine' } } };
+    const codexConfig = '[model_providers.magpie]\nname = "Magpie"\n';
+    const controller = new AbortController();
+    const cancel = new Error('App shutdown deadline');
+    let pendingRequest: AbortSignal | undefined;
+    try {
+      await manager.start();
+      await fs.mkdir(path.dirname(opencode), { recursive: true });
+      await fs.mkdir(path.dirname(privateConfig), { recursive: true });
+      await fs.mkdir(path.dirname(codex), { recursive: true });
+      await fs.writeFile(opencode, JSON.stringify(original));
+      await fs.writeFile(
+        privateConfig,
+        JSON.stringify({ provider: { magpie: { name: 'Magpie' } } }),
+      );
+      await fs.writeFile(codex, codexConfig);
+      await mergeOpenCodeConfigToUser(root, root);
+
+      const prior = fetcher.getMockImplementation()!;
+      fetcher.mockImplementation(async (url, init) => {
+        if (url.endsWith('/api/agents/disconnect/opencode')) {
+          agents[0].wired = false;
+          return Response.json({ agents });
+        }
+        if (url.endsWith('/api/agents/disconnect/codex')) {
+          pendingRequest = init?.signal ?? undefined;
+          return new Promise((_, reject) => {
+            pendingRequest?.addEventListener('abort', () => reject(pendingRequest?.reason), {
+              once: true,
+            });
+          });
+        }
+        return prior(url, init);
+      });
+
+      const disconnect = manager.disconnectAllAgents(controller.signal);
+      await vi.waitFor(() => expect(pendingRequest).toBeDefined());
+      controller.abort(cancel);
+      expect(pendingRequest?.aborted).toBe(true);
+      await expect(disconnect).rejects.toBe(cancel);
+      expect(JSON.parse(await fs.readFile(opencode, 'utf8'))).toEqual(original);
+      expect(await fs.readFile(codex, 'utf8')).toBe(codexConfig);
     } finally {
       await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });

@@ -2,7 +2,6 @@ export const WorkspaceIpc = {
   List: 'cowork:workspace:list',
   Create: 'cowork:workspace:create',
   Ensure: 'cowork:workspace:ensure',
-  Rename: 'cowork:workspace:rename',
   Update: 'cowork:workspace:update',
   Delete: 'cowork:workspace:delete',
 } as const;

@@ -4,6 +4,8 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { ManagedProviderAccessMode } from '../shared/managedProviders';
 import { getBranding } from '../shared/branding';
+import type { CodingWorkspaceSummary } from '../shared/codingAgent';
+import { buildCodingSessionDraftSelection } from './components/coding/codingSessionDraft';
 import { shouldSkipPreviewBoot } from './browserMock/previewQuery';
 import { InitErrorView } from './app/InitErrorView';
 import { MainViewCanvas } from './app/MainViewCanvas';
@@ -23,7 +25,11 @@ import {
   isAskUserQuestionPermission,
 } from './components/cowork/askUserQuestion';
 import type { ExpertTab } from './components/expert/ExpertView';
-import type { CodingSidebarSelection } from './components/coding/CodingWorkspaceSidebar';
+import { PromptDraftKey } from './components/cowork/promptInput/constants';
+import type {
+  CodingSidebarSelection,
+  CodingWorkspaceSidebarHandle,
+} from './components/coding/CodingWorkspaceSidebar';
 import type { McpRegistryId } from './components/mcp/constants';
 import type { SettingsOpenOptions } from './components/settings/types';
 import { prefetchFeatureView } from './components/featureViewPrefetch';
@@ -48,9 +54,10 @@ import { workspaceService } from './services/workspace';
 import { RootState, store } from './store';
 import {
   selectCurrentSessionId,
+  selectDisplayedSessionId,
   selectPendingPermissionForSession,
 } from './store/selectors/coworkSelectors';
-import { setDraftPrompt } from './store/slices/coworkSlice';
+import { requestPromptFocus, setDraftPrompt } from './store/slices/coworkSlice';
 import { clearSelection } from './store/slices/quickActionSlice';
 import { clearActiveSkills, setActiveSkillIds } from './store/slices/skillSlice';
 import { WorkMode } from './store/workMode/constants';
@@ -74,11 +81,15 @@ const App: React.FC = () => {
   const toast = useAppToastDisplay();
   const [, forceLanguageRefresh] = useState(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [codingSelection, setCodingSelection] = useState<CodingSidebarSelection>({
-    workspaceId: null,
-    workspaceRoot: '',
-    laneId: null,
-    draft: null,
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [codingAgentManagerOpen, setCodingAgentManagerOpen] = useState(false);
+  const codingWorkspaceSidebarRef = useRef<CodingWorkspaceSidebarHandle>(null);
+  const [{ selection: codingSelection, setupWorkspace }, setCodingNavigation] = useState<{
+    selection: CodingSidebarSelection;
+    setupWorkspace: CodingWorkspaceSummary | null;
+  }>({
+    selection: { workspaceId: null, workspaceRoot: '', laneId: null, draft: null },
+    setupWorkspace: null,
   });
   const {
     isInitialized,
@@ -280,6 +291,54 @@ const App: React.FC = () => {
     setMainView(MainView.Coding);
   }, []);
 
+  const changeCodingSelection = useCallback(
+    (update: React.SetStateAction<CodingSidebarSelection>) => {
+      setCodingNavigation(current => {
+        const selection = typeof update === 'function' ? update(current.selection) : update;
+        const previous = current.selection;
+        const changed =
+          selection.workspaceRoot !== previous.workspaceRoot ||
+          selection.laneId !== previous.laneId ||
+          selection.draft?.id !== previous.draft?.id;
+        return { selection, setupWorkspace: changed ? null : current.setupWorkspace };
+      });
+    },
+    [],
+  );
+
+  const closeCodingSessionSetup = useCallback(() => {
+    setCodingNavigation(current =>
+      current.setupWorkspace ? { ...current, setupWorkspace: null } : current,
+    );
+  }, []);
+
+  const openCodingSession = useCallback((workspace: CodingWorkspaceSummary, profileId?: string) => {
+    if (profileId) {
+      setCodingNavigation({
+        selection: buildCodingSessionDraftSelection(workspace, profileId),
+        setupWorkspace: null,
+      });
+    } else {
+      setCodingNavigation(current => ({ ...current, setupWorkspace: workspace }));
+    }
+  }, []);
+
+  const handleOpenCodingAgentManager = useCallback(() => {
+    setCodingAgentManagerOpen(true);
+  }, []);
+
+  const handleOpenCreateCodingWorkspace = useCallback(() => {
+    codingWorkspaceSidebarRef.current?.openCreateWorkspace();
+  }, []);
+
+  useEffect(() => {
+    if (mainView !== MainView.Coding) setCodingAgentManagerOpen(false);
+  }, [mainView]);
+
+  useEffect(() => {
+    if (mainView !== MainView.Coding && setupWorkspace) closeCodingSessionSetup();
+  }, [closeCodingSessionSetup, mainView, setupWorkspace]);
+
   const handleShowTodo = useCallback(() => {
     setMainView(MainView.Todo);
   }, []);
@@ -291,24 +350,21 @@ const App: React.FC = () => {
   const openNewConversation = useCallback(
     (options?: { clearExperts?: boolean }) => {
       // Only clear when already on home (no session) — preserve __home__ draft when returning from a session
-      const shouldClearInput = mainView === MainView.Cowork && !currentSessionId;
+      const shouldClearInput =
+        mainView === MainView.Cowork && !selectDisplayedSessionId(store.getState());
       if (currentWorkspaceIsHidden) void workspaceService.clearWorkspaceSelection();
       coworkService.clearSession();
       dispatch(clearSelection());
       setMainView(MainView.Cowork);
-      window.setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent('cowork:focus-input', {
-            detail: {
-              clear: shouldClearInput,
-              // New-chat entry clears the prompt expert chip; expert-page entry omits this so #100 can seed.
-              clearExperts: options?.clearExperts === true,
-            },
-          }),
-        );
-      }, 0);
+      dispatch(
+        requestPromptFocus({
+          draftKey: PromptDraftKey.Home,
+          clear: shouldClearInput,
+          clearExperts: options?.clearExperts === true,
+        }),
+      );
     },
-    [currentSessionId, currentWorkspaceIsHidden, dispatch, mainView],
+    [currentWorkspaceIsHidden, dispatch, mainView],
   );
 
   const handleNewChat = useCallback(() => {
@@ -319,7 +375,7 @@ const App: React.FC = () => {
   const handleTryMcp = useCallback(
     (prompt?: string) => {
       if (prompt?.trim()) {
-        dispatch(setDraftPrompt({ sessionId: '__home__', draft: prompt }));
+        dispatch(setDraftPrompt({ sessionId: PromptDraftKey.Home, draft: prompt }));
       }
       dispatch(setWorkMode(WorkMode.Work));
       handleNewChat();
@@ -328,7 +384,12 @@ const App: React.FC = () => {
   );
 
   const handleCreateSkillByChat = useCallback(() => {
-    dispatch(setDraftPrompt({ sessionId: '__home__', draft: i18nService.t('skillCreatorPrompt') }));
+    dispatch(
+      setDraftPrompt({
+        sessionId: PromptDraftKey.Home,
+        draft: i18nService.t('skillCreatorPrompt'),
+      }),
+    );
     handleNewChat();
   }, [dispatch, handleNewChat]);
 
@@ -388,24 +449,21 @@ const App: React.FC = () => {
     void refreshAvailableModels();
   }, [mainView, refreshAvailableModels]);
 
-  useAppKeyboardShortcuts({ onNewChat: handleNewChat, onShowSettings: handleShowSettings });
+  const handleOpenSearch = useCallback(() => setSearchOpen(true), []);
+  useAppKeyboardShortcuts({
+    onNewChat: handleNewChat,
+    onSearch: isInitialized && !initError && !bootScreenVisible ? handleOpenSearch : undefined,
+    onShowSettings: handleShowSettings,
+  });
 
-  // Listen for ask-ai events: close settings, navigate to cowork, pre-fill input
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const text = (e as CustomEvent<string>).detail;
+  const handleAskAi = useCallback(
+    (text: string) => {
+      const draftKey = selectDisplayedSessionId(store.getState()) ?? PromptDraftKey.Home;
       setMainView(MainView.Cowork);
-      window.setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent('cowork:focus-input', {
-            detail: { text },
-          }),
-        );
-      }, 50);
-    };
-    window.addEventListener('app:ask-ai', handler);
-    return () => window.removeEventListener('app:ask-ai', handler);
-  }, []);
+      dispatch(requestPromptFocus({ draftKey, text }));
+    },
+    [dispatch],
+  );
 
   useEffect(() => {
     const handler = () => {
@@ -470,6 +528,7 @@ const App: React.FC = () => {
         isSettingsOpen={initErrorSettingsOpen}
         onOpenSettings={() => setInitErrorSettingsOpen(true)}
         onCloseSettings={() => setInitErrorSettingsOpen(false)}
+        onAskAi={handleAskAi}
         settingsOptions={settingsOptions}
         enterpriseConfig={enterpriseConfig}
         managedModelsOnly={managedModelsOnly}
@@ -500,8 +559,13 @@ const App: React.FC = () => {
             onShowCoding={handleShowCoding}
             onShowTodo={handleShowTodo}
             codingSelection={codingSelection}
-            onCodingSelectionChange={setCodingSelection}
+            onCodingSelectionChange={changeCodingSelection}
+            onCreateCodingSession={openCodingSession}
+            onOpenCodingAgentManager={handleOpenCodingAgentManager}
+            codingWorkspaceSidebarRef={codingWorkspaceSidebarRef}
             onNewChat={handleNewChat}
+            searchOpen={searchOpen}
+            onSearchOpenChange={setSearchOpen}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={handleToggleSidebar}
             updateEntry={updateEntry}
@@ -517,6 +581,7 @@ const App: React.FC = () => {
             onNewChat={handleNewChat}
             settingsOptions={settingsOptions}
             onLeaveSettings={handleLeaveSettings}
+            onAskAi={handleAskAi}
             onRequestAppSettings={handleShowSettings}
             enterpriseConfig={enterpriseConfig}
             managedModelsOnly={managedModelsOnly}
@@ -533,7 +598,12 @@ const App: React.FC = () => {
             mcpOpenMarketplace={mcpOpenMarketplace}
             onShowScheduledTasks={handleShowScheduledTasks}
             codingSelection={codingSelection}
-            onCodingSelectionChange={setCodingSelection}
+            onCodingSelectionChange={changeCodingSelection}
+            codingSessionSetupWorkspace={setupWorkspace}
+            onCloseCodingSessionSetup={closeCodingSessionSetup}
+            codingAgentManagerOpen={codingAgentManagerOpen}
+            onCodingAgentManagerOpenChange={setCodingAgentManagerOpen}
+            onOpenCreateCodingWorkspace={handleOpenCreateCodingWorkspace}
             hasMountedLocalInference={hasMountedLocalInference}
             isLocalInferenceDormant={isLocalInferenceDormant}
             localInferenceRefreshRequestId={localInferenceRefreshRequestId}

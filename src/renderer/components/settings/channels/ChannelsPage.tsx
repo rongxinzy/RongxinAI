@@ -39,7 +39,7 @@ const CHANNEL_ORDER: readonly ChannelKey[] = [
   'email',
 ];
 
-export function ChannelsPage() {
+export function ChannelsPage({ onAskAi }: { onAskAi: (prompt: string) => void }) {
   const dispatch = useDispatch();
   const { config, status, isLoading } = useSelector((state: RootState) => state.im);
   const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
@@ -278,7 +278,7 @@ export function ChannelsPage() {
                 connectivityResults={connectivityResults}
               />
             )}
-            {activeChannel === 'email' && <EmailSettingsPage />}
+            {activeChannel === 'email' && <EmailSettingsPage onAskAi={onAskAi} />}
           </div>
         </SheetContent>
       </Sheet>

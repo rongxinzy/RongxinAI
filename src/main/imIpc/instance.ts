@@ -8,7 +8,7 @@ import type {
   WecomInstanceConfig,
 } from '../im';
 import { handleIpcContract } from '../ipc/handleIpcContract';
-import { feishuInstallContract, imInstanceContract } from '../../shared/ipc/imContract';
+import { imInstanceContract } from '../../shared/ipc/imContract';
 
 import { scheduleImConfigSync } from './gateway';
 
@@ -347,17 +347,6 @@ export const registerImInstanceIpc = (deps: ImInstanceIpcDeps): void => {
           success: false,
           error: error instanceof Error ? error.message : 'Failed to set Discord instance config',
         };
-      }
-    },
-  });
-
-  // feishu:install:verify lives in this registration unit as well.
-  handleIpcContract(feishuInstallContract, {
-    verify: async (_event, { appId, appSecret }) => {
-      try {
-        return await deps.getIMGatewayManager().verifyFeishuCredentials(appId, appSecret);
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : '验证失败' };
       }
     },
   });

@@ -8,9 +8,9 @@ const source = readFileSync(
   'utf8',
 );
 
-test('keeps the manager dialog with its sidebar event hook and removes the toolbar entry', () => {
-  expect(source).toContain('useCodingAgentManager()');
+test('renders the controlled manager dialog without duplicating the sidebar icon', () => {
   expect(source).toContain('<CodingAgentManager');
+  expect(source).toContain('onOpenChange={onAgentManagerOpenChange}');
   expect(source).not.toContain('<Settings2 />');
 });
 

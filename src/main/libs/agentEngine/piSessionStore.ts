@@ -1,25 +1,28 @@
 /**
  * File-backed Pi session persistence.
  *
- * One Pi session directory per Cowork session under
- * `<root>/pi-sessions/<coworkSessionId>/`. A persisted SessionManager keeps
+ * One Pi session directory per SQLite session lifetime under
+ * `<root>/pi-sessions/`. A persisted SessionManager keeps
  * the structured transcript (tool calls/results, images, thinking) in Pi's
  * own JSONL, so a rebuild — app restart, idle eviction, model/skills/MCP
  * topology recreation — reopens that file and continues with structured
  * history instead of flattening the SQLite transcript into one text prompt.
  *
  * The SQLite transcript stays the UI source of truth; the JSONL exists only
- * to restore the model context. Any mutation that makes the JSONL diverge
- * from the transcript (session delete, transcript rewrite) must invalidate
- * the directory (`invalidatePiSessionDir`) so the next turn falls back to
- * the one-shot text restore and starts a fresh file.
+ * to restore the model context. A new SQLite row has its own history key,
+ * so it cannot reopen files left behind by failed deletion cleanup. SQLite
+ * recovery quarantines the native history separately.
  */
 
+import { createHash } from 'node:crypto';
 import fs from 'fs';
 import path from 'path';
+import { removeSessionDirectory } from '../../removeSessionDirectory';
 
 /** Directory under the injected root holding every session's Pi JSONL. */
-const PI_SESSIONS_ROOT_DIR = 'pi-sessions';
+export const PI_SESSIONS_ROOT_DIR = 'pi-sessions';
+export const PI_SESSION_GENERATIONS_DIR = '.by-generation';
+export const PI_COMPANION_SESSIONS_ROOT_DIR = 'companion-chat';
 
 /**
  * Filesystem-safe directory name for one Cowork session. Session ids are
@@ -32,32 +35,19 @@ const sanitizeSessionDirName = (coworkSessionId: string): string => {
   return trimmed || 'session';
 };
 
-/** Computes a Cowork session's Pi session directory. */
-export const piSessionDirFor = (rootDir: string, coworkSessionId: string): string =>
-  path.join(rootDir, PI_SESSIONS_ROOT_DIR, sanitizeSessionDirName(coworkSessionId));
-
-/** Lists the `.jsonl` session files in a directory (empty when unreadable). */
-const listSessionFiles = (sessionDir: string): string[] => {
-  try {
-    return fs
-      .readdirSync(sessionDir)
-      .filter(entry => entry.endsWith('.jsonl'))
-      .map(entry => path.join(sessionDir, entry))
-      .filter(file => fs.statSync(file).isFile());
-  } catch {
-    return [];
-  }
-};
-
-/** True when the directory holds at least one Pi session file. */
-export const hasPersistedPiSession = (rootDir: string, coworkSessionId: string): boolean =>
-  listSessionFiles(piSessionDirFor(rootDir, coworkSessionId)).length > 0;
-
-export interface PiSessionStoreFileResolution {
-  /** Directory passed to the SessionManager; drives where new files land. */
-  sessionDir: string;
-  /** A `.jsonl` file to reopen, or null when the session must start fresh. */
-  sessionFile: string | null;
+/** Existing rows without a history key retain their original directories. */
+export function piSessionDirFor(
+  rootDir: string,
+  coworkSessionId: string,
+  piHistoryKey?: string | null,
+): string {
+  const root = path.join(rootDir, PI_SESSIONS_ROOT_DIR);
+  if (piHistoryKey == null) return path.join(root, sanitizeSessionDirName(coworkSessionId));
+  return path.join(
+    root,
+    PI_SESSION_GENERATIONS_DIR,
+    createHash('sha256').update(piHistoryKey).digest('hex'),
+  );
 }
 
 /**
@@ -67,32 +57,41 @@ export interface PiSessionStoreFileResolution {
  * in place. Multiple files (manual copy, crashed rewrite) resolve to the most
  * recently modified one, which matches `continueRecent`'s selection rule.
  */
-export const resolvePiSessionStoreFile = (
+export async function resolvePiSessionStoreFile(
   rootDir: string,
   coworkSessionId: string,
-): PiSessionStoreFileResolution => {
-  const sessionDir = piSessionDirFor(rootDir, coworkSessionId);
-  const files = listSessionFiles(sessionDir);
-  if (files.length === 0) return { sessionDir, sessionFile: null };
-  const newest = files.reduce((left, right) =>
-    fs.statSync(left).mtimeMs >= fs.statSync(right).mtimeMs ? left : right,
-  );
-  return { sessionDir, sessionFile: newest };
-};
+  signal?: AbortSignal,
+  piHistoryKey?: string | null,
+): Promise<{ sessionDir: string; sessionFile: string | null }> {
+  signal?.throwIfAborted();
+  const sessionDir = piSessionDirFor(rootDir, coworkSessionId, piHistoryKey);
+  const entries = await fs.promises
+    .readdir(sessionDir)
+    .catch((error: NodeJS.ErrnoException): string[] => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    });
+  let sessionFile: string | null = null;
+  let newest = -Infinity;
+  for (const entry of entries) {
+    signal?.throwIfAborted();
+    if (!entry.endsWith('.jsonl')) continue;
+    const candidate = path.join(sessionDir, entry);
+    const info = await fs.promises.stat(candidate);
+    if (info.isFile() && info.mtimeMs > newest) {
+      sessionFile = candidate;
+      newest = info.mtimeMs;
+    }
+  }
+  signal?.throwIfAborted();
+  return { sessionDir, sessionFile };
+}
 
 /** The static SessionManager surface this store drives. */
-export type PiSessionManagerModule = {
+type PiSessionManagerModule = {
   create(cwd: string, sessionDir?: string, options?: { id?: string }): unknown;
   open(sessionFile: string, sessionDir?: string, cwdOverride?: string): unknown;
 };
-
-export interface PersistentPiSessionManager {
-  manager: unknown;
-  /** True when an existing JSONL was reopened and already carries history. */
-  reusedFile: boolean;
-  /** Directory the SessionManager writes into. */
-  sessionDir: string;
-}
 
 /**
  * Builds the persistent SessionManager the adapter hands to Pi.
@@ -103,37 +102,45 @@ export interface PersistentPiSessionManager {
  * `cwdOverride` keeps a reopened session in the workspace this rebuild runs
  * under, not the one recorded in the file header.
  */
-export const openPersistentPiSessionManager = (
+export async function openPersistentPiSessionManager(
   SessionManager: PiSessionManagerModule,
   rootDir: string,
   coworkSessionId: string,
   workspaceRoot: string,
-): PersistentPiSessionManager => {
-  const { sessionDir, sessionFile } = resolvePiSessionStoreFile(rootDir, coworkSessionId);
+  signal: AbortSignal,
+  piHistoryKey?: string | null,
+): Promise<{ manager: unknown; reusedFile: boolean }> {
+  const { sessionDir, sessionFile } = await resolvePiSessionStoreFile(
+    rootDir,
+    coworkSessionId,
+    signal,
+    piHistoryKey,
+  );
+  signal.throwIfAborted();
   if (sessionFile) {
     return {
       manager: SessionManager.open(sessionFile, sessionDir, workspaceRoot),
       reusedFile: true,
-      sessionDir,
     };
   }
   return {
     manager: SessionManager.create(workspaceRoot, sessionDir),
     reusedFile: false,
-    sessionDir,
   };
-};
+}
 
 /**
- * Removes a Cowork session's Pi session directory so the next turn cannot
- * restore from a JSONL that no longer matches the SQLite transcript.
- * Missing directories are a no-op; failures leave the file in place and the
- * next turn still reopens it (worst case: stale context, never a crash).
+ * Best-effort filesystem cleanup after the SQLite session is deleted.
+ * The directory may remain on disk after an error, under its old history key.
  */
-export const invalidatePiSessionDir = (rootDir: string, coworkSessionId: string): void => {
-  const sessionDir = piSessionDirFor(rootDir, coworkSessionId);
+export const invalidatePiSessionDir = async (
+  rootDir: string,
+  coworkSessionId: string,
+  piHistoryKey?: string | null,
+): Promise<void> => {
+  const sessionDir = piSessionDirFor(rootDir, coworkSessionId, piHistoryKey);
   try {
-    fs.rmSync(sessionDir, { recursive: true, force: true });
+    await removeSessionDirectory(sessionDir);
   } catch (error) {
     console.error(
       `[PiSessionStore] failed to invalidate the session directory for ${coworkSessionId}:`,

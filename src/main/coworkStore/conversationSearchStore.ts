@@ -1,21 +1,21 @@
-// Conversation search over cowork messages/sessions for the CoworkStore class chain.
-// Split from src/main/coworkStore.ts (issue #1069).
+import type Database from 'better-sqlite3';
+
 import { extractConversationSearchTerms, parseTimeToMs, truncate } from './helpers';
-import { CoworkConfigStore } from './configStore';
 import type { CoworkConversationSearchRecord } from './types';
 
-export class CoworkConversationSearchStore extends CoworkConfigStore {
+export class CoworkConversationSearchStore {
+  constructor(private readonly db: Database.Database) {}
+
   private getLatestMessageByType(sessionId: string, type: 'user' | 'assistant'): string {
-    const row = this.getOne<{ content: string }>(
-      `
+    const row = this.db
+      .prepare<[string, string], { content: string }>(`
       SELECT content
       FROM cowork_messages
       WHERE session_id = ? AND type = ?
       ORDER BY created_at DESC, ROWID DESC
       LIMIT 1
-    `,
-      [sessionId, type],
-    );
+    `)
+      .get(sessionId, type);
     return truncate((row?.content || '').replace(/\s+/g, ' ').trim(), 280);
   }
 
@@ -45,24 +45,26 @@ export class CoworkConversationSearchStore extends CoworkConfigStore {
       params.push(afterMs);
     }
 
-    const rows = this.getAll<{
-      session_id: string;
-      title: string;
-      updated_at: number;
-      type: string;
-      content: string;
-      created_at: number;
-    }>(
-      `
+    const rows = this.db
+      .prepare<
+        (string | number)[],
+        {
+          session_id: string;
+          title: string;
+          updated_at: number;
+          type: string;
+          content: string;
+          created_at: number;
+        }
+      >(`
       SELECT m.session_id, s.title, s.updated_at, m.type, m.content, m.created_at
       FROM cowork_messages m
       INNER JOIN cowork_sessions s ON s.id = m.session_id
       WHERE ${clauses.join(' AND ')}
       ORDER BY m.created_at DESC
       LIMIT ?
-    `,
-      [...params, maxResults * 40],
-    );
+    `)
+      .all(...params, maxResults * 40);
 
     const bySession = new Map<string, CoworkConversationSearchRecord>();
     for (const row of rows) {
@@ -133,20 +135,15 @@ export class CoworkConversationSearchStore extends CoworkConfigStore {
 
     const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
-    const rows = this.getAll<{
-      id: string;
-      title: string;
-      updated_at: number;
-    }>(
-      `
+    const rows = this.db
+      .prepare<(string | number)[], { id: string; title: string; updated_at: number }>(`
       SELECT id, title, updated_at
       FROM cowork_sessions
       ${whereClause}
       ORDER BY updated_at ${sortOrder.toUpperCase()}
       LIMIT ?
-    `,
-      [...params, n],
-    );
+    `)
+      .all(...params, n);
 
     return rows.map(row => ({
       sessionId: row.id,

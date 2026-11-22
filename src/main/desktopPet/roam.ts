@@ -1,4 +1,5 @@
 import type { ThrowBounds } from '../../shared/desktopPet/physics';
+import type { DesktopPetWalkFrame } from '../../shared/desktopPet/contract';
 import { XIAOYUAN_WALK_SECONDS } from '../../shared/desktopPet/motionCatalog';
 
 export const DesktopPetRoamPhase = {
@@ -63,20 +64,13 @@ export class DesktopPetRoam {
     this.reset(now);
   }
 
-  observeMediaFrame(frame: unknown, now: number): void {
+  observeMediaFrame(frame: DesktopPetWalkFrame, now: number): void {
     const walk = this.mediaWalk;
     if (
       !walk ||
       this.expired(walk, now) ||
-      !frame ||
-      typeof frame !== 'object' ||
-      !('walkId' in frame) ||
       frame.walkId !== walk.id ||
-      !('mediaTime' in frame) ||
-      typeof frame.mediaTime !== 'number' ||
-      !Number.isFinite(frame.mediaTime) ||
-      frame.mediaTime < 0 ||
-      frame.mediaTime > XIAOYUAN_WALK_SECONDS ||
+      !(frame.mediaTime >= 0 && frame.mediaTime <= XIAOYUAN_WALK_SECONDS) ||
       frame.mediaTime <= (walk.frame?.mediaTime ?? -1)
     )
       return;

@@ -33,67 +33,17 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.0'
-      - name: Restore llama.cpp runtime
-        id: llama-runtime
-        uses: ./.github/actions/cache-llamacpp-runtime
-        with:
-          mode: restore
-      - name: Restore packaging caches
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.bun/install/cache
-            ~/.npm
-            ~/.cache/electron
-            ~/.cache/electron-builder
-            vendor/engram-runtime
-            vendor/channel-runtime
-          key: copy-v2-linux-install-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
-          restore-keys: |
-            copy-v2-linux-install-node24-bun1.4.0-
-      - name: Install Electron and virtual desktop dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
-            libxss1 libxtst6 libuuid1 xdg-utils xvfb
-      - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
-      - run: bun run apply:patches
-      - name: Read pinned Magpie Go toolchain
-        id: magpie-toolchain
-        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
-      - uses: actions/setup-go@v6
-        with:
-          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
-          cache: false
-      - name: Build and verify pinned Magpie gateway
-        run: |
-          bun run magpie:build -- --target linux-x64
-          bun run magpie:verify -- --target linux-x64
-      - name: Set up bundled Linux runtimes
-        run: |
-          bun run setup:posix-uv-runtime
-          bun run setup:posix-python-runtime
-          bun run engram:runtime:linux-x64
       - name: Build Linux installer artifacts
-        timeout-minutes: 65
-        run: bun run dist:linux
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Install the generated deb package
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t debs < <(find release -maxdepth 1 -type f -name '*.deb' -print | sort)
-          [[ ${#debs[@]} -eq 1 ]] || { echo 'Expected exactly one Linux deb package' >&2; exit 1; }
-          sudo apt-get install -y "$(realpath "${debs[0]}")"
-          test -x '/opt/知远智能体 (ZhiYuan Agent)/知远'
-      - name: Verify the installed Ubuntu application starts and paints
-        run: >-
-          node scripts/verify-linux-renderer.mjs
-          '/opt/知远智能体 (ZhiYuan Agent)/知远'
-          release/linux-deb-install-smoke.png
+        id: build-inference-packages
+        uses: ./.github/actions/build-inference-packages
+        with:
+          mode: verify
+          platform: linux
+          runtime-target: linux-x64
+          inference-edition: lite
+          MODELSCOPE-TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify the generated deb installs, starts and paints
+        run: node scripts/ci/linux-release-acceptance.mjs smoke-deb
       - name: Upload Linux startup diagnostics
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
@@ -107,5 +57,5 @@ jobs:
         uses: ./.github/actions/cache-llamacpp-runtime
         with:
           mode: save
-          cache-hit: ${{ steps.llama-runtime.outputs.cache-hit }}
-          cache-primary-key: ${{ steps.llama-runtime.outputs.cache-primary-key }}
+          cache-hit: ${{ steps.build-inference-packages.outputs.cache-hit }}
+          cache-primary-key: ${{ steps.build-inference-packages.outputs.cache-primary-key }}

@@ -1,18 +1,7 @@
-import { beforeEach, expect, test, vi } from 'vitest';
+import { beforeEach, expect, test } from 'vitest';
 
-import { LlamaCppAgentEligibilityReason } from '../../shared/llamacpp';
+import { assessLlamaCppAgentEligibility } from '../../shared/llamacpp';
 import { setLanguage } from '../i18n';
-
-const mocks = vi.hoisted(() => ({
-  isLlamaCppModelRunning: vi.fn(),
-  getLlamaCppModelAgentEligibility: vi.fn(),
-}));
-
-vi.mock('./llamacppRunningModelRegistry', () => ({
-  isLlamaCppModelRunning: mocks.isLlamaCppModelRunning,
-  getLlamaCppModelAgentEligibility: mocks.getLlamaCppModelAgentEligibility,
-}));
-
 import {
   assertLlamaCppWorkModeContext,
   assertWorkModeContextWindow,
@@ -20,41 +9,24 @@ import {
 
 beforeEach(() => {
   setLanguage('en');
-  mocks.isLlamaCppModelRunning.mockReset();
-  mocks.getLlamaCppModelAgentEligibility.mockReset();
 });
 
 test('assertLlamaCppWorkModeContext rejects models below the agent context minimum', () => {
-  mocks.isLlamaCppModelRunning.mockReturnValue(true);
-  mocks.getLlamaCppModelAgentEligibility.mockReturnValue({
-    eligible: false,
-    reason: LlamaCppAgentEligibilityReason.RuntimeContextTooSmall,
-    requiredContextWindow: 32768,
+  const eligibility = assessLlamaCppAgentEligibility({
     runtimeContextWindow: 8192,
-    canIncreaseContextWindow: true,
   });
-
-  expect(() =>
-    assertLlamaCppWorkModeContext({
-      providerName: 'llamacpp',
-      modelId: 'llamacpp/qwen-local',
-    }),
-  ).toThrow(/too small a context window \(8192\)/);
+  expect(() => assertLlamaCppWorkModeContext(eligibility)).toThrow(
+    /too small a context window \(8192\)/,
+  );
 });
 
-test('assertLlamaCppWorkModeContext ignores non-llamacpp providers', () => {
-  expect(() =>
-    assertLlamaCppWorkModeContext({
-      providerName: 'openai',
-      modelId: 'openai/gpt-5.2',
-    }),
-  ).not.toThrow();
+test('assertLlamaCppWorkModeContext rejects a local GPU model missing from the live snapshot', () => {
+  expect(() => assertLlamaCppWorkModeContext(null)).toThrow(/not running/i);
 });
 
 test('assertWorkModeContextWindow rejects small-context models across all providers', () => {
   expect(() =>
     assertWorkModeContextWindow({
-      providerName: 'ollama',
       modelId: 'ollama/llama3:8b',
       contextWindow: 4096,
     }),
@@ -62,7 +34,6 @@ test('assertWorkModeContextWindow rejects small-context models across all provid
 
   expect(() =>
     assertWorkModeContextWindow({
-      providerName: 'qianfan',
       modelId: 'ernie-4.5-8k',
       contextWindow: 8192,
     }),
@@ -70,7 +41,6 @@ test('assertWorkModeContextWindow rejects small-context models across all provid
 
   expect(() =>
     assertWorkModeContextWindow({
-      providerName: 'openai-compatible',
       modelId: 'custom-model',
       contextWindow: 16384,
     }),
@@ -78,7 +48,6 @@ test('assertWorkModeContextWindow rejects small-context models across all provid
 
   expect(() =>
     assertWorkModeContextWindow({
-      providerName: 'deepseek',
       modelId: 'deepseek-chat',
       contextWindow: 65536,
     }),
@@ -86,7 +55,6 @@ test('assertWorkModeContextWindow rejects small-context models across all provid
 
   expect(() =>
     assertWorkModeContextWindow({
-      providerName: 'custom',
       modelId: 'unprobed-model',
       contextWindow: undefined,
     }),

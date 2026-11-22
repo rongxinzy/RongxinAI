@@ -2,10 +2,11 @@ import { useCallback, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
 import type {
-  LlamaCppModel as OllamaModel,
+  LlamaCppModel,
   LlamaCppModelLaunchInput,
   LlamaCppModelPreferences,
-  LlamaCppRunningModel as OllamaRunningModel,
+  LlamaCppRunningModel,
+  LlamaCppStatusSnapshot,
 } from '../../../../shared/llamacpp';
 import { notifyLlamaCppRunningModelsChanged } from '../../../services/availableModels';
 import {
@@ -22,9 +23,10 @@ import { getRemainingBusyMs, shouldBlockModelAction } from '../utils/modelAction
 type UseLocalModelActionsInput = {
   runAction: (action: () => Promise<void>) => Promise<void>;
   showToast: (message: string, kind?: LocalInferenceToastKindType) => void;
-  setRunningModels: Dispatch<SetStateAction<OllamaRunningModel[]>>;
-  refreshRunningModels: () => Promise<OllamaRunningModel[]>;
-  refreshLocalModels: () => Promise<OllamaModel[]>;
+  setRunningModels: Dispatch<SetStateAction<LlamaCppRunningModel[]>>;
+  refreshStatus: () => Promise<LlamaCppStatusSnapshot>;
+  refreshRunningModels: () => Promise<LlamaCppRunningModel[]>;
+  refreshLocalModels: () => Promise<LlamaCppModel[]>;
   refreshModelPreferences: () => Promise<LlamaCppModelPreferences>;
   markMarketplaceUninstalled: (modelName: string) => void;
 };
@@ -35,7 +37,7 @@ type UseLocalModelActionsResult = {
   unloadingModelName: string | null;
   startedModelName: string | null;
   setStartedModelName: Dispatch<SetStateAction<string | null>>;
-  handleLoadModel: (model: OllamaModel) => void;
+  handleLoadModel: (model: LlamaCppModel) => void;
   handleCancelModelLoad: () => void;
   handleUnload: (modelName: string) => void;
   handleDelete: (modelName: string) => void;
@@ -51,6 +53,7 @@ export function useLocalModelActions(input: UseLocalModelActionsInput): UseLocal
     runAction,
     showToast,
     setRunningModels,
+    refreshStatus,
     refreshRunningModels,
     refreshLocalModels,
     refreshModelPreferences,
@@ -82,7 +85,7 @@ export function useLocalModelActions(input: UseLocalModelActionsInput): UseLocal
   );
 
   const handleLoadModel = useCallback(
-    (model: OllamaModel) => {
+    (model: LlamaCppModel) => {
       const modelName = model.name;
       if (loadingModelNameRef.current) return;
       loadingModelNameRef.current = modelName;
@@ -110,6 +113,7 @@ export function useLocalModelActions(input: UseLocalModelActionsInput): UseLocal
           }
           throw loadError;
         } finally {
+          await refreshStatus().catch(() => undefined);
           loadingModelNameRef.current = null;
           setLoadingModelName(current => (current === modelName ? null : current));
           setCancellingModelLoad(false);
@@ -117,7 +121,7 @@ export function useLocalModelActions(input: UseLocalModelActionsInput): UseLocal
         }
       });
     },
-    [refreshRunningModels, runAction, setRunningModels, showToast],
+    [refreshRunningModels, refreshStatus, runAction, setRunningModels, showToast],
   );
 
   const handleCancelModelLoad = useCallback(() => {

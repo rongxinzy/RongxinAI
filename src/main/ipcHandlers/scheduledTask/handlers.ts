@@ -6,6 +6,7 @@ import type { RunFilter, ScheduledTaskInput } from '../../../scheduledTask/types
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import { PlatformRegistry } from '../../../shared/platform';
 import { tryParseCcConnectScopedConversationId } from '../../im/ccConnectConversationId';
+import type { IMStore } from '../../im/imStore';
 import { t } from '../../i18n';
 import { handleIpcContract } from '../../ipc/handleIpcContract';
 import { scheduledTasksContract } from '../../../shared/ipc/automationContract';
@@ -13,29 +14,7 @@ import { listScheduledTaskChannels } from './helpers';
 
 export interface ScheduledTaskHandlerDeps {
   getCronJobService: () => ScheduledTaskService;
-  getIMGatewayManager: () => {
-    getIMStore: () =>
-      | {
-          getSessionMapping: (
-            conversationId: string,
-            platform: string,
-          ) =>
-            | {
-                coworkSessionId: string;
-              }
-            | undefined;
-          listSessionMappings: (
-            platform: string,
-            accountId?: string,
-          ) => Array<{
-            imConversationId: string;
-            platform: string;
-            coworkSessionId: string;
-            lastActiveAt: number;
-          }>;
-        }
-      | undefined;
-  } | null;
+  getIMStore: () => Pick<IMStore, 'getConfig' | 'listSessionMappings'> | null;
 }
 
 /**
@@ -83,7 +62,7 @@ function cloneScheduledTaskInput<T extends MutableScheduledTaskInput>(input: T):
 }
 
 export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): void {
-  const { getCronJobService, getIMGatewayManager } = deps;
+  const { getCronJobService, getIMStore } = deps;
 
   handleIpcContract(scheduledTasksContract, {
     list: async () => {
@@ -94,18 +73,6 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Failed to list tasks',
-        };
-      }
-    },
-
-    get: async (_event, id) => {
-      try {
-        const task = await getCronJobService().getJob(id);
-        return { success: true, task };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to get task',
         };
       }
     },
@@ -178,11 +145,6 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
       }
     },
 
-    stop: async (_event, _id) => {
-      // A claimed Pi Run is allowed to finish or time out on its own.
-      return { success: true, result: false };
-    },
-
     listRuns: async (_event, taskId, limit?, offset?, filter?: RunFilter) => {
       try {
         const runs = await getCronJobService().listRuns(taskId, limit, offset, filter);
@@ -207,18 +169,6 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
       }
     },
 
-    countRuns: async (_event, taskId) => {
-      try {
-        const count = await getCronJobService().countRuns(taskId);
-        return { success: true, count };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to count runs',
-        };
-      }
-    },
-
     listAllRuns: async (_event, limit?, offset?, filter?: RunFilter) => {
       try {
         const runs = await getCronJobService().listAllRuns(limit, offset, filter);
@@ -231,23 +181,9 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
       }
     },
 
-    resolveSession: async (_event, sessionKey) => {
-      try {
-        if (!sessionKey) return { success: true, session: null };
-        // Canonical Runs store their Pi session id directly. There is no remote
-        // scheduler session authority to query by an opaque legacy session key.
-        return { success: true, session: null as unknown as Record<string, unknown> | null };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to resolve session',
-        };
-      }
-    },
-
     listChannels: async () => {
       try {
-        return { success: true, channels: listScheduledTaskChannels() };
+        return { success: true, channels: listScheduledTaskChannels(getIMStore()?.getConfig()) };
       } catch (error) {
         return {
           success: false,
@@ -292,7 +228,7 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
       try {
         const platform = PlatformRegistry.platformOfChannel(channel);
         if (!platform) return { success: true, conversations: [] };
-        const imStore = getIMGatewayManager()?.getIMStore();
+        const imStore = getIMStore();
         if (!imStore) return { success: true, conversations: [] };
         const mappings = imStore.listSessionMappings(platform, filterAccountId ?? accountId);
         const conversations = mappings.map(m => ({

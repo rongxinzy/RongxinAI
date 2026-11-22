@@ -10,6 +10,7 @@
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { packageWindowsInstaller } = require('../../packaging/package-windows-installer.cjs');
 
 const root = path.resolve(__dirname, '..', '..', '..');
 const edition = (process.env.ZHIYUAN_UPDATE_VARIANT || process.argv[2] || '').trim().toLowerCase();
@@ -19,11 +20,11 @@ if (!['cpu', 'cuda'].includes(edition)) {
   process.exit(1);
 }
 
-function run(command, args, env = {}) {
+function run(command, args) {
   const result = spawnSync(command, args, {
     cwd: root,
     stdio: 'inherit',
-    env: { ...process.env, ...env },
+    env: { ...process.env, ZHIYUAN_ENTERPRISE_BUILD: '0', ZHIYUAN_UPDATE_VARIANT: edition },
   });
   if (result.error || result.status !== 0) {
     throw new Error(`${command} ${args.join(' ')} failed: ${result.error?.message || result.status}`);
@@ -41,20 +42,7 @@ for (const entry of fs.readdirSync(path.join(root, 'release'), { withFileTypes: 
   }
 }
 
-run(process.execPath, [path.join(root, 'scripts/prepare-inference-edition-runtime.cjs')], {
-  ZHIYUAN_UPDATE_VARIANT: edition,
-});
-
-const signedConfig = path.join(root, 'electron-builder.windows-signed.cjs');
-run(process.execPath, [path.join(root, 'scripts/ensure-build-version.js')], {
-  ZHIYUAN_UPDATE_VARIANT: edition,
-});
-run('bun', ['x', 'electron-builder', '--win', 'nsis', '--x64', '--config', signedConfig, '--publish', 'never'], {
-  ZHIYUAN_UPDATE_VARIANT: edition,
-});
-
-run(process.execPath, [path.join(root, 'scripts/installer-shell/build-distribution.cjs'), '--signed'], {
-  ZHIYUAN_UPDATE_VARIANT: edition,
-});
+run(process.execPath, ['scripts/ensure-build-version.js']);
+packageWindowsInstaller(run, { signed: true, enterprise: false, xiaoruan: false, edition });
 
 console.log(`[assemble-windows-edition] ${edition} edition ready under release/`);

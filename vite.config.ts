@@ -9,7 +9,6 @@ import { extractExternalDeps } from 'vite-plugin-electron/plugin';
 import renderer from 'vite-plugin-electron-renderer';
 
 import { ELECTRON_MAIN_EXTERNALS } from './scripts/electron-runtime-dependencies.mjs';
-import { copyCompanionPhoton } from './scripts/copy-companion-photon.mjs';
 import { documentWasmAssets } from './scripts/document-wasm-assets.mjs';
 
 // https://vitejs.dev/config/
@@ -102,7 +101,6 @@ const rejectDuplicateHighlighterModules = () => ({
 const copyPhotonWasmPlugin = () => ({
   name: 'copy-photon-wasm',
   closeBundle() {
-    copyCompanionPhoton(projectRoot, path.join(projectRoot, 'dist-electron'));
     const sourceCandidates = [
       path.resolve(
         projectRoot,
@@ -266,19 +264,7 @@ export default defineConfig(async ({ command }) => {
                 onstart() {},
               },
               {
-                entry: 'src/main/libs/modelCatalogUpdateWorker.ts',
-                vite: {
-                  build: {
-                    watch: command === 'serve' ? {} : null,
-                    sourcemap: electronSourceMap,
-                    outDir: 'dist-electron',
-                    minify: false,
-                  },
-                },
-                onstart() {},
-              },
-              {
-                // Stream SHA-256 file digests without blocking the main process.
+                // Stream file digests without blocking the main process.
                 entry: 'src/main/libs/hashWorker.ts',
                 vite: {
                   build: {
@@ -325,19 +311,6 @@ export default defineConfig(async ({ command }) => {
               {
                 // Prepare large AISphere request bodies off the main thread.
                 entry: 'src/main/extensions/aisphere/requestWorker.ts',
-                vite: {
-                  build: {
-                    watch: command === 'serve' ? {} : null,
-                    sourcemap: electronSourceMap,
-                    outDir: 'dist-electron',
-                    minify: false,
-                  },
-                },
-                onstart() {},
-              },
-              {
-                // Hash large update payloads without blocking Electron's main process.
-                entry: 'src/main/libs/appUpdateHashWorker.ts',
                 vite: {
                   build: {
                     watch: command === 'serve' ? {} : null,

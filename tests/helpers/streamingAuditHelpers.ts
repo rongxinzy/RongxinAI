@@ -1,5 +1,4 @@
 import { expect } from 'vitest';
-import { adapter } from '../../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
 import type { CoworkStore } from '../../src/main/coworkStore';
 import { createHarnessCoworkStore, ensureHarnessCoworkSession } from './harnessCoworkStore';
 import {
@@ -9,16 +8,26 @@ import {
   splitIntoDeltas,
   type StreamingHarness,
 } from './streamingPipelineHarness';
+import { createTestPiRuntime } from '../../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
 
 export async function createAuditHarness(
   sessionId: string,
   mode: 'work' | 'chat' = 'work',
 ): Promise<{ harness: StreamingHarness; store: CoworkStore; cleanup: () => void }> {
   const handle = createHarnessCoworkStore();
-  ensureHarnessCoworkSession(handle.store, sessionId, mode);
-  adapter.setCoworkStore(handle.store);
-  const harness = await createStreamingHarness({ sessionId });
-  return { harness, store: handle.store, cleanup: handle.cleanup };
+  const runtime = createTestPiRuntime({ coworkStore: handle.store });
+  const cleanup = () => {
+    runtime.stopAllSessions();
+    handle.cleanup();
+  };
+  try {
+    ensureHarnessCoworkSession(handle.store, sessionId, mode);
+    const harness = await createStreamingHarness({ sessionId, runtime });
+    return { harness, store: handle.store, cleanup };
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
 }
 
 export function assistantRows(harness: StreamingHarness) {

@@ -65,13 +65,13 @@ export async function installWindowsNsis(exePath: string, targetVersion: string)
     '}',
     '$installerExitCode = $null',
     '$failure = $null',
+    '$appExited = $false',
     'try {',
     '  [IO.File]::WriteAllText($handoffPath, "started")',
     '  Log "Update script started (appPid=$appPid)"',
-    // Wait-Process blocks until the pid is gone (or the timeout expires) instead
-    // of polling once per second, so the installer can start immediately after
-    // this process exits.
     '  Wait-Process -Id $appPid -Timeout 120 -ErrorAction SilentlyContinue',
+    '  if (Get-Process -Id $appPid -ErrorAction SilentlyContinue) { throw "Application did not exit before update install" }',
+    '  $appExited = $true',
     '  Log "Launching silent installer: $installerPath"',
     // /S --updated is the same invocation electron-updater performs for a
     // background update: no wizard page is shown, and the installer treats the
@@ -104,6 +104,7 @@ export async function installWindowsNsis(exePath: string, targetVersion: string)
     // brings the still-installed previous version back instead of leaving the
     // desktop without the app. A receipt write failure after a clean install
     // must not prevent that relaunch.
+    'if (-not $appExited) { return }',
     'if (Test-Path $appPath) {',
     '  Start-Process -FilePath $appPath',
     '  Log "Application relaunched after installer exit $installerExitCode"',
@@ -161,14 +162,4 @@ export async function installWindowsNsis(exePath: string, targetVersion: string)
   console.log(`[AppUpdate] Launcher PID: ${launcherPid}, calling app.quit()`);
   recordAppQuitOrigin(AppQuitOrigin.UpdateInstall);
   app.quit();
-  // The helper script waits for this PID to exit before starting the
-  // installer, and starts it anyway after 120s. App cleanup is bounded by the
-  // before-quit deadline, but if anything on the quit path wedges, force the
-  // exit here so the handoff never degrades into an installer that races a
-  // still-running old process (observed on Windows 10 upgrades).
-  const forceExitTimer = setTimeout(() => {
-    console.warn('[AppUpdate] App still alive after quit; forcing exit for update install.');
-    app.exit(0);
-  }, 20_000);
-  forceExitTimer.unref();
 }

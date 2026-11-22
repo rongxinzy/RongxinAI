@@ -83,15 +83,6 @@ function normalizeAgentId(name) {
   );
 }
 
-function generateUuid() {
-  // Simple UUID v4 without external deps
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
 function loadBetterSqlite3() {
   try {
     // When running inside the ZhiYuan Agent source tree, prefer project's better-sqlite3.
@@ -138,13 +129,6 @@ function agentIdExists(db, id) {
   return !!row;
 }
 
-function agentNameExists(db, name) {
-  const row = db
-    .prepare('SELECT 1 FROM agents WHERE LOWER(name) = LOWER(?) AND is_default = 0')
-    .get(name.trim());
-  return !!row;
-}
-
 function findAgentByName(db, name) {
   return db
     .prepare(
@@ -185,11 +169,6 @@ function updateAgentFromRequest(db, existingId, request) {
 function makeUniqueAgentId(db, baseId) {
   if (!agentIdExists(db, baseId)) return baseId;
   return `${baseId}-${Date.now()}`;
-}
-
-function getDefaultIcon() {
-  // Matches encodeAgentAvatarIcon({ svg: AgentAvatarSvg.Zhiyuan })
-  return 'agent-avatar-svg:zhiyuan';
 }
 
 function pickIconByCategory(categoryId) {
@@ -496,167 +475,16 @@ function getBundledSkillRoots() {
   return [path.resolve(__dirname, '..', 'presets')];
 }
 
-function registerAgentExpert(db, pluginJson, expertDir, options) {
-  const agentMdPath = resolvePackagePath(expertDir, pluginJson.agents[0], 'agent');
-  const { frontmatter, body } = parseMdFrontmatter(agentMdPath);
-
-  const name = pluginJson.displayName.zh || pluginJson.displayName.en;
-  if (agentNameExists(db, name)) {
-    throw new Error(`Agent name '${name}' already exists`);
-  }
-
-  const agentId = makeUniqueAgentId(db, normalizeAgentId(pluginJson.agentName));
-  const now = Date.now();
-
-  db.prepare(`
-    INSERT INTO agents (
-      id, name, description, system_prompt, identity, model, working_directory,
-      icon, skill_ids, enabled, pinned, is_default, source, preset_id,
-      triage_override, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 0, 'expert-package', ?, NULL, ?, ?)
-  `).run(
-    agentId,
-    name,
-    pluginJson.displayDescription.zh || pluginJson.displayDescription.en || '',
-    body,
-    pluginJson.profession.zh || pluginJson.profession.en || '',
-    options.model || '',
-    options.workingDirectory || '',
-    pickIconByCategory(pluginJson.categoryId),
-    JSON.stringify(options.skillIds || []),
-    pluginJson.name,
-    now,
-    now,
-  );
-
-  return [agentId];
-}
-
-function registerTeamExpert(db, pluginJson, expertDir, options) {
-  const agentsDir = path.join(expertDir, 'agents');
-  const leadAgentName = pluginJson.teamInfo.leadAgent;
-  const memberAgentNames = pluginJson.teamInfo.memberAgents;
-  const memberIds = [];
-
-  // Register members first
-  for (const memberId of memberAgentNames) {
-    const mdPath = resolvePackagePath(
-      expertDir,
-      path.join('agents', `${memberId}.md`),
-      'member agent',
-    );
-    if (!fs.existsSync(mdPath)) {
-      throw new Error(`Member agent markdown not found: ${mdPath}`);
-    }
-    const { frontmatter, body } = parseMdFrontmatter(mdPath);
-    const memberDisplay = (pluginJson.members || []).find(m => m.id === memberId);
-    const name =
-      memberDisplay?.displayName?.zh ||
-      memberDisplay?.displayName?.en ||
-      frontmatter.displayName?.zh ||
-      frontmatter.displayName?.en ||
-      memberId;
-
-    const agentId = makeUniqueAgentId(db, normalizeAgentId(memberId));
-    const now = Date.now();
-
-    db.prepare(`
-      INSERT INTO agents (
-        id, name, description, system_prompt, identity, model, working_directory,
-        icon, skill_ids, enabled, pinned, is_default, source, preset_id,
-        triage_override, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 0, 'expert-package-member', ?, NULL, ?, ?)
-    `).run(
-      agentId,
-      name,
-      '',
-      body,
-      memberDisplay?.profession?.zh ||
-        memberDisplay?.profession?.en ||
-        frontmatter.profession?.zh ||
-        frontmatter.profession?.en ||
-        '',
-      options.model || '',
-      options.workingDirectory || '',
-      pickIconByCategory(pluginJson.categoryId),
-      JSON.stringify([]),
-      pluginJson.name,
-      now,
-      now,
-    );
-
-    memberIds.push({ agentId, memberId });
-  }
-
-  // Register lead
-  const leadMdPath = resolvePackagePath(
-    expertDir,
-    path.join('agents', `${leadAgentName}.md`),
-    'lead agent',
-  );
-  if (!fs.existsSync(leadMdPath)) {
-    throw new Error(`Lead agent markdown not found: ${leadMdPath}`);
-  }
-  const { frontmatter: leadFm, body: leadBody } = parseMdFrontmatter(leadMdPath);
-
-  const leadName = pluginJson.displayName.zh || pluginJson.displayName.en;
-  if (agentNameExists(db, leadName)) {
-    throw new Error(`Agent name '${leadName}' already exists`);
-  }
-
-  const leadAgentId = makeUniqueAgentId(db, normalizeAgentId(leadAgentName));
-  const now = Date.now();
-
-  // Append member roster to lead system prompt for subagent orchestration
-  const memberRoster = memberIds
-    .map(({ memberId, agentId }) => {
-      const member = (pluginJson.members || []).find(m => m.id === memberId);
-      return `- ${memberId} (Agent DB ID: ${agentId}): ${member?.profession?.zh || member?.profession?.en || memberId}`;
-    })
-    .join('\n');
-
-  const augmentedSystemPrompt = `${leadBody}\n\n## 已注册成员映射\n\n${memberRoster}\n\n调度成员时，在 subagent 工具的 name 参数中使用成员 ID（如 ${memberAgentNames[0] || 'member-id'}），系统会自动路由到对应 Agent。`;
-
-  db.prepare(`
-    INSERT INTO agents (
-      id, name, description, system_prompt, identity, model, working_directory,
-      icon, skill_ids, enabled, pinned, is_default, source, preset_id,
-      triage_override, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 0, 'expert-package', ?, NULL, ?, ?)
-  `).run(
-    leadAgentId,
-    leadName,
-    pluginJson.displayDescription.zh || pluginJson.displayDescription.en || '',
-    augmentedSystemPrompt,
-    pluginJson.profession.zh || pluginJson.profession.en || '',
-    options.model || '',
-    options.workingDirectory || '',
-    pickIconByCategory(pluginJson.categoryId),
-    JSON.stringify(options.skillIds || []),
-    pluginJson.name,
-    now,
-    now,
-  );
-
-  return [leadAgentId, ...memberIds.map(m => m.agentId)];
-}
-
 function parseExpertPackage(expertDir, options = {}) {
-  /**
-   * Pure function that parses an expert package and returns a list of
-   * CreateAgentRequest objects plus metadata. Does NOT touch the database.
-   */
   const expertPath = fs.realpathSync(path.resolve(expertDir));
 
-  // Validate
   const validation = validateExpert(expertPath);
   if (!validation.isValid) {
     const summary = validation.summary();
     throw new Error(`Expert package validation failed:\n${summary}`);
   }
 
-  // Load plugin.json
-  const pluginJson = JSON.parse(fs.readFileSync(path.join(expertPath, 'plugin.json'), 'utf-8'));
+  const { pluginJson } = validation;
 
   // Validate every referenced path before copying files or touching Pi config.
   validatePackagePaths(pluginJson, expertPath);
@@ -665,29 +493,10 @@ function parseExpertPackage(expertDir, options = {}) {
   const skillIds = resolveSkillIds(pluginJson, expertPath);
   const packageMcpIds = resolveMcpIds(pluginJson);
 
-  // Copy skills to userData/SKILLs
-  const userDataDir = path.dirname(options.dbPath || getDefaultDbPath());
-  const userDataSkillsDir = path.join(userDataDir, 'SKILLs');
-  copySkillsToUserData(pluginJson, expertPath, userDataSkillsDir, Boolean(options.update));
-  // Top-level skillIds reference bundled SKILLs (e.g. "docx") that ship in the
-  // app, not in the package; materialize them into userData so sessions that
-  // only scan userData can still load them.
-  copyTopLevelSkillIdsToUserData(
-    skillIds,
-    userDataSkillsDir,
-    getTopLevelSkillSourceRoots(options.skillSourceRoots),
-    Boolean(options.update),
-  );
-
-  // Sync agent MDs to pi agents directory for subagent discovery
-  // (Team members and single agents alike — any expert agent can be a subagent target)
-  const piSyncedFiles = syncAgentsToPiDir(expertPath, pluginJson);
-
   const icon = pickIconByCategory(pluginJson.categoryId);
   const requests = [];
 
   if (pluginJson.expertType === 'team') {
-    const agentsDir = path.join(expertPath, 'agents');
     const leadAgentName = pluginJson.teamInfo.leadAgent;
     const memberAgentNames = pluginJson.teamInfo.memberAgents;
     const memberRequests = [];
@@ -695,7 +504,7 @@ function parseExpertPackage(expertDir, options = {}) {
     // Members first
     for (const memberId of memberAgentNames) {
       const mdPath = resolvePackagePath(
-        expertDir,
+        expertPath,
         path.join('agents', `${memberId}.md`),
         'member agent',
       );
@@ -789,6 +598,19 @@ function parseExpertPackage(expertDir, options = {}) {
     });
   }
 
+  const overwrite = Boolean(
+    options.update ||
+      (typeof pluginJson.name === 'string' && options.shouldUpdate?.(pluginJson.name)),
+  );
+  const userDataSkillsDir = path.join(path.dirname(options.dbPath || getDefaultDbPath()), 'SKILLs');
+  copySkillsToUserData(pluginJson, expertPath, userDataSkillsDir, overwrite);
+  copyTopLevelSkillIdsToUserData(
+    skillIds,
+    userDataSkillsDir,
+    getTopLevelSkillSourceRoots(options.skillSourceRoots),
+    overwrite,
+  );
+  const piSyncedFiles = syncAgentsToPiDir(expertPath, pluginJson);
   return { pluginJson, requests, piSyncedFiles };
 }
 

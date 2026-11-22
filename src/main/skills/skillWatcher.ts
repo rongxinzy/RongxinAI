@@ -71,65 +71,104 @@ export function isSkillDefinitionChange(
  * and re-created after every change.
  */
 export class SkillWatcher {
-  private watchers: fs.FSWatcher[] = [];
+  private readonly watchers = new Map<string, fs.FSWatcher>();
   private notifyTimer: NodeJS.Timeout | null = null;
   private changeListeners: Array<() => void> = [];
+  private cleanupRoots?: string[];
+  private cleanupTask?: Promise<void>;
+  private closed = false;
 
-  constructor(private getRoots: () => string[]) {}
+  constructor(
+    private getRoots: () => string[],
+    private platform: NodeJS.Platform = process.platform,
+  ) {}
 
   startWatching(): void {
-    this.stopWatching();
-    const roots = this.getRoots();
-
-    // Clean up tombstone directories left by failed deletions on Windows
-    if (process.platform === 'win32') {
-      for (const root of roots) {
-        if (!fs.existsSync(root)) continue;
-        try {
-          for (const entry of fs.readdirSync(root)) {
-            if (/\.deleted\.\d+$/.test(entry)) {
-              try {
-                fs.rmSync(path.join(root, entry), { recursive: true, force: true });
-                console.log('[skills] startWatching: cleaned up tombstone "%s"', entry);
-              } catch {
-                /* will retry next time */
-              }
-            }
-          }
-        } catch {
-          /* ignore scan errors */
-        }
-      }
+    if (this.closed) return;
+    const roots = new Set(this.getRoots());
+    for (const [root, watcher] of this.watchers) {
+      if (roots.has(root)) continue;
+      this.watchers.delete(root);
+      watcher.close();
     }
 
     const rootWatchHandler = (_event: string, filename: string | null) => {
-      if (isSkillDefinitionChange(filename, process.platform)) {
+      if (isSkillDefinitionChange(filename, this.platform)) {
         this.scheduleNotify();
       }
     };
 
-    roots.forEach(root => {
-      if (!fs.existsSync(root)) return;
+    for (const root of roots) {
+      if (this.watchers.has(root)) continue;
       try {
         const watcher = fs.watch(root, { recursive: true }, rootWatchHandler);
         watcher.on('error', error => {
-          // Watching a deleted/unavailable root must never crash main.
+          if (this.watchers.get(root) !== watcher) return;
+          this.watchers.delete(root);
+          watcher.close();
           console.error('[skills] Skills root watcher error for %s:', root, error);
         });
-        this.watchers.push(watcher);
+        this.watchers.set(root, watcher);
       } catch (error) {
-        console.warn('[skills] Failed to watch skills root:', root, error);
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          console.warn('[skills] Failed to watch skills root:', root, error);
+        }
       }
-    });
+    }
+
+    if (this.platform === 'win32') {
+      this.cleanupRoots = [...roots];
+      this.cleanupTask ??= Promise.resolve().then(() => this.cleanTombstones());
+    }
   }
 
   stopWatching(): void {
+    this.cleanupRoots = undefined;
     this.watchers.forEach(watcher => watcher.close());
-    this.watchers = [];
+    this.watchers.clear();
     if (this.notifyTimer) {
       clearTimeout(this.notifyTimer);
       this.notifyTimer = null;
     }
+  }
+
+  async shutdown(): Promise<void> {
+    this.closed = true;
+    this.stopWatching();
+    await this.cleanupTask;
+  }
+
+  private async cleanTombstones(): Promise<void> {
+    while (this.cleanupRoots) {
+      const roots = this.cleanupRoots;
+      for (const root of roots) {
+        if (this.cleanupRoots !== roots) break;
+        try {
+          for await (const entry of await fs.promises.opendir(root)) {
+            if (this.cleanupRoots !== roots) break;
+            if (!entry.isDirectory() || !/\.deleted\.\d+$/.test(entry.name)) continue;
+            const directory = path.join(root, entry.name);
+            try {
+              await fs.promises.lstat(path.join(directory, SKILL_FILE_NAME));
+              continue;
+            } catch (error) {
+              if ((error as NodeJS.ErrnoException).code !== 'ENOENT') continue;
+            }
+            if (this.cleanupRoots !== roots) break;
+            try {
+              await fs.promises.rm(directory, { recursive: true, force: true });
+              console.debug('[skills] cleaned up tombstone "%s"', entry.name);
+            } catch {
+              // Retry when the root is watched again.
+            }
+          }
+        } catch {
+          // Roots may disappear while pending.
+        }
+      }
+      if (this.cleanupRoots === roots) this.cleanupRoots = undefined;
+    }
+    this.cleanupTask = undefined;
   }
 
   handleWorkingDirectoryChange(): void {
@@ -148,6 +187,7 @@ export class SkillWatcher {
   }
 
   notifySkillsChanged(): void {
+    if (this.closed) return;
     BrowserWindow.getAllWindows().forEach(win => {
       if (!win.isDestroyed()) {
         win.webContents.send('skills:changed');

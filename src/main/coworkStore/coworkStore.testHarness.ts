@@ -1,7 +1,7 @@
 /**
  * Shared harness for the CoworkStore per-module test suites.
  *
- * Owns the in-memory SQLite schema (minimum schema the store touches) and the
+ * Owns the SQLite schema (minimum schema the store touches) and the
  * direct row-insertion helpers. Split from src/main/coworkStore.test.ts
  * (issue #1069); the suites under src/main/coworkStore/ drive the public
  * CoworkStore facade through the same schema.
@@ -17,9 +17,9 @@ export interface CoworkStoreTestHarness {
   store: CoworkStore;
 }
 
-/** Initialise a fresh in-memory database with the minimum schema. */
-export function createCoworkStoreHarness(): CoworkStoreTestHarness {
-  const db = new BetterSqlite3(':memory:');
+/** Initialise a database with the minimum schema, in memory by default. */
+export function createCoworkStoreHarness(databasePath = ':memory:'): CoworkStoreTestHarness {
+  const db = new BetterSqlite3(databasePath);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS cowork_sessions (
@@ -38,6 +38,7 @@ export function createCoworkStoreHarness(): CoworkStoreTestHarness {
       workspace_id TEXT,
       agent_id TEXT NOT NULL DEFAULT 'main',
       source TEXT NOT NULL DEFAULT '${CoworkSessionSource.Manual}',
+      pi_history_key TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );

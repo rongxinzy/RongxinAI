@@ -185,7 +185,8 @@ function resolveAssetDownloadSources(targetId, assetName, options = {}) {
     return [githubUrl];
   }
 
-  if (isTruthyEnv(env.LLAMACPP_RUNTIME_ALLOW_GITHUB_FALLBACK)) {
+  const githubFallback = env.LLAMACPP_RUNTIME_ALLOW_GITHUB_FALLBACK;
+  if (githubFallback === undefined ? options.allowOfficialFallback : isTruthyEnv(githubFallback)) {
     return [mirrorUrl, githubUrl];
   }
   return [mirrorUrl];

@@ -41,6 +41,7 @@ import { useSettingsTabs } from './useSettingsTabs';
 
 export default function SettingsPage({
   onClose,
+  onAskAi,
   initialTab,
   initialProvider: _initialProvider,
   notice,
@@ -352,7 +353,7 @@ export default function SettingsPage({
         return <PrivacyPage />;
 
       case 'channels':
-        return <ChannelsPage />;
+        return <ChannelsPage onAskAi={onAskAi} />;
 
       case 'advanced':
         return (

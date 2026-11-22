@@ -1,15 +1,12 @@
 /**
- * MCP configuration policy and settings-triggered bridge refresh.
+ * MCP configuration publication and diagnostics shutdown.
  */
 import { BrowserWindow } from 'electron';
+import { McpIpc } from '../../shared/ipc/channels';
 
-import { agentRuntime } from './agentRuntimeState';
-import { mcpRuntime } from './mcpRuntimeState';
 import { getMcpStore, getStore } from './runtimeServices';
-import { bumpCodingCommandCatalog } from './codingRoomRuntime';
 import { FEISHU_MCP_REGISTRY_ID } from './feishuConnector';
-import { refreshMcpOAuthHeaders } from './mcpOAuthHeaders';
-import { McpServerManager } from '../libs/mcpServerManager';
+import { shutdownMcpDiagnostics } from './codingMcpDiagnostics';
 import {
   hasVerifiedAgentTools,
   OfficialIntegrationId,
@@ -17,6 +14,9 @@ import {
 } from '../libs/mcpIntegrationManifest';
 
 const MCP_BUILT_IN_DEFAULTS_DISABLED_KEY = 'mcp_builtin_defaults_disabled_v1';
+const MCP_BRIDGE_SHUTDOWN_MESSAGE = 'MCP bridge is shutting down';
+const bridgeShutdown = new AbortController();
+type McpRefreshResult = { tools: number; error?: string };
 
 export const ensureBuiltInMcpDefaultsDisabled = (): void => {
   const store = getStore();
@@ -37,11 +37,10 @@ export const ensureBuiltInMcpDefaultsDisabled = (): void => {
   store.set(MCP_BUILT_IN_DEFAULTS_DISABLED_KEY, true);
 };
 
-/**
- * Refresh in-process MCP servers after configuration changes.
- * Returns a summary for the renderer to display.
- */
-const broadcastMcpBridgeSync = (channel: string, data?: Record<string, unknown>): void => {
+const broadcastMcpBridgeSync = (
+  channel: typeof McpIpc.BridgeSyncStart | typeof McpIpc.BridgeSyncDone,
+  data?: McpRefreshResult,
+): void => {
   const windows = BrowserWindow.getAllWindows();
   windows.forEach(win => {
     if (win.isDestroyed()) return;
@@ -53,65 +52,38 @@ const broadcastMcpBridgeSync = (channel: string, data?: Record<string, unknown>)
   });
 };
 
-const reconcileMcpBridge = (): Promise<{ tools: number; error?: string }> => {
-  if (mcpRuntime.bridgeRefreshPromise) {
-    // A server setting changed while the current pass was reading the enabled
-    // list. Schedule one more pass after it completes so the bridge converges
-    // on the latest persisted configuration.
-    mcpRuntime.bridgeRefreshPending = true;
-    return mcpRuntime.bridgeRefreshPromise;
-  }
-  mcpRuntime.bridgeRefreshPromise = (async () => {
-    try {
-      console.log('[McpBridge] refreshing after config change...');
-      broadcastMcpBridgeSync('mcp:bridge:syncStart');
+function publishMcpConfiguration(onConfigurationChanged: () => void): void {
+  bridgeShutdown.signal.throwIfAborted();
+  ensureBuiltInMcpDefaultsDisabled();
+  onConfigurationChanged();
+}
 
-      const enabledServers = await refreshMcpOAuthHeaders(getMcpStore().getEnabledServers());
-      if (!mcpRuntime.serverManager) {
-        mcpRuntime.serverManager = new McpServerManager();
-      }
-      // Reconcile preserves healthy, unchanged connections. A change to one
-      // integration must not interrupt every other configured MCP server.
-      const tools = await mcpRuntime.serverManager.reconcileServers(enabledServers);
-      const toolCount = tools.length;
-      console.log(`[McpBridge] refresh complete: ${toolCount} tools discovered`);
-      return { tools: toolCount };
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('[McpBridge] refresh error:', msg);
-      return { tools: 0, error: msg };
-    }
-  })()
-    .then(result => {
-      broadcastMcpBridgeSync('mcp:bridge:syncDone', { tools: result.tools, error: result.error });
-      return result;
-    })
-    .catch(err => {
-      const error = err instanceof Error ? err.message : String(err);
-      broadcastMcpBridgeSync('mcp:bridge:syncDone', { tools: 0, error });
-      return { tools: 0, error };
-    })
-    .finally(() => {
-      mcpRuntime.bridgeRefreshPromise = null;
-      if (mcpRuntime.bridgeRefreshPending) {
-        mcpRuntime.bridgeRefreshPending = false;
-        void reconcileMcpBridge();
-      }
-    });
-  return mcpRuntime.bridgeRefreshPromise;
-};
+function completeMcpRefresh(result: McpRefreshResult): McpRefreshResult {
+  broadcastMcpBridgeSync(McpIpc.BridgeSyncDone, result);
+  return result;
+}
 
-export const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
+function handleMcpRefreshError(error: unknown): McpRefreshResult {
+  const message = error instanceof Error ? error.message : String(error);
+  if (!bridgeShutdown.signal.aborted) console.error('[McpBridge] Refresh failed:', error);
+  return completeMcpRefresh({ tools: 0, error: message });
+}
+
+export async function refreshMcpBridge(
+  onConfigurationChanged: () => void,
+): Promise<McpRefreshResult> {
+  if (bridgeShutdown.signal.aborted) return { tools: 0, error: MCP_BRIDGE_SHUTDOWN_MESSAGE };
+
+  broadcastMcpBridgeSync(McpIpc.BridgeSyncStart);
   try {
-    ensureBuiltInMcpDefaultsDisabled();
-    // Existing sessions read the new configuration before their next turn.
-    agentRuntime.piRuntimeAdapter?.markMcpConfigurationChanged();
-    bumpCodingCommandCatalog();
-    return reconcileMcpBridge();
+    publishMcpConfiguration(onConfigurationChanged);
+    return completeMcpRefresh({ tools: 0 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('[McpBridge] failed to refresh MCP configuration:', error);
-    broadcastMcpBridgeSync('mcp:bridge:syncDone', { tools: 0, error: message });
-    return Promise.resolve({ tools: 0, error: message });
+    return handleMcpRefreshError(error);
   }
-};
+}
+
+export async function shutdownMcpBridge(): Promise<void> {
+  bridgeShutdown.abort(new Error(MCP_BRIDGE_SHUTDOWN_MESSAGE));
+  await shutdownMcpDiagnostics();
+}

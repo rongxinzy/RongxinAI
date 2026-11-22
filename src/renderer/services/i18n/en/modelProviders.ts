@@ -61,13 +61,6 @@ export const enModelProviders: Record<string, string> = {
   modelContextWindow: 'Context window (tokens)',
   modelContextWindowHint: 'Enter the model’s documented context limit to show context progress.',
   modelContextWindowInvalid: 'The context window must be a positive integer',
-  ollamaModelName: 'Model Name',
-  ollamaModelNameHint: 'Enter the name of a model installed in Ollama, e.g. qwen3:8b, lfm2:latest',
-  ollamaModelNamePlaceholder: 'qwen3:8b',
-  ollamaDisplayName: 'Display Name (optional)',
-  ollamaDisplayNameHint: 'Custom name shown in the model list. Leave empty to use the model name.',
-  ollamaDisplayNamePlaceholder: 'My Qwen3 Model',
-  ollamaModelNameRequired: 'Model name is required',
   supportsImageInput: 'Supports image input',
   modelCapabilities: 'Model capabilities',
   modelCapabilitiesHint:

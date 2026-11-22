@@ -65,7 +65,7 @@ export interface BuiltinCodingRuntime {
   ): Promise<void>;
   cancel(sessionId: string): Promise<void>;
   /** Installed skills and experts advertised with the command snapshot. */
-  listCommandChoices?(): BuiltinCodingCommandChoices;
+  listCommandChoices?(): Promise<BuiltinCodingCommandChoices> | BuiltinCodingCommandChoices;
   /** Bumped when those installed choices change; a newer value re-reads them. */
   commandCatalogGeneration?(): number;
   /** Applies thinking-level changes to a live Pi session. */
@@ -127,8 +127,10 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
    * generation re-reads them, so an open lane picks the change up on its next
    * turn instead of keeping the snapshot it was opened with.
    */
-  private commandChoices: BuiltinCodingCommandChoices | null = null;
-  private commandChoicesGeneration = -1;
+  private commandChoices?: {
+    generation: number;
+    value: BuiltinCodingCommandChoices | Promise<BuiltinCodingCommandChoices>;
+  };
 
   constructor(private readonly runtime: BuiltinCodingRuntime) {}
 
@@ -148,13 +150,13 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
   }): Promise<CodingAgentSession> {
     const id = input.localSessionId ?? randomUUID();
     const configOptions = this.buildOptions(input.existingConfigOptions);
+    const choices = await this.cachedCommandChoices();
     this.sessionConfigOptions.set(id, configOptions);
-    this.refreshCommandChoices();
     return {
       id,
       remoteSessionId: null,
       configOptions,
-      availableCommands: buildBuiltinCodingCommandList(this.commandChoices),
+      availableCommands: buildBuiltinCodingCommandList(choices),
     };
   }
   async loadSession(_input: { remoteSessionId: string }): Promise<CodingAgentSession> {
@@ -165,17 +167,21 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     return this.buildOptions();
   }
   /** Commands a new session would start with, without binding them to a session. */
-  getDefaultAvailableCommands(): CodingAgentAvailableCommand[] {
-    return buildBuiltinCodingCommandList(this.cachedCommandChoices());
+  async getDefaultAvailableCommands(): Promise<CodingAgentAvailableCommand[]> {
+    return buildBuiltinCodingCommandList(await this.cachedCommandChoices());
   }
   async *prompt(input: {
     sessionId: string;
     workspaceRoot: string;
     prompt: string;
     modelOverride?: string | null;
+    isCurrentTurn?: () => boolean;
   }): AsyncIterable<Omit<CodingEvent, 'id' | 'laneId' | 'sequence' | 'createdAt'>> {
+    const pending = this.cachedCommandChoices();
+    const choices = pending instanceof Promise ? await pending : pending;
+    if (input.isCurrentTurn && !input.isCurrentTurn()) return;
     const thinkingLevel = this.currentThinkingLevel(input.sessionId);
-    const parsed = parseBuiltinCodingPrompt(input.prompt, this.cachedCommandChoices());
+    const parsed = parseBuiltinCodingPrompt(input.prompt, choices);
     const turnMode = resolveBuiltinCodingTurnMode(parsed, this.currentPlanMode(input.sessionId));
     await this.runtime.start(input.sessionId, input.workspaceRoot, parsed.prompt, {
       ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
@@ -224,28 +230,27 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
   getSessionConfigOptions(sessionId: string): CodingAgentConfigOption[] {
     return this.sessionConfigOptions.get(sessionId) ?? [];
   }
-  getSessionAvailableCommands(_sessionId: string): CodingAgentAvailableCommand[] {
-    return buildBuiltinCodingCommandList(this.cachedCommandChoices());
+  async getSessionAvailableCommands(_sessionId: string): Promise<CodingAgentAvailableCommand[]> {
+    return buildBuiltinCodingCommandList(await this.cachedCommandChoices());
   }
-  private readCommandChoices(): BuiltinCodingCommandChoices {
-    return this.runtime.listCommandChoices?.() ?? EMPTY_BUILTIN_CODING_COMMAND_CHOICES;
-  }
-  private currentCatalogGeneration(): number {
-    return this.runtime.commandCatalogGeneration?.() ?? 0;
-  }
-  private refreshCommandChoices(): BuiltinCodingCommandChoices {
-    this.commandChoices = this.readCommandChoices();
-    this.commandChoicesGeneration = this.currentCatalogGeneration();
-    return this.commandChoices;
-  }
-  private cachedCommandChoices(): BuiltinCodingCommandChoices {
-    if (
-      this.commandChoices === null ||
-      this.commandChoicesGeneration !== this.currentCatalogGeneration()
-    ) {
-      return this.refreshCommandChoices();
+  private cachedCommandChoices():
+    | BuiltinCodingCommandChoices
+    | Promise<BuiltinCodingCommandChoices> {
+    const generation = this.runtime.commandCatalogGeneration?.() ?? 0;
+    if (this.commandChoices?.generation === generation) return this.commandChoices.value;
+    const value = this.runtime.listCommandChoices?.() ?? EMPTY_BUILTIN_CODING_COMMAND_CHOICES;
+    const catalog = { generation, value };
+    this.commandChoices = catalog;
+    if (value instanceof Promise) {
+      catalog.value = value.then(
+        choices => (catalog.value = choices),
+        error => {
+          if (this.commandChoices === catalog) this.commandChoices = undefined;
+          throw error;
+        },
+      );
     }
-    return this.commandChoices;
+    return catalog.value;
   }
   onAvailableCommandsChanged(
     _listener: (sessionId: string, commands: CodingAgentAvailableCommand[]) => void,

@@ -11,11 +11,13 @@ import { observeWorkbench } from '../../workbenchTask/observe';
 
 import { randomUUID } from 'crypto';
 
+import { CoworkSessionStatus } from '../../../shared/cowork/constants';
 import {
   CoworkInterruptionCause,
   type CoworkSessionInterruption,
 } from '../../../shared/cowork/interruption';
 import type { CoworkMessage } from '../../coworkStore';
+import { interruptedToolResult } from '../../coworkStore/messageStore';
 import type { ActivePiSession } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
 
@@ -41,21 +43,20 @@ export function disposePiSessionForRecreation(
   active.toolStartedAtByCallId.clear();
   const clearActivity = active.toolActivityTracker.clear();
   if (clearActivity) host.emit('toolActivity', sessionId, clearActivity);
-  active.piSession.abortBash();
-  active.abortController.abort();
-  active.unsubscribe();
-  void active.piSession.abort();
-  active.piSession.dispose?.();
-  observeWorkbench(sessionId, () => {
-    host
-      .getWorkbenchTaskService()
-      ?.cancelRun?.(
-        sessionId,
-        active.workbenchRunId,
-        'The session resources changed before completion.',
-      );
-  });
-  host.recovery.clearApprovalsBySession(sessionId);
+  host.stopNativeSession(sessionId, active);
+  const { workbenchRunId } = active;
+  if (workbenchRunId) {
+    observeWorkbench(sessionId, () => {
+      host
+        .getWorkbenchTaskService(sessionId)
+        ?.cancelRun?.(
+          sessionId,
+          workbenchRunId,
+          'The session resources changed before completion.',
+        );
+    });
+  }
+  host.clearToolPermissionsBySession(sessionId);
   host.memoryInjectionDedup.reset(sessionId);
   host.activeSessions.delete(sessionId);
 }
@@ -64,8 +65,10 @@ export function stopActivePiRuntimeSession(
   host: PiRuntimeAdapterHost,
   sessionId: string,
   reason: string,
-  cause?: CoworkInterruptionCause,
+  options?: { cause?: CoworkInterruptionCause; discardTranscript?: boolean },
 ): void {
+  const cause = options?.cause;
+  const persistTranscript = !options?.discardTranscript;
   // Control actions are not durable user input: an explicit stop must not
   // carry them into a later session that reuses the same id.
   host.queue.dropControlActions(sessionId);
@@ -73,6 +76,8 @@ export function stopActivePiRuntimeSession(
   host.recovery.dismissCodingElicitationsBySession(sessionId, reason);
   const initializing = host.initializingSessions.get(sessionId);
   if (initializing) {
+    if (initializing.nativeAcquisition)
+      host.trackNativeSessionStop(sessionId, initializing.nativeAcquisition);
     initializing.abortController.abort();
     host.initializingSessions.delete(sessionId);
     initializing.onSettled?.({ ok: false, error: reason });
@@ -80,12 +85,16 @@ export function stopActivePiRuntimeSession(
   const active = host.activeSessions.get(sessionId);
   if (!active) {
     host.transcript.clearThrottleStateBySession(sessionId, false);
-    closeInterruptedToolUses(host, sessionId);
-    observeWorkbench(sessionId, () =>
-      host.getWorkbenchTaskService()?.cancelRun?.(sessionId, undefined, reason),
-    );
-    host.recovery.clearApprovalsBySession(sessionId);
-    if (cause && !host.retainedSessionIds.has(sessionId)) {
+    if (persistTranscript) closeInterruptedToolUses(host, sessionId);
+    if (!initializing || initializing.workbenchRunId) {
+      observeWorkbench(sessionId, () =>
+        host
+          .getWorkbenchTaskService(sessionId)
+          ?.cancelRun?.(sessionId, initializing?.workbenchRunId, reason),
+      );
+    }
+    host.clearToolPermissionsBySession(sessionId);
+    if (cause && (initializing || !host.retainedSessionIds.has(sessionId))) {
       recordSessionInterruption(host, sessionId, cause);
     }
     if (initializing) host.emit('sessionStopped', sessionId);
@@ -93,10 +102,16 @@ export function stopActivePiRuntimeSession(
   }
   if (!active.isRunning && active.aborted) return;
 
-  host.transcript.finalizeActiveThinking(sessionId, active);
-  // Close in-flight tools before the turn is marked paused. Otherwise resume
-  // starts a new command while the previous one still looks "running".
-  closeInterruptedToolUses(host, sessionId);
+  const transcriptErrors: unknown[] = [];
+  if (persistTranscript) {
+    try {
+      host.transcript.finalizeActiveThinking(sessionId, active);
+      // Close in-flight tools before the turn is marked paused.
+      closeInterruptedToolUses(host, sessionId);
+    } catch (error) {
+      transcriptErrors.push(error);
+    }
+  }
 
   // Mark the session as aborted so continueSession knows not to reuse the Pi
   // session object, which may be in an inconsistent state after abort.
@@ -116,81 +131,63 @@ export function stopActivePiRuntimeSession(
 
   // Drop the Pi session after the turn is aborted. IM routing still treats the
   // session as active via retainedSessionIds, and the next turn rebuilds from SQLite.
-  active.piSession.abortBash();
-  active.abortController.abort();
-  active.unsubscribe();
-  void active.piSession.abort();
-  active.piSession.dispose?.();
+  host.stopNativeSession(sessionId, active);
   host.queue.resetNativeDispatch(sessionId);
-  observeWorkbench(sessionId, () =>
-    host.getWorkbenchTaskService()?.cancelRun?.(sessionId, active.workbenchRunId, reason),
-  );
-  host.recovery.clearApprovalsBySession(sessionId);
+  const { workbenchRunId } = active;
+  if (workbenchRunId) {
+    observeWorkbench(sessionId, () =>
+      host.getWorkbenchTaskService(sessionId)?.cancelRun?.(sessionId, workbenchRunId, reason),
+    );
+  }
+  host.clearToolPermissionsBySession(sessionId);
   onSettled?.({ ok: false, error: reason });
   host.emit('sessionStopped', sessionId);
-  if (cause) recordSessionInterruption(host, sessionId, cause);
+  if (cause) {
+    try {
+      recordSessionInterruption(host, sessionId, cause);
+    } catch (error) {
+      transcriptErrors.push(error);
+    }
+  }
 
   // Stopping closes idle placeholders so a partial answer bubble with
   // isStreaming metadata cannot stay in flight after the run is gone; any
   // partial body it persists is bounded by the checkpoint policy.
-  host.transcript.closeIdlePlaceholders(sessionId, active);
+  if (persistTranscript) {
+    try {
+      host.transcript.closeIdlePlaceholders(sessionId, active);
+    } catch (error) {
+      transcriptErrors.push(error);
+    }
+  }
   releaseStoppedSession(host, sessionId);
-
   host.queue.clear(sessionId);
+  if (transcriptErrors.length === 1) throw transcriptErrors[0];
+  if (transcriptErrors.length > 1) {
+    throw new AggregateError(
+      transcriptErrors,
+      `Failed to finalize the transcript for ${sessionId}.`,
+    );
+  }
 }
 
 /** Persist a terminal result for tool calls still open when the user pauses. */
 function closeInterruptedToolUses(host: PiRuntimeAdapterHost, sessionId: string): void {
-  const store = host.getStore();
-  if (!store || typeof store.getSessionMessagesDesc !== 'function') return;
-
-  // Scan through the page containing the latest user message. Keep that
-  // whole boundary page so nearby orphan tool calls still receive terminal
-  // results, as in the previous full scan. Persist results oldest-first.
-  const tailNewestFirst: CoworkMessage[] = [];
-  const pageSize = 200;
-  let offset = 0;
+  const messageStore = host.getStore(sessionId)?.messages;
+  if (!messageStore) return;
+  let openCalls: string[];
   try {
-    for (;;) {
-      const page = store.getSessionMessagesDesc(sessionId, pageSize, offset);
-      if (page.length === 0) break;
-      offset += page.length;
-      tailNewestFirst.push(...page);
-      if (page.some(message => message.type === 'user') || page.length < pageSize) break;
-    }
+    openCalls = messageStore.listOpenToolUseIds(sessionId);
   } catch {
     return;
   }
-  if (tailNewestFirst.length === 0) return;
-  const messages = tailNewestFirst.reverse();
-
-  const closed = new Set<string>();
-  for (const message of messages) {
-    if (message.type !== 'tool_result') continue;
-    const toolUseId = message.metadata?.toolUseId;
-    if (typeof toolUseId === 'string' && toolUseId) closed.add(toolUseId);
-  }
-
-  for (const message of messages) {
-    if (message.type !== 'tool_use') continue;
-    const toolUseId = message.metadata?.toolUseId;
-    if (typeof toolUseId !== 'string' || !toolUseId || closed.has(toolUseId)) continue;
-    const result: CoworkMessage = {
-      id: randomUUID(),
-      type: 'tool_result',
-      content: 'The command was interrupted because the task was paused.',
-      timestamp: Date.now(),
-      metadata: {
-        toolUseId,
-        isError: true,
-        error: 'interrupted',
-        isStreaming: false,
-        isFinal: true,
-      },
-    };
-    const persisted = store.addMessage(sessionId, result);
+  for (const toolUseId of openCalls) {
+    const result = interruptedToolResult(
+      toolUseId,
+      'The command was interrupted because the task was paused.',
+    );
+    const persisted = messageStore.addMessage(sessionId, result);
     host.emit('message', sessionId, persisted);
-    closed.add(toolUseId);
   }
 }
 
@@ -198,7 +195,7 @@ function recordSessionInterruption(
   host: PiRuntimeAdapterHost,
   sessionId: string,
   cause: CoworkInterruptionCause,
-): CoworkSessionInterruption {
+): void {
   const interruption: CoworkSessionInterruption = {
     sessionId,
     interruptionId: randomUUID(),
@@ -213,53 +210,62 @@ function recordSessionInterruption(
     timestamp: Date.now(),
     metadata: { interruption },
   };
-  const store = host.getStore();
-  const message = store ? store.addMessage(sessionId, seed) : seed;
-  store?.updateSession(sessionId, { status: 'idle' });
+  const store = host.getStore(sessionId);
+  const message = store
+    ? store.messages.addMessage(sessionId, seed, seed.timestamp, CoworkSessionStatus.Idle)
+    : seed;
   host.emit('message', sessionId, message);
   host.emit('sessionInterrupted', interruption);
-  return interruption;
 }
 
 export function stopAllPiRuntimeSessions(host: PiRuntimeAdapterHost): void {
   const sessionIds = new Set([...host.activeSessions.keys(), ...host.initializingSessions.keys()]);
+  const errors: unknown[] = [];
   for (const sessionId of sessionIds) {
-    stopActivePiRuntimeSession(host, sessionId, 'The application stopped the active session.');
-    // Quit stops carry no interruption cause (no interruption record is
-    // written), but the status projection must not survive as a zombie
-    // 'running' row until the next launch's bulk reset.
-    host.getStore()?.updateSession(sessionId, { status: 'idle' });
+    try {
+      stopActivePiRuntimeSession(host, sessionId, 'The application stopped the active session.');
+    } catch (error) {
+      errors.push(error);
+    }
   }
   host.transcript.clearAll();
-  void host.cadViewerService.stop();
+  if (errors.length) throw new AggregateError(errors, 'Failed to close all Pi session state.');
 }
 
-export function onPiSessionDeleted(host: PiRuntimeAdapterHost, sessionId: string): void {
-  stopActivePiRuntimeSession(host, sessionId, 'The session was deleted.');
-  host.recovery.clearApprovalsBySession(sessionId);
+export async function onPiSessionDeleted(
+  host: PiRuntimeAdapterHost,
+  sessionId: string,
+  piHistoryKey?: string | null,
+): Promise<void> {
+  stopActivePiRuntimeSession(host, sessionId, 'The session was deleted.', {
+    discardTranscript: true,
+  });
+  host.clearToolPermissionsBySession(sessionId);
   host.memoryInjectionDedup.reset(sessionId);
   host.activeSessions.delete(sessionId);
   host.retainedSessionIds.delete(sessionId);
   host.transcript.clearThrottleStateBySession(sessionId, true);
   // queue.clear emits queueUpdated itself when the session had queued items.
   host.queue.clear(sessionId);
-  observeWorkbench(sessionId, () => host.getWorkbenchTaskService()?.deleteSession(sessionId));
-  // The deleted session's Pi JSONL must go with it: it holds the only other
-  // copy of the conversation and a reused cowork session id must start clean.
-  host.invalidatePiSessionDir(sessionId);
+  await host.waitForNativeSessionStop(sessionId);
+  await host.invalidatePiSessionDir(sessionId, piHistoryKey);
 }
 
 export function evictIdlePiRuntimeSessions(host: PiRuntimeAdapterHost, now = Date.now()): void {
   const idle = [...host.activeSessions.values()]
     .filter(session => {
-      if (session.isRunning) return false;
+      if (session.isRunning || session.revalidatingModelScope) return false;
+      if (session.artifactRecorder?.pendingFinalCapture) return false;
       if (host.queue.hasPendingFollowUp(session.sessionId)) return false;
       if (host.queue.hasQueuedControlActions(session.sessionId)) return false;
       return now - session.lastUsedAt >= IDLE_SESSION_TTL_MS;
     })
     .sort((left, right) => left.lastUsedAt - right.lastUsedAt);
   const residentIdle = [...host.activeSessions.values()].filter(
-    session => !session.isRunning && !host.queue.hasPendingFollowUp(session.sessionId),
+    session =>
+      !session.isRunning &&
+      !session.revalidatingModelScope &&
+      !host.queue.hasPendingFollowUp(session.sessionId),
   ).length;
   const excessCount = Math.max(0, residentIdle - MAX_RESIDENT_IDLE_SESSIONS);
   const expired = idle.filter(session => now - session.lastUsedAt >= IDLE_SESSION_TTL_MS);
@@ -270,10 +276,7 @@ export function evictIdlePiRuntimeSessions(host: PiRuntimeAdapterHost, now = Dat
   ];
   for (const session of candidates) {
     session.artifactRecorder?.dispose();
-    session.unsubscribe();
-    session.piSession.abortBash();
-    void session.piSession.abort();
-    session.piSession.dispose?.();
+    host.stopNativeSession(session.sessionId, session);
     host.queue.resetNativeDispatch(session.sessionId);
     host.memoryInjectionDedup.reset(session.sessionId);
     host.activeSessions.delete(session.sessionId);

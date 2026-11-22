@@ -4,9 +4,7 @@ import {
   ApiFormat,
   clampRuntimeContextWindow,
   createLlamaCppRuntimeSnapshot,
-  createOllamaRuntimeSnapshot,
   ModelCapabilityStatus,
-  parseLlamaCppRuntimeCapabilities,
   ProviderName,
   ProviderRegistry,
   resolveModelEndpoint,
@@ -331,63 +329,33 @@ test('an explicit baseUrl override still wins while modelBaseUrl surfaces the mo
   expect(endpoint.modelBaseUrl).toBe('https://gateway.example.test/bench-anthropic');
 });
 
-test('llama.cpp runtime capabilities map declared modalities', () => {
-  expect(
-    parseLlamaCppRuntimeCapabilities({
-      modalities: { vision: true, video: true, audio: false },
-      chat_template_caps: { supports_tools: true },
-    }),
-  ).toEqual({
-    toolCalling: ModelCapabilityStatus.Supported,
-    imageInput: ModelCapabilityStatus.Supported,
-    videoInput: ModelCapabilityStatus.Supported,
-    audioInput: ModelCapabilityStatus.Unsupported,
-  });
-
-  expect(
-    parseLlamaCppRuntimeCapabilities({
-      modalities: { vision: false, audio: true },
-      chat_template_caps: { supports_tools: false },
-    }),
-  ).toEqual({
-    toolCalling: ModelCapabilityStatus.Unsupported,
-    imageInput: ModelCapabilityStatus.Unsupported,
-    audioInput: ModelCapabilityStatus.Supported,
-  });
-
-  expect(parseLlamaCppRuntimeCapabilities({ chat_template_caps: {} }).toolCalling).toBeUndefined();
-});
-
 test('runtime context never exceeds trained context', () => {
   expect(clampRuntimeContextWindow(32_000, 16_000)).toBe(16_000);
   expect(clampRuntimeContextWindow(8_000, 16_000)).toBe(8_000);
 });
 
-test('local runtime adapters expose loaded state and detected metadata', () => {
-  expect(
-    createOllamaRuntimeSnapshot({
-      serviceStatus: 'running',
-      showModel: { capabilities: ['completion'] },
-    }).detectedCapabilities?.toolCalling,
-  ).not.toBe(ModelCapabilityStatus.Supported);
-
-  expect(
-    createOllamaRuntimeSnapshot({
-      serviceStatus: 'running',
-      modelId: 'qwen3:8b',
-      runningModel: { name: 'qwen3:8b', context_length: 8192 },
-      showModel: { capabilities: ['vision', 'thinking'] },
-    }),
-  ).toMatchObject({
-    kind: 'ollama',
-    status: 'loaded',
-    runtimeContextWindow: 8192,
-    detectedCapabilities: {
-      imageInput: ModelCapabilityStatus.Supported,
-      reasoning: ModelCapabilityStatus.Supported,
-    },
+test('an external loopback endpoint uses generic runtime metadata', () => {
+  const endpoint = resolveModelEndpoint('custom-loopback', 'qwen3:8b', {
+    apiFormat: ApiFormat.OpenAI,
+    baseUrl: 'http://127.0.0.1:31400/v1',
+    apiKey: ' test-key ',
   });
 
+  expect(endpoint).toMatchObject({
+    providerId: 'custom-loopback',
+    modelId: 'qwen3:8b',
+    protocol: 'openai',
+    baseUrl: 'http://127.0.0.1:31400/v1',
+    apiKey: 'test-key',
+    runtime: { kind: 'cloud', status: 'unknown' },
+  });
+});
+
+test('llama.cpp runtime snapshots expose loaded state and detected metadata', () => {
+  expect(resolveModelEndpoint(ProviderName.LlamaCpp, 'local').runtime).toEqual({
+    kind: 'llamacpp',
+    status: 'unknown',
+  });
   expect(
     createLlamaCppRuntimeSnapshot({
       serviceStatus: 'running',
@@ -396,13 +364,20 @@ test('local runtime adapters expose loaded state and detected metadata', () => {
         status: 'loaded',
         runtime_context_length: 4096,
         trained_context_length: 8192,
+        supportsThinkingToggle: true,
       },
+      detectedCapabilities: { imageInput: ModelCapabilityStatus.Supported },
     }),
   ).toMatchObject({
     kind: 'llamacpp',
     status: 'loaded',
+    runtimeModelId: 'local',
     runtimeContextWindow: 4096,
     trainedContextWindow: 8192,
+    detectedCapabilities: {
+      imageInput: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
   });
 });
 

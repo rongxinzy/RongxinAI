@@ -1,7 +1,7 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { realpath, stat } from 'node:fs/promises';
 import type Database from 'better-sqlite3';
-import { CoworkSessionMode, CoworkPermissionMode } from '../../shared/cowork/constants';
+import { CoworkSessionMode } from '../../shared/cowork/constants';
 import { CompanionUnavailableReason } from '../../shared/companion/constants';
 import {
   companionTaskRequest,
@@ -11,18 +11,17 @@ import {
   type CompanionTaskResult,
 } from '../../shared/companion/tasks';
 import type { CompanionProfile } from '../../shared/companion/types';
+import { WorkbenchExecutionStatus } from '../../shared/workbenchTask';
 import {
-  WorkbenchContractKind,
-  WorkbenchExecutionStatus,
-  WorkbenchRunTrigger,
-} from '../../shared/workbenchTask';
-import { prepareCoworkSession, type CoworkSessionIpcDeps } from '../coworkIpc/sessionStart';
+  prepareCoworkSession,
+  resolveCoworkStartExperts,
+  resolveCoworkStartWorkspace,
+  type CoworkSessionIpcDeps,
+} from '../coworkIpc/sessionStart';
 import type { MagpieModelService } from '../magpie/modelService';
-import type { WorkbenchTaskService } from '../workbenchTask/taskService';
-import { observeWorkbench } from '../workbenchTask/observe';
 import { companionInstructions } from './personas';
 import { CompanionAttachments } from './attachments';
-import { initializeCompanionTaskAdmissions } from './taskOwnership';
+import { resolveCompanionTaskOwner } from './taskOwnership';
 
 interface Row extends CompanionTaskReceipt {
   fingerprint: string;
@@ -31,7 +30,6 @@ interface Options {
   db: Database.Database;
   sessions: CoworkSessionIpcDeps;
   models: Pick<MagpieModelService, 'resolveAutomatic'>;
-  tasks: WorkbenchTaskService;
 }
 
 /** Ownership links only; canonical Cowork/Workbench tables remain the task and run authority. */
@@ -40,25 +38,12 @@ export class CompanionTasks {
   readonly attachments: CompanionAttachments;
   constructor(private readonly options: Options) {
     this.attachments = new CompanionAttachments(options.db);
-    initializeCompanionTaskAdmissions(options.db);
-    // Queued work left by a previous process never silently replays external effects.
-    const queued = options.db
-      .prepare(`SELECT a.session_id AS sessionId FROM companion_task_admissions a
-      JOIN workbench_runs r ON r.id = a.run_id
-      JOIN workbench_tasks t ON t.id = a.task_id AND t.active_run_id = r.id WHERE r.status = ?`)
-      .all(WorkbenchExecutionStatus.Queued) as { sessionId: string }[];
-    for (const { sessionId } of queued)
-      observeWorkbench(sessionId, () =>
-        options.tasks.failRun(sessionId, {
-          message: 'Task admission was interrupted before execution.',
-        }),
-      );
   }
 
   workspaces() {
     return this.options.sessions
       .getCoworkStore()
-      .listWorkspaces()
+      .workspaces.listWorkspaces()
       .filter(workspace => !workspace.isHidden)
       .map(({ id, name }) => ({ id, name }));
   }
@@ -67,17 +52,18 @@ export class CompanionTasks {
   async chooseWorkspace(selectedPath: string) {
     const directory = await realpath(selectedPath);
     if (!(await stat(directory)).isDirectory()) throw new Error('Workspace must be a directory');
-    const store = this.options.sessions.getCoworkStore();
-    const workspace = store.ensureWorkspace(directory);
-    if (workspace.isHidden) store.setWorkspaceHidden(workspace.id, false);
+    const workspaces = this.options.sessions.getCoworkStore().workspaces;
+    const workspace = workspaces.ensureWorkspace(directory);
+    if (workspace.isHidden) workspaces.setWorkspaceHidden(workspace.id, false);
     return { id: workspace.id, name: workspace.name };
   }
 
   onChanged(listener: (sessionId: string) => void): () => void {
     const changed = (event: { sessionId: string }) => listener(event.sessionId);
-    this.options.tasks.on('changed', changed);
+    const tasks = this.options.sessions.getWorkbenchTaskService();
+    tasks.on('changed', changed);
     return () => {
-      this.options.tasks.off('changed', changed);
+      tasks.off('changed', changed);
     };
   }
 
@@ -109,39 +95,40 @@ export class CompanionTasks {
     const previous = this.find(profile.petId, request.requestId);
     if (previous) return this.existing(previous, fingerprint);
     const store = this.options.sessions.getCoworkStore();
-    const workspace = store.getWorkspace(request.workspaceId);
+    const workspace = store.workspaces.getWorkspace(request.workspaceId);
     if (!workspace || workspace.isHidden) throw new Error('Unknown task workspace');
     let model;
     try {
-      model = await this.options.models.resolveAutomatic();
+      model = await this.options.models.resolveAutomatic(undefined, { work: true });
     } catch {
       return { receipt: null, reason: CompanionUnavailableReason.ServiceUnavailable };
     }
     if (!model) return { receipt: null, reason: CompanionUnavailableReason.NoModel };
-    const attachments = await this.attachments.resolve(profile.petId, request.attachmentIds);
+    const { fileAttachments } = await this.attachments.resolve(
+      profile.petId,
+      request.attachmentIds,
+    );
+    const modelPrompt = fileAttachments.length
+      ? [
+          request.text,
+          'Files explicitly attached to this task (references only):',
+          ...fileAttachments.map(({ name, path }) => JSON.stringify({ name, path })),
+        ].join('\n\n')
+      : undefined;
+    const experts = await resolveCoworkStartExperts(this.options.sessions, {});
+    const startWorkspace = await resolveCoworkStartWorkspace(this.options.sessions, {
+      workspaceId: workspace.id,
+      cwd: workspace.path,
+    });
 
     const launch: { current?: () => void } = {};
-    const modelId = model.model.id;
+    const modelId = model.modelId;
     const result = this.options.db.transaction((): CompanionTaskResult => {
       // Another request may have committed while model availability was being resolved.
       const existing = this.find(profile.petId, request.requestId);
       if (existing) return this.existing(existing, fingerprint);
-      const sessionId = randomUUID();
-      const taskId = randomUUID();
-      const runId = randomUUID();
-      const repository = this.options.tasks.repository;
-      observeWorkbench(sessionId, () =>
-        repository.transaction(() => {
-          repository.createTask(
-            sessionId,
-            request.text,
-            { kind: WorkbenchContractKind.GenericWork },
-            taskId,
-          );
-          repository.createRun(taskId, WorkbenchRunTrigger.Message, runId);
-          repository.updateTaskStatus(taskId, WorkbenchExecutionStatus.Queued, runId);
-        }),
-      );
+      if (startWorkspace.workspace?.path !== workspace.path || startWorkspace.workspace.isHidden)
+        throw new Error('Unknown task workspace');
       const prepared = prepareCoworkSession(
         this.options.sessions,
         {
@@ -150,42 +137,23 @@ export class CompanionTasks {
           cwd: workspace.path,
           mode: CoworkSessionMode.Work,
           modelOverride: modelId,
-          ...attachments,
-          // Keep the existing user permission choice. Personality never grants authority.
-          permissionMode: store.getConfig().permissionMode ?? CoworkPermissionMode.Ask,
-          systemPrompt: [
-            store.getConfig().systemPrompt,
-            companionInstructions(profile.personaId),
-            attachments.fileAttachments.length
-              ? [
-                  'Files explicitly attached to this task (references only):',
-                  ...attachments.fileAttachments.map(({ name, path }) =>
-                    JSON.stringify({ name, path }),
-                  ),
-                ].join('\n')
-              : undefined,
-          ]
+          fileAttachments,
+          systemPrompt: [store.getConfig().systemPrompt, companionInstructions(profile.personaId)]
             .filter(Boolean)
             .join('\n\n'),
         },
         {
-          sessionId,
-          workbenchRunId: runId,
-          workbenchTaskId: taskId,
-          onFailure: error =>
-            observeWorkbench(sessionId, () =>
-              this.options.tasks.failRun(sessionId, {
-                message: error instanceof Error ? error.message : String(error),
-              }),
-            ),
+          ...experts,
+          modelPrompt,
+          startWorkspace,
         },
       );
+      if (!prepared.workbenchReservation) throw new Error('Companion Work run was not reserved');
       const receipt = {
         petId: profile.petId,
         requestId: request.requestId,
         sessionId: prepared.session.id,
-        taskId,
-        runId,
+        ...prepared.workbenchReservation,
       };
       this.options.db
         .prepare(`INSERT INTO companion_task_admissions
@@ -215,20 +183,12 @@ export class CompanionTasks {
   }
 
   owned(petId: string, sessionId: string): boolean {
-    return Boolean(
-      this.options.db
-        .prepare('SELECT 1 FROM companion_task_admissions WHERE pet_id = ? AND session_id = ?')
-        .get(petId, sessionId),
-    );
+    return resolveCompanionTaskOwner(this.options.db, sessionId) === petId;
   }
 
   stop(petId: string, sessionId: string): void {
     if (!this.owned(petId, sessionId)) throw new Error('Task belongs to another companion');
     this.options.sessions.getPiRuntimeAdapter().stopSession(sessionId);
-    observeWorkbench(sessionId, () => {
-      const task = this.options.tasks.getCurrent(sessionId)?.task;
-      if (task?.activeRunId) this.options.tasks.cancelRun(sessionId, task.activeRunId);
-    });
   }
 
   snapshot(petId: string) {
@@ -237,26 +197,23 @@ export class CompanionTasks {
 
   recent(petId: string): CompanionTaskProjection[] {
     const rows = this.options.db
-      .prepare(`SELECT pet_id AS petId, request_id AS requestId,
-      fingerprint, session_id AS sessionId, task_id AS taskId, run_id AS runId
-      FROM companion_task_admissions WHERE pet_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 12`)
-      .all(petId) as Row[];
-    return rows.map(row => {
-      const session = this.options.sessions
-        .getCoworkStore()
-        .getSession(row.sessionId, 0, { includeArtifacts: false });
-      const task = this.options.tasks.repository.getTask(row.taskId);
-      const latest = this.options.db
-        .prepare('SELECT id FROM workbench_runs WHERE task_id = ? ORDER BY attempt DESC LIMIT 1')
-        .get(row.taskId) as { id: string } | undefined;
-      const run = this.options.tasks.repository.getRun(
-        task?.activeRunId ?? latest?.id ?? row.runId,
-      );
+      .prepare<[string], CompanionTaskReceipt & { title: string | null }>(`
+        SELECT a.pet_id AS petId, a.request_id AS requestId, a.session_id AS sessionId,
+          a.task_id AS taskId, a.run_id AS runId, s.title
+        FROM companion_task_admissions a LEFT JOIN cowork_sessions s ON s.id = a.session_id
+        WHERE a.pet_id = ? ORDER BY a.created_at DESC, a.rowid DESC LIMIT 12`)
+      .all(petId);
+    if (!rows.length) return [];
+    const statuses = this.options.sessions
+      .getWorkbenchTaskService()
+      .repository.getLatestTaskStatuses(rows.map(row => row.sessionId));
+    return rows.map(({ title, ...receipt }) => {
+      const status = statuses.get(receipt.sessionId);
       return {
-        receipt: this.receipt(row),
-        title: session?.title ?? '',
-        status: run?.status ?? WorkbenchExecutionStatus.Cancelled,
-        missing: !session || !task || !run,
+        receipt,
+        title: title ?? '',
+        status: status ?? WorkbenchExecutionStatus.Cancelled,
+        missing: title === null || status === undefined,
       };
     });
   }

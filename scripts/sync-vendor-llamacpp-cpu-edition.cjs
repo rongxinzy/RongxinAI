@@ -321,13 +321,16 @@ function runVersionSmoke(executablePath, platform) {
 
 async function installBackendEntry(releaseTag, entry, hostPlatform) {
   const assetName = resolveOfficialRuntimeAssetName(entry.targetId);
-  const urls = resolveRuntimeDownloadSources(entry.targetId, { rootDir: ROOT });
+  const expectedSha256 = readExpectedArchiveSha256(assetName);
+  const urls = resolveRuntimeDownloadSources(entry.targetId, {
+    rootDir: ROOT,
+    allowOfficialFallback: Boolean(expectedSha256),
+  });
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-cpu-edition-'));
   const archivePath = path.join(tempDir, assetName);
   const extractDir = path.join(tempDir, 'extract');
   try {
     const sourceUrl = await downloadToFile(urls, archivePath);
-    const expectedSha256 = readExpectedArchiveSha256(assetName);
     if (expectedSha256) {
       const actualSha256 = sha256File(archivePath);
       if (actualSha256 !== expectedSha256) {

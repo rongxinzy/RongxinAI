@@ -4,6 +4,7 @@
  * CoworkStore facade so the split modules stay contract-compatible.
  */
 import { beforeEach, expect, test, vi } from 'vitest';
+import { CoworkMessageType, CoworkSessionStatus } from '../../shared/cowork/constants';
 
 vi.mock('electron', () => ({
   app: { getAppPath: () => '/mock' },
@@ -20,6 +21,35 @@ let harness: CoworkStoreTestHarness;
 
 beforeEach(() => {
   harness = createCoworkStoreHarness();
+});
+
+test('commits an interruption message and its idle status as one write', () => {
+  const { db, store } = harness;
+  const sessionId = 'stopped-session';
+  insertSessionRow(db, sessionId);
+  store.updateSession(sessionId, { status: CoworkSessionStatus.Error });
+  db.exec(`CREATE TRIGGER fail_idle_update BEFORE UPDATE OF status ON cowork_sessions
+    WHEN NEW.status = '${CoworkSessionStatus.Idle}'
+    BEGIN SELECT RAISE(ABORT, 'Idle write failed'); END`);
+  const append = () =>
+    store.messages.addMessage(
+      sessionId,
+      { type: CoworkMessageType.System, content: 'Stopped.' },
+      123,
+      CoworkSessionStatus.Idle,
+    );
+  expect(append).toThrow('Idle write failed');
+  expect(store.getSession(sessionId)).toMatchObject({
+    status: CoworkSessionStatus.Error,
+    messages: [],
+  });
+  db.exec('DROP TRIGGER fail_idle_update');
+  const message = append();
+  expect(store.getSession(sessionId)).toMatchObject({
+    status: CoworkSessionStatus.Idle,
+    updatedAt: 123,
+    messages: [message],
+  });
 });
 
 test('getSession returns all messages when ALL have corrupt metadata', () => {
@@ -82,35 +112,6 @@ test('no console.warn when all metadata is valid or null', () => {
   warnSpy.mockRestore();
 });
 
-test('replaceConversationMessages preserves existing timestamps and uses gateway timestamps', () => {
-  const { db, store } = harness;
-  const sid = 'sess-replace-timestamps';
-  insertSessionRow(db, sid);
-
-  insertMessageRow(db, 'msg-user', sid, 'user', 'old user', '{}', 1, 1000);
-  insertMessageRow(db, 'msg-assistant', sid, 'assistant', 'old assistant', '{}', 2, 2000);
-
-  store.replaceConversationMessages(sid, [
-    { role: 'user', text: 'old user' },
-    { role: 'assistant', text: 'old assistant' },
-    { role: 'user', text: 'new user', timestamp: 3000 },
-  ]);
-
-  const session = store.getSession(sid);
-  expect(
-    session?.messages.map(message => ({
-      type: message.type,
-      content: message.content,
-      timestamp: message.timestamp,
-    })),
-  ).toEqual([
-    { type: 'user', content: 'old user', timestamp: 1000 },
-    { type: 'assistant', content: 'old assistant', timestamp: 2000 },
-    { type: 'user', content: 'new user', timestamp: 3000 },
-  ]);
-  expect(session?.updatedAt).toBe(3000);
-});
-
 test('updateMessage refreshes the session updated time', () => {
   const { db, store } = harness;
   const sid = 'sess-update-time';
@@ -121,7 +122,7 @@ test('updateMessage refreshes the session updated time', () => {
 
   const beforeUpdate = Date.now();
 
-  store.updateMessage(sid, 'msg-edit', { content: 'final' });
+  store.messages.updateMessage(sid, 'msg-edit', { content: 'final' });
 
   const session = store.getSession(sid);
   expect(session?.updatedAt).toBeGreaterThanOrEqual(beforeUpdate);
@@ -135,7 +136,7 @@ test('updateMessage can skip refreshing the session updated time', () => {
   insertMessageRow(db, 'msg-edit-skipped', sid, 'assistant', 'draft', null, 1);
   db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(1000, sid);
 
-  store.updateMessage(
+  store.messages.updateMessage(
     sid,
     'msg-edit-skipped',
     { content: 'streaming update' },
@@ -147,77 +148,30 @@ test('updateMessage can skip refreshing the session updated time', () => {
   expect(session?.messages[0]?.content).toBe('streaming update');
 });
 
-test('upsertMessage preserves the caller message id and replaces streaming content', () => {
+test('finds unmatched tool calls in transcript order across the newest user page', () => {
   const { db, store } = harness;
-  const sid = 'sess-upsert-message';
-  insertSessionRow(db, sid);
-
-  store.upsertMessage(sid, {
-    id: 'chat-assistant-1',
-    type: 'assistant',
-    content: 'draft',
-    timestamp: 1000,
-    metadata: { isStreaming: true, isFinal: false },
-  });
-  store.upsertMessage(sid, {
-    id: 'chat-assistant-1',
-    type: 'assistant',
-    content: 'final',
-    timestamp: 1000,
-    metadata: { isStreaming: false, isFinal: true },
-  });
-
-  expect(store.getSession(sid)?.messages).toEqual([
-    expect.objectContaining({
-      id: 'chat-assistant-1',
-      content: 'final',
-      metadata: { isStreaming: false, isFinal: true },
-    }),
-  ]);
-});
-
-test('getSessionMessagesDesc returns newest-first pages in reverse chronological order', () => {
-  const { db, store } = harness;
-  const sid = 'sess-desc';
-  insertSessionRow(db, sid);
-  for (let i = 1; i <= 7; i += 1) {
-    insertMessageRow(db, `m${i}`, sid, 'user', `msg-${i}`, null, i, 1000 + i);
+  const id = 'open-tools';
+  insertSessionRow(db, id);
+  const tool = (sequence: number, type: 'tool_use' | 'tool_result', toolUseId: string) =>
+    insertMessageRow(db, `m-${sequence}`, id, type, '', JSON.stringify({ toolUseId }), sequence);
+  tool(1, 'tool_use', 'too-old');
+  tool(8, 'tool_use', 'orphan');
+  insertMessageRow(db, 'latest-user', id, 'user', 'prompt', '{bad json', 18);
+  tool(19, 'tool_use', 'finished');
+  tool(20, 'tool_use', 'pending');
+  tool(21, 'tool_result', 'finished');
+  tool(22, 'tool_use', 'orphan');
+  insertMessageRow(db, 'bad-tool', id, 'tool_use', '', '{bad json', 23);
+  insertMessageRow(db, 'bad-id', id, 'tool_use', '', '{"toolUseId":{"nested":true}}', 24);
+  for (let index = 25; index <= 405; ++index) {
+    insertMessageRow(db, `m-${index}`, id, 'assistant', 'response', null, index);
   }
-
-  expect(store.getSessionMessagesDesc(sid, 3, 0).map(m => m.id)).toEqual(['m7', 'm6', 'm5']);
-  expect(store.getSessionMessagesDesc(sid, 3, 3).map(m => m.id)).toEqual(['m4', 'm3', 'm2']);
-  expect(store.getSessionMessagesDesc(sid, 3, 6).map(m => m.id)).toEqual(['m1']);
-  expect(store.getSessionMessagesDesc(sid, 3, 7)).toEqual([]);
-});
-
-test('getSessionMessagesDesc mirrors the ascending page order in reverse', () => {
-  const { db, store } = harness;
-  const sid = 'sess-desc-order';
-  insertSessionRow(db, sid);
-  for (let i = 1; i <= 10; i += 1) {
-    insertMessageRow(
-      db,
-      `m${i}`,
-      sid,
-      i % 2 === 1 ? 'user' : 'assistant',
-      `msg-${i}`,
-      null,
-      i,
-      1000 + i,
-    );
+  // Fill the sparse early range so the boundary page begins at row six.
+  for (const sequence of [2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17]) {
+    insertMessageRow(db, `m-${sequence}`, id, 'assistant', '', null, sequence);
   }
-
-  const ascending = store.getPagedSessionMessages(sid, 10, 0).map(m => m.id);
-  const descending: string[] = [];
-  let offset = 0;
-  for (;;) {
-    const page = store.getSessionMessagesDesc(sid, 4, offset);
-    if (page.length === 0) break;
-    descending.push(...page.map(m => m.id));
-    offset += page.length;
-    if (page.length < 4) break;
-  }
-  expect(descending).toEqual([...ascending].reverse());
+  expect(store.messages.listOpenToolUseIds(id)).toEqual(['orphan', 'pending']);
+  expect(store.messages.listOpenToolUseIds('other')).toEqual([]);
 });
 
 test('getSessionMessageStats aggregates totals without materializing messages', () => {
@@ -228,12 +182,12 @@ test('getSessionMessageStats aggregates totals without materializing messages', 
   // Multibyte content: 2 characters, 6 UTF-8 bytes — stats must count bytes.
   insertMessageRow(db, 'b', sid, 'assistant', '你好', null, 2);
 
-  const stats = store.getSessionMessageStats(sid);
+  const stats = store.messages.getSessionMessageStats(sid);
   expect(stats.messageCount).toBe(2);
   expect(stats.contentBytes).toBe(5 + 6);
   expect(stats.metadataBytes).toBe(Buffer.byteLength('{"x":1}', 'utf8'));
 
-  expect(store.getSessionMessageStats('missing-session')).toEqual({
+  expect(store.messages.getSessionMessageStats('missing-session')).toEqual({
     messageCount: 0,
     contentBytes: 0,
     metadataBytes: 0,
@@ -253,7 +207,7 @@ test('session message pages use the ordering index, not a temp b-tree sort', () 
   insertMessageRow(db, 'p1', sid, 'user', 'one', null, 1);
   db.exec(CREATE_SESSION_ORDER_INDEX);
 
-  // Keep the SQL text identical to getPagedSessionMessages / getSessionMessagesDesc.
+  // Keep the SQL text identical to getPagedSessionMessages.
   const pagedAsc = db
     .prepare(
       `EXPLAIN QUERY PLAN SELECT id, type, content, metadata, created_at, sequence
@@ -263,7 +217,7 @@ test('session message pages use the ordering index, not a temp b-tree sort', () 
     .all(sid, 50, 0) as Array<{ detail: string }>;
   const pagedDesc = db
     .prepare(
-      `EXPLAIN QUERY PLAN SELECT id, type, content, metadata, created_at, sequence
+      `EXPLAIN QUERY PLAN SELECT type
        FROM cowork_messages WHERE session_id = ?
        ORDER BY COALESCE(sequence, created_at) DESC, created_at DESC, ROWID DESC LIMIT ? OFFSET ?`,
     )
@@ -276,107 +230,101 @@ test('session message pages use the ordering index, not a temp b-tree sort', () 
   }
 });
 
-test('descending pages mirror ascending order across null sequences and timestamp ties', () => {
-  const { db, store } = harness;
-  const sid = 'sess-desc-ties';
-  insertSessionRow(db, sid);
-  const now = 1_700_000_000_000;
-  const insertRaw = (id: string, createdAt: number, sequence: number | null): void => {
-    db.prepare(
-      `INSERT INTO cowork_messages (id, session_id, type, content, metadata, created_at, sequence)
-       VALUES (?, ?, 'user', ?, NULL, ?, ?)`,
-    ).run(id, sid, id, createdAt, sequence);
-  };
-  // Gateway backfill can insert an older timestamp after newer rows; ties and
-  // null sequences must not break the reverse-page mirror.
-  insertRaw('tie-a', now, null);
-  insertRaw('tie-b', now, null);
-  insertRaw('seq-1', now - 10, 1);
-  insertRaw('seq-2', now - 5, 2);
-  insertRaw('backfill-older', now - 20, null);
-
-  const ascending = store.getPagedSessionMessages(sid, 10, 0).map(m => m.id);
-  const descending: string[] = [];
-  let offset = 0;
-  for (;;) {
-    const page = store.getSessionMessagesDesc(sid, 2, offset);
-    if (page.length === 0) break;
-    descending.push(...page.map(m => m.id));
-    offset += page.length;
-    if (page.length < 2) break;
-  }
-  expect(descending).toEqual([...ascending].reverse());
-});
-
 test('addMessage assigns monotonic sequences and refreshes the session updated time', () => {
   const { store } = harness;
   const session = store.createSession('messages', '/tmp/message-store');
 
-  const first = store.addMessage(session.id, { type: 'user', content: 'one' }, 1000);
-  const second = store.addMessage(session.id, { type: 'assistant', content: 'two' }, 2000);
+  const first = store.messages.addMessage(session.id, { type: 'user', content: 'one' }, 1000);
+  const second = store.messages.addMessage(session.id, { type: 'assistant', content: 'two' }, 2000);
 
   expect(first).toMatchObject({ type: 'user', content: 'one', timestamp: 1000, sequence: 1 });
   expect(second).toMatchObject({ type: 'assistant', content: 'two', timestamp: 2000, sequence: 2 });
   expect(store.getSession(session.id)?.messages.map(m => m.id)).toEqual([first.id, second.id]);
   expect(store.getSession(session.id)?.updatedAt).toBe(2000);
-  expect(store.countSessionMessages(session.id)).toBe(2);
+  expect(store.messages.countSessionMessages(session.id)).toBe(2);
 });
 
-test('insertMessageBeforeId shifts later sequences and lands before the target', () => {
-  const { store } = harness;
-  const sid = store.createSession('insert-before', '/tmp/insert-before').id;
-  const user = store.addMessage(sid, { type: 'user', content: 'question' }, 1000);
-  const assistant = store.addMessage(sid, { type: 'assistant', content: 'answer' }, 2000);
-  const followUp = store.addMessage(sid, { type: 'assistant', content: 'follow up' }, 3000);
+test('message writes roll back if their session timestamp cannot be committed', () => {
+  const { db, store } = harness;
+  const session = store.createSession('messages', '/tmp/message-store');
+  const id = session.id;
+  const first = store.messages.addMessage(id, { type: 'assistant', content: 'original' }, 1000);
+  db.exec(`
+    CREATE TEMP TRIGGER reject_session_touch BEFORE UPDATE OF updated_at ON cowork_sessions
+    BEGIN SELECT RAISE(ABORT, 'session timestamp write rejected'); END;
+  `);
 
-  const inserted = store.insertMessageBeforeId(sid, assistant.id, {
-    type: 'user',
-    content: 'channel message',
-  });
+  expect(() =>
+    store.messages.addMessage(id, { type: 'user', content: 'new message' }, 2000),
+  ).toThrow('session timestamp write rejected');
+  expect(() => store.messages.updateMessage(id, first.id, { content: 'replacement' })).toThrow(
+    'session timestamp write rejected',
+  );
+  expect(store.getSession(id)?.messages).toEqual([first]);
+  expect(store.getSession(id)?.updatedAt).toBe(1000);
 
-  expect(inserted.sequence).toBe(assistant.sequence);
-  expect(store.getPagedSessionMessages(sid, 10, 0).map(m => [m.id, m.sequence])).toEqual([
-    [user.id, 1],
-    [inserted.id, 2],
-    [assistant.id, 3],
-    [followUp.id, 4],
-  ]);
+  store.messages.updateMessage(id, first.id, { content: 'checkpoint' }, { touchUpdatedAt: false });
+  expect(store.messages.getMessage(id, first.id)?.content).toBe('checkpoint');
+  expect(store.getSession(id)?.updatedAt).toBe(1000);
+
+  db.exec('DROP TRIGGER reject_session_touch');
+  const second = store.messages.addMessage(id, { type: 'user', content: 'new message' }, 2000);
+  expect(second.sequence).toBe(2);
+  expect(store.getSession(id)?.updatedAt).toBe(2000);
 });
 
-test('insertMessageBeforeId falls back to an append when the target is missing', () => {
-  const { store } = harness;
-  const sid = store.createSession('insert-before-missing', '/tmp/insert-before-missing').id;
-  const first = store.addMessage(sid, { type: 'user', content: 'question' }, 1000);
-
-  const appended = store.insertMessageBeforeId(sid, 'missing-message-id', {
-    type: 'user',
-    content: 'appended',
+test('commits the final answer marker and idle status together after a failed turn', () => {
+  const { db, store } = harness;
+  const { id } = store.createSession('recovered turn', '/tmp/message-store');
+  store.updateSession(id, { status: CoworkSessionStatus.Error });
+  const answer = store.messages.addMessage(id, {
+    type: CoworkMessageType.Assistant,
+    content: 'done',
   });
+  const settle = () =>
+    store.messages.updateMessage(
+      id,
+      answer.id,
+      { metadata: { isFinalAnswer: true } },
+      { sessionStatus: CoworkSessionStatus.Idle },
+    );
+  db.exec(`CREATE TEMP TRIGGER reject_idle BEFORE UPDATE OF status ON cowork_sessions
+    WHEN NEW.status = '${CoworkSessionStatus.Idle}'
+    BEGIN SELECT RAISE(ABORT, 'idle status rejected'); END`);
+  expect(settle).toThrow('idle status rejected');
+  expect(store.messages.getMessage(id, answer.id)).toEqual(answer);
+  expect(store.getSession(id)?.status).toBe(CoworkSessionStatus.Error);
 
-  expect(appended.sequence).toBe(2);
-  expect(store.getPagedSessionMessages(sid, 10, 0).map(m => m.id)).toEqual([first.id, appended.id]);
+  db.exec('DROP TRIGGER reject_idle');
+  expect(settle()).toBe(true);
+  expect(store.messages.getMessage(id, answer.id)?.metadata).toEqual({ isFinalAnswer: true });
+  expect(store.getSession(id)?.status).toBe(CoworkSessionStatus.Idle);
 });
 
 test('deleteMessage removes only the targeted message', () => {
   const { store } = harness;
   const sid = store.createSession('delete-message', '/tmp/delete-message').id;
-  const first = store.addMessage(sid, { type: 'user', content: 'one' }, 1000);
-  const second = store.addMessage(sid, { type: 'assistant', content: 'two' }, 2000);
+  const first = store.messages.addMessage(sid, { type: 'user', content: 'one' }, 1000);
+  const second = store.messages.addMessage(sid, { type: 'assistant', content: 'two' }, 2000);
 
-  expect(store.deleteMessage(sid, first.id)).toBe(true);
-  expect(store.deleteMessage(sid, first.id)).toBe(false);
-  expect(store.getPagedSessionMessages(sid, 10, 0).map(m => m.id)).toEqual([second.id]);
+  expect(store.messages.deleteMessage(sid, first.id)).toBe(true);
+  expect(store.messages.deleteMessage(sid, first.id)).toBe(false);
+  expect(store.messages.getPagedSessionMessages(sid, 10, 0).map(m => m.id)).toEqual([second.id]);
 });
 
 test('getMessage returns a row only under its own session id', () => {
   const { store } = harness;
   const sidA = store.createSession('get-message-a', '/tmp/get-message-a').id;
   const sidB = store.createSession('get-message-b', '/tmp/get-message-b').id;
-  const message = store.addMessage(sidA, { type: 'assistant', content: 'checkpoint body' }, 1000);
+  const message = store.messages.addMessage(
+    sidA,
+    { type: 'assistant', content: 'checkpoint body' },
+    1000,
+  );
 
-  expect(store.getMessage(sidA, message.id)?.content).toBe('checkpoint body');
+  expect(store.messages.getMessage(sidA, message.id)?.content).toBe('checkpoint body');
   // The same message id asked under another session must not leak across rows.
-  expect(store.getMessage(sidB, message.id)).toBeNull();
-  expect(store.getMessage(sidA, 'no-such-message')).toBeNull();
-  expect(store.getMessage('no-such-session', message.id)).toBeNull();
+  expect(store.messages.getMessage(sidB, message.id)).toBeNull();
+  expect(store.messages.getMessage(sidA, 'no-such-message')).toBeNull();
+  expect(store.messages.getMessage('no-such-session', message.id)).toBeNull();
 });

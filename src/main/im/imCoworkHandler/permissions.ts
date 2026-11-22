@@ -5,7 +5,7 @@
 
 import type { Platform } from '../../../shared/platform';
 import type { PermissionRequest, PermissionResult } from '../../libs/agentEngine/types';
-import type { IMCoworkBackgroundDelivery, MessageAccumulator, PendingIMPermission } from './types';
+import type { MessageAccumulator, PendingIMPermission } from './types';
 
 const PERMISSION_CONFIRM_TIMEOUT_MS = 60_000;
 const IM_ALLOW_RESPONSE_RE = /^(允许|同意|yes|y)$/i;
@@ -92,8 +92,6 @@ export function accumulatorFromPendingPermissions(
 
   return {
     runId: pending.runId,
-    messages: [],
-    backgroundDelivery: pending.backgroundDelivery,
   };
 }
 
@@ -104,7 +102,6 @@ interface IMCoworkPendingPermissionEntry {
   request: PermissionRequest;
   conversationId: string;
   platform: Platform;
-  backgroundDelivery?: IMCoworkBackgroundDelivery;
 }
 
 export class IMCoworkPermissionRegistry {

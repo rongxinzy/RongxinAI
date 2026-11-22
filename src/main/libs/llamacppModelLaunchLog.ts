@@ -6,7 +6,6 @@ import {
   LlamaCppModelLaunchLogPhase,
   LlamaCppModelLaunchLogSource,
 } from '../../shared/llamacpp';
-import type { LlamaCppServiceStartupLogger } from './llamacppServiceStartup';
 
 export type LlamaCppModelLaunchLogInput = {
   level: LlamaCppModelLaunchLogLevel;
@@ -108,19 +107,6 @@ export function createLlamaCppModelLaunchLogger(input: {
   };
 }
 
-export function createLlamaCppServiceStartupLaunchLogger(
-  logger: LlamaCppModelLaunchLogger,
-): LlamaCppServiceStartupLogger {
-  return {
-    log: (...args: unknown[]) => {
-      reportServiceStartupLog(logger, LlamaCppModelLaunchLogLevel.Info, args);
-    },
-    warn: (...args: unknown[]) => {
-      reportServiceStartupLog(logger, LlamaCppModelLaunchLogLevel.Warn, args);
-    },
-  };
-}
-
 export async function withLlamaCppModelLaunchHeartbeat<T>(input: {
   logger: LlamaCppModelLaunchLogger;
   phase: LlamaCppModelLaunchLogPhase;
@@ -137,36 +123,6 @@ export async function withLlamaCppModelLaunchHeartbeat<T>(input: {
   } finally {
     clearInterval(timer);
   }
-}
-
-function reportServiceStartupLog(
-  logger: LlamaCppModelLaunchLogger,
-  level: LlamaCppModelLaunchLogLevel,
-  args: unknown[],
-): void {
-  const phase = resolveServiceStartupPhase(args);
-  if (phase !== LlamaCppModelLaunchLogPhase.StartingService) {
-    return;
-  }
-  logger.report({
-    level,
-    phase,
-    detail: stringifyDetail(args),
-  });
-}
-
-function resolveServiceStartupPhase(args: unknown[]): LlamaCppModelLaunchLogPhase {
-  const text = stringifyDetail(args).toLowerCase();
-  if (text.includes('starting service')) {
-    return LlamaCppModelLaunchLogPhase.StartingService;
-  }
-  if (text.includes('service is ready') || text.includes('already running')) {
-    return LlamaCppModelLaunchLogPhase.ServiceReady;
-  }
-  if (text.includes('failed')) {
-    return LlamaCppModelLaunchLogPhase.Failed;
-  }
-  return LlamaCppModelLaunchLogPhase.CheckingService;
 }
 
 function stringifyDetail(value: unknown): string {

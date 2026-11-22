@@ -33,3 +33,17 @@ export function getSkillsRoot(): string {
   // Final fallback for first-run dev environments where SKILLs may not exist yet.
   return join(app.getAppPath(), 'SKILLs');
 }
+
+/** Packaged fallback roots used when a bundled skill is unavailable in userData. */
+export function resolveBundledSkillsRoots(): string[] {
+  const roots: string[] = [];
+  if (typeof process.resourcesPath === 'string' && process.resourcesPath.length > 0) {
+    roots.push(join(process.resourcesPath, 'SKILLs'));
+  }
+  try {
+    if (typeof app.getAppPath === 'function') roots.push(join(app.getAppPath(), 'SKILLs'));
+  } catch {
+    // The resources path can still supply bundled skills.
+  }
+  return roots;
+}

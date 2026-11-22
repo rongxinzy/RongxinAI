@@ -25,6 +25,8 @@ describe('Kylin packaging', () => {
       ZHIYUAN_DEFAULT_LOCALE: 'zh-CN',
       ZHIYUAN_UPDATE_VARIANT: 'cpu',
       ZHIYUAN_DISTRIBUTION: 'kylin-v11',
+      UPDATE_MANIFEST_KEY_ID: '',
+      UPDATE_MANIFEST_PUBLIC_KEY_BASE64: '',
     });
   });
 
@@ -81,7 +83,7 @@ describe('Kylin packaging', () => {
     expect(workflow).toContain('bun install --frozen-lockfile --ignore-scripts');
   });
 
-  test('builds Magpie runtime resources before the RPM installer', () => {
+  test('delegates CPU preparation and packaging to the Linux CPU entrypoint with the RPM config', () => {
     const calls: string[][] = [];
     buildKylin({
       platform: 'linux',
@@ -92,19 +94,17 @@ describe('Kylin packaging', () => {
       },
     });
     expect(calls.map(call => call.join(' '))).toEqual([
-      'bun run channel:runtime:linux-x64',
-      'bun run engram:runtime:linux-x64',
-      'node scripts/ensure-build-version.js',
-      'bun run sync:vendor-llamacpp-cpu',
-      'bun run prepare:inference-edition-runtime',
-      'bun run build',
-      'bun run build:skills',
-      'bun run rebuild:electron-native:linux-packaging',
-      'bunx electron-builder --linux rpm --x64 --config electron-builder.kylin.cjs --publish never',
+      'bun run dist:linux:cpu -- --x64 --config electron-builder.kylin.cjs',
     ]);
   });
 
-  test('packages only the Kylin RPM target with a stable ASCII filename', () => {
+  test('validates the RPM configuration and keeps a stable ASCII filename', async () => {
+    const builderRequire = createRequire(require.resolve('electron-builder/package.json'));
+    const { validateConfiguration } = builderRequire(
+      'app-builder-lib/out/util/config/config.js',
+    ) as {
+      validateConfiguration(config: unknown, debugLogger: { isEnabled: false }): Promise<void>;
+    };
     const config = require('../../electron-builder.kylin.cjs') as {
       linux: {
         target: string[];
@@ -113,6 +113,7 @@ describe('Kylin packaging', () => {
         desktop: { entry: Record<string, string> };
       };
     };
+    await validateConfiguration(config, { isEnabled: false });
     expect(config.linux.target).toEqual(['rpm']);
     expect(config.linux.publish).toEqual([]);
     expect(config.linux.artifactName).toBe('ZhiYuanAgent-Kylin-V11-${version}-${arch}.${ext}');

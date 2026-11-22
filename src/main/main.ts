@@ -6,6 +6,7 @@
  * creation, startup sequencing) to the modules under `./appBootstrap/`.
  * The order of the calls below preserves the original bootstrap sequence.
  */
+import './libs/anysearchGatewayCredentials';
 import { app } from 'electron';
 
 import {
@@ -24,12 +25,12 @@ import { registerAppIpc } from './appIpc';
 import { registerSkillsIpc } from './skills/ipc';
 import { registerWorkspaceIpc } from './appBootstrap/workspaceIpc';
 import { setupMagpieRuntime } from './appBootstrap/magpieRuntime';
+import { createLocalInferenceRuntime } from './appBootstrap/localInferenceRuntime';
 import { registerCoworkQueueIpc } from './coworkIpc/queue';
 import { registerCoreIpc } from './appSystemIpc/core';
 import { registerManagedProvidersIpc } from './appSystemIpc/managedProviders';
 import { registerAppUpdateIpc } from './appUpdateIpc';
-import { registerShellIpc } from './shellIpc';
-import { getCodingRoomService } from './appBootstrap/codingRoomRuntime';
+import { createCodingRoomRuntime } from './appBootstrap/codingRoomRuntime';
 import { registerIntegrationsIpc } from './integrationsIpc';
 import { registerMcpIpc } from './mcpIpc';
 import { registerProjectIpc } from './projectIpc';
@@ -38,7 +39,6 @@ import { registerDialogIpc } from './dialogIpc';
 import { registerCoworkSessionIpc } from './coworkIpc/session';
 import { registerCoworkSessionAdminIpc } from './coworkIpc/sessionAdmin';
 import { registerArtifactIpc } from './artifactLedger/artifactIpc';
-import { registerCoworkExportIpc } from './coworkIpc/export';
 import { registerCoworkConfigIpc } from './coworkIpc/config';
 import { registerAgentIpc } from './agentIpc';
 import { registerScheduledTaskIpc } from '../scheduledTask/ipc';
@@ -48,42 +48,37 @@ import {
   getMcpStore,
   getSkillManager,
   getStore,
+  getIMStore,
 } from './appBootstrap/runtimeServices';
-import { getCoworkImageRoot } from './appBootstrap/coworkSessionImages';
-import { getPiRuntimeAdapter } from './appBootstrap/sessionServices';
-import { lifecycleRuntime } from './appBootstrap/lifecycleRuntimeState';
-import { channelRuntime } from './appBootstrap/channelRuntimeState';
+import { forgetCoworkSession } from './appBootstrap/coworkSessionImages';
+import { createCoworkSessionDeletion } from './coworkSessionDeletion';
 import {
-  getActiveMcpAuthorizations,
-  setActiveMcpAuthorizations,
-} from './appBootstrap/mcpRuntimeState';
+  coworkSessionDependencies,
+  getCanonicalScheduledTaskService,
+  getPiRuntimeAdapter,
+  getProjectMemoryService,
+  getWorkbenchTaskService,
+  hasRunningPiSessions,
+  markPiMcpConfigurationChanged,
+} from './appBootstrap/sessionServices';
+import { lifecycleRuntime } from './appBootstrap/lifecycleRuntimeState';
 import { getAgentManager, setPreventSleepBlockerEnabled } from './appBootstrap/runtimeServices';
 import {
   getDefaultProjectBaseDir,
   getUnmanagedWorkspaceBaseDir,
   isInternalWorkspacePath,
-  resolveSessionWorkingDirectory,
-  resolveTaskWorkingDirectory,
 } from './appBootstrap/workspacePaths';
 import { getDefaultConversationWorkspacePath } from './defaultConversationWorkspace';
-import {
-  getMagpieModelService,
-  isMagpieGatewayRunning,
-  synchronizeManagedMagpieCatalog,
-} from './appBootstrap/magpieRuntime';
 import { getAppUpdateCoordinator } from './appBootstrap/runtimeServices';
 import {
-  getCanonicalScheduledTaskService,
   getIMGatewayManager,
-} from './appBootstrap/ccConnectRuntime';
-import {
+  getChannelAccountRuntimeStatus,
+  hasIMGatewayManager,
   reconcileCcConnectChannelSidecars,
   refreshCcConnectPlatformStatuses,
-  resolveCcConnectSidecarExecutable,
+  setupCcConnectWeixin,
 } from './appBootstrap/ccConnectRuntime';
-import { resolveCcConnectAccountRuntimeStatus } from './libs/ccConnectAccountRuntimeStatus';
 import { showSystemMenu } from './appBootstrap/windowManagement';
-import { bumpCodingCommandCatalog } from './appBootstrap/codingRoomRuntime';
 import { resolveDefaultAgentModelRef } from './appBootstrap/defaultAgentModel';
 import { registerImGatewayIpc } from './imIpc/gateway';
 import { registerImInstanceIpc } from './imIpc/instance';
@@ -106,11 +101,21 @@ if (!gotTheLock) {
   // taking over a stale older-version instance, then exit.
   handleSecondInstanceExit();
 } else {
+  const deleteCoworkSessions = createCoworkSessionDeletion({
+    getCoworkStore,
+    getProjectMemoryService,
+    getIMStore,
+    getWorkbenchTaskService,
+    forgetSession: forgetCoworkSession,
+  });
   registerCommunityAuthBootstrap();
   registerCoreIpc({ getStore });
+  const localInference = createLocalInferenceRuntime(getStore);
+  const codingRoom = createCodingRoomRuntime();
+  const magpie = setupMagpieRuntime(localInference.readModelBindings);
   registerManagedProvidersIpc({
-    isMagpieRunning: isMagpieGatewayRunning,
-    synchronizeManagedCatalog: synchronizeManagedMagpieCatalog,
+    isMagpieRunning: magpie.isRunning,
+    synchronizeManagedCatalog: magpie.synchronizeCatalog,
   });
   registerAppIpc({
     isDev: () => isDev,
@@ -120,43 +125,37 @@ if (!gotTheLock) {
     showSystemMenu,
     reconcileCcConnectChannelSidecars,
     getMainWindow: () => lifecycleRuntime.mainWindow,
-    hasIMGatewayManager: () => channelRuntime.gatewayManager !== null,
+    hasIMGatewayManager,
   });
   registerCommunityAuthIpc();
   registerSkillsIpc({ getSkillManager, getStore });
-  registerMcpIpc({
+  const shutdownMcpAuthorizations = registerMcpIpc({
     getMcpStore,
     getStore,
-    getActiveMcpAuthorizations,
-    setActiveMcpAuthorizations,
+    onConfigurationChanged: () => {
+      markPiMcpConfigurationChanged();
+      codingRoom.bumpCommandCatalog();
+    },
   });
-  registerWorkspaceIpc();
+  registerWorkspaceIpc(workspaceId =>
+    deleteCoworkSessions({ workspaceId }, () =>
+      getCoworkStore().workspaces.deleteWorkspace(workspaceId),
+    ),
+  );
   registerProjectIpc({
     getDefaultProjectBaseDir,
     getUnmanagedWorkspaceBaseDir,
     getDefaultConversationWorkspacePath,
   });
-  setupMagpieRuntime();
-  registerCoworkSessionIpc({
-    getCoworkImageRoot,
-    getAgentManager,
-    getCoworkStore,
-    getPiRuntimeAdapter,
-    resolveSessionWorkingDirectory,
-    resolveTaskWorkingDirectory,
-  });
-  registerCoworkQueueIpc({
-    getPiRuntimeAdapter,
-    getCoworkStore,
-    getCoworkImageRoot,
-  });
+  registerCoworkSessionIpc(coworkSessionDependencies);
+  registerCoworkQueueIpc({ getPiRuntimeAdapter });
   registerCoworkSessionAdminIpc({
     getCoworkStore,
     getPiRuntimeAdapter,
-    getIMGatewayManager,
+    getIMStore,
+    deleteSessions: ids => deleteCoworkSessions({ ids }),
   });
   registerArtifactIpc();
-  registerCoworkExportIpc({ getPiRuntimeAdapter });
   registerCoworkConfigIpc({
     getCoworkStore,
     getSkillManager,
@@ -164,60 +163,50 @@ if (!gotTheLock) {
   });
   registerAgentIpc({
     getAgentManager,
-    getCoworkStore,
     getSkillManager,
-    getStore,
-    getIMGatewayManager,
-    bumpCodingCommandCatalog,
+    deleteAgentWithSessions: agentId =>
+      deleteCoworkSessions({ agentId }, () => getAgentManager().deleteAgent(agentId)),
+    bumpCodingCommandCatalog: codingRoom.bumpCommandCatalog,
     resolveDefaultAgentModelRef,
   });
   registerScheduledTaskIpc({
     getActivityService,
     getScheduledTaskService: getCanonicalScheduledTaskService,
-    getIMGatewayManager,
+    getIMStore,
   });
   registerPermissionsIpc();
   registerImGatewayIpc({
     getIMGatewayManager,
     reconcileCcConnectChannelSidecars,
     refreshCcConnectPlatformStatuses,
-    resolveCcConnectSidecarExecutable,
-    resolveCcConnectAccountRuntimeStatus: accountId =>
-      resolveCcConnectAccountRuntimeStatus(
-        channelRuntime.statuses,
-        accountId,
-        channelRuntime.sidecarManager?.running === true,
-      ),
+    setupCcConnectWeixin,
+    resolveCcConnectAccountRuntimeStatus: getChannelAccountRuntimeStatus,
   });
   registerImInstanceIpc({
     getIMGatewayManager,
     reconcileCcConnectChannelSidecars,
   });
   registerIntegrationsIpc({
-    getIMGatewayManager,
-    getMagpieModelService,
     isInternalWorkspacePath,
     getCoworkStore,
+    checkApiConfig: async () =>
+      lifecycleRuntime.isQuitting
+        ? { hasConfig: false, config: null }
+        : magpie.modelService.checkReadiness(),
   });
-  registerDialogIpc({ getCoworkStore });
-  registerShellIpc({
-    getCoworkStore,
-    getCodingWorkspaceRoots: () =>
-      getCodingRoomService()
-        .listWorkspaces()
-        .flatMap(workspace => [
-          workspace.primaryRoot,
-          ...workspace.sources.map(source => source.path),
-        ]),
-  });
+  registerDialogIpc();
   registerAppUpdateIpc({
     getAppUpdateCoordinator,
-    hasRunningSessions: () => getPiRuntimeAdapter().hasRunningSessions(),
+    hasRunningSessions: hasRunningPiSessions,
   });
-  registerAppLifecycleHandlers();
-
-  // 启动应用
-  initApp().catch(console.error);
+  const startup = initApp(magpie, localInference, codingRoom);
+  registerAppLifecycleHandlers(
+    shutdownMcpAuthorizations,
+    magpie,
+    localInference,
+    codingRoom.stop,
+    startup,
+  );
 
   // 当所有窗口关闭时退出应用
   app.on('window-all-closed', () => {

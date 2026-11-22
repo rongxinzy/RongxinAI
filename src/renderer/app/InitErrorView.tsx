@@ -15,6 +15,7 @@ interface InitErrorViewProps {
   isSettingsOpen: boolean;
   onOpenSettings: () => void;
   onCloseSettings: () => void;
+  onAskAi: (prompt: string) => void;
   settingsOptions: SettingsOpenOptions;
   enterpriseConfig: SettingsEnterpriseConfig | null;
   managedModelsOnly: boolean;
@@ -31,6 +32,7 @@ export function InitErrorView({
   isSettingsOpen,
   onOpenSettings,
   onCloseSettings,
+  onAskAi,
   settingsOptions,
   enterpriseConfig,
   managedModelsOnly,
@@ -45,6 +47,7 @@ export function InitErrorView({
             <React.Suspense fallback={null}>
               <SettingsPage
                 onClose={onCloseSettings}
+                onAskAi={onAskAi}
                 initialTab={settingsOptions.initialTab}
                 initialProvider={settingsOptions.initialProvider}
                 notice={settingsOptions.notice}

@@ -128,7 +128,8 @@ export function AddProviderWizard({
   const runTest = async (overrideBaseUrl?: string, overrideApiKey?: string) => {
     const candidateKey = overrideApiKey ?? apiKey;
     if (!window.electron?.magpie?.testProvider) return;
-    if (preset.requiresKey && !candidateKey.trim()) return;
+    if (!(overrideBaseUrl ?? baseUrl).trim() || (preset.requiresKey && !candidateKey.trim()))
+      return;
     setTesting(true);
     setTestError(null);
     setTestPassed(false);

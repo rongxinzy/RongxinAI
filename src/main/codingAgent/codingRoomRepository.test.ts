@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import {
   CodingAgentProfileId,
@@ -14,6 +14,7 @@ import {
   CodingToolCallStatus,
 } from '../../shared/codingAgent';
 import { initializeCodingAgentSchema } from './schema';
+import { ArtifactLedger } from '../artifactLedger/artifactLedger';
 import { initializeArtifactLedgerSchema } from '../artifactLedger/schema';
 import { CodingRoomRepository } from './codingRoomRepository';
 
@@ -155,21 +156,30 @@ test('replaces an in-process streaming snapshot instead of appending it', () => 
   expect(repository.listEvents([lane.id])[0].payload.content).toBe('Hello world');
 });
 
-test('coalesces streamed tool call snapshots with the same tool call ID', () => {
+test('coalesces streamed tool call snapshots without rewriting an unchanged artifact', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   initializeArtifactLedgerSchema(db);
-  const repository = new CodingRoomRepository(db);
+  const ledger = new ArtifactLedger(db);
+  const recordFile = vi.spyOn(ledger, 'recordFile');
+  const repository = new CodingRoomRepository(db, ledger);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Tool');
   const lane = repository.createLane(mission.id, 'agent', '/workspace/project');
+  db.exec(`CREATE TABLE artifact_updates (content TEXT);
+    CREATE TRIGGER count_artifact_updates AFTER UPDATE ON artifact_ledger
+    BEGIN INSERT INTO artifact_updates VALUES (NEW.content); END;`);
 
   repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.ToolCall, {
     toolCallId: 'call-1',
-    toolName: 'bash',
-    toolInput: { command: 'pwd' },
+    toolName: 'write',
+    toolInput: { path: 'report.md', content: 'initial report' },
     status: CodingToolCallStatus.Pending,
   });
+  expect(recordFile).toHaveBeenCalledWith(
+    lane.id,
+    expect.objectContaining({ content: 'initial report' }),
+  );
   repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.ToolCall, {
     toolCallId: 'call-1',
     status: CodingToolCallStatus.Completed,
@@ -178,29 +188,59 @@ test('coalesces streamed tool call snapshots with the same tool call ID', () => 
   expect(repository.listEvents([lane.id])).toHaveLength(1);
   expect(repository.listEvents([lane.id])[0].payload).toMatchObject({
     toolCallId: 'call-1',
-    toolName: 'bash',
+    toolName: 'write',
     status: CodingToolCallStatus.Completed,
   });
+  expect(db.prepare('SELECT * FROM artifact_updates').all()).toEqual([]);
+
+  repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.ToolCall, {
+    toolCallId: 'call-1',
+    toolInput: { path: 'report.md', content: 'changed report' },
+  });
+  repository.flushPendingStreamWrites(lane.id);
+  expect(recordFile).toHaveBeenLastCalledWith(
+    lane.id,
+    expect.objectContaining({ content: 'changed report' }),
+  );
+  expect(db.prepare('SELECT * FROM artifact_updates').all()).toEqual([
+    { content: 'changed report' },
+  ]);
 });
 
-test('loads a lane and its owning room directly by lane id', () => {
+test('resolves persisted Pi session ownership and excludes external lanes', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Direct lookup');
-  const lane = repository.createLane(mission.id, 'agent', '/workspace/project');
+  const lane = repository.createLane(
+    mission.id,
+    CodingAgentProfileId.Builtin,
+    '/workspace/project',
+  );
+  const external = repository.createLane(mission.id, 'agent', '/workspace/project');
 
-  expect(repository.getLaneById(lane.id)).toEqual(expect.objectContaining({ id: lane.id }));
+  const reopened = new CodingRoomRepository(db);
+  expect(reopened.getBuiltinLaneSession(lane.localSessionId)).toEqual({
+    lane,
+    roomId: room.id,
+    workspaceRoot: room.workspaceRoot,
+  });
   expect(repository.getRoomByLaneId(lane.id)).toEqual(
     expect.objectContaining({ id: room.id, workspaceRoot: '/workspace/project' }),
   );
-  expect(repository.getLaneById('missing-lane')).toBeNull();
+  expect(reopened.hasBuiltinLaneSession(external.localSessionId)).toBe(false);
+  expect(reopened.hasBuiltinLaneSession('missing-session')).toBe(false);
   expect(repository.getRoomByLaneId('missing-lane')).toBeNull();
+  repository.deleteMission(room.id, mission.id);
+  expect(reopened.hasBuiltinLaneSession(lane.localSessionId)).toBe(false);
 });
 
-test('coalesces stream chunks in memory and flushes them to SQLite', () => {
+test.each([
+  [CodingEventKind.MessageDelta, CodingStreamUpdateMode.Append, 'lo'],
+  [CodingEventKind.Reasoning, CodingStreamUpdateMode.Replace, 'Hello'],
+] as const)('coalesces %s by message id and flushes one event to SQLite', (kind, mode, update) => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   initializeArtifactLedgerSchema(db);
@@ -209,15 +249,15 @@ test('coalesces stream chunks in memory and flushes them to SQLite', () => {
   const mission = repository.createMission(room.id, 'Memory coalesce');
   const lane = repository.createLane(mission.id, 'agent', '/workspace/project');
 
-  const first = repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+  const first = repository.appendOrMergeStreamEvent(lane.id, kind, {
     messageId: 'm1',
     content: 'Hel',
-    streamUpdateMode: CodingStreamUpdateMode.Append,
+    streamUpdateMode: mode,
   });
-  const second = repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+  const second = repository.appendOrMergeStreamEvent(lane.id, kind, {
     messageId: 'm1',
-    content: 'lo',
-    streamUpdateMode: CodingStreamUpdateMode.Append,
+    content: update,
+    streamUpdateMode: mode,
   });
 
   // Both projected reads observe the merged content, under one event id.
@@ -423,6 +463,30 @@ test('recovers the lanes and missions that were waiting for an answer', () => {
   const recovered = repository.recoverInterruptedLanes();
 
   expect(recovered.map(candidate => candidate.id)).toEqual([lane.id]);
-  expect(repository.getLaneById(lane.id)?.status).toBe(CodingLaneStatus.Idle);
+  expect(repository.getBuiltinLaneSession(lane.localSessionId)?.lane.status).toBe(
+    CodingLaneStatus.Idle,
+  );
   expect(repository.listMissions(room.id)[0]?.status).toBe(CodingMissionStatus.NeedsReview);
+});
+
+test('recovery releases a writer lease persisted without a running lane', () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const workspace = '/workspace/project';
+  const room = repository.getOrCreateRoom(workspace);
+  const mission = repository.createMission(room.id, 'Interrupted admission');
+  const first = repository.createLane(mission.id, CodingAgentProfileId.Builtin, workspace);
+  const next = repository.createLane(mission.id, CodingAgentProfileId.Builtin, workspace);
+  repository.acquireWriterLease(room.id, workspace, first.id);
+  expect(repository.getBuiltinLaneSession(first.localSessionId)?.lane.status).toBe(
+    CodingLaneStatus.Idle,
+  );
+
+  const reopened = new CodingRoomRepository(db);
+  expect(reopened.recoverInterruptedLanes()).toEqual([]);
+  expect(reopened.getWriterLease(room.id, workspace)).toBeNull();
+  reopened.acquireWriterLease(room.id, workspace, next.id);
+  expect(reopened.getWriterLease(room.id, workspace)).toBe(next.id);
 });

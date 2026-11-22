@@ -1,39 +1,19 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge } from 'electron';
 
 import { DesktopPetIpc } from '../shared/desktopPet/constants';
-import type {
-  DesktopPetBridge,
-  DesktopPetEffect,
-  DesktopPetPose,
-  DesktopPetSnapshot,
-} from '../shared/desktopPet/types';
+import type { desktopPetEventContract } from '../shared/desktopPet/contract';
+import { desktopPetEventChannels } from '../shared/desktopPet/contract.channels';
+import type { DesktopPetBridge } from '../shared/desktopPet/types';
+import { createIpcEventSenders } from './preload/createIpcInvokers';
+import { onPush } from './preload/pushChannel';
 
+const events = createIpcEventSenders<typeof desktopPetEventContract>(desktopPetEventChannels);
 const bridge: DesktopPetBridge = {
-  ready: () => ipcRenderer.send(DesktopPetIpc.Ready),
-  dragStart: () => ipcRenderer.send(DesktopPetIpc.DragStart),
-  dragEnd: cancelled => ipcRenderer.send(DesktopPetIpc.DragEnd, cancelled === true),
-  menu: () => ipcRenderer.send(DesktopPetIpc.Menu),
-  open: () => ipcRenderer.send(DesktopPetIpc.Open),
-  hitMask: mask => ipcRenderer.send(DesktopPetIpc.HitMask, mask),
-  motion: reduced => ipcRenderer.send(DesktopPetIpc.Motion, reduced),
-  walkFrame: frame => ipcRenderer.send(DesktopPetIpc.WalkFrame, frame),
-  onState: listener => {
-    const handler = (_event: Electron.IpcRendererEvent, state: DesktopPetSnapshot) =>
-      listener(state);
-    ipcRenderer.on(DesktopPetIpc.State, handler);
-    return () => ipcRenderer.removeListener(DesktopPetIpc.State, handler);
-  },
-  onPose: listener => {
-    const handler = (_event: Electron.IpcRendererEvent, pose: DesktopPetPose) => listener(pose);
-    ipcRenderer.on(DesktopPetIpc.Pose, handler);
-    return () => ipcRenderer.removeListener(DesktopPetIpc.Pose, handler);
-  },
-  onEffect: listener => {
-    const handler = (_event: Electron.IpcRendererEvent, effect: DesktopPetEffect) =>
-      listener(effect);
-    ipcRenderer.on(DesktopPetIpc.Effect, handler);
-    return () => ipcRenderer.removeListener(DesktopPetIpc.Effect, handler);
-  },
+  ...events,
+  dragEnd: cancelled => events.dragEnd(cancelled === true),
+  onState: listener => onPush(DesktopPetIpc.State, listener),
+  onPose: listener => onPush(DesktopPetIpc.Pose, listener),
+  onEffect: listener => onPush(DesktopPetIpc.Effect, listener),
 };
 
 contextBridge.exposeInMainWorld('desktopPet', bridge);

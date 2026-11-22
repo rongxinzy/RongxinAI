@@ -11,8 +11,6 @@
  * 带 scheme 的 file URL 会被整链路过滤；剥壳后的裸路径与相对路径候选走同一解析链。
  */
 import { cjk } from '@streamdown/cjk';
-import { LinkSafetyModal } from '@shared/components/ai-elements/linkSafetyModal';
-import { hasRichMessageContent } from '@shared/components/ai-elements/richMessageResponseLoader';
 import { Button } from '@shared/components/ui/button';
 import { FileText, Folder } from 'lucide-react';
 import React, { Suspense, lazy, useMemo } from 'react';
@@ -21,6 +19,8 @@ import { Streamdown, type StreamdownProps } from 'streamdown';
 import { i18nService } from '../../services/i18n';
 import { showAppToast } from '../../services/toastNotification';
 import { isLocalPathCandidate, useResolvedLocalPath } from '../../services/useResolvedLocalPath';
+import { LinkSafetyModal } from '../ai-elements/linkSafetyModal';
+import { hasRichMessageContent } from '../ai-elements/richMessageResponseLoader';
 import { toLocalfileUrl } from '../../utils/localfileUrl';
 import { zhiyuanShikiThemes } from './shikiThemes';
 // KaTeX 样式与 mhchem 宏随富渲染模块按需加载（与 chat 的 richMessageResponse 同策略）。

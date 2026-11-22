@@ -1,9 +1,6 @@
 import { useCallback, useState } from 'react';
 
-import type {
-  LlamaCppModelPreferences,
-  LlamaCppRunningModel as OllamaRunningModel,
-} from '../../../../shared/llamacpp';
+import type { LlamaCppModelPreferences, LlamaCppRunningModel } from '../../../../shared/llamacpp';
 import { i18nService } from '../../../services/i18n';
 import {
   LocalInferenceToastKind,
@@ -19,7 +16,7 @@ type ModelPreferenceInput = {
 };
 
 type UseModelPreferencesInput = {
-  runningModels: OllamaRunningModel[];
+  runningModels: LlamaCppRunningModel[];
   setLoading: (loading: boolean) => void;
   showToast: (message: string, kind?: LocalInferenceToastKindType) => void;
 };

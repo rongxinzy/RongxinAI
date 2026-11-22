@@ -86,8 +86,7 @@ test('operation id survives a lost response, failed recovery and process restart
     }),
   );
   const manager = {
-    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
-    start: vi.fn(),
+    start: async () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
   } as never;
   const adapter = new ZhiYuanEngramAdapter(manager);
   const input = {

@@ -1,15 +1,15 @@
 /**
- * Coding-lane artifact recording at the event-write choke point.
- *
- * CodingRoomRepository.appendEvent delegates here after a coding event row is
- * committed. This is the only coding-artifact rule: FileChange events with a
- * diff/write action and write-shaped ToolCall events become ledger rows scoped
- * to the lane id, resolved against the lane's execution root.
+ * External coding lanes record artifacts from their events. Built-in lanes
+ * read artifacts from their Pi session.
  */
 import type Database from 'better-sqlite3';
 
-import { CodingEventKind } from '../../shared/codingAgent';
-import { CoworkArtifactRole, type CoworkArtifactType } from '../../shared/cowork/artifacts';
+import { CodingAgentProfileId, CodingEventKind } from '../../shared/codingAgent';
+import {
+  CoworkArtifactRole,
+  type CoworkArtifactType,
+  type CoworkPersistedArtifact,
+} from '../../shared/cowork/artifacts';
 import {
   extractFilePath,
   normalizeToolName,
@@ -20,7 +20,7 @@ import {
   isBinaryArtifactFile,
 } from '../../shared/cowork/artifactPreview';
 import {
-  ArtifactLedger,
+  type ArtifactLedger,
   artifactKeyForPath,
   getArtifactFileName,
   resolveArtifactInputPath,
@@ -41,6 +41,10 @@ const CODING_COLLECTIBLE_TYPES = new Set([
   'unsupported',
 ]);
 
+export function isCodingLaneArtifact(artifact: CoworkPersistedArtifact): boolean {
+  return Boolean(artifact.filePath) && CODING_COLLECTIBLE_TYPES.has(artifact.type);
+}
+
 const readString = (value: unknown): string | null =>
   typeof value === 'string' && value ? value : null;
 
@@ -49,36 +53,32 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
-const ledgers = new WeakMap<Database.Database, ArtifactLedger>();
-
-function ledgerFor(db: Database.Database): ArtifactLedger {
-  let ledger = ledgers.get(db);
-  if (!ledger) {
-    ledger = new ArtifactLedger(db);
-    ledgers.set(db, ledger);
-  }
-  return ledger;
-}
-
 /**
  * Record file-backed artifacts for a coding event. Never throws into the
  * event-append path; failures are logged and skipped.
  */
 export function recordCodingLaneArtifact(
   db: Database.Database,
+  ledger: ArtifactLedger,
   laneId: string,
   kind: CodingEventKind,
   payload: Record<string, unknown>,
 ): void {
+  if (kind !== CodingEventKind.FileChange && kind !== CodingEventKind.ToolCall) return;
   try {
     const lane = db
-      .prepare('SELECT execution_root, source_root FROM coding_agent_lanes WHERE id = ?')
-      .get(laneId) as { execution_root?: string | null; source_root?: string | null } | undefined;
+      .prepare(
+        'SELECT profile_id, execution_root, source_root FROM coding_agent_lanes WHERE id = ?',
+      )
+      .get(laneId) as
+      | { profile_id: string; execution_root: string; source_root: string }
+      | undefined;
+    if (!lane || lane.profile_id === CodingAgentProfileId.Builtin) return;
     const baseDir = readString(lane?.execution_root) ?? readString(lane?.source_root);
     if (!baseDir) return;
     const candidate = extractCandidate(kind, payload, baseDir);
     if (!candidate) return;
-    const artifact = ledgerFor(db).recordFile(laneId, {
+    const artifact = ledger.recordFile(laneId, {
       filePath: candidate.filePath,
       id: `coding-file-${artifactKeyForPath(candidate.filePath)}`,
       messageId: '',

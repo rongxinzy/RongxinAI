@@ -25,7 +25,11 @@ import {
   type PiUiEvent,
   type StreamingHarness,
 } from './helpers/streamingPipelineHarness';
-import { describe, expect, it } from 'vitest';
+import { BrowserWindow } from 'electron';
+import { describe, expect, it, vi } from 'vitest';
+import { CoworkErrorKind } from '../src/common/coworkError';
+import { PiRunEvent } from '../src/shared/cowork/runState';
+import { CoworkStreamIpc, RuntimeNoticeIpc } from '../src/shared/ipc/channels';
 
 // ─── shared helpers ──────────────────────────────────────────────────────────
 
@@ -130,6 +134,39 @@ function buildFinalStateTurn(seed: number): TurnPlan {
 
 describe('Cowork streaming consistency C5–C7 (recovery through the real pipeline)', () => {
   setupPiRuntimeAdapterSuite();
+
+  it('publishes Cowork events, progress and retries to the owning window', async () => {
+    await withStreamingHarness('standalone-retry-notice', harness => {
+      const send = vi.spyOn(harness.fakeWindow.webContents, 'send');
+      const unrelated = vi.fn();
+      const allWindows = vi.spyOn(BrowserWindow, 'getAllWindows').mockReturnValue([
+        {
+          isDestroyed: () => false,
+          webContents: { send: unrelated },
+        } as unknown as BrowserWindow,
+      ]);
+      const notice = { kind: CoworkErrorKind.RateLimited, message: 'Retrying', attempt: 1 };
+      try {
+        harness.runtime.emit('started', harness.sessionId);
+        harness.runtime.emit('executionEvent', harness.sessionId, { type: PiRunEvent.AgentStart });
+        const streamEventCount = harness.ipcEvents.length;
+        harness.runtime.emit('retryNotice', harness.sessionId, notice);
+        expect(send.mock.calls.map(([channel]) => channel)).toEqual([
+          CoworkStreamIpc.UiEvent,
+          CoworkStreamIpc.RunState,
+          RuntimeNoticeIpc.Notice,
+        ]);
+        expect(send).toHaveBeenLastCalledWith(RuntimeNoticeIpc.Notice, {
+          sessionId: harness.sessionId,
+          ...notice,
+        });
+        expect(harness.ipcEvents).toHaveLength(streamEventCount);
+        expect(unrelated).not.toHaveBeenCalled();
+      } finally {
+        allWindows.mockRestore();
+      }
+    });
+  });
 
   it('C5/B7: a mid-stream IPC gap recovers via resync and stays prefix-exact (80 seeds)', async () => {
     const seedCount = 80;

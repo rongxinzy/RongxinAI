@@ -1,66 +1,44 @@
-// Agent CRUD for the CoworkStore class chain.
-// Split from src/main/coworkStore.ts (issue #1069).
+import type Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
 
 import { normalizeAgentAvatarIcon } from '../../shared/agent/avatar';
-import { CoworkConversationSearchStore } from './conversationSearchStore';
+import { AgentId } from '../../shared/agent/constants';
 import type { Agent, AgentSource, CreateAgentRequest, UpdateAgentRequest } from './types';
 
-export class CoworkAgentStore extends CoworkConversationSearchStore {
-  // ========== Agent CRUD ==========
+interface AgentRow {
+  id: string;
+  name: string;
+  description: string;
+  system_prompt: string;
+  identity: string;
+  model: string;
+  working_directory?: string | null;
+  icon: string;
+  skill_ids: string;
+  mcp_ids?: string;
+  enabled: number;
+  pinned?: number | null;
+  pin_order?: number | null;
+  is_default: number;
+  source: string;
+  preset_id: string;
+  // The expert registration script still uses triage_override.
+  created_at: number;
+  updated_at: number;
+}
+
+export class CoworkAgentStore {
+  constructor(private readonly db: Database.Database) {}
 
   listAgents(): Agent[] {
-    interface AgentRow {
-      id: string;
-      name: string;
-      description: string;
-      system_prompt: string;
-      identity: string;
-      model: string;
-      working_directory?: string | null;
-      icon: string;
-      skill_ids: string;
-      mcp_ids?: string;
-      enabled: number;
-      pinned?: number | null;
-      pin_order?: number | null;
-      is_default: number;
-      source: string;
-      preset_id: string;
-      created_at: number;
-      updated_at: number;
-    }
-
-    const rows = this.getAll<AgentRow>(`
-      SELECT * FROM agents ORDER BY is_default DESC, created_at ASC
-    `);
-
+    const rows = this.db
+      .prepare<[], AgentRow>('SELECT * FROM agents ORDER BY is_default DESC, created_at ASC')
+      .all();
     return rows.map(row => this.mapAgentRow(row));
   }
 
   getAgent(id: string): Agent | null {
-    interface AgentRow {
-      id: string;
-      name: string;
-      description: string;
-      system_prompt: string;
-      identity: string;
-      model: string;
-      working_directory?: string | null;
-      icon: string;
-      skill_ids: string;
-      mcp_ids?: string;
-      enabled: number;
-      pinned?: number | null;
-      pin_order?: number | null;
-      is_default: number;
-      source: string;
-      preset_id: string;
-      created_at: number;
-      updated_at: number;
-    }
-
-    const row = this.getOne<AgentRow>(`SELECT * FROM agents WHERE id = ?`, [id]);
+    const row = this.db.prepare<[string], AgentRow>('SELECT * FROM agents WHERE id = ?').get(id);
     if (!row) return null;
     return this.mapAgentRow(row);
   }
@@ -83,10 +61,11 @@ export class CoworkAgentStore extends CoworkConversationSearchStore {
     }
 
     // 名称去重校验（大小写不敏感）
-    const dupName = this.getOne<{ id: string }>(
-      'SELECT id FROM agents WHERE LOWER(name) = LOWER(?) AND is_default = 0',
-      [request.name.trim()],
-    );
+    const dupName = this.db
+      .prepare<[string], { id: string }>(
+        'SELECT id FROM agents WHERE LOWER(name) = LOWER(?) AND is_default = 0',
+      )
+      .get(request.name.trim());
     if (dupName) {
       throw new Error('Agent name already exists');
     }
@@ -202,34 +181,14 @@ export class CoworkAgentStore extends CoworkConversationSearchStore {
   }
 
   deleteAgent(id: string): boolean {
-    if (id === 'main') return false; // Cannot delete default agent
-    this.db.prepare('DELETE FROM agents WHERE id = ? AND is_default = 0').run(id);
-    return true;
+    if (id === AgentId.Main) return false;
+    const { changes } = this.db
+      .prepare('DELETE FROM agents WHERE id = ? AND is_default = 0')
+      .run(id);
+    return changes > 0;
   }
 
-  private mapAgentRow(row: {
-    id: string;
-    name: string;
-    description: string;
-    system_prompt: string;
-    identity: string;
-    model: string;
-    working_directory?: string | null;
-    icon: string;
-    skill_ids: string;
-    mcp_ids?: string;
-    enabled: number;
-    pinned?: number | null;
-    pin_order?: number | null;
-    is_default: number;
-    source: string;
-    preset_id: string;
-    // NOTE: the triage_override column stays in coreSchema for now — the
-    // built-in skill SKILLs/zhiyuan-expert-manager/scripts/register_expert.js
-    // still reads and writes it — but no app code selects it anymore.
-    created_at: number;
-    updated_at: number;
-  }): Agent {
+  private mapAgentRow(row: AgentRow): Agent {
     let skillIds: string[] = [];
     try {
       skillIds = JSON.parse(row.skill_ids);
@@ -267,9 +226,11 @@ export class CoworkAgentStore extends CoworkConversationSearchStore {
   }
 
   private getNextAgentPinOrder(): number {
-    const row = this.getOne<{ max_order: number | null }>(
-      'SELECT MAX(pin_order) as max_order FROM agents WHERE pinned = 1',
-    );
+    const row = this.db
+      .prepare<[], { max_order: number | null }>(
+        'SELECT MAX(pin_order) as max_order FROM agents WHERE pinned = 1',
+      )
+      .get();
     return (row?.max_order ?? 0) + 1;
   }
 }

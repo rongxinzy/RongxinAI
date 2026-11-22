@@ -1,12 +1,13 @@
 import { runCommandCapture } from '../../skills/processRunner';
 import { app } from 'electron';
 import { existsSync } from 'fs';
-import { delimiter, join } from 'path';
+import { delimiter, dirname, join } from 'path';
 
 import { applyManagedPythonEnv } from '../managedPythonEnv';
 import { getFeishuCliBinDirectory } from '../feishuConnectorPaths';
 import { applyUvPackageIndexDefaults, PythonPackageIndexUrl } from '../pythonPackageIndexes';
 import { coworkLog } from '../coworkLogger';
+import { NpmCli, resolveBundledNpmCliPath } from '../npmRuntime';
 import { getElectronNodeRuntimePath } from './electronNodeRuntime';
 import { appendEnvPath, hasCommandInEnv } from './pathUtils';
 import { ensureElectronNodeShim } from './nodeShims';
@@ -157,20 +158,13 @@ export async function applyApplicationRuntimeEnv(
   const resourcesPath = process.resourcesPath;
   coworkLog('INFO', 'applyPackagedEnvOverrides', `Packaged mode: resourcesPath=${resourcesPath}`);
 
-  // Create node/npx/npm shims that wrap Electron as a Node.js runtime via
-  // ELECTRON_RUN_AS_NODE=1 and point npx/npm to the bundled npm package.
-  // This avoids relying on node_modules/.bin symlinks which don't work on
-  // Windows cross-platform builds.
-  const npmBinDir = join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin');
-  coworkLog(
-    'INFO',
-    'applyPackagedEnvOverrides',
-    `npmBinDir=${npmBinDir}, exists=${existsSync(npmBinDir)}`,
-  );
-
-  // Set env var so .cmd shims can reference npmBinDir without hardcoding
-  // non-ASCII characters (which break on Windows when cmd.exe uses GBK code page).
-  env.ZHIYUAN_NPM_BIN_DIR = npmBinDir;
+  const npmCliPaths = {
+    [NpmCli.Npm]: resolveBundledNpmCliPath(NpmCli.Npm),
+    [NpmCli.Npx]: resolveBundledNpmCliPath(NpmCli.Npx),
+  };
+  const npmCliPath = npmCliPaths[NpmCli.Npm] ?? npmCliPaths[NpmCli.Npx];
+  if (npmCliPath) env.ZHIYUAN_NPM_BIN_DIR = dirname(npmCliPath);
+  else delete env.ZHIYUAN_NPM_BIN_DIR;
 
   const [hasSystemNode, hasSystemNpx, hasSystemNpm] = await Promise.all([
     hasCommandInEnv('node', env),
@@ -183,7 +177,7 @@ export async function applyApplicationRuntimeEnv(
     process.platform === 'win32' ||
     !(hasSystemNode && hasSystemNpx && hasSystemNpm);
   if (shouldInjectShim) {
-    const shimDir = ensureElectronNodeShim(electronNodeRuntimePath, npmBinDir);
+    const shimDir = ensureElectronNodeShim(npmCliPaths);
     if (shimDir) {
       env.PATH = [shimDir, env.PATH].filter(Boolean).join(delimiter);
       env.ZHIYUAN_NODE_SHIM_ACTIVE = '1';

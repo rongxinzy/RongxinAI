@@ -10,9 +10,13 @@ if (!bootstrapText) {
 const bootstrap = JSON.parse(
   Buffer.from(bootstrapText, 'base64url').toString('utf8'),
 ) as LlamaCppModelDaemonBootstrap;
-const daemon = new LlamaCppModelDaemonRuntime(bootstrap);
+const daemon = new LlamaCppModelDaemonRuntime(bootstrap, process.connected ? process : undefined);
 
 void daemon.start().catch(error => {
   console.error('[LlamaCppDaemon] failed to start:', error);
   process.exitCode = 1;
+  void daemon.shutdown().catch(error => {
+    console.warn('[LlamaCppDaemon] failed to clean up after startup:', error);
+  });
+  if (process.connected) process.disconnect?.();
 });

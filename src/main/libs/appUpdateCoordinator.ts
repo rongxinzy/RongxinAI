@@ -6,6 +6,7 @@ import {
   type UpdateInfo,
 } from 'electron-updater';
 import fs from 'fs';
+import { addAbortListener } from 'node:events';
 import path from 'path';
 import { gt, lt, valid } from 'semver';
 
@@ -123,6 +124,7 @@ export class AppUpdateCoordinator {
   private readonly updater: ElectronUpdaterAdapter;
   private readonly openExternal: (url: string) => Promise<unknown>;
   private readonly enterpriseBuild: boolean;
+  private readonly closing = new AbortController();
   private checkPromise: Promise<AppUpdateCheckResult> | null = null;
   private downloadPromise: Promise<void> | null = null;
   private installPromise: Promise<AppUpdateInstallResult> | null = null;
@@ -139,8 +141,6 @@ export class AppUpdateCoordinator {
     this.handleDownloadProgress(progress);
   private readonly onUpdateDownloaded = (event: { downloadedFile: string }): void => {
     this.downloadedFilePath = event.downloadedFile;
-    // The cache directory is not obvious from the UI; log the concrete path
-    // so support can locate the payload from logs.
     console.info(`[AppUpdate] update payload cached at: ${event.downloadedFile}`);
   };
   private readonly onUpdaterError = (error: Error): void => this.handleUpdaterError(error);
@@ -184,6 +184,14 @@ export class AppUpdateCoordinator {
     this.updater.removeListener('download-progress', this.onDownloadProgress);
     this.updater.removeListener('update-downloaded', this.onUpdateDownloaded);
     this.updater.removeListener('error', this.onUpdaterError);
+  }
+
+  async shutdown(): Promise<void> {
+    this.closing.abort();
+    this.downloadCancellation?.cancel();
+    if (this.pendingInstallResultTimer) clearTimeout(this.pendingInstallResultTimer);
+    // The installer itself requests app quit. Wait only for background operations here.
+    await Promise.allSettled([this.checkPromise, this.downloadPromise, this.readyFreshnessPromise]);
   }
 
   getState(): AppUpdateRuntimeState {
@@ -347,8 +355,7 @@ export class AppUpdateCoordinator {
         error: this.updateDisabledMessage(),
       };
     }
-    // One install at a time: a second click while the handoff is being
-    // prepared must not spawn a second installer.
+    // Coalesce concurrent install clicks into one handoff.
     if (this.installPromise) return this.installPromise;
     const promise = this.performInstallReadyUpdate();
     this.installPromise = promise;
@@ -366,9 +373,7 @@ export class AppUpdateCoordinator {
       return { success: false, state: this.getState(), error: 'No verified update is ready' };
     }
 
-    // Acknowledge the click before any blocking work: the renderer replaces the
-    // install button with the installing status instead of leaving it looking
-    // dead while the file is verified.
+    // Publish installation before verifying the file so the renderer can show progress.
     this.state.lastInstallResult = null;
     this.setState({
       ...this.state,
@@ -420,6 +425,7 @@ export class AppUpdateCoordinator {
         readyFileHash,
         this.verifiedFile,
       );
+      this.closing.signal.throwIfAborted();
       this.hiddenWindowsForInstall = hideWindowsForInstall();
       if (process.platform === 'win32') {
         await installWindowsNsis(readyFilePath, info.latestVersion);
@@ -430,7 +436,7 @@ export class AppUpdateCoordinator {
       return { success: true, state: this.getState() };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Update installation failed';
-      restoreHiddenWindows(this.hiddenWindowsForInstall);
+      if (!this.closing.signal.aborted) restoreHiddenWindows(this.hiddenWindowsForInstall);
       this.hiddenWindowsForInstall = [];
       const state = this.setState({
         ...this.state,
@@ -524,7 +530,7 @@ export class AppUpdateCoordinator {
   }
 
   private startBackgroundDownload(update: VerifiedUpdate, source: AppUpdateSource): void {
-    if (this.downloadPromise) return;
+    if (this.closing.signal.aborted || this.downloadPromise) return;
     const { envelope, info } = update;
     const cancellation = new CancellationToken();
     this.downloadCancellation = cancellation;
@@ -735,8 +741,14 @@ export class AppUpdateCoordinator {
 
   private async assertElectronUpdaterFeed(update: VerifiedUpdate): Promise<void> {
     if (update.info.manualDownloadOnly) return;
+    const { signal } = this.closing;
+    signal.throwIfAborted();
     this.configureUpdater(update.target);
-    const result = await this.updater.checkForUpdates();
+    // The updater's feed check has no AbortSignal; only its result is needed here.
+    const cancelled = Promise.withResolvers<never>();
+    using listener = addAbortListener(signal, () => cancelled.reject(signal.reason));
+    const result = await Promise.race([this.updater.checkForUpdates(), cancelled.promise]);
+    signal.throwIfAborted();
     if (!result?.isUpdateAvailable) {
       throw new Error('The electron updater feed does not contain the signed update');
     }
@@ -769,16 +781,13 @@ export class AppUpdateCoordinator {
   }
 
   setChannelPreference(channel: AppUpdateChannelPreference): void {
+    this.closing.signal.throwIfAborted();
     writeChannelPreference(this.store, channel);
     this.clearTransientUpdateState();
   }
 
   private resolveReleaseChannel(): AppUpdateReleaseChannel {
     return readChannelPreference(this.store);
-  }
-
-  private manifestCacheKey(target: UpdateTarget): string {
-    return manifestCacheKeyForChannel(this.resolveReleaseChannel(), target);
   }
 
   private configureUpdater(target: UpdateTarget): void {
@@ -858,11 +867,13 @@ export class AppUpdateCoordinator {
   }
 
   private async fetchUpdateInfo(currentVersion: string): Promise<VerifiedUpdate | null> {
+    const { signal } = this.closing;
+    signal.throwIfAborted();
     const target = this.resolveUpdateTarget();
     if (!target) return null;
     const { platform, arch, variant } = target;
     const channel = this.resolveReleaseChannel();
-    const cacheKey = this.manifestCacheKey(target);
+    const cacheKey = manifestCacheKeyForChannel(channel, target);
     const cachedManifest = this.readCachedManifest(cacheKey);
     const url = new URL(UPDATE_ENDPOINT);
     url.searchParams.set('channel', channel);
@@ -875,8 +886,9 @@ export class AppUpdateCoordinator {
         ? { 'if-none-match': cachedManifest.etag, accept: 'application/json' }
         : { accept: 'application/json' },
       redirect: 'error',
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
     });
+    signal.throwIfAborted();
     if (response.status === 404) {
       this.store.delete(cacheKey);
       return null;
@@ -889,6 +901,7 @@ export class AppUpdateCoordinator {
     }
     const envelope: unknown =
       response.status === 304 ? cachedManifest?.envelope : await response.json();
+    signal.throwIfAborted();
     const payload = verifyAndDecodeUpdateManifest(envelope);
     const info = toUpdateInfo(payload, target, isElectronUpdaterEnabled(target.platform), channel);
     if (response.status !== 304) {
@@ -938,6 +951,7 @@ export class AppUpdateCoordinator {
   }
 
   private clearStateIfUpdatesDisabled(): boolean {
+    if (this.closing.signal.aborted) return true;
     if (!this.isUpdateDisabled()) return false;
     this.downloadCancellation?.cancel();
     this.downloadCancellation = null;
@@ -972,6 +986,7 @@ export class AppUpdateCoordinator {
   }
 
   private setState(nextState: AppUpdateRuntimeState): AppUpdateRuntimeState {
+    if (this.closing.signal.aborted) return { ...this.state };
     this.state = {
       ...nextState,
       lastInstallResult: nextState.lastInstallResult ?? this.state.lastInstallResult,

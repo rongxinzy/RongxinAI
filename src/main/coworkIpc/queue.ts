@@ -4,14 +4,11 @@
  */
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { coworkQueueContract } from '../../shared/ipc/coworkContract';
-import { persistCoworkImageAttachments, slimQueuedMessagesForIpc } from '../coworkImageAttachments';
-import type { CoworkStore } from '../coworkStore';
+import { slimQueuedMessagesForIpc } from '../coworkImageAttachments';
 import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 
 export interface CoworkQueueIpcDeps {
   getPiRuntimeAdapter: () => PiRuntimeAdapter;
-  getCoworkStore: () => CoworkStore;
-  getCoworkImageRoot: () => string;
 }
 
 export const registerCoworkQueueIpc = (deps: CoworkQueueIpcDeps): void => {
@@ -32,21 +29,14 @@ export const registerCoworkQueueIpc = (deps: CoworkQueueIpcDeps): void => {
       }
     },
 
-    enqueuePendingMessage: (_event, input) => {
+    enqueuePendingMessage: async (_event, input) => {
       try {
-        const storedImages = input.imageAttachments?.length
-          ? persistCoworkImageAttachments(
-              deps.getCoworkImageRoot(),
-              input.sessionId,
-              input.imageAttachments,
-            )
-          : undefined;
-        return deps
+        return await deps
           .getPiRuntimeAdapter()
           .enqueuePendingMessage(
             input.sessionId,
             input.text,
-            storedImages,
+            input.imageAttachments,
             input.fileAttachments,
             input.skillIds,
           );

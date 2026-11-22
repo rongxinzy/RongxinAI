@@ -4,7 +4,7 @@
  * Every Electron IPC channel name lives here as an `as const` object.
  * Types are derived from these values so that preload and main share a single source of truth.
  *
- * Pattern (matching existing ScheduledTaskIpc / OllamaIpcChannel convention):
+ * Pattern (matching the existing ScheduledTaskIpc convention):
  *   import { CoworkSessionIpc } from '@shared/ipc/channels';
  *   ipcRenderer.invoke(CoworkSessionIpc.Start, options);
  */
@@ -16,7 +16,6 @@ export const CompanionIpc = {
   Bootstrap: 'companion:bootstrap',
   Select: 'companion:select',
   Submit: 'companion:submit',
-  Answer: 'companion:answer',
   Stop: 'companion:stop',
   SubmitTask: 'companion:task:submit',
   Tasks: 'companion:tasks',
@@ -25,11 +24,6 @@ export const CompanionIpc = {
   ChooseWorkspace: 'companion:workspace:choose',
   ChooseFiles: 'companion:files:choose',
   StageFile: 'companion:files:stage',
-  ListMemories: 'companion:memory:list',
-  SaveMemory: 'companion:memory:save',
-  ConfirmMemory: 'companion:memory:confirm',
-  ForgetMemory: 'companion:memory:forget',
-  ShareMemory: 'companion:memory:share',
   Hide: 'companion:hide',
   OpenWorkbench: 'companion:openWorkbench',
   Context: 'companion:context',
@@ -54,9 +48,7 @@ export const SkillsIpc = {
   Delete: 'skills:delete',
   Download: 'skills:download',
   ConfirmInstall: 'skills:confirmInstall',
-  GetRoot: 'skills:getRoot',
   GetContent: 'skills:getContent',
-  AutoRoutingPrompt: 'skills:autoRoutingPrompt',
   GetConfig: 'skills:getConfig',
   SetConfig: 'skills:setConfig',
   TestEmailConnectivity: 'skills:testEmailConnectivity',
@@ -76,7 +68,6 @@ export const McpIpc = {
   SetEnabled: 'mcp:setEnabled',
   TestConnection: 'mcp:testConnection',
   FetchMarketplace: 'mcp:fetchMarketplace',
-  RefreshBridge: 'mcp:refreshBridge',
   Authorize: 'mcp:authorize',
   CancelAuthorize: 'mcp:cancelAuthorize',
   GetFeishuCliStatus: 'mcp:feishuCliStatus',
@@ -89,13 +80,6 @@ export const McpIpc = {
   BridgeSyncDone: 'mcp:bridge:syncDone',
 } as const;
 export type McpIpc = (typeof McpIpc)[keyof typeof McpIpc];
-
-// ─── Hardware ───────────────────────────────────────────────────────────────
-export const HardwareIpc = {
-  NvidiaSmi: 'hardware:nvidia-smi',
-  SystemMemory: 'hardware:system-memory',
-} as const;
-export type HardwareIpc = (typeof HardwareIpc)[keyof typeof HardwareIpc];
 
 // ─── Permissions ────────────────────────────────────────────────────────────
 export const PermissionsIpc = {
@@ -117,18 +101,6 @@ export const ManagedProviderIpc = {
 } as const;
 export type ManagedProviderIpc = (typeof ManagedProviderIpc)[keyof typeof ManagedProviderIpc];
 
-// ─── ZhiYuan Model Pool ────────────────────────────────────────────────────
-export const ModelPoolIpc = {
-  ListModels: 'model-pool:list-models',
-  Stream: 'model-pool:stream',
-  CancelStream: 'model-pool:stream:cancel',
-  streamData: (requestId: string) => `model-pool:stream:${requestId}:data`,
-  streamDone: (requestId: string) => `model-pool:stream:${requestId}:done`,
-  streamError: (requestId: string) => `model-pool:stream:${requestId}:error`,
-  streamAbort: (requestId: string) => `model-pool:stream:${requestId}:abort`,
-} as const;
-export type ModelPoolIpc = (typeof ModelPoolIpc)[keyof typeof ModelPoolIpc];
-
 // ─── Window ─────────────────────────────────────────────────────────────────
 export const WindowIpc = {
   Minimize: 'window-minimize',
@@ -137,7 +109,6 @@ export const WindowIpc = {
   IsMaximized: 'window:isMaximized',
   ShowSystemMenu: 'window:showSystemMenu',
   StateChanged: 'window:state-changed',
-  ToggleDevTools: 'window:toggleDevTools',
   OpenDevTools: 'window:openDevTools',
 } as const;
 export type WindowIpc = (typeof WindowIpc)[keyof typeof WindowIpc];
@@ -163,7 +134,6 @@ export const CoworkSessionIpc = {
   Continue: 'cowork:session:continue',
   Stop: 'cowork:session:stop',
   Compact: 'cowork:session:compact',
-  Save: 'cowork:session:save',
   Delete: 'cowork:session:delete',
   DeleteBatch: 'cowork:session:deleteBatch',
   Pin: 'cowork:session:pin',
@@ -171,13 +141,8 @@ export const CoworkSessionIpc = {
   UpdateModel: 'cowork:session:updateModel',
   Get: 'cowork:session:get',
   RunSnapshot: 'cowork:session:runSnapshot',
-  RemoteManaged: 'cowork:session:remoteManaged',
   List: 'cowork:session:list',
   GetMessages: 'cowork:session:getMessages',
-  ExportResultImage: 'cowork:session:exportResultImage',
-  CaptureImageChunk: 'cowork:session:captureImageChunk',
-  SaveResultImage: 'cowork:session:saveResultImage',
-  ExportText: 'cowork:session:exportText',
 } as const;
 export type CoworkSessionIpc = (typeof CoworkSessionIpc)[keyof typeof CoworkSessionIpc];
 
@@ -207,14 +172,12 @@ export const CoworkStreamIpc = {
   RuntimeSnapshots: 'cowork:stream:runtimeSnapshots',
   UiEvent: 'cowork:stream:uiEvent',
   StreamResync: 'cowork:stream:resync',
-  SessionsChanged: 'cowork:sessions:changed',
 } as const;
 export type CoworkStreamIpc = (typeof CoworkStreamIpc)[keyof typeof CoworkStreamIpc];
 
 // ─── Project (working directory helpers) ────────────────────────────────────
 export const ProjectIpc = {
   GetDefaultBaseDir: 'project:getDefaultBaseDir',
-  CreateDirectory: 'project:createDirectory',
   EnsureScratchDir: 'project:ensureScratchDir',
   CreateRandomWorkspace: 'project:createRandomWorkspace',
 } as const;
@@ -223,13 +186,10 @@ export type ProjectIpc = (typeof ProjectIpc)[keyof typeof ProjectIpc];
 // ─── Dialog ─────────────────────────────────────────────────────────────────
 export const DialogIpc = {
   SelectDirectory: 'dialog:selectDirectory',
-  SelectFile: 'dialog:selectFile',
   SelectFiles: 'dialog:selectFiles',
   SaveInlineFile: 'dialog:saveInlineFile',
   ReadFileAsDataUrl: 'dialog:readFileAsDataUrl',
   CheckArtifactFile: 'dialog:checkArtifactFile',
-  GenerateThumbnail: 'dialog:generateThumbnail',
-  ShowMessageBox: 'dialog:showMessageBox',
 } as const;
 export type DialogIpc = (typeof DialogIpc)[keyof typeof DialogIpc];
 
@@ -331,17 +291,10 @@ export const CommunityAuthIpc = {
 } as const;
 export type CommunityAuthIpc = (typeof CommunityAuthIpc)[keyof typeof CommunityAuthIpc];
 
-// ─── Feishu Install ─────────────────────────────────────────────────────────
-export const FeishuInstallIpc = {
-  Verify: 'feishu:install:verify',
-} as const;
-export type FeishuInstallIpc = (typeof FeishuInstallIpc)[keyof typeof FeishuInstallIpc];
-
 // ─── DingTalk Install ───────────────────────────────────────────────────────
 export const DingTalkInstallIpc = {
   Qrcode: 'dingtalk:install:qrcode',
   Poll: 'dingtalk:install:poll',
-  Verify: 'dingtalk:install:verify',
 } as const;
 export type DingTalkInstallIpc = (typeof DingTalkInstallIpc)[keyof typeof DingTalkInstallIpc];
 

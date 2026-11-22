@@ -28,6 +28,19 @@ describe('projectRoutingUsage', () => {
     expect(state.models[0]?.id).toBe('relay/gpt-6-astra');
   });
 
+  it('marks omitted routing membership without treating the exact projection limit as incomplete', () => {
+    const members = Array.from({ length: 201 }, (_, index) => `relay/model-${index}`);
+    const { groups } = projectRoutingGroups({
+      groups: [
+        { id: 'exact', name: 'Exact', members: members.slice(0, 200) },
+        { id: 'truncated', name: 'Truncated', members },
+        { id: 'missing', name: 'Missing' },
+      ],
+    });
+    expect(groups.map(group => group.membersIncomplete)).toEqual([undefined, true, true]);
+    expect(groups[1].members).toHaveLength(200);
+  });
+
   it('projects usage summary totals', () => {
     const summary = projectUsageSummary(
       { calls: 3, errors: 1, input: 100, output: 20, cost: 0.42, unpriced: 1, path: '~/log' },

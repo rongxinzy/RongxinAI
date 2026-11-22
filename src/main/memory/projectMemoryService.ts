@@ -52,6 +52,8 @@ export interface ActiveSessionSummary {
 
 export class ProjectMemoryService {
   private readonly outboxScheduler: MemoryOutboxScheduler;
+  private readonly sessionRegistrations = new Map<string, Promise<void>>();
+  private closing = false;
 
   constructor(
     readonly repository: MemoryRepository,
@@ -498,31 +500,52 @@ export class ProjectMemoryService {
   }
 
   async registerSession(sessionId: string, workingDirectory: string): Promise<void> {
+    if (this.closing) return;
+    const pending = this.sessionRegistrations.get(sessionId);
+    if (pending) return pending;
     const project = this.resolveIdentity(workingDirectory);
-    const runtimeSessionId = await this.adapter.resumeSession(
-      sessionId,
-      project.id,
-      project.root,
-      this.repository.lifecycle.getRuntimeSessionId(sessionId) ?? undefined,
-    );
-    this.repository.lifecycle.saveRuntimeSessionId({
-      localSessionId: sessionId,
-      runtimeSessionId,
-      projectId: project.id,
-      projectRoot: project.root,
-    });
+    const registration = this.adapter
+      .resumeSession(
+        sessionId,
+        project.id,
+        project.root,
+        this.repository.lifecycle.getRuntimeSessionId(sessionId) ?? undefined,
+      )
+      .then(runtimeSessionId => {
+        this.repository.lifecycle.saveRuntimeSessionId({
+          localSessionId: sessionId,
+          runtimeSessionId,
+          projectId: project.id,
+          projectRoot: project.root,
+        });
+      });
+    this.sessionRegistrations.set(sessionId, registration);
+    try {
+      await registration;
+    } finally {
+      this.sessionRegistrations.delete(sessionId);
+    }
   }
 
+  /** The callback captures snapshots and deletes SQL rows in the same transaction. */
   finalizeSessionsForDeletion(
-    sessions: Array<{ sessionId: string; workingDirectory: string; summary: string }>,
-    deleteSessions: () => void,
-  ): void {
-    const finalizations = sessions.map(session => {
-      const project = this.resolveIdentity(session.workingDirectory);
-      return { sessionId: session.sessionId, projectId: project.id, summary: session.summary };
+    deleteSessions: () => Array<{
+      sessionId: string;
+      workingDirectory: string;
+      summary: string;
+    }> | null,
+  ): string[] | null {
+    const deletedSessionIds = this.repository.lifecycle.queueSessionFinalizations(() => {
+      const sessions = deleteSessions();
+      if (!sessions) return null;
+      return sessions.map(session => ({
+        sessionId: session.sessionId,
+        projectId: this.resolveIdentity(session.workingDirectory).id,
+        summary: session.summary,
+      }));
     });
-    this.repository.lifecycle.queueSessionFinalizations(finalizations, deleteSessions);
-    this.outboxScheduler.kick();
+    if (deletedSessionIds?.length) this.outboxScheduler.kick();
+    return deletedSessionIds;
   }
 
   listSessionSummaryBackfillRecords(): MemoryMigrationRecord[] {
@@ -595,20 +618,27 @@ export class ProjectMemoryService {
   }
 
   startOutboxScheduler(): void {
-    this.outboxScheduler.start();
+    if (!this.closing) this.outboxScheduler.start();
   }
 
   resumeOutboxDrain(): void {
+    if (this.closing) return;
     this.repository.makePendingAvailable();
     this.outboxScheduler.kick();
   }
 
-  async stopOutboxScheduler(): Promise<void> {
-    await this.outboxScheduler.stop();
-    await this.outboxItemQueue;
+  async shutdown(): Promise<void> {
+    this.closing = true;
+    try {
+      await this.outboxScheduler.stop();
+      await this.outboxItemQueue;
+    } finally {
+      await Promise.allSettled(this.sessionRegistrations.values());
+    }
   }
 
   async drainOutbox(limit = 20): Promise<number> {
+    if (this.closing) return 0;
     let completed = 0;
     for (const item of this.repository.listPending(limit)) {
       if ((await this.processOutboxItem(item)) !== null) completed += 1;
@@ -617,6 +647,7 @@ export class ProjectMemoryService {
   }
 
   async retryPendingOutbox(limit = 20): Promise<number> {
+    if (this.closing) return 0;
     this.repository.makePendingAvailable();
     const completed = await this.drainOutbox(limit);
     this.outboxScheduler.kick();
@@ -679,8 +710,11 @@ export class ProjectMemoryService {
   private outboxItemQueue: Promise<unknown> = Promise.resolve();
 
   private async processOutboxItem(item: MemoryOutboxItem | null): Promise<number | null> {
+    if (this.closing) return null;
     const delivery = this.outboxItemQueue.then(() =>
-      processMemoryOutboxItem(this.repository, this.adapter, item),
+      processMemoryOutboxItem(this.repository, this.adapter, item, sessionId =>
+        this.sessionRegistrations.get(sessionId),
+      ),
     );
     this.outboxItemQueue = delivery.catch((): void => {});
     try {

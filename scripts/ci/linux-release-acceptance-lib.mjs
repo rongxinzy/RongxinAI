@@ -39,22 +39,23 @@ export function installedExecutable(installedFiles, executableName) {
   return matches[0];
 }
 
-export async function releaseArtifacts(directory) {
+export async function releaseArtifact(directory, format) {
+  const extension = format === 'deb' ? '.deb' : '.AppImage';
   const entries = await fs.readdir(directory);
-  const artifacts = {};
-  for (const [format, extension] of [
-    ['deb', '.deb'],
-    ['appimage', '.AppImage'],
-  ]) {
-    const matches = entries.filter(name => name.endsWith(extension));
-    if (matches.length !== 1) throw new Error(`Expected exactly one final ${format} artifact`);
-    const artifact = path.resolve(directory, matches[0]);
-    if (!(await fs.lstat(artifact)).isFile()) {
-      throw new Error(`Final ${format} artifact must be a regular file`);
-    }
-    artifacts[format] = artifact;
+  const matches = entries.filter(name => name.endsWith(extension));
+  if (matches.length !== 1) throw new Error(`Expected exactly one final ${format} artifact`);
+  const artifact = path.resolve(directory, matches[0]);
+  if (!(await fs.lstat(artifact)).isFile()) {
+    throw new Error(`Final ${format} artifact must be a regular file`);
   }
-  return artifacts;
+  return artifact;
+}
+
+export async function releaseArtifacts(directory) {
+  return {
+    deb: await releaseArtifact(directory, 'deb'),
+    appimage: await releaseArtifact(directory, 'appimage'),
+  };
 }
 
 export async function fingerprintArtifacts(artifacts) {

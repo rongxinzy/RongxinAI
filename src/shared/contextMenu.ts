@@ -8,11 +8,6 @@ export const ContextMenuAction = {
 } as const;
 export type ContextMenuAction = (typeof ContextMenuAction)[keyof typeof ContextMenuAction];
 
-const contextMenuActionValues = new Set<string>(Object.values(ContextMenuAction));
-
-export const isContextMenuAction = (value: unknown): value is ContextMenuAction =>
-  typeof value === 'string' && contextMenuActionValues.has(value);
-
 interface ContextMenuEditFlags {
   canUndo: boolean;
   canRedo: boolean;

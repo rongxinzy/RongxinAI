@@ -28,11 +28,13 @@ const mocks = vi.hoisted(() => ({
   end: vi.fn(() => false),
   dispose: vi.fn(),
   setMask: vi.fn(),
+  observeWalkFrame: vi.fn(),
   screenOn: vi.fn(),
   screenOff: vi.fn(),
   changed: vi.fn(),
   openChat: vi.fn(),
   hideChat: vi.fn(),
+  isChatVisible: vi.fn(() => false),
   menuPopup: vi.fn(),
   rest: vi.fn(),
   allowRoam: vi.fn(),
@@ -118,7 +120,7 @@ vi.mock('../../src/main/desktopPet/motion', () => ({
     setReducedMotion() {}
     setSpringDragEnabled() {}
     setMediaDrivenWalk() {}
-    observeWalkFrame() {}
+    observeWalkFrame = mocks.observeWalkFrame;
     setRoamingEnabled() {}
     setWindowSnapshot() {}
     setAllowRoam = mocks.allowRoam;
@@ -133,6 +135,6 @@ vi.mock('../../src/main/desktopPet/motion', () => ({
 vi.mock('../../src/main/companion/window', () => ({
   openCompanionWindow: mocks.openChat,
   hideCompanionWindow: mocks.hideChat,
+  isCompanionWindowVisible: mocks.isChatVisible,
   prepareCompanionWindow: vi.fn(),
-  updateActiveCompanionAppearance: vi.fn(),
 }));

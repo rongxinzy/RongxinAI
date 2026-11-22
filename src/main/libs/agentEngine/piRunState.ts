@@ -69,20 +69,21 @@ export class PiRunStateTracker {
 
   constructor(private readonly publish: (snapshot: CoworkRunSnapshot) => void) {}
 
-  observe(sessionId: string, event: PiRunProgressEvent): void {
+  observe(sessionId: string, event: PiRunProgressEvent, workbenchRunId?: string | null): void {
     if (event.type === PiRunEvent.AgentStart) {
       this.clearTimer(sessionId);
       const now = Date.now();
       const existing = this.states.get(sessionId);
+      const runId = workbenchRunId ?? (existing?.running ? existing.runId : randomUUID());
+      const sameRun = existing?.runId === runId;
+      if (!sameRun) this.tools.delete(sessionId);
       this.states.set(sessionId, {
         sessionId,
-        runId: existing?.running ? existing.runId : randomUUID(),
-        sequence: existing?.running ? existing.sequence : 0,
+        runId,
+        sequence: sameRun ? existing.sequence : 0,
         phase: CoworkRunPhase.Waiting,
         running: true,
-        startedAt: existing?.running
-          ? existing.startedAt
-          : Math.max(now, (existing?.startedAt ?? 0) + 1),
+        startedAt: sameRun ? existing.startedAt : Math.max(now, (existing?.startedAt ?? 0) + 1),
         confirmedAt: now,
         lastProgressAt: now,
       });

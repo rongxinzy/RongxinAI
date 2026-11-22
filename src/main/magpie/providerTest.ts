@@ -23,7 +23,7 @@ function readNestedContextTokens(record: Record<string, unknown>, key: string): 
   );
 }
 
-/** Extracts a model's declared context window from OpenAI-compat / vLLM / SGLang / Ollama fields. */
+/** Extracts context limits declared by OpenAI-compatible endpoints. */
 export function extractDiscoveredModelContextWindow(item: unknown): number | undefined {
   if (!item || typeof item !== 'object') return undefined;
   const record = item as Record<string, unknown>;

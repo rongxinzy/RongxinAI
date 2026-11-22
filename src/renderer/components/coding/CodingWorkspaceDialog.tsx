@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { Bot, Folder, FolderPlus, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   CodingAgentProfileId,
@@ -48,6 +48,7 @@ export const CodingWorkspaceDialog = ({
   onOpenChange,
   onSubmit,
 }: CodingWorkspaceDialogProps) => {
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [sourceFolders, setSourceFolders] = useState<string[]>([]);
   const [defaultProfileId, setDefaultProfileId] = useState<string>(CodingAgentProfileId.Builtin);
@@ -85,7 +86,7 @@ export const CodingWorkspaceDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" initialFocus={nameInputRef}>
         <DialogHeader>
           <DialogTitle>
             {i18nService.t(workspace ? 'codingWorkspaceEdit' : 'codingWorkspaceCreate')}
@@ -98,8 +99,8 @@ export const CodingWorkspaceDialog = ({
               {i18nService.t('codingWorkspaceName')}
             </FieldLabel>
             <Input
+              ref={nameInputRef}
               id="coding-workspace-name"
-              autoFocus
               value={name}
               placeholder={i18nService.t('codingWorkspaceNamePlaceholder')}
               onChange={event => setName(event.target.value)}

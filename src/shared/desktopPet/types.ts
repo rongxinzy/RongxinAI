@@ -1,34 +1,25 @@
-import type { DesktopPetPlayableAction, DesktopPetState, DesktopPetTaskResult } from './constants';
+import type { DesktopPetPlayableAction, DesktopPetState } from './constants';
 import type { DesktopPetBuiltinId } from './catalog';
 import type { PetOrientation } from './surfaces/constants';
+import type { desktopPetContract, desktopPetEventContract } from './contract';
+import type { IpcContractApi, IpcEventApi } from '../ipc/contract';
 
-export interface DesktopPetSettings {
-  characterId: DesktopPetBuiltinId;
-  enabled: boolean;
-  doNotDisturb: boolean;
-  hideInFullscreen: boolean;
-  roaming: boolean;
-  chatter: boolean;
-}
+type DesktopPetInvokeApi = IpcContractApi<typeof desktopPetContract>;
 
-export interface DesktopPetTaskOpen {
-  requestId: number;
-  sessionId: string;
-}
+export type DesktopPetSettings = Awaited<ReturnType<DesktopPetInvokeApi['getSettings']>>;
+export type DesktopPetTaskOpen = NonNullable<
+  Awaited<ReturnType<DesktopPetInvokeApi['getPendingTask']>>
+>;
 
 export interface DesktopPetFailure {
   sessionId: string;
   eventId: string;
 }
 
-export interface DesktopPetApi {
-  getSettings(): Promise<DesktopPetSettings>;
-  setSettings(patch: Partial<DesktopPetSettings>): Promise<DesktopPetSettings>;
+export type DesktopPetApi = DesktopPetInvokeApi & {
   onSettingsChanged(listener: (settings: DesktopPetSettings) => void): () => void;
   onOpenTask(listener: (request: DesktopPetTaskOpen) => void): () => void;
-  getPendingTask(): Promise<DesktopPetTaskOpen | null>;
-  resolveTask(requestId: number, result: DesktopPetTaskResult): Promise<void>;
-}
+};
 
 export type DesktopPetEffect =
   | { kind: 'visibility'; visible: boolean }
@@ -51,20 +42,7 @@ export interface DesktopPetPose {
   walkId?: number;
 }
 
-interface DesktopPetWalkFrame {
-  walkId: number;
-  mediaTime: number;
-}
-
-export interface DesktopPetBridge {
-  ready(): void;
-  dragStart(): void;
-  dragEnd(cancelled?: boolean): void;
-  menu(): void;
-  open(): void;
-  hitMask(mask: Uint8Array): void;
-  motion(reduced: boolean): void;
-  walkFrame(frame: DesktopPetWalkFrame): void;
+export interface DesktopPetBridge extends IpcEventApi<typeof desktopPetEventContract> {
   onState(listener: (state: DesktopPetSnapshot) => void): () => void;
   onPose(listener: (pose: DesktopPetPose) => void): () => void;
   onEffect(listener: (effect: DesktopPetEffect) => void): () => void;

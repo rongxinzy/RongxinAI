@@ -131,6 +131,7 @@ export interface CoworkSession {
   workspaceId: string;
   agentId: string;
   source: CoworkSessionSource;
+  remoteManaged?: boolean;
   experts?: CoworkSessionExpertSnapshot[];
   messages: CoworkMessage[];
   /** Offset of the first loaded message in the full message history. 0 means loaded from the beginning. */
@@ -257,12 +258,6 @@ export interface CoworkContinueOptions {
 }
 
 // IPC result types
-export interface CoworkSessionResult {
-  success: boolean;
-  session?: CoworkSession;
-  error?: string;
-}
-
 export interface CoworkSessionListResult {
   success: boolean;
   sessions?: CoworkSessionSummary[];

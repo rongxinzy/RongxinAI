@@ -86,7 +86,7 @@ test('real worker inspection preserves preview hashes, save results and external
     beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
     completeExternalWorkbenchRun: () => undefined,
   });
-  service.createWorkspace({
+  await service.createWorkspace({
     name: 'test',
     sourceFolders: [root],
     defaultProfileId: CodingAgentProfileId.Builtin,

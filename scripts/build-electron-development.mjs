@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite-plugin-electron';
 import { extractExternalDeps } from 'vite-plugin-electron/plugin';
 import { ELECTRON_MAIN_EXTERNALS } from './electron-runtime-dependencies.mjs';
-import { copyCompanionPhoton } from './copy-companion-photon.mjs';
 import { documentWasmAssets } from './document-wasm-assets.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -72,12 +71,10 @@ await build(createBuildOptions('src/main/companionWindowPreload.ts'));
 await build(createBuildOptions('src/main/llamacppModelDaemonEntry.ts'));
 await build(createBuildOptions('src/main/workbenchTask/artifactWorker.ts'));
 await build(createBuildOptions('src/main/magpie/catalogWorker.ts'));
-await build(createBuildOptions('src/main/libs/modelCatalogUpdateWorker.ts'));
 await build(createBuildOptions('src/main/libs/hashWorker.ts'));
 await build(createBuildOptions('src/main/libs/sqliteBackup/sqliteVerifyWorker.ts'));
 await build(createBuildOptions('src/main/libs/skillSecurity/skillSecurityScanWorker.ts'));
 await build(createBuildOptions('src/main/extensions/aisphere/requestWorker.ts'));
-await build(createBuildOptions('src/main/libs/appUpdateHashWorker.ts'));
 const documentWorker = createBuildOptions('src/main/documentReader/documentWorker.ts', {
   external: [],
 });
@@ -102,6 +99,5 @@ await build(
 );
 
 copyPhotonWasm();
-copyCompanionPhoton(projectRoot, outputDirectory);
 fs.writeFileSync(readyPath, '');
 console.log('[ElectronDevBuild] Main and preload bundles are ready.');

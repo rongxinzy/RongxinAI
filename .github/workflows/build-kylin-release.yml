@@ -74,37 +74,10 @@ jobs:
       - name: Install Bun dependencies
         run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
 
-      - name: Apply project patches
-        run: bun run apply:patches
-
-      - name: Read pinned Magpie Go toolchain
-        id: magpie-toolchain
-        run: >-
-          node -e "const p=require('./resources/magpie/upstream.json');
-          require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT,
-          'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
-
-      - uses: actions/setup-go@v6
+      - uses: ./.github/actions/prepare-magpie-runtime
         with:
-          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
-          cache: false
-
-      - name: Build and verify pinned Magpie gateway
-        run: |
-          set -euo pipefail
-          go version | grep -Fq "go${{ steps.magpie-toolchain.outputs.go-version }}"
-          for attempt in 1 2 3; do
-            if bun run magpie:build -- --target linux-x64; then
-              break
-            fi
-            if [[ "$attempt" == "3" ]]; then
-              echo "Magpie build failed after $attempt attempts" >&2
-              exit 1
-            fi
-            echo "Magpie build attempt $attempt failed; retrying in 15 seconds..." >&2
-            sleep 15
-          done
-          bun run magpie:verify -- --target linux-x64
+          target: linux-x64
+          build-attempts: '3'
 
       - name: Prepare Kylin runtimes
         run: |

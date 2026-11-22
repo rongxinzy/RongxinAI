@@ -5,8 +5,8 @@ import { MagpieManagerManagement } from './managerManagement';
 import type { MagpieSignInState } from './oauthPolicy';
 
 import { type MagpieHostProvider } from './hostProviders';
-import { execFile, spawn, type ChildProcess } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type {
@@ -31,16 +31,11 @@ import type { MagpiePreferences, MagpiePreferencesPatch } from '../../shared/mag
 import type { MagpieRoutingGateway } from './magpieRoutingGateway';
 import { MagpieRoutingUsageService } from './routingUsageService';
 import { delay, freePort } from './magpieManagerUtils';
+import { stopOwnedProcess } from '../libs/ownedProcessStop';
 
 export type { MagpieManagerOptions } from './managerOptions';
 
-function defaultKillWindowsProcessTree(pid: number): Promise<void> {
-  return new Promise(resolve => {
-    execFile('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, () => {
-      resolve();
-    });
-  });
-}
+const MAGPIE_QUIT_REQUEST_TIMEOUT_MS = 1_000;
 
 /** Owns exactly one verified, isolated upstream process. Never attaches to existing gateways. */
 export class MagpieManager implements MagpieRoutingGateway {
@@ -51,7 +46,9 @@ export class MagpieManager implements MagpieRoutingGateway {
   private abort?: AbortController;
   private webPort?: number;
   private webKey?: string;
+  #workKey?: string;
   private stopRevision = 0;
+  private closed = false;
   private memoryEnabled = false;
   private deniedAfterPersistenceFailure = false;
   private subscriptionChange?: Promise<MagpieStatus>;
@@ -66,6 +63,7 @@ export class MagpieManager implements MagpieRoutingGateway {
   constructor(private readonly options: MagpieManagerOptions) {
     this.providerOperations = new MagpieManagerProviders({
       state: () => this.state,
+      catalogOwner: () => this.catalogOwner(),
       ensureRunning: () => this.ensureRunning(),
       managementJson: (route, init, timeoutMs) => this.managementJson(route, init, timeoutMs),
       request: (url, init, timeoutMs) => this.request(url, init, timeoutMs),
@@ -78,7 +76,6 @@ export class MagpieManager implements MagpieRoutingGateway {
       state: () => this.state,
       ensureRunning: () => this.ensureRunning(),
       managementJson: (route, init, timeoutMs) => this.managementJson(route, init, timeoutMs),
-      agents: timeoutMs => this.agents(timeoutMs),
       options,
     });
     this.managementOperations = new MagpieManagerManagement({
@@ -89,7 +86,6 @@ export class MagpieManager implements MagpieRoutingGateway {
       status: () => this.status(),
       ensureRunning: () => this.ensureRunning(),
       webRequest: (route, init, timeoutMs) => this.webRequest(route, init, timeoutMs),
-      managementJson: (route, init) => this.managementJson(route, init),
       request: (url, init, timeoutMs) => this.request(url, init, timeoutMs),
     });
     this.routingUsage = new MagpieRoutingUsageService(this);
@@ -112,8 +108,10 @@ export class MagpieManager implements MagpieRoutingGateway {
     return this.options.lanAccess?.read().enabled === true;
   }
   /** The process may run for the model service or because LAN access needs it. */
-  private shouldRun = (): boolean => this.isServiceEnabled() || this.isLanAccessEnabled();
+  private shouldRun = (): boolean =>
+    !this.closed && (this.isServiceEnabled() || this.isLanAccessEnabled());
   start(): Promise<MagpieStatus> {
+    if (this.closed) return Promise.reject(new Error('The model service is shutting down.'));
     try {
       this.options.serviceEnabled?.write(true);
       this.memoryEnabled = true;
@@ -124,13 +122,19 @@ export class MagpieManager implements MagpieRoutingGateway {
     return this.startOwned();
   }
   private startOwned(): Promise<MagpieStatus> {
+    if (this.closed) return this.stopping ?? Promise.resolve(this.status());
     if (this.stopping)
       return this.stopping.then(() => (this.shouldRun() ? this.startOwned() : this.status()));
     if (this.pending) return this.pending;
     if (this.state.state === 'running') return Promise.resolve(this.status());
+    if (this.child) return Promise.reject(new Error('The previous model service is still owned.'));
+    const previousReapply = this.agentOperations.stopStartupReapply();
     this.abort = new AbortController();
+    const signal = this.abort.signal;
     this.state = { state: 'starting', version: MAGPIE_VERSION };
-    this.pending = this.launch(this.abort.signal).finally(() => {
+    this.pending = (
+      previousReapply ? previousReapply.then(() => this.launch(signal)) : this.launch(signal)
+    ).finally(() => {
       this.pending = undefined;
     });
     return this.pending;
@@ -150,37 +154,31 @@ export class MagpieManager implements MagpieRoutingGateway {
     args: string[],
   ): { executable: string; args: string[] } {
     const platform = this.options.platform ?? process.platform;
-    if (platform !== 'win32' || this.options.jobRunnerPath === false) {
+    if (platform !== 'win32') {
       return { executable: binary, args };
     }
-    if (typeof this.options.jobRunnerPath === 'string' && this.options.jobRunnerPath.length > 0) {
-      return {
-        executable: this.options.jobRunnerPath,
-        args: [String(process.pid), binary, ...args],
-      };
-    }
-    if (this.options.spawn) {
-      return { executable: binary, args };
-    }
-    const candidate = path.join(
+    const executable = path.join(
       path.dirname(this.options.resourcesRoot),
       'python-runtime',
       'job-runner.exe',
     );
-    if (fs.existsSync(candidate)) {
-      return { executable: candidate, args: [String(process.pid), binary, ...args] };
+    if (!fs.existsSync(executable)) {
+      console.warn(`[Magpie] Missing the Windows Job Object helper at ${executable}.`);
+      throw new Error('Windows process supervisor is unavailable.');
     }
-    return { executable: binary, args };
+    return { executable, args: [String(process.pid), binary, ...args] };
   }
 
   private async launch(signal: AbortSignal): Promise<MagpieStatus> {
-    let phase: 'verify' | 'prepare-home' | 'resolve-port' | 'spawn' | 'probe' = 'verify';
+    let phase: 'verify' | 'prepare-home' | 'resolve-port' | 'spawn' | 'probe' | 'retire-providers' =
+      'verify';
     let stderrTail = '';
     let spawnError: unknown;
     let exitCode: number | null = null;
     let exitSignal: NodeJS.Signals | null = null;
     let chosenGatewayPort: number | undefined;
     try {
+      signal.throwIfAborted();
       const binary = await (this.options.verify ?? verifyMagpieBinary)(
         this.options.resourcesRoot,
         signal,
@@ -204,6 +202,7 @@ export class MagpieManager implements MagpieRoutingGateway {
       this.webPort = await port();
       while (this.webPort === gatewayPort) this.webPort = await port();
       this.webKey = randomBytes(32).toString('hex');
+      this.#workKey = `sk-zhiyuan-work-${randomBytes(32).toString('base64url')}`;
       signal.throwIfAborted();
       phase = 'spawn';
       const spawnTarget = this.resolveSpawnTarget(binary, [
@@ -212,19 +211,25 @@ export class MagpieManager implements MagpieRoutingGateway {
         `127.0.0.1:${this.webPort}`,
         '--no-open',
       ]);
+      const enterpriseForward = this.options.enterpriseForward?.();
       const child = (this.options.spawn ?? spawn)(spawnTarget.executable, spawnTarget.args, {
         cwd: this.options.privateHome,
         shell: false,
         windowsHide: true,
         stdio: ['ignore', 'ignore', 'pipe'],
-        env: isolatedMagpieEnvironment(
-          this.options.privateHome,
-          gatewayPort,
-          this.webKey,
-          this.options.environment,
-          this.options.subscriptionAccounts?.read() === true,
-          lanAccessEnabled,
-        ),
+        env: {
+          ...isolatedMagpieEnvironment(
+            this.options.privateHome,
+            gatewayPort,
+            this.webKey,
+            this.options.environment,
+            this.options.subscriptionAccounts?.read() === true,
+            lanAccessEnabled,
+          ),
+          MAGPIE_ENTERPRISE_FORWARD_KEY: enterpriseForward?.key,
+          MAGPIE_ENTERPRISE_FORWARD_ORIGIN: enterpriseForward?.origin,
+          MAGPIE_WORK_KEY_SHA256: createHash('sha256').update(this.#workKey).digest('hex'),
+        },
       });
       this.child = child;
       let exited = false;
@@ -247,10 +252,11 @@ export class MagpieManager implements MagpieRoutingGateway {
         exitSignal = sig;
         if (this.child === child) {
           this.child = undefined;
-          this.providerOperations.clearHostSignatures();
           this.webKey = undefined;
           this.webPort = undefined;
+          this.#workKey = undefined;
           if (this.state.state === 'running') {
+            this.abort?.abort();
             const stderr = this.sanitizeDiagnosticText(stderrTail);
             console.warn('[Magpie] Owned model service exited unexpectedly:', {
               code,
@@ -271,26 +277,25 @@ export class MagpieManager implements MagpieRoutingGateway {
       while (Date.now() < deadline) {
         signal.throwIfAborted();
         if (exited) throw new Error('Model service process exited during startup');
+        let ready = false;
         try {
           const hello = await this.request(`${gatewayUrl}/api/hello`, { signal });
           const data = (await hello.json()) as { name?: string; version?: string };
           const web = await this.webRequest('/', { signal });
-          if (data.name === 'magpie' && data.version === MAGPIE_VERSION && web.ok && !exited) {
-            if ((this.options.platform ?? process.platform) === 'win32') {
-              void this.providerOperations.disableRetiredStrataProvider(signal).catch(error => {
-                if (!signal.aborted) {
-                  console.warn('[Magpie] Failed to disable the retired local provider:', error);
-                }
-              });
-            }
-            this.failedGatewayPorts.clear();
-            this.state = { state: 'running', version: MAGPIE_VERSION, gatewayUrl };
-            void this.agentOperations.reapplyManagedAgentsAfterStart();
-            if (lanAccessEnabled) void this.managementOperations.syncLanAccessKeyAfterStart();
-            return this.status();
-          }
+          ready = data.name === 'magpie' && data.version === MAGPIE_VERSION && web.ok;
         } catch {
           signal.throwIfAborted();
+        }
+        if (ready && !exited) {
+          phase = 'retire-providers';
+          await this.providerOperations.disableRetiredHostProviders(signal);
+          signal.throwIfAborted();
+          if (exited) throw new Error('Model service process exited during startup');
+          this.failedGatewayPorts.clear();
+          this.state = { state: 'running', version: MAGPIE_VERSION, gatewayUrl };
+          this.agentOperations.reapplyAfterStart(gatewayUrl, signal);
+          if (lanAccessEnabled) void this.managementOperations.syncLanAccessKeyAfterStart(signal);
+          return this.status();
         }
         await delay(100);
       }
@@ -360,11 +365,29 @@ export class MagpieManager implements MagpieRoutingGateway {
       key: this.webKey,
     };
   }
+  /** Main-only credential resolver bound to one process, even if a restart reuses its port. */
+  workKeyResolver(gatewayUrl: string): (() => string | undefined) | undefined {
+    const owner = this.abort;
+    if (!owner) return undefined;
+    const resolve = () =>
+      owner === this.abort &&
+      !owner.signal.aborted &&
+      this.state.state === 'running' &&
+      this.state.gatewayUrl === gatewayUrl
+        ? this.#workKey
+        : undefined;
+    return resolve() ? resolve : undefined;
+  }
   models(): Promise<MagpieModel[]> {
     return this.managementOperations.models();
   }
+  /** Main-only identity for catalog reads. A restarted process can reuse the same port. */
+  catalogOwner(): AbortSignal | undefined {
+    return this.state.state === 'running' ? this.abort?.signal : undefined;
+  }
   /** Only a previously explicit, persisted enable permits lazy startup or one recovery attempt. */
   async ensureRunning(): Promise<MagpieStatus> {
+    if (this.closed) throw new Error('The model service is shutting down.');
     if (!this.shouldRun()) throw new Error('Enable unified model management in settings first.');
     const status = await this.startOwned();
     if (status.state !== 'running' || !status.gatewayUrl || !this.shouldRun())
@@ -372,6 +395,10 @@ export class MagpieManager implements MagpieRoutingGateway {
         status.error || 'The model service could not start. Retry in model settings.',
       );
     return status;
+  }
+
+  waitForStartup(): Promise<MagpieStatus> | undefined {
+    return this.pending;
   }
 
   /** Records system sleep entry so post-wake recovery resets transient port exclusions. */
@@ -426,6 +453,7 @@ export class MagpieManager implements MagpieRoutingGateway {
    * service-enabled preference itself is never rewritten.
    */
   onLanAccessChanged(): Promise<MagpieStatus> {
+    if (this.closed) return this.stopping ?? Promise.resolve(this.status());
     if (this.subscriptionChange)
       return Promise.reject(new Error('Subscription settings are already changing'));
     if (this.lanAccessChange) return this.lanAccessChange;
@@ -434,12 +462,16 @@ export class MagpieManager implements MagpieRoutingGateway {
       const shouldRun = this.shouldRun();
       if (this.state.state === 'running' && !shouldRun) {
         // LAN was the only reason the process was running.
-        return await this.shutdown();
+        return this.requestStop();
       }
       if (this.state.state === 'running') {
         // The env flip needs a restart even when the token itself is unchanged;
         // launch re-imports the key once the new process is up.
-        return await this.stopOwned().then(() => this.startOwned());
+        const revision = this.stopRevision;
+        await this.stopOwned();
+        return this.stopRevision === revision && this.shouldRun()
+          ? this.startOwned()
+          : this.status();
       }
       if (shouldRun) return await this.startOwned();
       return this.status();
@@ -454,8 +486,12 @@ export class MagpieManager implements MagpieRoutingGateway {
   onLanAccessTokenRegenerated(): Promise<void> {
     return this.managementOperations.onLanAccessTokenRegenerated();
   }
-  syncHostProviders(definitions: readonly MagpieHostProvider[]): Promise<void> {
-    return this.providerOperations.syncHostProviders(definitions);
+  syncHostProviders(
+    definitions: readonly MagpieHostProvider[],
+    owner = this.catalogOwner(),
+  ): Promise<void> {
+    if (!owner) return Promise.reject(new Error('Model service is unavailable'));
+    return this.providerOperations.syncHostProviders(definitions, owner);
   }
   recordError(message: string, providerId?: string): void {
     this.providerOperations.recordError(message, providerId);
@@ -466,8 +502,11 @@ export class MagpieManager implements MagpieRoutingGateway {
   clearDiagnostics(): Promise<MagpieDiagnosticSummary> {
     return this.providerOperations.clearDiagnostics();
   }
-  providers(): Promise<MagpieProviderSummary[]> {
-    return this.providerOperations.providers();
+  async providers({ probeStoredKeys = true }: { probeStoredKeys?: boolean } = {}): Promise<
+    MagpieProviderSummary[]
+  > {
+    if (this.state.state === 'starting') await this.waitForStartup();
+    return this.providerOperations.providers(probeStoredKeys);
   }
   saveProvider(input: MagpieSaveProviderInput): Promise<MagpieProviderSummary[]> {
     return this.providerOperations.saveProvider(input);
@@ -512,7 +551,7 @@ export class MagpieManager implements MagpieRoutingGateway {
         await preference.write(enabled);
       } catch (error) {
         // Fail closed if persistence fails: do not leave newly permitted account access running.
-        await this.shutdown();
+        await this.requestStop();
         throw error;
       }
       await this.stopOwned();
@@ -527,8 +566,8 @@ export class MagpieManager implements MagpieRoutingGateway {
   signInStatus(id: string): Promise<MagpieSignInState> {
     return this.managementOperations.signInStatus(id);
   }
-  agents(readTimeoutMs?: number): Promise<MagpieAgents> {
-    return this.agentOperations.agents(readTimeoutMs);
+  agents(): Promise<MagpieAgents> {
+    return this.agentOperations.agents();
   }
   previewAgent(agentId: string): Promise<MagpieAgentConnectPreview> {
     return this.agentOperations.previewAgent(agentId);
@@ -539,8 +578,8 @@ export class MagpieManager implements MagpieRoutingGateway {
   disconnectAgent(agentId: string): Promise<MagpieAgents> {
     return this.agentOperations.disconnectAgent(agentId);
   }
-  disconnectAllAgents(): Promise<MagpieAgents> {
-    return this.agentOperations.disconnectAllAgents();
+  disconnectAllAgents(signal?: AbortSignal): Promise<MagpieAgents> {
+    return this.agentOperations.disconnectAllAgents(signal);
   }
   setModel(selection: MagpieModelSelection): Promise<MagpieAgents> {
     return this.agentOperations.setModel(selection);
@@ -554,31 +593,42 @@ export class MagpieManager implements MagpieRoutingGateway {
   }
   /** Explicit user disable. Application exit and internal restarts must use shutdown/stopOwned. */
   stop(): Promise<MagpieStatus> {
+    if (this.closed) return this.stopping ?? Promise.resolve(this.status());
     this.memoryEnabled = false;
     try {
       this.options.serviceEnabled?.write(false);
     } catch (error) {
       this.deniedAfterPersistenceFailure = true;
-      return this.shutdown().then(() => {
+      return this.requestStop().then(() => {
         throw error;
       });
     }
-    return this.shutdown();
+    return this.requestStop();
   }
-  /** Stop the owned process without forgetting the user's permission for the next app start. */
+  /** Permanently stop this instance while preserving consent for the next app start. */
   shutdown(): Promise<MagpieStatus> {
+    this.closed = true;
+    return this.requestStop();
+  }
+  private requestStop(): Promise<MagpieStatus> {
     this.stopRevision++;
     return this.stopOwned();
   }
   private stopOwned(): Promise<MagpieStatus> {
     if (this.stopping) return this.stopping;
     this.abort?.abort();
+    const reapply = this.agentOperations.stopStartupReapply();
+    this.#workKey = undefined;
     this.state = { state: 'stopping', version: MAGPIE_VERSION };
     this.stopping = (async () => {
       await this.pending;
       if (this.child) {
         try {
-          await this.webRequest('/api/window/quit', { method: 'POST' });
+          await this.webRequest(
+            '/api/window/quit',
+            { method: 'POST' },
+            MAGPIE_QUIT_REQUEST_TIMEOUT_MS,
+          );
           // Upstream WebWindow exits after its response has flushed (200 ms).
           await delay(300);
         } catch {
@@ -586,6 +636,7 @@ export class MagpieManager implements MagpieRoutingGateway {
         }
         await this.terminate();
       }
+      await reapply;
       this.state = { state: 'stopped', version: MAGPIE_VERSION };
       this.providerOperations.resetHydration();
       return this.status();
@@ -605,35 +656,11 @@ export class MagpieManager implements MagpieRoutingGateway {
   }
   private async terminate(): Promise<void> {
     const child = this.child;
-    const platform = this.options.platform ?? process.platform;
-    if (child && child.exitCode === null && child.signalCode === null) {
-      child.kill('SIGTERM');
-      await Promise.race([
-        new Promise<void>(resolve => child.once('exit', () => resolve())),
-        delay(1500),
-      ]);
-      if (child.exitCode === null && child.signalCode === null) {
-        if (platform === 'win32' && child.pid) {
-          await (this.options.killProcessTree ?? defaultKillWindowsProcessTree)(child.pid);
-          await Promise.race([
-            new Promise<void>(resolve => child.once('exit', () => resolve())),
-            delay(500),
-          ]);
-        }
-        if (child.exitCode === null && child.signalCode === null) {
-          child.kill('SIGKILL');
-          await Promise.race([
-            new Promise<void>(resolve => child.once('exit', () => resolve())),
-            delay(1500),
-          ]);
-        }
-        if (child.exitCode === null && child.signalCode === null)
-          throw new Error('The owned model process has not stopped');
-      }
-    }
+    // On Windows the launcher owns the job. Exiting the launcher closes the job handle.
+    if (child) await stopOwnedProcess(child);
     this.child = undefined;
     this.webKey = undefined;
     this.webPort = undefined;
-    this.providerOperations.clearHostSignatures();
+    this.#workKey = undefined;
   }
 }

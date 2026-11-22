@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { initializeCompanionTaskAdmissions } from '../companion/taskOwnership';
+import { initializeCompanionSchema } from '../companion/schema';
 import { buildPiConversationHistoryTool } from './piTool';
 import { ConversationHistoryService } from './service';
 import { ConversationHistoryRole } from './constants';
@@ -26,7 +26,7 @@ function fixture(filename = ':memory:') {
     CREATE TABLE IF NOT EXISTS cowork_messages (
       id TEXT PRIMARY KEY, session_id TEXT, type TEXT, content TEXT,
       metadata TEXT, created_at INTEGER, sequence INTEGER);`);
-  initializeCompanionTaskAdmissions(db);
+  initializeCompanionSchema(db);
   const service = new ConversationHistoryService(db, cwd => ({
     id: cwd,
     root: cwd,

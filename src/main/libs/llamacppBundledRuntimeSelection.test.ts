@@ -12,7 +12,6 @@ vi.mock('node:child_process', () => ({
 import {
   clearBundledVulkanGpuProbeCache,
   detectUsableBundledVulkanGpu,
-  isVulkanBackendStartupFailure,
   resolveBundledEditionRuntime,
 } from './llamacppBundledRuntimeSelection';
 
@@ -132,10 +131,5 @@ describe('llamacppBundledRuntimeSelection', () => {
 
   test('detectUsableBundledVulkanGpu returns false for missing binary', async () => {
     await expect(detectUsableBundledVulkanGpu('/does/not/exist')).resolves.toBe(false);
-  });
-
-  test('isVulkanBackendStartupFailure matches vulkan startup errors', () => {
-    expect(isVulkanBackendStartupFailure('Vulkan device not available')).toBe(true);
-    expect(isVulkanBackendStartupFailure('port in use')).toBe(false);
   });
 });

@@ -23,7 +23,7 @@ vi.mock('fs', () => ({
   existsSync: mocks.existsSync,
 }));
 
-vi.mock('./coworkUtil', () => ({
+vi.mock('./coworkEnv/electronNodeRuntime', () => ({
   getElectronNodeRuntimePath: () => 'C:\\Program Files\\ZhiYuan Agent\\ZhiYuan Agent.exe',
 }));
 

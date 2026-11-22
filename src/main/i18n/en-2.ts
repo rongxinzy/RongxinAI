@@ -1,4 +1,5 @@
 export const enMain2 = {
+  coworkSessionNotFound: 'This conversation no longer exists.',
   coworkWorkContextWindowTooSmall:
     'Model "{model}" context window ({current} tokens) is below the minimum {required} required for Work mode. Choose a model with a larger context window or switch to Chat mode.',
   coworkReasoningOutputTruncated:
@@ -60,14 +61,6 @@ export const enMain2 = {
   llamacppModelLoadInProgress: 'A model is already loading. Wait for it to finish and try again.',
   llamacppServiceStartupPortInUse:
     'The local inference service port is already in use. Check the port setting or close the conflicting process and try again.',
-  llamacppServiceStartupProcessExited:
-    'The local inference service exited during startup. Please try again later.',
-  llamacppServiceStartupTimeout:
-    'The local inference service startup timed out. Please try again later.',
-  llamacppServiceStartupBackendUnavailable:
-    'The selected local inference runtime backend is unavailable. Check the GPU driver or runtime configuration.',
-  llamacppServiceStartupRuntimeDamaged:
-    'The local inference runtime is unavailable or may be damaged. Reinstall the application and try again.',
   llamacppServiceStartupUnknown:
     'The local inference service failed to start. Please try again later.',
   llamacppModelLaunchLogWindowTitle: 'Model startup logs',

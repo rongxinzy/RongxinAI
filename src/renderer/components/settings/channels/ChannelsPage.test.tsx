@@ -47,7 +47,7 @@ vi.mock('../email/EmailSettingsPage', () => ({
 
 describe('ChannelsPage', () => {
   test('renders 6 active channels without Discord or Telegram and opens Sheet on click', () => {
-    render(<ChannelsPage />);
+    render(<ChannelsPage onAskAi={vi.fn()} />);
 
     for (const label of ['weixin', 'wecom', 'dingtalk', 'feishu', 'qq', 'emailSettings']) {
       expect(screen.getByText(label)).toBeInTheDocument();

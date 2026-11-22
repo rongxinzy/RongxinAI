@@ -6,6 +6,7 @@ import JSZip from 'jszip';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { documentReaderWorkerMock } from '../../../../tests/fixtures/document-reader/worker.testHarness';
+import { DOCUMENT_MAX_BYTES } from '../../documentReader/constants';
 
 const ocrState = vi.hoisted(() => ({
   supported: false,
@@ -93,6 +94,21 @@ test('converts a workspace DOCX fixture to Markdown locally', async () => {
   const result = await tool.execute('tool-1', { path: 'example.docx' });
 
   expect(result.content[0]?.text).toContain('Walking on imported air');
+});
+
+test('rejects an oversized document using its validated file size', async () => {
+  const root = createRoot();
+  const file = path.join(root, 'too-large.docx');
+  fs.writeFileSync(file, '');
+  fs.truncateSync(file, DOCUMENT_MAX_BYTES + 1);
+
+  const result = await buildPiDocumentReaderTool({ workspaceRoot: root }).execute('large', {
+    path: 'too-large.docx',
+  });
+  expect(result.structuredContent).toMatchObject({
+    errorCode: 'DOCUMENT_TOO_LARGE',
+    bytes: DOCUMENT_MAX_BYTES + 1,
+  });
 });
 
 test.each([

@@ -8,6 +8,7 @@
  */
 
 import {
+  createTestPiRuntime,
   adapter,
   createTemporaryWorkspace,
   mockApplyApplicationRuntimeEnv,
@@ -33,6 +34,7 @@ import {
   WorkbenchExecutionStatus,
 } from '../../../shared/workbenchTask';
 import { CONVERSATION_HISTORY_TOOL_NAME } from '../../conversationHistory/constants';
+import type { ConversationHistoryService } from '../../conversationHistory/service';
 import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
@@ -122,7 +124,11 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('registers raw conversation search as a separate tool', async () => {
-      adapter.setConversationHistoryService({ search: vi.fn(() => []) } as never);
+      const adapter = createTestPiRuntime({
+        conversationHistoryService: {
+          search: vi.fn(() => []),
+        } as unknown as ConversationHistoryService,
+      });
 
       await adapter.startSession('history-session', 'Find the previous decision');
       const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
@@ -152,7 +158,7 @@ describe('PiRuntimeAdapter', () => {
         const db = new Database(':memory:');
         initializeWorkbenchTaskSchema(db);
         const service = new RealWorkbenchTaskService(db);
-        adapter.setWorkbenchTaskService(service);
+        const adapter = createTestPiRuntime({ workbenchTaskService: service });
         const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-ppt-runtime-'));
         try {
           await adapter.startSession('ppt-session', 'Create a deck', {
@@ -202,7 +208,7 @@ describe('PiRuntimeAdapter', () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
+      const adapter = createTestPiRuntime({ workbenchTaskService: service });
       const workspaceRoot = createTemporaryWorkspace();
       try {
         await adapter.startSession('native-work', 'Write and verify a report', {
@@ -277,7 +283,7 @@ describe('PiRuntimeAdapter', () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
+      const adapter = createTestPiRuntime({ workbenchTaskService: service });
       const workspaceRoot = createTemporaryWorkspace();
 
       try {
@@ -288,7 +294,7 @@ describe('PiRuntimeAdapter', () => {
         });
 
         expect(service.getCurrent('audited-runtime')?.runs[0].context).toEqual({
-          model: 'qwen-local',
+          model: 'fixture/qwen-local',
           provider: 'magpie',
           reasoningProfile: 'default',
           workspaceRoot,
@@ -306,7 +312,7 @@ describe('PiRuntimeAdapter', () => {
         expect(tasks).toHaveLength(2);
         for (const task of tasks) {
           expect(service.getDetail(task.id)?.runs[0].context).toEqual({
-            model: 'qwen-local',
+            model: 'fixture/qwen-local',
             provider: 'magpie',
             reasoningProfile: 'default',
             workspaceRoot,

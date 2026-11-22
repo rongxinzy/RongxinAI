@@ -1,12 +1,9 @@
-import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
 import { app } from 'electron';
 
 import type { LlamaCppBackendRef } from '../../shared/llamacpp';
-import { resolveBundledLlamaCppBackendDir } from './llamacppBackendResources';
-import { usesBundledLlamaCppRuntime } from './inferenceEditionPolicy';
 
 export const LLAMACPP_BUNDLED_RUNTIME_DIR = 'llamacpp-bundled';
 
@@ -39,60 +36,4 @@ export function readBundledLlamaCppRuntimeManifest(): BundledRuntimeManifest | u
   } catch {
     return undefined;
   }
-}
-
-export function resolveBundledLlamaCppExecutablePath(
-  manifest: BundledRuntimeManifest,
-  options: { preferCpuFallback?: boolean } = {},
-): string | undefined {
-  const root = resolveBundledLlamaCppRuntimeRoot();
-  const relative =
-    options.preferCpuFallback && manifest.cpuFallbackExecutable
-      ? manifest.cpuFallbackExecutable
-      : manifest.executable;
-  const absolute = path.join(root, relative);
-  if (!fs.existsSync(absolute)) return undefined;
-  const expectedSha256 = options.preferCpuFallback ? manifest.cpuFallbackSha256 : manifest.sha256;
-  if (expectedSha256 && !verifySha256(absolute, expectedSha256)) {
-    throw new Error('The bundled llama.cpp runtime failed SHA-256 verification.');
-  }
-  return absolute;
-}
-
-export function tryResolveActiveBundledLlamaCppRuntime():
-  | {
-      executablePath: string;
-      backend: LlamaCppBackendRef;
-    }
-  | undefined {
-  if (!usesBundledLlamaCppRuntime()) return undefined;
-  const manifest = readBundledLlamaCppRuntimeManifest();
-  if (!manifest) return undefined;
-  const executablePath = resolveBundledLlamaCppExecutablePath(manifest);
-  if (!executablePath) return undefined;
-  return { executablePath, backend: normalizeBundledBackendRef(manifest.backend) };
-}
-
-function normalizeBundledBackendRef(
-  backend: LlamaCppBackendRef | { version: string; backend: string; versionBackend?: string },
-): LlamaCppBackendRef {
-  const versionBackend =
-    'versionBackend' in backend && backend.versionBackend
-      ? backend.versionBackend
-      : `${backend.version}/${backend.backend}`;
-  return {
-    version: backend.version,
-    backend: backend.backend,
-    versionBackend,
-  };
-}
-
-export function resolveBundledBackendManifestPath(): string {
-  return path.join(resolveBundledLlamaCppBackendDir(), 'manifest.json');
-}
-
-function verifySha256(filePath: string, expectedSha256: string): boolean {
-  const hash = createHash('sha256');
-  hash.update(fs.readFileSync(filePath));
-  return hash.digest('hex').toLowerCase() === expectedSha256.trim().toLowerCase();
 }

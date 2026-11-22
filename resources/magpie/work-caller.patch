@@ -1,0 +1,283 @@
+diff --git a/internal/access/access.go b/internal/access/access.go
+--- a/internal/access/access.go
++++ b/internal/access/access.go
+@@ -133,6 +133,7 @@
+ 	Limit          *Limit
+ 	Models         []string
+ 	Accounts       []string
++	ExactModels    bool
+ }
+ type contextKey struct{}
+ 
+diff --git a/internal/access/models.go b/internal/access/models.go
+--- a/internal/access/models.go
++++ b/internal/access/models.go
+@@ -40,6 +40,9 @@
+ // lists none. The accounts a key may be held to say nothing of its
+ // models: they hold the candidates of a plan, not its models.
+ func (who Identity) Allows(ids ...string) bool {
++	if who.ExactModels {
++		return slices.ContainsFunc(ids, func(id string) bool { return slices.Contains(who.Models, id) })
++	}
+ 	if len(who.Models) == 0 {
+ 		return true
+ 	}
+diff --git a/internal/gateway/lan.go b/internal/gateway/lan.go
+--- a/internal/gateway/lan.go
++++ b/internal/gateway/lan.go
+@@ -259,8 +259,11 @@
+ 			http.Error(w, "magpie isn't shared on the local network", http.StatusForbidden)
+ 			return
+ 		}
+-		if remote || managedKey(r) {
+-			var ok bool
++		r, ok := authenticateWorkCaller(w, r)
++		if !ok {
++			return
++		}
++		if !access.Caller(r.Context()).ExactModels && (remote || managedKey(r)) {
+ 			r, ok = identifyCaller(w, r)
+ 			if !ok {
+ 				return
+@@ -381,6 +384,13 @@
+ // callerGuard also covers embedded handlers used by the web app and tests.
+ func callerGuard(next http.Handler) http.Handler {
+ 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		if !access.Caller(r.Context()).ExactModels {
++			var ok bool
++			r, ok = authenticateWorkCaller(w, r)
++			if !ok {
++				return
++			}
++		}
+ 		if access.Caller(r.Context()).KeyID == "" && managedKey(r) && (local(r) || remoteKeyed()) {
+ 			var ok bool
+ 			r, ok = identifyCaller(w, r)
+diff --git a/internal/gateway/work_caller.go b/internal/gateway/work_caller.go
+new file mode 100644
+--- /dev/null
++++ b/internal/gateway/work_caller.go
+@@ -0,0 +1,83 @@
++package gateway
++
++import (
++	"crypto/sha256"
++	"crypto/subtle"
++	"encoding/hex"
++	"encoding/json"
++	"net/http"
++	"os"
++	"slices"
++	"strings"
++	"unicode"
++	"unicode/utf8"
++
++	"github.com/yetone/magpie/internal/access"
++)
++
++const (
++	workKeyFingerprintEnv = "MAGPIE_WORK_KEY_SHA256"
++	workModelsHeader      = "X-Magpie-Work-Models"
++	workModelsHeaderLimit = 16 * 1024
++	workModelLimit        = 500
++	workModelRefLimit     = 300
++)
++
++func workCredentialMatches(r *http.Request) bool {
++	expected, err := hex.DecodeString(os.Getenv(workKeyFingerprintEnv))
++	if err != nil || len(expected) != sha256.Size {
++		return false
++	}
++	scheme, bearer, _ := strings.Cut(r.Header.Get("Authorization"), " ")
++	matches := func(key string) bool {
++		if key == "" {
++			return false
++		}
++		digest := sha256.Sum256([]byte(key))
++		return subtle.ConstantTimeCompare(digest[:], expected) == 1
++	}
++	return strings.EqualFold(scheme, "Bearer") && matches(bearer) || matches(r.Header.Get("X-Api-Key"))
++}
++
++func authenticateWorkCaller(w http.ResponseWriter, r *http.Request) (*http.Request, bool) {
++	workloads := r.Header.Values("X-Magpie-Workload")
++	marked := slices.Contains(workloads, "work") || slices.Contains(workloads, "enterprise-chat")
++	matched := workCredentialMatches(r)
++	if !marked && !matched {
++		return r, true
++	}
++	if len(workloads) != 1 || !marked || !matched || !local(r) {
++		writeError(w, protoOfPath(r.URL.Path), http.StatusUnauthorized, "Work requires its local host credential")
++		return r, false
++	}
++
++	var models []string
++	scope := r.Header.Values(workModelsHeader)
++	if len(scope) != 1 || len(scope[0]) > workModelsHeaderLimit || !utf8.ValidString(scope[0]) ||
++		json.Unmarshal([]byte(scope[0]), &models) != nil || len(models) == 0 ||
++		len(models) > workModelLimit || slices.ContainsFunc(models, invalidWorkModelRef) {
++		writeError(w, protoOfPath(r.URL.Path), http.StatusBadRequest, "Work requires an explicit provider model allowlist")
++		return r, false
++	}
++
++	keyID, keyName := "host:work", "Work"
++	if workloads[0] == "enterprise-chat" {
++		keyID, keyName = "host:enterprise-chat", "Enterprise Chat"
++	}
++	r = r.WithContext(access.WithIdentity(r.Context(), access.Identity{
++		KeyID: keyID, KeyName: keyName, Models: models, ExactModels: true,
++	}))
++	// Keep the host credential and its scope out of downstream request headers.
++	r.Header = r.Header.Clone()
++	r.Header.Set("Authorization", "Bearer "+TokenFor("zhiyuan"))
++	r.Header.Del("X-Api-Key")
++	r.Header.Del(workModelsHeader)
++	return r, true
++}
++
++func invalidWorkModelRef(ref string) bool {
++	owner, model, ok := strings.Cut(ref, "/")
++	return !ok || owner == "" || model == "" || strings.EqualFold(owner, "group") ||
++		len(ref) > workModelRefLimit || ref != strings.TrimSpace(ref) || strings.Contains(ref, "*") ||
++		strings.Contains(ref, "//") || strings.HasSuffix(ref, "/") || strings.IndexFunc(ref, unicode.IsControl) >= 0
++}
+diff --git a/internal/gateway/work_caller_test.go b/internal/gateway/work_caller_test.go
+new file mode 100644
+--- /dev/null
++++ b/internal/gateway/work_caller_test.go
+@@ -0,0 +1,97 @@
++package gateway
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"errors"
++	"net/http"
++	"net/http/httptest"
++	"os"
++	"strings"
++	"testing"
++
++	"github.com/yetone/magpie/internal/access"
++	"github.com/yetone/magpie/internal/provider"
++	"github.com/yetone/magpie/internal/settings"
++)
++
++func TestHostWorkCallerRestrictsNativeCandidates(t *testing.T) {
++	fresh(t)
++	plan := &fake{t: t, ctype: "application/json", reply: `{"id":"from-plan","choices":[]}`}
++	spare := &fake{t: t, ctype: "application/json", reply: `{"id":"from-spare","choices":[]}`}
++	twoProviders(t, plan, spare)
++	const key = "synthetic-work-caller-fixture"
++	fingerprint := sha256.Sum256([]byte(key))
++	t.Setenv(workKeyFingerprintEnv, hex.EncodeToString(fingerprint[:]))
++	if settings.Load().LAN {
++		t.Fatal("fixture requires LAN off")
++	}
++	group := func(members ...string) {
++		t.Helper()
++		if err := provider.SaveGroup(provider.Group{ID: "work-fixture", Name: "Work fixture", Members: members, Routing: provider.Ordered}); err != nil {
++			t.Fatal(err)
++		}
++	}
++	group("plan/m1")
++
++	s := New()
++	localGateway := lanGuard(s.Handler())
++	post := func(h http.Handler, secret, model string, work bool, scope ...string) *httptest.ResponseRecorder {
++		r := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"`+model+`","messages":[{"role":"user","content":"fixture input"}]}`))
++		r.RemoteAddr = "127.0.0.1:43210"
++		if secret != "" {
++			r.Header.Set("Authorization", "Bearer "+secret)
++		}
++		if work {
++			r.Header.Set("X-Magpie-Workload", "work")
++			for _, value := range scope {
++				r.Header.Add(workModelsHeader, value)
++			}
++		}
++		w := httptest.NewRecorder()
++		h.ServeHTTP(w, r)
++		return w
++	}
++	expect := func(h http.Handler, secret, model string, work bool, status int, scope ...string) {
++		t.Helper()
++		if w := post(h, secret, model, work, scope...); w.Code != status {
++			t.Fatalf("%s: %d want %d, %s", model, w.Code, status, w.Body.String())
++		}
++	}
++	const refs = `["plan/m1"]`
++	expect(localGateway, "", "group/work-fixture", true, 401, refs)
++	expect(localGateway, "wrong-fixture-key", "group/work-fixture", true, 401, refs)
++	expect(localGateway, key, "group/work-fixture", false, 401)
++	expect(s.Handler(), "", "group/work-fixture", true, 401, refs)
++	expect(localGateway, key, "group/work-fixture", true, 400)
++	expect(localGateway, key, "group/work-fixture", true, 400, refs, refs)
++	for _, scope := range []string{`[]`, `["group/work-fixture"]`, `["plan/*"]`, `["plan//m1"]`, `["plan/m1",null]`, strings.Repeat(" ", workModelsHeaderLimit+1) + refs} {
++		expect(localGateway, key, "group/work-fixture", true, 400, scope)
++	}
++	expect(localGateway, key, "group/work-fixture", true, 403, `["PLAN/m1"]`)
++	if plan.calls != 0 || spare.calls != 0 {
++		t.Fatal("refused Work touched an upstream")
++	}
++	expect(localGateway, key, "group/work-fixture", true, 200, refs)
++	if rec := lastUsage(t); rec.CallerKeyID != "host:work" || rec.Provider != "plan" {
++		t.Fatalf("wrong caller/provider in usage: %+v", rec)
++	}
++	group("plan/m1", "spare/m2")
++	expect(localGateway, key, "group/work-fixture", true, 403, refs)
++	if plan.calls != 1 || spare.calls != 0 {
++		t.Fatal("a newly disallowed group touched an upstream")
++	}
++
++	plan.code, plan.reply = 503, `{"error":{"message":"service unavailable"}}`
++	if w := post(localGateway, key, "plan/m1", true, refs); w.Code < 400 || spare.calls != 0 {
++		t.Fatalf("disallowed fallback reached native provider: %d, spare calls %d", w.Code, spare.calls)
++	}
++	t.Setenv(workKeyFingerprintEnv, "invalid")
++	expect(localGateway, key, "plan/m1", true, 401, refs)
++	t.Setenv(workKeyFingerprintEnv, "")
++	expect(localGateway, key, "plan/m1", true, 401, refs)
++	expect(localGateway, "", "spare/m2", false, 200)
++	if _, err := os.Stat(access.Path()); !errors.Is(err, os.ErrNotExist) {
++		t.Fatal("host caller must never create a persisted key", err)
++	}
++}
+diff --git a/internal/gateway/gateway.go b/internal/gateway/gateway.go
+--- a/internal/gateway/gateway.go
++++ b/internal/gateway/gateway.go
+@@ -28,6 +28,7 @@
+ 
+ 	"github.com/tidwall/gjson"
+ 
++	"github.com/yetone/magpie/internal/access"
+ 	"github.com/yetone/magpie/internal/awake"
+ 
+ 	"github.com/yetone/magpie/internal/plugin"
+@@ -3456,8 +3457,26 @@
+ 		passOnCaller(ctx, req)
+ 		markSearching(ctx, req)
+ 	}
++	// Only the host-owned enterprise loopback transport receives desktop request context.
++	if strings.HasPrefix(p.ID, "zhiyuan-host-enterprise-") {
++		key := os.Getenv("MAGPIE_ENTERPRISE_FORWARD_KEY")
++		origin := req.URL.Scheme + "://" + req.URL.Host
++		if !access.Caller(ctx).ExactModels || key == "" || req.URL.Scheme != "http" || req.URL.Hostname() != "127.0.0.1" ||
++			origin != os.Getenv("MAGPIE_ENTERPRISE_FORWARD_ORIGIN") {
++			return nil, errors.New("enterprise models require an authorized desktop request")
++		}
++		for _, h := range []string{"X-Session-Affinity", "X-Session-Id", "X-Client-Request-Id", "Session_id", "X-Zhiyuan-Conversation-Id", "X-Zhiyuan-Workload"} {
++			if v := in.Get(h); v != "" {
++				req.Header.Set(h, v)
++			}
++		}
++	}
+ 	if err := p.Sign(ctx, req, to, body); err != nil {
+ 		return nil, err
++	}
++	// Write the desktop proof after provider signing, which applies configured headers.
++	if strings.HasPrefix(p.ID, "zhiyuan-host-enterprise-") {
++		req.Header.Set("X-Zhiyuan-Enterprise-Forward", os.Getenv("MAGPIE_ENTERPRISE_FORWARD_KEY"))
+ 	}
+ 	// a sign-in its vendor revoked isn't sent again: the next member is
+ 	// asked, and the agent told to sign in again (#1793)

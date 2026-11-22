@@ -20,7 +20,7 @@ test('runs builtin control commands locally instead of forwarding them to the ag
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/commands';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: CodingAgentProfileId.Builtin,
   });
@@ -76,7 +76,7 @@ test('answers the mcp command from the runtime instead of the agent', async () =
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/mcp-command';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: CodingAgentProfileId.Builtin,
   });
@@ -123,7 +123,7 @@ test('treats a too-small builtin compaction as a no-op instead of a failure', as
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/compact-noop';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: CodingAgentProfileId.Builtin,
   });
@@ -151,7 +151,7 @@ test('reports a missing builtin session instead of failing to compact', async ()
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/compact-no-session';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: CodingAgentProfileId.Builtin,
   });
@@ -184,7 +184,7 @@ test('queues a builtin control command while the session is running', async () =
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/queued-command';
-  const created = await service.createMission({
+  const created = await service.seedSession({
     workspaceRoot,
     profileId: CodingAgentProfileId.Builtin,
   });

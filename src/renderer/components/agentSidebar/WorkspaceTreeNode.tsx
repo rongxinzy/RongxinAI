@@ -43,7 +43,6 @@ interface WorkspaceTreeNodeProps {
   onCollapseTasks: (workspaceId: string) => void;
   onSelectTask: (task: AgentSidebarTaskNode) => void;
   onDeleteTask: (task: AgentSidebarTaskNode) => Promise<void>;
-  onShareTask: (task: AgentSidebarTaskNode) => Promise<void>;
   onToggleTaskPin: (task: AgentSidebarTaskNode, pinned: boolean) => Promise<void>;
   onRenameTask: (task: AgentSidebarTaskNode, title: string) => Promise<void>;
   onToggleSelection: (sessionId: string) => void;
@@ -70,7 +69,6 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   onCollapseTasks,
   onSelectTask,
   onDeleteTask,
-  onShareTask,
   onToggleTaskPin,
   onRenameTask,
   onToggleSelection,
@@ -250,7 +248,6 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                   showBatchOption
                   onSelect={() => onSelectTask(task)}
                   onDelete={() => onDeleteTask(task)}
-                  onShare={() => onShareTask(task)}
                   onTogglePin={pinned => onToggleTaskPin(task, pinned)}
                   onRename={title => onRenameTask(task, title)}
                   onToggleSelection={() => onToggleSelection(task.id)}

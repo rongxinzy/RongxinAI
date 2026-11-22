@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import {
   expectedDebVersion,
   fingerprintArtifacts,
+  releaseArtifact,
   releaseArtifacts,
   releaseIdentity,
   verifyEvidence,
@@ -12,14 +13,12 @@ import {
 import { queryInstalledExecutable } from './linux-installed-executable.mjs';
 
 const mode = process.argv[2];
-if (!['accept', 'verify'].includes(mode)) {
-  throw new Error('usage: linux-release-acceptance.mjs <accept|verify>');
+if (!['accept', 'verify', 'smoke-deb'].includes(mode)) {
+  throw new Error('usage: linux-release-acceptance.mjs <accept|verify|smoke-deb>');
 }
-const identity = releaseIdentity(process.env);
 const directory = path.resolve('release');
 const evidenceDirectory = path.join(directory, 'linux-release-acceptance');
 const evidencePath = path.join(evidenceDirectory, 'evidence.json');
-const artifacts = await releaseArtifacts(directory);
 
 function run(command, args, capture = false) {
   return execFileSync(command, args, {
@@ -30,10 +29,25 @@ function run(command, args, capture = false) {
   })?.trim();
 }
 
-if (mode === 'verify') {
-  const evidence = JSON.parse(await fs.readFile(evidencePath, 'utf8'));
-  verifyEvidence(evidence, identity, await fingerprintArtifacts(artifacts));
-} else {
+async function smokeDeb(deb, screenshot, expectedVersion) {
+  const debVersion = run('dpkg-deb', ['-f', deb, 'Version'], true);
+  if (expectedVersion && debVersion !== expectedVersion) {
+    throw new Error(`Final deb version does not match release: ${debVersion}`);
+  }
+  const packageName = run('dpkg-deb', ['-f', deb, 'Package'], true);
+  if (!/^[a-z0-9][a-z0-9+.-]+$/.test(packageName)) {
+    throw new Error('Final deb has an invalid package name');
+  }
+  run('sudo', ['apt-get', 'install', '-y', deb]);
+  const installedVersion = run('dpkg-query', ['-W', '-f=${Version}', packageName], true);
+  if (installedVersion !== debVersion) throw new Error('Installed deb version mismatch');
+  const builder = JSON.parse(await fs.readFile('electron-builder.json', 'utf8'));
+  const executable = await queryInstalledExecutable(packageName, builder.executableName);
+  await fs.access(executable, constants.X_OK);
+  run(process.execPath, ['scripts/verify-linux-renderer.mjs', executable, screenshot]);
+}
+
+async function acceptRelease(identity, artifacts) {
   await fs.mkdir(evidenceDirectory, { recursive: true });
   await fs.rm(evidencePath, { force: true });
   // Exercise the delivered AppImage through FUSE. Extraction is not equivalent acceptance.
@@ -42,25 +56,11 @@ if (mode === 'verify') {
   }
   await fs.access('/dev/fuse', constants.R_OK | constants.W_OK);
   const fingerprints = await fingerprintArtifacts(artifacts);
-  const debVersion = run('dpkg-deb', ['-f', artifacts.deb, 'Version'], true);
-  if (debVersion !== expectedDebVersion(identity.version)) {
-    throw new Error(`Final deb version does not match release: ${debVersion}`);
-  }
-  const packageName = run('dpkg-deb', ['-f', artifacts.deb, 'Package'], true);
-  if (!/^[a-z0-9][a-z0-9+.-]+$/.test(packageName)) {
-    throw new Error('Final deb has an invalid package name');
-  }
-  run('sudo', ['apt-get', 'install', '-y', artifacts.deb]);
-  const installedVersion = run('dpkg-query', ['-W', '-f=${Version}', packageName], true);
-  if (installedVersion !== debVersion) throw new Error('Installed deb version mismatch');
-  const builder = JSON.parse(await fs.readFile('electron-builder.json', 'utf8'));
-  const executable = await queryInstalledExecutable(packageName, builder.executableName);
-  await fs.access(executable, constants.X_OK);
-  run(process.execPath, [
-    'scripts/verify-linux-renderer.mjs',
-    executable,
+  await smokeDeb(
+    artifacts.deb,
     path.join(evidenceDirectory, 'deb.png'),
-  ]);
+    expectedDebVersion(identity.version),
+  );
   await fs.chmod(artifacts.appimage, 0o755);
   run(process.execPath, [
     'scripts/verify-linux-renderer.mjs',
@@ -81,4 +81,21 @@ if (mode === 'verify') {
   verifyEvidence(evidence, identity, await fingerprintArtifacts(artifacts));
   await fs.writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
 }
-console.log(`[LinuxReleaseAcceptance] ${mode} passed for ${identity.edition}`);
+
+if (mode === 'smoke-deb') {
+  await smokeDeb(
+    await releaseArtifact(directory, 'deb'),
+    path.join(directory, 'linux-deb-install-smoke.png'),
+  );
+  console.log('[LinuxReleaseAcceptance] deb smoke passed');
+} else {
+  const identity = releaseIdentity(process.env);
+  const artifacts = await releaseArtifacts(directory);
+  if (mode === 'verify') {
+    const evidence = JSON.parse(await fs.readFile(evidencePath, 'utf8'));
+    verifyEvidence(evidence, identity, await fingerprintArtifacts(artifacts));
+  } else {
+    await acceptRelease(identity, artifacts);
+  }
+  console.log(`[LinuxReleaseAcceptance] ${mode} passed for ${identity.edition}`);
+}

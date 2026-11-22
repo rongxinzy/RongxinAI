@@ -6,23 +6,21 @@
  * settle. Native follow-up and steer queues are delegated directly to Pi.
  */
 
-import { randomUUID } from 'crypto';
-
 import {
   CoworkQueueDelivery,
   CoworkQueueItemStatus,
   type CoworkPendingMessage,
 } from '../../../shared/cowork/pendingMessageQueue';
-import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { hasVisiblePromptContent } from '../../../shared/cowork/submissionContent';
-import type { CoworkMessage } from '../../coworkStore';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import {
   haveSameStringList,
+  persistPiUserMessage,
   mergeSkillIds,
   preparePiPrompt,
   type ActivePiSession,
   type PiEvent,
+  type PreparedPiPrompt,
 } from './piRuntimeSessionState';
 import type { PiContinueOptions } from './piRuntimeTypes';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
@@ -32,19 +30,22 @@ import { resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 
 const ScheduledInputError =
   'Interactive messages are unavailable while the scheduled task is running.';
+const FollowUpEndedError = 'The Work turn ended before Pi accepted this follow-up.';
 
-type QueuedFollowUp = { itemId: string; images: ImagePromptPreparation };
+type QueuedInput = { itemId: string; images: ImagePromptPreparation } | { steerText: string };
 
 export class PiRuntimeQueueController {
   private readonly pendingMessageQueue = new PiPendingMessageQueue();
   /** Opaque application actions that run after queued Work prompts settle. */
   private readonly queuedControlActions = new Map<string, Array<() => Promise<void>>>();
-  private readonly nativeFollowUps = new Map<string, WeakMap<object, QueuedFollowUp>>();
+  private readonly nativeInputs = new Map<string, WeakMap<object, QueuedInput>>();
+  private readonly pendingImageAdmissions = new Map<string, Promise<void>>();
 
   constructor(private readonly host: PiRuntimeAdapterHost) {}
 
   resetNativeDispatch(sessionId: string): void {
-    this.nativeFollowUps.delete(sessionId);
+    this.nativeInputs.delete(sessionId);
+    this.pendingImageAdmissions.delete(sessionId);
   }
 
   discardRecreatedSessionFollowUps(sessionId: string): void {
@@ -66,10 +67,17 @@ export class PiRuntimeQueueController {
     active: ActivePiSession,
     message: NonNullable<PiEvent['message']>,
   ): void {
-    const followUps = this.nativeFollowUps.get(sessionId);
-    const queued = followUps?.get(message);
+    const inputs = this.nativeInputs.get(sessionId);
+    const queued = inputs?.get(message);
     if (!queued) return;
-    followUps?.delete(message);
+    inputs?.delete(message);
+    if ('steerText' in queued) {
+      persistPiUserMessage(this.host, sessionId, queued.steerText, {
+        queueDelivery: CoworkQueueDelivery.Steer,
+      });
+      active.summaryCheckpointGoal = queued.steerText;
+      return;
+    }
     const item = this.pendingMessageQueue.take(
       sessionId,
       queued.itemId,
@@ -77,16 +85,23 @@ export class PiRuntimeQueueController {
     );
     if (!item) return;
     this.applyQueuedSkillIds(active, item.skillIds);
-    this.persistQueuedSkillIds(sessionId, item.skillIds);
+    if (item.skillIds?.length)
+      this.host.getStore(sessionId)?.appendSessionSkills(sessionId, item.skillIds);
     this.emitQueueUpdated(sessionId);
     active.summaryCheckpointGoal = item.text;
     this.host.recovery.reportOmittedImages(sessionId, queued.images);
-    this.persistQueuedUserMessage(sessionId, item, CoworkQueueDelivery.FollowUp);
+    persistPiUserMessage(this.host, sessionId, item.text, {
+      ...item,
+      queueDelivery: CoworkQueueDelivery.FollowUp,
+    });
     this.pendingMessageQueue.finishDelivery(item.id);
   }
 
   hasPendingFollowUp(sessionId: string): boolean {
-    return this.pendingMessageQueue.hasPendingFollowUp(sessionId);
+    return (
+      this.pendingImageAdmissions.has(sessionId) ||
+      this.pendingMessageQueue.hasPendingFollowUp(sessionId)
+    );
   }
 
   hasQueuedControlActions(sessionId: string): boolean {
@@ -131,13 +146,13 @@ export class PiRuntimeQueueController {
     return { success: true };
   }
 
-  enqueuePendingMessage(
+  async enqueuePendingMessage(
     sessionId: string,
     text: string,
     imageAttachments?: PiContinueOptions['imageAttachments'],
     fileAttachments?: PiContinueOptions['fileAttachments'],
     skillIds?: string[],
-  ): { success: boolean; item?: CoworkPendingMessage; error?: string } {
+  ): Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }> {
     const active = this.host.activeSessions.get(sessionId);
     if (!this.isWorkSession(sessionId, active)) {
       return { success: false, error: 'Pending message queue is only available in Work sessions.' };
@@ -150,75 +165,149 @@ export class PiRuntimeQueueController {
     const normalizedText = text.trim();
     if (!hasVisiblePromptContent(normalizedText))
       return { success: false, error: 'Message text is required.' };
-    // IPC enqueue already persists; IM/internal callers still pass base64 here.
-    const storedImages = this.host.persistImageAttachments(sessionId, imageAttachments);
-    const item = this.pendingMessageQueue.enqueue(
-      sessionId,
-      normalizedText,
-      CoworkQueueDelivery.FollowUp,
-      storedImages,
-      fileAttachments,
-      skillIds,
-    );
-    this.emitQueueUpdated(sessionId);
-    const skillContext =
-      item.skillIds && active.resourceState.describeQueuedSkills?.(item.skillIds);
-    // Follow-ups run before Pi can reload the session's ResourceLoader. Keep the
-    // selected Skill references on this native input, leaving the current request alone.
-    const { content, ...imagePreparation } = this.buildQueuedPromptPayload(
-      active,
-      item,
-      skillContext,
-    );
-    const textParts =
-      typeof content === 'string' ? [] : content.filter(part => part.type === 'text');
-    const promptText =
-      typeof content === 'string' ? content : textParts.map(part => part.text).join('\n');
-    const images =
-      typeof content === 'string' ? undefined : content.filter(part => part.type === 'image');
-    const followUps = this.nativeFollowUps.get(sessionId) ?? new WeakMap<object, QueuedFollowUp>();
-    this.nativeFollowUps.set(sessionId, followUps);
     const submissionToken = active.submissionToken;
-    // followUp queues even during initial prompt preparation, when Pi is still idle.
-    void active.piSession
-      .followUp(promptText, images, {
-        onQueued: message => {
+    const signal = active.abortController.signal;
+    const isCurrent = () =>
+      this.host.activeSessions.get(sessionId) === active &&
+      active.submissionToken === submissionToken &&
+      active.isRunning &&
+      !active.aborted &&
+      !signal.aborted;
+    const previous = this.pendingImageAdmissions.get(sessionId);
+    if (!previous && !imageAttachments?.length) {
+      return this.enqueueNativeFollowUp(
+        sessionId,
+        active,
+        isCurrent,
+        normalizedText,
+        undefined,
+        fileAttachments,
+        skillIds,
+      );
+    }
+    const images = imageAttachments?.length
+      ? Promise.allSettled([
+          this.host.persistImageAttachments(sessionId, imageAttachments, signal, isCurrent),
+        ])
+      : undefined;
+    const submission = (async () => {
+      await previous;
+      const ready = (await images)?.[0];
+      if (!isCurrent()) return { success: false, error: FollowUpEndedError };
+      if (ready?.status === 'rejected') throw ready.reason;
+      return this.enqueueNativeFollowUp(
+        sessionId,
+        active,
+        isCurrent,
+        normalizedText,
+        ready?.status === 'fulfilled' ? ready.value : undefined,
+        fileAttachments,
+        skillIds,
+      );
+    })();
+    const barrier = submission.then(
+      (): void => {},
+      (): void => {},
+    );
+    this.pendingImageAdmissions.set(sessionId, barrier);
+    try {
+      return await submission;
+    } finally {
+      if (this.pendingImageAdmissions.get(sessionId) === barrier) {
+        this.pendingImageAdmissions.delete(sessionId);
+        if (
+          this.host.activeSessions.get(sessionId) === active &&
+          !active.isRunning &&
+          this.hasQueuedControlActions(sessionId)
+        ) {
+          void this.flushControlActions(sessionId, active);
+        }
+      }
+    }
+  }
+
+  private enqueueNativeFollowUp(
+    sessionId: string,
+    active: ActivePiSession,
+    isCurrent: () => boolean,
+    normalizedText: string,
+    storedImages?: PiContinueOptions['imageAttachments'],
+    fileAttachments?: PiContinueOptions['fileAttachments'],
+    skillIds?: string[],
+  ) {
+    const skillContext = skillIds?.length && active.resourceState.describeQueuedSkills?.(skillIds);
+    // Keep the first space after a bare /skill command so Pi can still parse it.
+    const delimiter =
+      normalizedText.startsWith('/skill:') && !normalizedText.includes(' ') ? ' ' : '\n\n';
+    const prepared = preparePiPrompt(
+      skillContext ? `${normalizedText}${delimiter}${skillContext}` : normalizedText,
+      storedImages,
+      this.host.recovery.imageInputVerdictForActive(active),
+      this.host.getOcrCommandFor(),
+      collectImagePathReferences(fileAttachments),
+      active.abortController.signal,
+    );
+    const submit = ({ content, ...imagePreparation }: PreparedPiPrompt) => {
+      if (!isCurrent()) return { success: false, error: FollowUpEndedError };
+      const item = this.pendingMessageQueue.enqueue(
+        sessionId,
+        normalizedText,
+        CoworkQueueDelivery.FollowUp,
+        storedImages,
+        fileAttachments,
+        skillIds,
+      );
+      this.emitQueueUpdated(sessionId);
+      const textParts =
+        typeof content === 'string' ? [] : content.filter(part => part.type === 'text');
+      const promptText =
+        typeof content === 'string' ? content : textParts.map(part => part.text).join('\n');
+      const images =
+        typeof content === 'string' ? undefined : content.filter(part => part.type === 'image');
+      const inputs = this.nativeInputs.get(sessionId) ?? new WeakMap<object, QueuedInput>();
+      this.nativeInputs.set(sessionId, inputs);
+      // followUp queues even during initial prompt preparation, when Pi is still idle.
+      void active.piSession
+        .followUp(promptText, images, {
+          onQueued: message => {
+            if (!isCurrent() || this.nativeInputs.get(sessionId) !== inputs) {
+              throw new Error(FollowUpEndedError);
+            }
+            inputs.set(message, { itemId: item.id, images: imagePreparation });
+          },
+        })
+        .then(disposition => {
+          if (disposition === 'handled')
+            throw new Error('The agent handled this input without adding a follow-up.');
+        })
+        .catch(error => {
           if (
             this.host.activeSessions.get(sessionId) !== active ||
-            this.nativeFollowUps.get(sessionId) !== followUps ||
-            !active.isRunning ||
-            active.submissionToken !== submissionToken
+            active.aborted ||
+            active.abortController.signal.aborted
           ) {
-            throw new Error('The Work turn ended before Pi accepted this follow-up.');
+            return;
           }
-          followUps.set(message, { itemId: item.id, images: imagePreparation });
-        },
-      })
-      .then(disposition => {
-        if (disposition === 'handled')
-          throw new Error('The agent handled this input without adding a follow-up.');
-      })
-      .catch(error => {
-        if (
-          this.host.activeSessions.get(sessionId) !== active ||
-          active.aborted ||
-          active.abortController.signal.aborted
-        ) {
-          return;
-        }
-        const message = error instanceof Error ? error.message : String(error);
-        const taken = this.pendingMessageQueue.take(
-          sessionId,
-          item.id,
-          CoworkQueueDelivery.FollowUp,
-        );
-        if (!taken) return;
-        this.pendingMessageQueue.restore(sessionId, { ...taken, error: message });
-        this.emitQueueUpdated(sessionId);
-        void this.flushControlActions(sessionId, active);
-      });
+          const message = error instanceof Error ? error.message : String(error);
+          const taken = this.pendingMessageQueue.take(
+            sessionId,
+            item.id,
+            CoworkQueueDelivery.FollowUp,
+          );
+          if (!taken) return;
+          this.pendingMessageQueue.restore(sessionId, { ...taken, error: message });
+          this.emitQueueUpdated(sessionId);
+          void this.flushControlActions(sessionId, active);
+        });
 
-    return { success: true, item };
+      return { success: true, item };
+    };
+    return prepared instanceof Promise
+      ? prepared.then(submit, (error: unknown) => {
+          if (!isCurrent()) return { success: false, error: FollowUpEndedError };
+          throw error;
+        })
+      : submit(prepared);
   }
 
   /** A new explicit input goes straight to Pi; accepted inputs are never rebuilt. */
@@ -233,11 +322,16 @@ export class PiRuntimeQueueController {
       return { success: false, error: 'Steering requires a Work session and message text.' };
     }
     try {
-      const disposition = await active.piSession.steer(text);
-      if (disposition === 'queued' && this.host.activeSessions.get(sessionId) === active) {
-        this.persistQueuedUserMessage(sessionId, { text }, CoworkQueueDelivery.Steer);
-        active.summaryCheckpointGoal = text;
-      }
+      const inputs = this.nativeInputs.get(sessionId) ?? new WeakMap<object, QueuedInput>();
+      this.nativeInputs.set(sessionId, inputs);
+      await active.piSession.steer(text, undefined, {
+        onQueued: message => {
+          if (this.nativeInputs.get(sessionId) !== inputs || !active.isRunning) {
+            throw new Error('The Work session ended before Pi accepted the steering input.');
+          }
+          inputs.set(message, { steerText: text });
+        },
+      });
       return { success: true };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -287,22 +381,6 @@ export class PiRuntimeQueueController {
     return this.host.isStoredSessionWorkMode(sessionId);
   }
 
-  private buildQueuedPromptPayload(
-    active: ActivePiSession,
-    item: CoworkPendingMessage,
-    skillContext?: string,
-  ) {
-    // Keep the first space after a bare /skill command so Pi can still parse it.
-    const delimiter = item.text.startsWith('/skill:') && !item.text.includes(' ') ? ' ' : '\n\n';
-    return preparePiPrompt(
-      skillContext ? `${item.text}${delimiter}${skillContext}` : item.text,
-      item.imageAttachments,
-      this.host.recovery.imageInputVerdictForActive(active),
-      this.host.getOcrCommandFor(),
-      collectImagePathReferences(item.fileAttachments),
-    );
-  }
-
   private applyQueuedSkillIds(active: ActivePiSession, skillIds?: string[]): void {
     const mergedSkillIds = mergeSkillIds(active.resourceState.skillIds, skillIds);
     if (haveSameStringList(mergedSkillIds, active.resourceState.skillIds)) return;
@@ -319,40 +397,6 @@ export class PiRuntimeQueueController {
     active.requestedSkillIds = mergedSkillIds;
     // Defer `piSession.reload()` until idle; Pi refuses reload() while streaming.
     active.pendingSkillReload = true;
-  }
-
-  private persistQueuedSkillIds(sessionId: string, skillIds?: string[]): void {
-    if (!skillIds?.length) return;
-    const store = this.host.getStore();
-    const session = store?.getSession(sessionId, 0, { includeArtifacts: false });
-    if (!store || !session) return;
-    const activeSkillIds = mergeSkillIds(session.activeSkillIds, skillIds) ?? [];
-    if (!haveSameStringList(session.activeSkillIds, activeSkillIds)) {
-      store.updateSession(sessionId, { activeSkillIds }, { touchUpdatedAt: false });
-    }
-  }
-
-  private persistQueuedUserMessage(
-    sessionId: string,
-    item: Pick<CoworkPendingMessage, 'text' | 'skillIds' | 'imageAttachments' | 'fileAttachments'>,
-    delivery: CoworkQueueDelivery,
-  ): CoworkMessage {
-    const message: CoworkMessage = {
-      id: randomUUID(),
-      type: 'user',
-      content: item.text,
-      timestamp: Date.now(),
-      metadata: {
-        queueDelivery: delivery,
-        ...(item.skillIds?.length ? { skillIds: item.skillIds } : {}),
-        ...(item.imageAttachments?.length ? { imageAttachments: item.imageAttachments } : {}),
-        ...(item.fileAttachments?.length ? { fileAttachments: item.fileAttachments } : {}),
-      },
-    };
-    const store = this.host.getStore();
-    const persisted = store ? store.addMessage(sessionId, message) : message;
-    this.host.emit('message', sessionId, persisted);
-    return persisted;
   }
 
   private emitQueueUpdated(sessionId: string): void {

@@ -3,14 +3,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
-const { TARGETS, upstream, binaryName, sha256File } = require('../magpie-runtime.cjs');
+const {
+  TARGETS,
+  upstream,
+  binaryName,
+  sha256File,
+  isPinnedSource,
+} = require('../magpie-runtime.cjs');
 
 const MANIFEST_LIMIT_BYTES = 16_384;
 
 /**
  * True only for the pinned Magpie gateway executable at
  * resources/magpie/<target>/<binary>. The sibling manifest must name the
- * upstream version and commit, and the file hash must be the unmodified
+ * pinned patched source, and the file hash must be the unmodified
  * compiler digest. Every other path under resources/ is still scanned.
  */
 export function isPinnedMagpieGatewayBinary(root, relativePath) {
@@ -33,7 +39,7 @@ export function isPinnedMagpieGatewayBinary(root, relativePath) {
   if (
     manifest.schemaVersion !== 1 ||
     manifest.version !== upstream.version ||
-    manifest.source?.commit !== upstream.commit ||
+    !isPinnedSource(manifest.source) ||
     manifest.binary !== filename ||
     manifest.platform !== TARGETS[key].platform ||
     manifest.arch !== TARGETS[key].arch ||

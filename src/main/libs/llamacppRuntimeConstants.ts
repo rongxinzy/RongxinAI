@@ -12,3 +12,25 @@ export const LlamaCppRuntimeTargetId = {
 
 export type LlamaCppRuntimeTargetId =
   (typeof LlamaCppRuntimeTargetId)[keyof typeof LlamaCppRuntimeTargetId];
+
+export function resolveLlamaCppExecutableName(platform: NodeJS.Platform): string {
+  return platform === 'win32' ? 'llama-server.exe' : 'llama-server';
+}
+
+export function resolveLlamaCppRuntimeTargetId(
+  platform: NodeJS.Platform,
+  arch: string,
+): string | null {
+  if (platform === 'darwin') {
+    return arch === 'arm64' || arch === 'ia32'
+      ? LlamaCppRuntimeTargetId.MacArm64
+      : LlamaCppRuntimeTargetId.MacX64;
+  }
+  if (platform === 'win32') {
+    return arch === 'arm64' ? LlamaCppRuntimeTargetId.WinArm64 : LlamaCppRuntimeTargetId.WinX64;
+  }
+  if (platform === 'linux') {
+    return arch === 'arm64' ? LlamaCppRuntimeTargetId.LinuxArm64 : LlamaCppRuntimeTargetId.LinuxX64;
+  }
+  return null;
+}

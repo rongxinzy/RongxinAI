@@ -8,8 +8,8 @@
  */
 
 import {
+  createTestPiRuntime,
   activePiModel,
-  adapter,
   applyTestResolution,
   mockSession,
   setupPiRuntimeAdapterSuite,
@@ -20,23 +20,27 @@ import {
   VISION_MODEL_RESOLUTION,
 } from './piRuntimeAdapter.testHarness';
 
-import path from 'path';
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModelCapabilityStatus } from '../../../shared/providers';
-import { getMagpieModelService } from '../../magpie/modelService';
+import { CoworkMessageType, CoworkSessionStatus } from '../../../shared/cowork/constants';
 import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
 import type { CoworkStore } from '../../coworkStore';
+import { PiRuntimeAdapter } from './piRuntimeAdapter';
 
 describe('PiRuntimeAdapter', () => {
   setupPiRuntimeAdapterSuite();
 
   describe('auto-retry error storm', () => {
+    let adapter: PiRuntimeAdapter;
     let listener: ((event: unknown) => void) | null = null;
     let mockStore: {
       updateSession: ReturnType<typeof vi.fn>;
-      updateMessage: ReturnType<typeof vi.fn>;
-      addMessage: ReturnType<typeof vi.fn>;
+      recordTerminalError: CoworkStore['recordTerminalError'];
+      messages: {
+        addMessage: ReturnType<typeof vi.fn>;
+        getMessage: ReturnType<typeof vi.fn>;
+        updateMessage: ReturnType<typeof vi.fn>;
+      };
       getSession: ReturnType<typeof vi.fn>;
       getAgent: ReturnType<typeof vi.fn>;
       listAgents: ReturnType<typeof vi.fn>;
@@ -69,7 +73,7 @@ describe('PiRuntimeAdapter', () => {
     };
 
     const systemErrorMessages = () =>
-      mockStore.addMessage.mock.calls.filter(
+      mockStore.messages.addMessage.mock.calls.filter(
         ([, message]) => (message as { type: string }).type === 'system',
       );
 
@@ -81,17 +85,30 @@ describe('PiRuntimeAdapter', () => {
       });
       mockStore = {
         updateSession: vi.fn(),
-        updateMessage: vi.fn(),
-        getMessage: vi.fn(() => undefined),
-        addMessage: vi.fn((_sessionId: string, message: Record<string, unknown>) => ({
-          ...message,
-          id: (message.id as string) ?? 'stored-id',
-        })),
+        recordTerminalError(sessionId, error, publish) {
+          mockStore.updateSession(sessionId, { status: CoworkSessionStatus.Error });
+          publish(
+            mockStore.messages.addMessage(sessionId, {
+              type: CoworkMessageType.System,
+              content: '',
+              metadata: { error: error.message, errorKind: error.kind },
+            }),
+          );
+          return true;
+        },
+        messages: {
+          updateMessage: vi.fn(),
+          getMessage: vi.fn(() => undefined),
+          addMessage: vi.fn((_sessionId: string, message: Record<string, unknown>) => ({
+            ...message,
+            id: (message.id as string) ?? 'stored-id',
+          })),
+        },
         getSession: vi.fn(() => undefined),
         getAgent: vi.fn(() => undefined),
         listAgents: vi.fn(() => []),
       };
-      adapter.setCoworkStore(mockStore as unknown as CoworkStore);
+      adapter = createTestPiRuntime({ coworkStore: mockStore as unknown as CoworkStore });
       errors = [];
       completes = [];
       emittedMessages = [];
@@ -114,7 +131,7 @@ describe('PiRuntimeAdapter', () => {
       mockStore.getSession.mockImplementation(() => ({
         messages: sessionMessages,
       }));
-      mockStore.addMessage.mockImplementation(
+      mockStore.messages.addMessage.mockImplementation(
         (_sessionId: string, message: Record<string, unknown>) => {
           const stored = {
             ...message,
@@ -124,7 +141,7 @@ describe('PiRuntimeAdapter', () => {
           return stored;
         },
       );
-      mockStore.updateMessage.mockImplementation(
+      mockStore.messages.updateMessage.mockImplementation(
         (_sessionId: string, messageId: string, patch: Record<string, unknown>) => {
           const row = sessionMessages.find(item => item.id === messageId);
           if (!row) return;
@@ -278,7 +295,7 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('kicks Magpie recovery when auto_retry_start runs after a loopback NetworkError', async () => {
-      const recoverSpy = vi.spyOn(getMagpieModelService(), 'recoverIfNeeded').mockResolvedValue({
+      const recoverSpy = vi.spyOn(adapter.modelService!, 'recoverIfNeeded').mockResolvedValue({
         state: 'running',
         version: 'test',
         gatewayUrl: 'http://127.0.0.1:1234',
@@ -425,8 +442,7 @@ describe('PiRuntimeAdapter', () => {
         expect(mockSession.prompt).not.toHaveBeenCalled();
         expect(activePiModel(adapter, 'live-image')?.input).toEqual(['text', 'image']);
 
-        // Refreshing unchanged user settings must not mutate the model either.
-        await adapter.resetImageInputCapabilities();
+        await adapter.modelService!.catalog();
         expect(activePiModel(adapter, 'live-image')?.input).toEqual(['text', 'image']);
         expect(mockSession.setModel).not.toHaveBeenCalled();
       } finally {
@@ -476,6 +492,7 @@ describe('PiRuntimeAdapter', () => {
       const restore = stubRawApiConfig(UNKNOWN_MODEL_RESOLUTION);
       try {
         await adapter.startSession('cfg-enabled', 'Describe this image', {
+          modelOverride: UNKNOWN_MODEL_RESOLUTION.config.model,
           imageAttachments: [
             {
               name: 'example.png',
@@ -487,11 +504,12 @@ describe('PiRuntimeAdapter', () => {
         });
         expect(mockSession.sendUserMessage).not.toHaveBeenCalled();
         expect(activePiModel(adapter, 'cfg-enabled')?.input).toEqual(['text']);
+        listener!({ type: 'agent_settled' });
 
         // The user enables image input on this model in the settings.
         stubRawApiConfig(VISION_MODEL_RESOLUTION);
-        await adapter.resetImageInputCapabilities();
-        expect(activePiModel(adapter, 'cfg-enabled')?.input).toEqual(['text', 'image']);
+        await adapter.modelService!.catalog();
+        expect(activePiModel(adapter, 'cfg-enabled')?.input).toEqual(['text']);
 
         await adapter.continueSession('cfg-enabled', '再看一张', {
           imageAttachments: [
@@ -503,7 +521,7 @@ describe('PiRuntimeAdapter', () => {
             },
           ],
         });
-        // The bytes travel again without a new session or an app restart.
+        expect(activePiModel(adapter, 'cfg-enabled')?.input).toEqual(['text', 'image']);
         expect(mockSession.sendUserMessage).toHaveBeenCalledTimes(1);
       } finally {
         restore();
@@ -514,6 +532,7 @@ describe('PiRuntimeAdapter', () => {
       const restore = stubRawApiConfig(VISION_MODEL_RESOLUTION);
       try {
         await adapter.startSession('cfg-disabled', 'Describe this image', {
+          modelOverride: VISION_MODEL_RESOLUTION.config.model,
           imageAttachments: [
             {
               name: 'example.png',
@@ -524,12 +543,13 @@ describe('PiRuntimeAdapter', () => {
           ],
         });
         expect(mockSession.sendUserMessage).toHaveBeenCalledTimes(1);
+        listener!({ type: 'agent_settled' });
 
         // The user marks the model as text-only (or moves it to a server
         // without a vision encoder) and saves.
         stubRawApiConfig(TEXT_ONLY_MODEL_RESOLUTION);
-        await adapter.resetImageInputCapabilities();
-        expect(activePiModel(adapter, 'cfg-disabled')?.input).toEqual(['text']);
+        await adapter.modelService!.catalog();
+        expect(activePiModel(adapter, 'cfg-disabled')?.input).toEqual(['text', 'image']);
 
         await adapter.continueSession('cfg-disabled', '再看一张', {
           imageAttachments: [
@@ -542,6 +562,7 @@ describe('PiRuntimeAdapter', () => {
           ],
         });
         // The session keeps its context, but the image stays out of the request.
+        expect(activePiModel(adapter, 'cfg-disabled')?.input).toEqual(['text']);
         expect(mockSession.sendUserMessage).toHaveBeenCalledTimes(1);
         const [sentPrompt] = mockSession.prompt.mock.calls.at(-1) as [string];
         expect(sentPrompt).toContain('C:\\cowork-images\\s\\second.png');

@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { CoworkArtifactRole, CoworkArtifactSource } from '../../../src/shared/cowork/artifacts.ts';
 import { installConversation } from '../shared/conversationFixture.mjs';
 import { attachConsoleGuards, home, previewSearch } from '../shared/harness.mjs';
+import { applyThemeRecipes } from '../shared/themeFixture.mjs';
 
 const SESSION_ID = 'conversation-regression';
 const HTML_ID = 'html-frame';
@@ -277,34 +278,15 @@ for (const theme of ['light', 'dark']) {
     await expect(htmlFrame(page).getByRole('textbox', { name: 'Preview note' })).toBeFocused();
     await expectDocumentState(page, documentState, originalIframe);
 
-    await page.evaluate(async theme => {
-      const [{ allThemes }, { themeService }] = await Promise.all([
-        import(new URL('/src/renderer/theme/index.ts', location.href).href),
-        import(new URL('/src/renderer/services/theme.ts', location.href).href),
-      ]);
-      const definition = allThemes.find(item => item.meta.appearance === theme);
-      window.__htmlPreviewRecipes = {
-        stage: structuredClone(definition.components['html-preview-stage']),
-        viewport: structuredClone(definition.components['html-preview-viewport']),
-      };
-      definition.components['html-preview-stage'].wide.padding = '1rem';
-      definition.components['html-preview-stage'].base['background-color'] = '#e0e1e2';
-      definition.components['html-preview-viewport'].base['border-radius'] = '12px';
-      themeService.setTheme(theme);
-    }, theme);
+    await applyThemeRecipes(page, theme, [
+      ['html-preview-stage', 'wide', { padding: '1rem' }],
+      ['html-preview-stage', 'base', { 'background-color': '#e0e1e2' }],
+      ['html-preview-viewport', 'base', { 'border-radius': '12px' }],
+    ]);
     await expectInset(page, 16, 12);
     await expect(stage(page)).toHaveCSS('background-color', 'rgb(224, 225, 226)');
     await expectDocumentState(page, documentState, originalIframe);
-    await page.evaluate(async theme => {
-      const [{ allThemes }, { themeService }] = await Promise.all([
-        import(new URL('/src/renderer/theme/index.ts', location.href).href),
-        import(new URL('/src/renderer/services/theme.ts', location.href).href),
-      ]);
-      const definition = allThemes.find(item => item.meta.appearance === theme);
-      definition.components['html-preview-stage'] = window.__htmlPreviewRecipes.stage;
-      definition.components['html-preview-viewport'] = window.__htmlPreviewRecipes.viewport;
-      themeService.setTheme(theme);
-    }, theme);
+    await applyThemeRecipes(page, theme, []);
     await expectInset(page, 12);
 
     await page.getByRole('button', { name: 'Open full-window preview', exact: true }).click();

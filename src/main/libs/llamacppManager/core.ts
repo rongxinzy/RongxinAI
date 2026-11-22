@@ -1,60 +1,46 @@
-import { type ChildProcess, spawn } from 'child_process';
-import { app } from 'electron';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
 
-import type {
-  LlamaCppBackendListResult,
-  LlamaCppInstallModelInput,
-  LlamaCppInstallProgress,
-  LlamaCppModel,
-  LlamaCppModelLaunchInput,
-  LlamaCppModelLaunchResult,
-  LlamaCppRunningModel,
-  LlamaCppRuntimeCapabilities,
-  LlamaCppRuntimeImportResult,
-  LlamaCppRuntimeInstallResult,
-  LlamaCppRuntimeListDevicesResult,
-  LlamaCppRuntimeUninstallResult,
-  LlamaCppServiceConfig,
-  LlamaCppStatusSnapshot,
-} from '../../../shared/llamacpp';
-import type { LlamaCppBackendRef } from '../../../shared/llamacpp';
 import {
   isLikelyCudaDriverMismatchError,
   LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID,
-  resolveLlamaCppLaunchContext,
+  type LlamaCppBackendListResult,
+  type LlamaCppBackendRef,
+  type LlamaCppInstallModelInput,
+  type LlamaCppInstallProgress,
+  type LlamaCppModel,
+  type LlamaCppRuntimeCapabilities,
+  type LlamaCppRuntimeImportResult,
+  type LlamaCppRuntimeInstallResult,
+  type LlamaCppRuntimeListDevicesResult,
+  type LlamaCppRuntimeUninstallResult,
+  type LlamaCppServiceConfig,
+  type LlamaCppStatusSnapshot,
 } from '../../../shared/llamacpp';
+import { t } from '../../i18n';
+import { scanLocalModelsAsync } from '../../workbenchTask/artifactWorkerPool';
+import {
+  isLocalInferenceFeatureEnabled,
+  usesBundledLlamaCppRuntime,
+} from '../inferenceEditionPolicy';
 import {
   fetchLlamaCppBackendManifest,
   getLlamaCppBackendCompatibilityError,
   getLlamaCppBackendExecutablePath,
-  getLlamaCppCurrentExecutablePath,
   importLlamaCppBackendPath,
   installLlamaCppBackend,
   listLlamaCppBackends,
-  readCurrentBackendRef,
   recommendLlamaCppBackend,
   recommendLlamaCppCpuBackend,
-  resolveLlamaCppBackendDownloadSize,
-  syncCurrentBackend,
   uninstallLlamaCppBackend,
 } from '../llamacppBackendManager';
 import {
   backendRequiresDeviceValidation,
   validateBackendDevices,
 } from '../llamacppBackendValidation';
+import { readBundledLlamaCppRuntimeManifest } from '../llamacppBundledRuntime';
 import {
-  prepareLlamaCppBackendVersionSwitch,
-  restartLlamaCppBackendVersionService,
-} from '../llamacppBackendVersionSwitch';
-import {
-  readBundledLlamaCppRuntimeManifest,
-  resolveBundledLlamaCppExecutablePath,
-} from '../llamacppBundledRuntime';
-import {
-  isVulkanBackendStartupFailure,
   resolveBundledEditionRuntime,
   type ResolvedBundledRuntime,
 } from '../llamacppBundledRuntimeSelection';
@@ -64,12 +50,6 @@ import {
   shouldEnforceCudaEditionGpuPolicy,
 } from '../llamacppCudaEditionPolicy';
 import {
-  isLocalInferenceFeatureEnabled,
-  usesBundledLlamaCppRuntime,
-} from '../inferenceEditionPolicy';
-import { LlamaCppClient } from '../llamacppClient';
-import { isPathInside, mergeLocalModels, scanLocalGgufModels } from '../llamacppModelCatalog';
-import {
   installModelOnce,
   isModelDownloadNotFoundError,
   isSameInstallRequest,
@@ -77,17 +57,9 @@ import {
   refreshInstallInputFromMarketplace,
   resolveManagedModelInstallDir,
 } from '../llamacppModelInstallation';
-import { getDefaultLlamaCppModelsDir } from '../llamacppModelLibraryPath';
-import {
-  createLlamaCppServerSpawnOptions,
-  shouldKeepLlamaCppServiceRunning,
-} from '../llamacppProcessLifecycle';
-import { retryLlamaCppReadRequest } from '../llamacppRequestRetry';
-import {
-  createLlamaCppRuntimeInstallPlan,
-  executeLlamaCppRuntimeInstallPlan,
-  resolveLlamaCppExecutableName,
-} from '../llamacppRuntimeInstaller';
+import { resolveLlamaCppModelsDir } from '../llamacppModelLibraryPath';
+import { getLlamaCppNvidiaSnapshot, hasAvailableNvidiaGpu } from '../llamacppNvidiaEnvironment';
+import { listLlamaCppRuntimeDevices } from '../llamacppRuntimeDeviceProbe';
 import {
   findExternalLlamaCppExecutable,
   findLlamaCppExecutable,
@@ -95,43 +67,21 @@ import {
   resolveLlamaCppRuntimeMetadata,
 } from '../llamacppRuntimePaths';
 import {
-  buildLlamaCppServeEnv,
   buildLlamaCppServiceConfigFieldSupport,
-  buildLlamaServerArgs,
-  filterLlamaCppServiceConfigByRuntimeCapabilities,
   isGpuLikeRuntimeDevice,
   listLlamaCppRuntimeHelpFlags,
-  resolveLlamaCppDeviceSelection,
-  shouldEnableLlamaCppModelsAutoload,
 } from '../llamacppServe';
-import { listLlamaCppRuntimeDevices } from '../llamacppRuntimeDeviceProbe';
-import { MarketplaceService } from '../marketplaceService';
-import { getAppLocalModelCatalog } from '../appLocalModelCatalog';
-import {
-  getLlamaCppNvidiaSnapshot,
-  hasAvailableNvidiaGpu,
-  resolveLlamaCppHostServiceDefaults,
-} from '../llamacppNvidiaEnvironment';
-import { t } from '../../i18n';
-import {
-  buildLlamaCppPresetGlobalGpuSection,
-  LLAMACPP_PRESET_GLOBAL_GPU_KEYS,
-  normalizePositiveInteger,
-  replaceIniSectionKeys,
-} from './fileUtils';
-import type { LlamaCppManagerDownstreamSurface } from './types';
+import type { MarketplaceService } from '../marketplaceService';
+import { isPathInside } from '../../pathContainment';
+import { isGgufPath, removeEmptyParentDirs, resolveImportedModelTargetPath } from './fileUtils';
 
-const DEFAULT_HOST = '127.0.0.1';
-const DEFAULT_PORT = '8080';
-const DEFAULT_CONNECTION_AND_LOAD_TIMEOUT_MS = 120_000;
-export const LLAMACPP_RUNNING_MODELS_DEFAULT_TIMEOUT_MS = 2_000;
-export const QUIT_RUNNING_MODELS_TIMEOUT_MS = 1500;
-export const QUIT_UNLOAD_MODEL_TIMEOUT_MS = 3000;
-export const LLAMACPP_RUNTIME_PROGRESS_KEY = LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID;
-export const LLAMACPP_LAST_LOADED_MODEL_KEY = 'llamacpp_last_loaded_model';
+const LLAMACPP_RUNTIME_PROGRESS_KEY = LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID;
 const LLAMACPP_BACKEND_LIST_CACHE_TTL_MS = 60_000;
 
 type RequestOptions = { signal?: AbortSignal };
+type LlamaCppRuntimeInstallOptions = RequestOptions & {
+  activate: (ref: LlamaCppBackendRef) => Promise<void>;
+};
 
 type LlamaCppBackendListCacheEntry = {
   key: string;
@@ -139,93 +89,18 @@ type LlamaCppBackendListCacheEntry = {
   result: LlamaCppBackendListResult;
 };
 
-type LlamaCppManagerStorage = {
-  get<T = unknown>(key: string): T | undefined;
-  set<T = unknown>(key: string, value: T): void;
-  delete(key: string): void;
-};
-
-import {
-  LlamaCppManagerLifecycleEvent,
-  LlamaCppProcessOutputStream,
-  type LlamaCppModelsUnloadedForQuitEvent,
-  type LlamaCppProcessOutputEvent,
-} from './types';
-
-export class LlamaCppManagerCore extends EventEmitter {
-  protected executablePath: string | null = null;
-  protected bundledRuntimeSelection: ResolvedBundledRuntime | undefined;
-  protected bundledStartupCpuFallbackAttempted = false;
-  protected process: ChildProcess | null = null;
-  protected runtimeContextLengthByModel = new Map<string, number>();
-  protected thinkingToggleSupportByModel = new Map<string, boolean>();
-  protected startupStderr = '';
-  protected readonly marketplaceService: MarketplaceService;
-  protected readonly storage?: LlamaCppManagerStorage;
-  protected backendListCache: LlamaCppBackendListCacheEntry | null = null;
-  /** Message of the last router-listing failure; repeats stay at debug level. */
-  protected routerListFailure: string | null = null;
-  protected status: LlamaCppStatusSnapshot = {
-    status: 'unknown',
-    checkedAt: new Date().toISOString(),
-  };
+export class LlamaCppManager extends EventEmitter {
+  private backendListCache: LlamaCppBackendListCacheEntry | null = null;
 
   constructor(
-    protected readonly getServiceConfig: () => LlamaCppServiceConfig = () => ({}),
-    marketplaceService?: MarketplaceService,
-    storage?: LlamaCppManagerStorage,
+    private readonly getServiceConfig: () => LlamaCppServiceConfig,
+    private readonly marketplaceService: Pick<MarketplaceService, 'resolveModel'>,
   ) {
     super();
-    this.marketplaceService =
-      marketplaceService ??
-      new MarketplaceService(() => this.getModelsDir(), {
-        localCatalog: getAppLocalModelCatalog(app.getPath('userData')),
-      });
-    this.storage = storage;
-  }
-
-  getStatus(): LlamaCppStatusSnapshot {
-    return this.status;
-  }
-
-  protected handleProcessOutput(stream: LlamaCppProcessOutputStream, chunk: Buffer): string {
-    const text = chunk.toString().trim();
-    if (!text) return '';
-
-    if (stream === LlamaCppProcessOutputStream.Stdout) {
-      console.debug(`[LlamaCpp] ${text}`);
-    } else {
-      console.warn(`[LlamaCpp] ${text}`);
-    }
-
-    this.emit(LlamaCppManagerLifecycleEvent.ProcessOutput, {
-      stream,
-      text,
-      createdAt: new Date().toISOString(),
-      ...(this.process?.pid ? { pid: this.process.pid } : {}),
-    } satisfies LlamaCppProcessOutputEvent);
-
-    return text;
-  }
-
-  getBaseUrl(): string {
-    const config = this.getServiceConfig();
-    const host =
-      config.host?.trim() === '0.0.0.0' ? DEFAULT_HOST : config.host?.trim() || DEFAULT_HOST;
-    const port = config.port?.trim() || DEFAULT_PORT;
-    return `http://${host}:${port}`;
   }
 
   getModelsDir(): string {
-    return (
-      this.getServiceConfig().modelsDir?.trim() ||
-      getDefaultLlamaCppModelsDir({
-        platform: process.platform,
-        appDataPath: app.getPath('appData'),
-        userDataPath: app.getPath('userData'),
-        localAppDataPath: process.env.LOCALAPPDATA,
-      })
-    );
+    return resolveLlamaCppModelsDir(this.getServiceConfig());
   }
 
   initializeModelsDir(): string {
@@ -234,37 +109,7 @@ export class LlamaCppManagerCore extends EventEmitter {
     return modelsDir;
   }
 
-  getPresetPath(): string {
-    return path.join(app.getPath('userData'), 'llamacpp', 'models-preset.ini');
-  }
-
-  /**
-   * Keeps the preset's global `[*]` GPU section in sync with the resolved
-   * runtime config. Router CLI GPU flags were removed (they override every
-   * model's preset section), so the global section carries the service-level
-   * defaults while per-model sections written by writeModelPreset still win.
-   */
-  protected upsertPresetGlobalGpuSection(config: LlamaCppServiceConfig): void {
-    const existing = fs.existsSync(this.getPresetPath())
-      ? fs.readFileSync(this.getPresetPath(), 'utf-8')
-      : 'version = 1\n\n';
-    const next = replaceIniSectionKeys(
-      existing,
-      '*',
-      LLAMACPP_PRESET_GLOBAL_GPU_KEYS,
-      buildLlamaCppPresetGlobalGpuSection(config),
-    );
-    fs.mkdirSync(path.dirname(this.getPresetPath()), { recursive: true });
-    fs.writeFileSync(this.getPresetPath(), next, 'utf-8');
-  }
-
-  getConnectionAndLoadTimeoutMs(): number {
-    const configuredSeconds = normalizePositiveInteger(this.getServiceConfig().timeout);
-    if (!configuredSeconds) return DEFAULT_CONNECTION_AND_LOAD_TIMEOUT_MS;
-    return configuredSeconds * 1000;
-  }
-
-  protected getBackendListCacheKey(): string {
+  private getBackendListCacheKey(): string {
     const config = this.getServiceConfig();
     return [
       process.platform,
@@ -274,35 +119,15 @@ export class LlamaCppManagerCore extends EventEmitter {
     ].join(':');
   }
 
-  protected clearBackendListCache(): void {
+  private clearBackendListCache(): void {
     this.backendListCache = null;
   }
 
-  protected async resolveRuntimeServiceConfig(): Promise<LlamaCppServiceConfig> {
-    const config = this.getServiceConfig();
-    const requestedDevice = config.device?.trim();
-    if (!requestedDevice) return config;
-
-    try {
-      const runtimeDevices = await this.listRuntimeDevices();
-      if (!runtimeDevices.success || runtimeDevices.devices.length === 0) {
-        return config;
-      }
-      return {
-        ...config,
-        device: resolveLlamaCppDeviceSelection(requestedDevice, runtimeDevices.devices),
-      };
-    } catch {
-      return config;
-    }
-  }
-
   async installRuntime(
-    options: { signal?: AbortSignal } = {},
+    options: LlamaCppRuntimeInstallOptions,
   ): Promise<LlamaCppRuntimeInstallResult> {
     if (!isLocalInferenceFeatureEnabled()) {
       const error = 'Local inference is not included in this edition.';
-      this.setStatus({ status: 'not-installed', managedByApp: false, error });
       return { success: false, plan: { kind: 'needs-manual', message: error }, error };
     }
     this.clearBackendListCache();
@@ -317,28 +142,17 @@ export class LlamaCppManagerCore extends EventEmitter {
     }
     const externalExecutablePath = await findExternalLlamaCppExecutable(config);
     if (externalExecutablePath) {
-      const plan = createLlamaCppRuntimeInstallPlan({
-        platform: process.platform,
-        arch: process.arch,
-        isPackaged: app.isPackaged,
-        existingExecutablePath: externalExecutablePath,
-        userRuntimeRoot: getUserLlamaCppRuntimeRoot(),
-      });
-      const result = await executeLlamaCppRuntimeInstallPlan(plan);
-      this.executablePath = result.executablePath ?? externalExecutablePath;
-      this.setStatus({
-        status: result.success ? 'installed' : 'not-installed',
-        executablePath: this.executablePath,
-        managedByApp: false,
-        error: result.error,
-      });
       this.emit('install-progress', {
-        phase: result.success ? 'done' : 'failed',
+        phase: 'done',
         modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
         modelName: 'llama.cpp runtime',
-        ...(result.success ? { percent: 100 } : { error: result.error }),
+        percent: 100,
       } satisfies LlamaCppInstallProgress);
-      return result;
+      return {
+        success: true,
+        executablePath: externalExecutablePath,
+        plan: { kind: 'ready', executablePath: externalExecutablePath },
+      };
     }
 
     const runtimeRoot = getUserLlamaCppRuntimeRoot();
@@ -354,24 +168,12 @@ export class LlamaCppManagerCore extends EventEmitter {
     });
     if (!ref) {
       const error = `Unsupported platform for llama.cpp runtime: ${process.platform}/${process.arch}.`;
-      this.setStatus({
-        status: 'not-installed',
-        executablePath: this.executablePath ?? undefined,
-        managedByApp: false,
-        error,
-      });
       return {
         success: false,
         plan: { kind: 'needs-manual', message: error },
         error,
       };
     }
-    this.setStatus({
-      status: this.status.status,
-      executablePath: this.executablePath ?? undefined,
-      managedByApp: false,
-      error: undefined,
-    });
     this.emit('install-progress', {
       phase: 'downloading',
       modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
@@ -433,12 +235,6 @@ export class LlamaCppManagerCore extends EventEmitter {
       if (backendRequiresDeviceValidation(ref)) {
         const deviceResult = await this.listRuntimeDevices(ref);
         if (!deviceResult.success) {
-          this.setStatus({
-            status: 'not-installed',
-            executablePath: undefined,
-            managedByApp: false,
-            error: deviceResult.error || 'Backend device validation failed.',
-          });
           this.emit('install-progress', {
             phase: 'failed',
             modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
@@ -453,12 +249,6 @@ export class LlamaCppManagerCore extends EventEmitter {
         }
         const validationError = validateBackendDevices(ref, deviceResult.devices);
         if (validationError) {
-          this.setStatus({
-            status: 'not-installed',
-            executablePath: undefined,
-            managedByApp: false,
-            error: validationError,
-          });
           this.emit('install-progress', {
             phase: 'failed',
             modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
@@ -472,14 +262,23 @@ export class LlamaCppManagerCore extends EventEmitter {
           };
         }
       }
-      syncCurrentBackend(runtimeRoot, ref);
-      const currentExecutablePath = getLlamaCppCurrentExecutablePath(runtimeRoot, process.platform);
-      this.executablePath = currentExecutablePath;
-      this.setStatus({
-        status: 'installed',
-        executablePath: currentExecutablePath,
-        managedByApp: false,
-      });
+      try {
+        await this.activateInstalledBackend(ref, options);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.emit('install-progress', {
+          phase: options.signal?.aborted ? 'cancelled' : 'failed',
+          modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+          modelName: ref.versionBackend,
+          error: options.signal?.aborted ? undefined : message,
+        } satisfies LlamaCppInstallProgress);
+        return {
+          success: false,
+          cancelled: options.signal?.aborted || undefined,
+          plan: { kind: 'needs-manual', message },
+          error: message,
+        };
+      }
       this.emit('install-progress', {
         phase: 'done',
         modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
@@ -487,12 +286,6 @@ export class LlamaCppManagerCore extends EventEmitter {
         percent: 100,
       } satisfies LlamaCppInstallProgress);
     } else {
-      this.setStatus({
-        status: 'not-installed',
-        executablePath: undefined,
-        managedByApp: false,
-        error: result.error,
-      });
       this.emit('install-progress', {
         phase: result.cancelled ? 'cancelled' : 'failed',
         modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
@@ -503,16 +296,21 @@ export class LlamaCppManagerCore extends EventEmitter {
     return installWarning && result.success ? { ...result, warning: installWarning } : result;
   }
 
-  protected async installBundledRuntime(
-    options: { signal?: AbortSignal } = {},
+  private async activateInstalledBackend(
+    ref: LlamaCppBackendRef,
+    options: LlamaCppRuntimeInstallOptions,
+  ): Promise<void> {
+    options.signal?.throwIfAborted();
+    await options.activate(ref);
+  }
+
+  private async installBundledRuntime(
+    options: LlamaCppRuntimeInstallOptions,
   ): Promise<LlamaCppRuntimeInstallResult> {
-    void options;
-    const runtimeRoot = getUserLlamaCppRuntimeRoot();
     const nvidiaSnapshot = await getLlamaCppNvidiaSnapshot();
     const manifest = readBundledLlamaCppRuntimeManifest();
     if (!manifest) {
       const error = 'Bundled llama.cpp runtime manifest is missing from this installation.';
-      this.setStatus({ status: 'not-installed', managedByApp: true, error });
       return { success: false, plan: { kind: 'needs-manual', message: error }, error };
     }
 
@@ -522,7 +320,6 @@ export class LlamaCppManagerCore extends EventEmitter {
       installWarning = resolveCudaEditionGpuMessage(nvidiaSnapshot);
       preferCpuFallback = Boolean(manifest.cpuFallbackExecutable);
       if (!preferCpuFallback) {
-        this.setStatus({ status: 'not-installed', managedByApp: true, error: installWarning });
         return {
           success: false,
           plan: { kind: 'needs-manual', message: installWarning },
@@ -534,21 +331,13 @@ export class LlamaCppManagerCore extends EventEmitter {
     let resolved: ResolvedBundledRuntime;
     try {
       resolved = await resolveBundledEditionRuntime({ manifest, preferCpuFallback });
+      options.signal?.throwIfAborted();
+      await options.activate(resolved.backend);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.setStatus({ status: 'not-installed', managedByApp: true, error: message });
       return { success: false, plan: { kind: 'needs-manual', message }, error: message };
     }
 
-    this.bundledRuntimeSelection = resolved;
-    this.bundledStartupCpuFallbackAttempted = false;
-    syncCurrentBackend(runtimeRoot, resolved.backend);
-    this.executablePath = resolved.executablePath;
-    this.setStatus({
-      status: 'installed',
-      executablePath: resolved.executablePath,
-      managedByApp: true,
-    });
     this.emit('install-progress', {
       phase: 'done',
       modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
@@ -564,18 +353,16 @@ export class LlamaCppManagerCore extends EventEmitter {
   }
 
   async listRuntimeDevices(ref?: LlamaCppBackendRef): Promise<LlamaCppRuntimeListDevicesResult> {
-    let executablePath = this.executablePath;
-    if (ref) {
-      executablePath = getLlamaCppBackendExecutablePath(
-        getUserLlamaCppRuntimeRoot(),
-        ref,
-        process.platform,
-      );
-    }
-    if (!executablePath) {
-      this.executablePath = await findLlamaCppExecutable(this.getServiceConfig());
-      executablePath = this.executablePath;
-    }
+    const executablePath = ref
+      ? getLlamaCppBackendExecutablePath(getUserLlamaCppRuntimeRoot(), ref, process.platform)
+      : await findLlamaCppExecutable(this.getServiceConfig());
+    const result = await this.probeRuntimeDevices(executablePath);
+    return ref ? { ...result, backend: ref } : result;
+  }
+
+  private async probeRuntimeDevices(
+    executablePath: string | null,
+  ): Promise<LlamaCppRuntimeListDevicesResult> {
     if (!executablePath) {
       return {
         success: false,
@@ -587,24 +374,20 @@ export class LlamaCppManagerCore extends EventEmitter {
       return {
         success: false,
         executablePath,
-        backend: ref,
         devices: [],
         error: `llama.cpp executable does not exist: ${executablePath}`,
       };
     }
-    const result = await listLlamaCppRuntimeDevices({
+    return listLlamaCppRuntimeDevices({
       executablePath,
       platform: process.platform,
       baseEnv: process.env,
     });
-    return ref ? { ...result, backend: ref } : result;
   }
 
   async getRuntimeCapabilities(): Promise<LlamaCppRuntimeCapabilities> {
-    if (!this.executablePath) {
-      this.executablePath = await findLlamaCppExecutable(this.getServiceConfig());
-    }
-    if (!this.executablePath) {
+    const executablePath = await findLlamaCppExecutable(this.getServiceConfig());
+    if (!executablePath) {
       return {
         success: false,
         flags: [],
@@ -619,20 +402,21 @@ export class LlamaCppManagerCore extends EventEmitter {
 
     const [helpFlagsResult, devicesResult] = await Promise.all([
       listLlamaCppRuntimeHelpFlags({
-        executablePath: this.executablePath,
+        executablePath,
         platform: process.platform,
         baseEnv: process.env,
       }),
-      this.listRuntimeDevices(),
+      this.probeRuntimeDevices(executablePath),
     ]);
 
+    const metadata = resolveLlamaCppRuntimeMetadata(executablePath);
     const devices = devicesResult.success ? devicesResult.devices : [];
     const backendKinds = Array.from(new Set(devices.map(device => device.backend).filter(Boolean)));
     const gpuDeviceCount = devices.filter(device => isGpuLikeRuntimeDevice(device)).length;
     return {
       success: helpFlagsResult.success || devicesResult.success,
-      executablePath: this.executablePath,
-      version: this.status.version,
+      executablePath,
+      version: metadata.runtimeVersion,
       runtimeTargetId: devicesResult.runtimeTargetId,
       flags: helpFlagsResult.flags,
       deviceProbeSucceeded: devicesResult.success,
@@ -643,7 +427,7 @@ export class LlamaCppManagerCore extends EventEmitter {
         helpProbeSucceeded: helpFlagsResult.success,
         flags: helpFlagsResult.flags,
         devices,
-        runtimeBackend: this.status.runtimeBackend,
+        runtimeBackend: metadata.runtimeBackend,
       }),
       ...(helpFlagsResult.success
         ? {}
@@ -651,349 +435,370 @@ export class LlamaCppManagerCore extends EventEmitter {
     };
   }
 
-  /**
-   * Import a user-provided llama.cpp runtime from a local directory.
-   * Copies all files from the directory containing llama-server into
-   * <runtimeRoot>/current/bin/, matching the existing auto-download
-   * copy strategy. Platform differences (DLLs, dylibs, .so) are handled
-   * automatically by copying the full directory.
-   */
-
-  async detect(): Promise<LlamaCppStatusSnapshot> {
-    const client = new LlamaCppClient(this.getBaseUrl());
-    try {
-      const version = await client.version(300);
-      this.setStatus({
-        status: 'running',
-        version: version.version,
-        executablePath: this.executablePath ?? undefined,
-        pid: this.process?.pid,
-        managedByApp: Boolean(this.process),
-      });
-      return this.status;
-    } catch {
-      // Continue with executable detection.
-    }
-
-    const executablePath = await findLlamaCppExecutable(this.getServiceConfig());
-    this.executablePath = executablePath;
-    this.setStatus({
+  private async readInstallationStatus(): Promise<LlamaCppStatusSnapshot> {
+    const executablePath = (await findLlamaCppExecutable(this.getServiceConfig())) ?? undefined;
+    return {
       status: executablePath ? 'installed' : 'not-installed',
-      executablePath: executablePath ?? undefined,
-      managedByApp: false,
-    });
-    return this.status;
-  }
-
-  async start(): Promise<LlamaCppStatusSnapshot> {
-    if (await this.isHealthy()) return this.status;
-
-    if (!this.executablePath) {
-      this.executablePath = await findLlamaCppExecutable(this.getServiceConfig());
-    }
-    if (!this.executablePath) {
-      this.setStatus({ status: 'not-installed', managedByApp: false });
-      return this.status;
-    }
-
-    fs.mkdirSync(this.getModelsDir(), { recursive: true });
-    fs.mkdirSync(path.dirname(this.getPresetPath()), { recursive: true });
-    if (!fs.existsSync(this.getPresetPath())) {
-      fs.writeFileSync(this.getPresetPath(), 'version = 1\n\n', 'utf-8');
-    }
-
-    const runtimeConfig = await this.resolveRuntimeServiceConfig();
-    const resolvedRuntimeConfig = await resolveLlamaCppHostServiceDefaults(runtimeConfig);
-    const runtimeCapabilities = await this.getRuntimeCapabilities().catch((): null => null);
-    const filteredRuntimeConfig = filterLlamaCppServiceConfigByRuntimeCapabilities(
-      resolvedRuntimeConfig,
-      runtimeCapabilities,
-    );
-    this.upsertPresetGlobalGpuSection(filteredRuntimeConfig);
-    this.setStatus({ status: 'starting', executablePath: this.executablePath, managedByApp: true });
-    const keepRunningOnAppQuit = shouldKeepLlamaCppServiceRunning(filteredRuntimeConfig);
-    const serviceProcess = spawn(
-      this.executablePath,
-      buildLlamaServerArgs(filteredRuntimeConfig, this.getModelsDir(), this.getPresetPath()),
-      createLlamaCppServerSpawnOptions({
-        config: filteredRuntimeConfig,
-        env: buildLlamaCppServeEnv(process.env, this.executablePath, process.platform),
-      }),
-    );
-    this.process = serviceProcess;
-    if (keepRunningOnAppQuit) serviceProcess.unref();
-
-    this.startupStderr = '';
-    serviceProcess.stdout?.on('data', chunk => {
-      this.handleProcessOutput(LlamaCppProcessOutputStream.Stdout, chunk);
-    });
-    serviceProcess.stderr?.on('data', chunk => {
-      const text = this.handleProcessOutput(LlamaCppProcessOutputStream.Stderr, chunk);
-      if (!text) return;
-      this.startupStderr += (this.startupStderr ? '\n' : '') + text;
-    });
-    serviceProcess.on('exit', (code, signal) => {
-      console.log(
-        `[LlamaCpp] process exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`,
-      );
-      this.process = null;
-      if (this.status.status === 'starting') {
-        const exitDetail = this.formatStartupExitDetail(code, signal);
-        const stderrSnippet = this.startupStderr
-          ? `: ${this.startupStderr.slice(0, 300)} (${exitDetail})`
-          : ` (${exitDetail})`;
-        this.setStatus({
-          status: 'error',
-          error: `llama.cpp exited unexpectedly during startup${stderrSnippet}`,
-          executablePath: this.executablePath ?? undefined,
-          managedByApp: false,
-        });
-        return;
-      }
-      if (this.status.status === 'running') {
-        this.setStatus({
-          status: 'stopped',
-          executablePath: this.executablePath ?? undefined,
-          managedByApp: false,
-        });
-      }
-    });
-    serviceProcess.on('error', error => {
-      console.warn('[LlamaCpp] process failed:', error);
-      this.setStatus({
-        status: 'error',
-        error: error.message,
-        executablePath: this.executablePath ?? undefined,
-        managedByApp: false,
-      });
-    });
-
-    await Promise.race([
-      this.waitUntilHealthy(this.getConnectionAndLoadTimeoutMs()),
-      this.waitForStartupProcessExit(serviceProcess),
-    ]);
-    if (
-      usesBundledLlamaCppRuntime() &&
-      !this.bundledStartupCpuFallbackAttempted &&
-      this.bundledRuntimeSelection?.accelerator === 'vulkan' &&
-      this.status.status === 'error'
-    ) {
-      const manifest = readBundledLlamaCppRuntimeManifest();
-      const startupError = this.status.error ?? this.startupStderr;
-      if (
-        manifest?.cpuFallbackExecutable &&
-        (isVulkanBackendStartupFailure(startupError) ||
-          /backend.*(?:unavailable|not available|failed)/i.test(startupError ?? ''))
-      ) {
-        this.bundledStartupCpuFallbackAttempted = true;
-        try {
-          const cpuResolved = await resolveBundledEditionRuntime({
-            manifest,
-            forceCpuPath: true,
-          });
-          this.bundledRuntimeSelection = cpuResolved;
-          this.executablePath = cpuResolved.executablePath;
-          syncCurrentBackend(getUserLlamaCppRuntimeRoot(), cpuResolved.backend);
-          console.warn('[LlamaCpp] Vulkan startup failed; falling back to bundled CPU runtime.');
-          return this.start();
-        } catch (error) {
-          console.warn('[LlamaCpp] Bundled CPU fallback failed:', error);
-        }
-      }
-    }
-    return this.status;
-  }
-
-  async stop(): Promise<LlamaCppStatusSnapshot> {
-    if (!this.process) {
-      if (await this.isHealthy()) {
-        this.setStatus({
-          status: 'running',
-          executablePath: this.executablePath ?? undefined,
-          managedByApp: false,
-          error: 'llama.cpp is running outside this app and must be stopped externally.',
-        });
-        return this.status;
-      }
-
-      this.setStatus({
-        status: 'stopped',
-        executablePath: this.executablePath ?? undefined,
-        managedByApp: false,
-      });
-      return this.status;
-    }
-
-    const child = this.process;
-    await new Promise<void>(resolve => {
-      const timeout = setTimeout(() => {
-        child.kill('SIGKILL');
-        resolve();
-      }, 3000);
-      child.once('exit', () => {
-        clearTimeout(timeout);
-        resolve();
-      });
-      child.kill('SIGTERM');
-    });
-    this.process = null;
-    if (await this.isHealthy()) {
-      this.setStatus({
-        status: 'running',
-        executablePath: this.executablePath ?? undefined,
-        managedByApp: false,
-        error: 'llama.cpp is still running outside this app.',
-      });
-      return this.status;
-    }
-
-    this.setStatus({
-      status: 'stopped',
-      executablePath: this.executablePath ?? undefined,
-      managedByApp: false,
-    });
-    return this.status;
-  }
-
-  async restart(): Promise<LlamaCppStatusSnapshot> {
-    await this.stop();
-    return await this.start();
-  }
-
-  async client(): Promise<LlamaCppClient> {
-    if (this.status.status !== 'running') {
-      await this.detect();
-    }
-    return new LlamaCppClient(this.getBaseUrl(), {
-      loadTimeoutMs: this.getConnectionAndLoadTimeoutMs(),
-    });
-  }
-
-  async shutdownForQuit(): Promise<LlamaCppStatusSnapshot> {
-    if (shouldKeepLlamaCppServiceRunning(this.getServiceConfig())) {
-      this.process?.unref();
-      console.log('[LlamaCpp] keeping the local inference service running after app quit.');
-      return this.status;
-    }
-    await this.unloadAllRunningModels();
-    return await this.stop();
-  }
-
-  async unloadAllRunningModels(): Promise<void> {
-    const client = new LlamaCppClient(this.getBaseUrl());
-    let runningModels: LlamaCppRunningModel[];
-    try {
-      runningModels = await (this as unknown as LlamaCppManagerDownstreamSurface).listRunningModels(
-        QUIT_RUNNING_MODELS_TIMEOUT_MS,
-      );
-    } catch (error) {
-      console.debug(
-        '[LlamaCpp] skipped model unload during quit because running models could not be listed:',
-        error,
-      );
-      return;
-    }
-
-    const unloadModelNames = Array.from(
-      new Set(runningModels.map(model => (model.name || model.model || '').trim()).filter(Boolean)),
-    );
-    const logModelNames = Array.from(
-      new Set(
-        runningModels
-          .flatMap(model => [model.name, model.model, model.id])
-          .map(value => value?.trim())
-          .filter((value): value is string => Boolean(value)),
-      ),
-    );
-    if (unloadModelNames.length === 0) return;
-
-    console.log(`[LlamaCpp] unloading ${unloadModelNames.length} model(s) during app quit`);
-    const results = await Promise.allSettled(
-      unloadModelNames.map(async modelName => {
-        await client.unloadModel(modelName, QUIT_UNLOAD_MODEL_TIMEOUT_MS);
-      }),
-    );
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        console.warn(
-          `[LlamaCpp] failed to unload model ${unloadModelNames[index]} during quit:`,
-          result.reason,
-        );
-      }
-    });
-    if (logModelNames.length > 0) {
-      this.emit(LlamaCppManagerLifecycleEvent.ModelsUnloadedForQuit, {
-        modelNames: logModelNames,
-      } satisfies LlamaCppModelsUnloadedForQuitEvent);
-    }
-  }
-
-  protected async isHealthy(): Promise<boolean> {
-    try {
-      const version = await new LlamaCppClient(this.getBaseUrl()).version(300);
-      this.setStatus({
-        status: 'running',
-        version: version.version,
-        executablePath: this.executablePath ?? undefined,
-        pid: this.process?.pid,
-        managedByApp: Boolean(this.process),
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  protected async waitForStartupProcessExit(child: ChildProcess): Promise<void> {
-    if (child.exitCode !== null || child.signalCode !== null) return;
-    await new Promise<void>(resolve => {
-      const settle = () => {
-        child.off('exit', settle);
-        child.off('error', settle);
-        resolve();
-      };
-      child.once('exit', settle);
-      child.once('error', settle);
-    });
-  }
-
-  protected formatStartupExitDetail(code: number | null, signal: NodeJS.Signals | null): string {
-    const exitCode = code === null ? 'null' : `${code} (0x${code.toString(16)})`;
-    return `exit code ${exitCode}, signal ${signal ?? 'null'}`;
-  }
-
-  protected async waitUntilHealthy(timeoutMs: number): Promise<void> {
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < timeoutMs) {
-      if (await this.isHealthy()) return;
-      if (this.status.status === 'error' || this.status.status === 'stopped') {
-        return; // exit handler already set an error
-      }
-      await new Promise(resolve => setTimeout(resolve, 250));
-    }
-    const detail = this.startupStderr ? ` (stderr: ${this.startupStderr.slice(0, 300)})` : '';
-    this.setStatus({
-      status: 'error',
-      executablePath: this.executablePath ?? undefined,
-      error: `llama.cpp did not become ready before timeout${detail}`,
-      managedByApp: Boolean(this.process),
-    });
-  }
-
-  protected setStatus(
-    patch: Omit<Partial<LlamaCppStatusSnapshot>, 'checkedAt'> & {
-      status: LlamaCppStatusSnapshot['status'];
-    },
-  ): void {
-    const executablePath = Object.prototype.hasOwnProperty.call(patch, 'executablePath')
-      ? patch.executablePath
-      : this.status.executablePath;
-    this.status = {
-      ...this.status,
-      ...patch,
+      executablePath,
       ...resolveLlamaCppRuntimeMetadata(executablePath),
       checkedAt: new Date().toISOString(),
     };
-    this.emit('status', this.status);
+  }
+
+  async listBackends(): Promise<LlamaCppBackendListResult> {
+    const cacheKey = this.getBackendListCacheKey();
+    const cached = this.backendListCache;
+    if (cached && cached.key === cacheKey && cached.expiresAt > Date.now()) {
+      return cached.result;
+    }
+
+    try {
+      const nvidiaSnapshot = await getLlamaCppNvidiaSnapshot();
+      const result = await listLlamaCppBackends({
+        runtimeRoot: getUserLlamaCppRuntimeRoot(),
+        platform: process.platform,
+        arch: process.arch,
+        hasNvidiaGpu: hasAvailableNvidiaGpu(nvidiaSnapshot),
+        config: this.getServiceConfig(),
+      });
+      const nextResult = { success: true as const, ...result };
+      // Cache only a successful, short-lived snapshot; installed-state changes clear it.
+      this.backendListCache = {
+        key: cacheKey,
+        expiresAt: Date.now() + LLAMACPP_BACKEND_LIST_CACHE_TTL_MS,
+        result: nextResult,
+      };
+      return nextResult;
+    } catch (error) {
+      return {
+        success: false,
+        backends: [],
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  async importRuntime(
+    sourcePath: string,
+    beforeReplace: () => Promise<void>,
+  ): Promise<LlamaCppRuntimeImportResult> {
+    this.clearBackendListCache();
+    try {
+      const nvidiaSnapshot = await getLlamaCppNvidiaSnapshot();
+      const result = await importLlamaCppBackendPath({
+        runtimeRoot: getUserLlamaCppRuntimeRoot(),
+        sourcePath,
+        beforeReplace,
+        platform: process.platform,
+        arch: process.arch,
+        hasNvidiaGpu: hasAvailableNvidiaGpu(nvidiaSnapshot),
+      });
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message };
+    }
+  }
+
+  async uninstallRuntime(ref?: LlamaCppBackendRef): Promise<LlamaCppRuntimeUninstallResult> {
+    this.clearBackendListCache();
+    const runtimeRoot = getUserLlamaCppRuntimeRoot();
+    try {
+      const result = await uninstallLlamaCppBackend({ runtimeRoot, ref });
+      return { ...result, status: await this.readInstallationStatus() };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        deleted: false,
+        runtimeRoot,
+        backend: ref,
+        status: { status: 'error', error: message, checkedAt: new Date().toISOString() },
+        error: message,
+      };
+    }
+  }
+
+  async setBackendSelection(
+    ref: LlamaCppBackendRef,
+    options: LlamaCppRuntimeInstallOptions,
+  ): Promise<LlamaCppRuntimeInstallResult> {
+    this.clearBackendListCache();
+    const runtimeRoot = getUserLlamaCppRuntimeRoot();
+    const installedExecutablePath = getLlamaCppBackendExecutablePath(
+      runtimeRoot,
+      ref,
+      process.platform,
+    );
+    const nvidiaSnapshot = await getLlamaCppNvidiaSnapshot();
+    const hasNvidiaGpu = hasAvailableNvidiaGpu(nvidiaSnapshot);
+    const backendAlreadyInstalled = fs.existsSync(installedExecutablePath);
+    if (!backendAlreadyInstalled) {
+      this.emit('install-progress', {
+        phase: 'starting',
+        modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+        modelName: ref.versionBackend,
+      } satisfies LlamaCppInstallProgress);
+    }
+    const compatibilityError = await getLlamaCppBackendCompatibilityError({
+      runtimeRoot,
+      ref,
+      platform: process.platform,
+      arch: process.arch,
+      hasNvidiaGpu,
+    });
+    if (compatibilityError) {
+      if (!backendAlreadyInstalled) {
+        this.emit('install-progress', {
+          phase: 'failed',
+          modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+          modelName: ref.versionBackend,
+          error: compatibilityError,
+        } satisfies LlamaCppInstallProgress);
+      }
+      return {
+        success: false,
+        error: compatibilityError,
+        plan: {
+          kind: 'needs-manual',
+          message: compatibilityError,
+        },
+      };
+    }
+    const result: LlamaCppRuntimeInstallResult = backendAlreadyInstalled
+      ? (() => {
+          return {
+            success: true,
+            backend: ref,
+            executablePath: installedExecutablePath,
+            plan: {
+              kind: 'ready' as const,
+              executablePath: installedExecutablePath,
+            },
+          };
+        })()
+      : await (async () => {
+          this.emit('install-progress', {
+            phase: 'downloading',
+            modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+            modelName: ref.versionBackend,
+          } satisfies LlamaCppInstallProgress);
+          return await installLlamaCppBackend({
+            runtimeRoot,
+            ref,
+            platform: process.platform,
+            arch: process.arch,
+            hasNvidiaGpu,
+            switchCurrent: false,
+            signal: options.signal,
+            onProgress: progress => {
+              this.emit('install-progress', {
+                ...progress,
+                modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+                modelName: ref.versionBackend,
+              } satisfies LlamaCppInstallProgress);
+            },
+          });
+        })();
+    if (result.success && result.executablePath) {
+      if (backendRequiresDeviceValidation(ref)) {
+        const deviceResult = await this.listRuntimeDevices(ref);
+        if (!deviceResult.success) {
+          if (!backendAlreadyInstalled) {
+            this.emit('install-progress', {
+              phase: 'failed',
+              modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+              modelName: ref.versionBackend,
+              error: deviceResult.error || 'Backend device validation failed.',
+            } satisfies LlamaCppInstallProgress);
+          }
+          return {
+            ...result,
+            success: false,
+            error: deviceResult.error || 'Backend device validation failed.',
+          };
+        }
+        const validationError = validateBackendDevices(ref, deviceResult.devices);
+        if (validationError) {
+          if (!backendAlreadyInstalled) {
+            this.emit('install-progress', {
+              phase: 'failed',
+              modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+              modelName: ref.versionBackend,
+              error: validationError,
+            } satisfies LlamaCppInstallProgress);
+          }
+          return {
+            ...result,
+            success: false,
+            error: validationError,
+          };
+        }
+      }
+      try {
+        await this.activateInstalledBackend(ref, options);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!backendAlreadyInstalled) {
+          this.emit('install-progress', {
+            phase: options.signal?.aborted ? 'cancelled' : 'failed',
+            modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+            modelName: ref.versionBackend,
+            error: options.signal?.aborted ? undefined : message,
+          } satisfies LlamaCppInstallProgress);
+        }
+        return {
+          success: false,
+          cancelled: options.signal?.aborted || undefined,
+          error: message,
+          plan: { kind: 'needs-manual', message },
+        };
+      }
+      if (!backendAlreadyInstalled) {
+        this.emit('install-progress', {
+          phase: 'done',
+          modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+          modelName: ref.versionBackend,
+          percent: 100,
+        } satisfies LlamaCppInstallProgress);
+      }
+    } else {
+      if (!backendAlreadyInstalled) {
+        this.emit('install-progress', {
+          phase: result.cancelled ? 'cancelled' : 'failed',
+          modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+          modelName: ref.versionBackend,
+          error: result.cancelled ? undefined : 'error' in result ? result.error : undefined,
+        } satisfies LlamaCppInstallProgress);
+      }
+    }
+    return result;
+  }
+
+  async listLocalModels(signal?: AbortSignal): Promise<LlamaCppModel[]> {
+    const models = await scanLocalModelsAsync(this.getModelsDir(), signal);
+    return models.sort((first, second) => first.name.localeCompare(second.name));
+  }
+
+  async deleteModel(
+    name: string,
+    deleteFile: (modelName: string, modelPath: string) => Promise<void>,
+  ): Promise<{
+    success: boolean;
+    deleted?: boolean;
+    reason?: 'not-local-file' | 'not-app-managed';
+    error?: string;
+    removedModelName?: string;
+  }> {
+    const modelName = name.trim();
+    if (!modelName) throw new Error('Model name is required');
+    const root = path.resolve(this.getModelsDir());
+    const models = await this.listLocalModels();
+    const model = models.find(item => item.name === modelName || item.id === modelName);
+    const modelPath = model?.path;
+    if (!modelPath || !isGgufPath(modelPath)) {
+      return {
+        success: false,
+        deleted: false,
+        reason: 'not-local-file',
+        error: 'Only local GGUF model files can be deleted.',
+      };
+    }
+    const target = path.resolve(modelPath);
+    const parent = path.dirname(target);
+    if (
+      !isPathInside(parent, root) ||
+      !isPathInside(await fs.promises.realpath(parent), await fs.promises.realpath(root))
+    ) {
+      return {
+        success: false,
+        deleted: false,
+        reason: 'not-app-managed',
+        error: 'Only models in the app-managed models directory can be deleted.',
+      };
+    }
+    await deleteFile(modelName, target);
+    await removeEmptyParentDirs(parent, root);
+    return { success: true, deleted: true, removedModelName: modelName };
+  }
+
+  async installModel(
+    input: LlamaCppInstallModelInput,
+    onProgress?: (progress: LlamaCppInstallProgress) => void,
+    options: RequestOptions = {},
+  ): Promise<LlamaCppModel> {
+    const modelId = input.modelId.trim();
+    if (!modelId) throw new Error('Model ID is required');
+    const modelsDir = this.getModelsDir();
+    const safeModelDir = resolveManagedModelInstallDir(modelsDir, modelId);
+    let request = await prefillInstallInputFromMarketplace(input, this.marketplaceService);
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await installModelOnce({
+          request,
+          safeModelDir,
+          modelsDir,
+          onProgress,
+          options,
+        });
+      } catch (error) {
+        lastError = error;
+        if (attempt > 0 || !isModelDownloadNotFoundError(error)) {
+          throw error;
+        }
+        const refreshed = await refreshInstallInputFromMarketplace(
+          request,
+          this.marketplaceService,
+        );
+        if (!refreshed || isSameInstallRequest(request, refreshed)) {
+          throw error;
+        }
+        request = refreshed;
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  async importModelFiles(filePaths: string[]): Promise<LlamaCppModel[]> {
+    const sources = filePaths.map(filePath => path.resolve(filePath)).filter(isGgufPath);
+    if (sources.length === 0) return [];
+
+    const modelsDir = path.resolve(this.getModelsDir());
+    const importDir = path.join(modelsDir, 'imported');
+    await fs.promises.mkdir(importDir, { recursive: true });
+    const stagingDir = await fs.promises.mkdtemp(path.join(importDir, '.gguf-import-'));
+    const importedPaths = new Set<string>();
+    try {
+      for (const [index, source] of sources.entries()) {
+        await fs.promises.copyFile(source, path.join(stagingDir, String(index)));
+      }
+
+      // Pick the name and publish in one turn so concurrent imports cannot choose the same path.
+      for (const [index, source] of sources.entries()) {
+        const targetPath = resolveImportedModelTargetPath(importDir, source);
+        fs.renameSync(path.join(stagingDir, String(index)), targetPath);
+        importedPaths.add(targetPath);
+      }
+    } catch (error) {
+      for (const targetPath of importedPaths) {
+        try {
+          fs.rmSync(targetPath, { force: true });
+          importedPaths.delete(targetPath);
+        } catch (rollbackError) {
+          console.warn('[LlamaCpp] failed to roll back a model import:', targetPath, rollbackError);
+        }
+      }
+      throw error;
+    } finally {
+      await fs.promises.rm(stagingDir, { recursive: true, force: true }).catch(error => {
+        console.warn('[LlamaCpp] failed to remove staged model imports:', error);
+      });
+    }
+
+    return (await scanLocalModelsAsync(modelsDir)).filter(model =>
+      Boolean(model.path && importedPaths.has(model.path)),
+    );
   }
 }

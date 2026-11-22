@@ -10,11 +10,21 @@ import {
   verifyMagpieBinary,
   assertPeHasAuthenticodeSignature,
   MAGPIE_COMMIT,
+  MAGPIE_PATCH_SHA256,
+  MAGPIE_PATCHED_SOURCE_SHA256,
   MAGPIE_VERSION,
 } from './integrity';
 
 import { temporary } from './manager.testHarness';
+import upstream from '../../../resources/magpie/upstream.json';
+
 describe('Magpie isolation and integrity', () => {
+  it('uses the packaged source pin at app startup', () => {
+    expect(MAGPIE_COMMIT).toBe(upstream.commit);
+    expect(MAGPIE_VERSION).toBe(upstream.version);
+    expect(MAGPIE_PATCH_SHA256).toBe(upstream.patchSha256);
+    expect(MAGPIE_PATCHED_SOURCE_SHA256).toBe(upstream.patchedTreeSha256);
+  });
   it('keeps real CLI home while isolating service settings and dropping credential environment', () => {
     const env = isolatedMagpieEnvironment('/private', 1234, 'test', {
       HOME: '/real',
@@ -76,7 +86,11 @@ describe('Magpie isolation and integrity', () => {
       platform: process.platform,
       arch: process.arch,
       binary,
-      source: { commit: MAGPIE_COMMIT },
+      source: {
+        commit: MAGPIE_COMMIT,
+        patchSha256: MAGPIE_PATCH_SHA256,
+        treeSha256: MAGPIE_PATCHED_SOURCE_SHA256,
+      },
       version: MAGPIE_VERSION,
       sha256: 'a'.repeat(64),
     };
@@ -88,6 +102,13 @@ describe('Magpie isolation and integrity', () => {
       expect(
         await verifyMagpieBinary(root, new AbortController().signal, async () => 'a'.repeat(64)),
       ).toBe(path.join(dir, binary));
+      await fs.writeFile(
+        path.join(dir, 'manifest.json'),
+        JSON.stringify({ ...manifest, source: { ...manifest.source, patchSha256: undefined } }),
+      );
+      await expect(
+        verifyMagpieBinary(root, new AbortController().signal, async () => 'a'.repeat(64)),
+      ).rejects.toThrow('manifest');
       await fs.writeFile(
         path.join(dir, 'manifest.json'),
         JSON.stringify({ ...manifest, source: { commit: 'moving-main' } }),
@@ -143,7 +164,11 @@ describe('Magpie isolation and integrity', () => {
       platform: process.platform,
       arch: process.arch,
       binary,
-      source: { commit: MAGPIE_COMMIT },
+      source: {
+        commit: MAGPIE_COMMIT,
+        patchSha256: MAGPIE_PATCH_SHA256,
+        treeSha256: MAGPIE_PATCHED_SOURCE_SHA256,
+      },
       version: MAGPIE_VERSION,
       sha256: 'a'.repeat(64),
       buildSha256: 'b'.repeat(64),

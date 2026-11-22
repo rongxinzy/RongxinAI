@@ -54,20 +54,6 @@ const ChatSessionList = memo(function ChatSessionList({
             }
           }}
           onDelete={() => onDeleteSession(task.id)}
-          onShare={async () => {
-            const session = sessions.find(item => item.id === task.id);
-            if (session) {
-              onDismissSearch();
-              await onSelectSession(session);
-              window.setTimeout(() => {
-                window.dispatchEvent(
-                  new CustomEvent('cowork:open-share-options', {
-                    detail: { sessionId: task.id },
-                  }),
-                );
-              }, 0);
-            }
-          }}
           onTogglePin={pinned => onToggleSessionPin(task.id, pinned)}
           onRename={title => onRenameSession(task.id, title)}
           onToggleSelection={() => onToggleSelection(task.id)}

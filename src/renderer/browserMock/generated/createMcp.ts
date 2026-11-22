@@ -65,13 +65,6 @@ export function createMcp(runtime: BrowserMockRuntime): Window['electron']['mcp'
         },
       };
     },
-    refreshBridge: async () => {
-      runtime.warnOnce('mcp.refreshBridge');
-      return {
-        success: true,
-        tools: 0,
-      };
-    },
     authorize: async _p0 => {
       void _p0;
       runtime.warnOnce('mcp.authorize');

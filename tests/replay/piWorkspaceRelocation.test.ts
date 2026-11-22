@@ -14,7 +14,7 @@ import { PiRuntimeAdapter } from '../../src/main/libs/agentEngine/piRuntimeAdapt
 import { resolvePiSessionStoreFile } from '../../src/main/libs/agentEngine/piSessionStore';
 import { CoworkExecutionMode, CoworkSessionMode } from '../../src/shared/cowork/constants';
 import { WorkbenchApprovalMode } from '../../src/shared/workbenchTask';
-import { installTestMagpie } from '../helpers/installTestMagpie';
+import { createTestMagpie } from '../helpers/createTestMagpie';
 
 // Real Pi SDK, native write tool, SQLite and JSONL. Only Electron and model
 // inference are substitutes: deterministic SSE is served on loopback, not by
@@ -120,22 +120,14 @@ test(
       }
     });
     let store: SqliteStore | undefined;
-    let gateway: ReturnType<typeof installTestMagpie> | undefined;
-    const adapter = new PiRuntimeAdapter();
-    adapter.on('error', (_sessionId, error) => errors.push(`runtime:${error.kind}`));
-    adapter.on('complete', () => {
-      completions += 1;
-    });
-    adapter.on('permissionRequest', (_sessionId, request) => {
-      permissions.push(request.toolName);
-      adapter.respondToPermission(request.requestId, { behavior: 'allow' });
-    });
+    let gateway: ReturnType<typeof createTestMagpie> | undefined;
+    let runtime: PiRuntimeAdapter | undefined;
     try {
       await mkdir(workspaceA);
       await mkdir(workspaceB);
       await mkdir(path.join(root, 'database'));
       await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
-      gateway = installTestMagpie({
+      gateway = createTestMagpie({
         gatewayUrl: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`,
         defaultModelId: model,
       });
@@ -143,9 +135,21 @@ test(
       store = await SqliteStore.create(path.join(root, 'database'));
       const ledger = new ArtifactLedger(store.getDatabase());
       const cowork = new CoworkStore(store.getDatabase(), ledger);
-      adapter.setArtifactLedger(ledger);
-      adapter.setCoworkStore(cowork);
-      adapter.setPiSessionStoreRoot(sessionRoot);
+      const adapter = new PiRuntimeAdapter({
+        modelService: gateway.modelService,
+        artifactLedger: ledger,
+        coworkStore: cowork,
+        piSessionStoreRoot: sessionRoot,
+      });
+      runtime = adapter;
+      adapter.on('error', (_sessionId, error) => errors.push(`runtime:${error.kind}`));
+      adapter.on('complete', () => {
+        completions += 1;
+      });
+      adapter.on('permissionRequest', (_sessionId, request) => {
+        permissions.push(request.toolName);
+        adapter.respondToPermission(request.requestId, { behavior: 'allow' });
+      });
       const session = cowork.createSession(
         'Workspace relocation',
         workspaceA,
@@ -157,14 +161,37 @@ test(
         CoworkSessionMode.Work,
         'workspace-relocation-session',
       );
+      store.getDatabase().exec(`CREATE TEMP TRIGGER reject_persisted_liveness
+        BEFORE UPDATE OF status ON cowork_sessions WHEN NEW.status = 'running'
+        BEGIN SELECT RAISE(ABORT, 'Pi liveness must stay in memory'); END;`);
+      const piHistoryKey = cowork.getPiHistoryKey(session.id);
+      const resolvePiHistory = () =>
+        resolvePiSessionStoreFile(sessionRoot, session.id, undefined, piHistoryKey);
       const options = {
         sessionMode: CoworkSessionMode.Work,
         approvalMode: WorkbenchApprovalMode.Ask,
       };
-      await adapter.startSession(session.id, 'Write first.txt in the current directory.', {
-        ...options,
-        workspaceRoot: workspaceA,
-      });
+      const firstTurn = adapter.startSession(
+        session.id,
+        'Write first.txt in the current directory.',
+        {
+          ...options,
+          workspaceRoot: workspaceA,
+        },
+      );
+      try {
+        expect(adapter.getRunningSessionIds()).toEqual([session.id]);
+        expect(() =>
+          cowork.workspaces.relocateWorkspace(
+            session.workspaceId,
+            workspaceB,
+            'Moved project',
+            adapter.getRunningSessionIds(),
+          ),
+        ).toThrow('while a session is running');
+      } finally {
+        await firstTurn;
+      }
       expect(errors).toEqual([]);
       expect(completions).toBe(1);
       expect(adapter.isSessionRunning(session.id)).toBe(false);
@@ -178,7 +205,7 @@ test(
       expect(ledger.list(session.id).map(artifact => artifact.filePath)).toContain(
         path.join(workspaceA, 'first.txt'),
       );
-      const file = resolvePiSessionStoreFile(sessionRoot, session.id).sessionFile;
+      const { sessionFile: file } = await resolvePiHistory();
       expect(file).not.toBeNull();
       const firstEntries = await readEntries(file!);
       expect(
@@ -192,7 +219,12 @@ test(
 
       // Relocate the existing workspace through its real store entry point, not
       // a new session or a direct mutation of active.workspaceRoot.
-      const relocated = cowork.relocateWorkspace(session.workspaceId, workspaceB, 'Moved project');
+      const relocated = cowork.workspaces.relocateWorkspace(
+        session.workspaceId,
+        workspaceB,
+        'Moved project',
+        adapter.getRunningSessionIds(),
+      );
       const stored = cowork.getSession(session.id, 0, { includeArtifacts: false })!;
       expect(stored.cwd).toBe(workspaceB);
       expect(stored.workspaceId).toBe(relocated!.id);
@@ -225,7 +257,9 @@ test(
       const artifactPaths = ledger.list(session.id).map(artifact => artifact.filePath);
       expect(artifactPaths).toContain(path.join(workspaceB, 'second.txt'));
       expect(artifactPaths).not.toContain(path.join(workspaceA, 'second.txt'));
-      expect(resolvePiSessionStoreFile(sessionRoot, session.id).sessionFile).toBe(file);
+      await expect(resolvePiHistory()).resolves.toMatchObject({
+        sessionFile: file,
+      });
       expect((await readEntries(file!)).slice(0, firstEntries.length)).toEqual(firstEntries);
       expectStructuredWriteHistory(requests[2], 'relocate-write-1', 'first.txt');
 
@@ -245,13 +279,14 @@ test(
       });
       expectStructuredWriteHistory(requests[4], 'relocate-write-1', 'first.txt');
       expectStructuredWriteHistory(requests[4], 'relocate-write-2', 'second.txt');
-      expect(resolvePiSessionStoreFile(sessionRoot, session.id).sessionFile).toBe(file);
+      await expect(resolvePiHistory()).resolves.toMatchObject({
+        sessionFile: file,
+      });
       expect((await readEntries(file!)).slice(0, firstEntries.length)).toEqual(firstEntries);
     } finally {
-      adapter.stopAllSessions();
+      runtime?.stopAllSessions();
       vi.restoreAllMocks();
       store?.close();
-      gateway?.dispose();
       await new Promise<void>(resolve => {
         upstream.close(() => resolve());
         upstream.closeAllConnections();

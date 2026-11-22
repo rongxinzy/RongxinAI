@@ -2,26 +2,10 @@ import { describe, expect, test } from 'vitest';
 
 import {
   buildLogExportFileName,
-  ensurePngFileName,
   ensureZipFileName,
-  getDefaultExportImageName,
   inferAttachmentExtension,
-  normalizeCaptureRect,
   sanitizeAttachmentFileName,
-  sanitizeExportFileName,
 } from './fileExportHelpers';
-
-describe('sanitizeExportFileName', () => {
-  test('strips invalid filename characters and collapses whitespace', () => {
-    expect(sanitizeExportFileName('a<b>:c/"d\\|e?*f')).toBe('a b c d e f');
-    expect(sanitizeExportFileName('  lots   of   space  ')).toBe('lots of space');
-  });
-
-  test('falls back to default when nothing remains', () => {
-    expect(sanitizeExportFileName('???')).toBe('cowork-session');
-    expect(sanitizeExportFileName('')).toBe('cowork-session');
-  });
-});
 
 describe('sanitizeAttachmentFileName', () => {
   test('defaults for empty or non-string input', () => {
@@ -53,52 +37,10 @@ describe('inferAttachmentExtension', () => {
   });
 });
 
-describe('ensurePngFileName / ensureZipFileName', () => {
+describe('ensureZipFileName', () => {
   test('appends the extension only when missing', () => {
-    expect(ensurePngFileName('shot')).toBe('shot.png');
-    expect(ensurePngFileName('shot.PNG')).toBe('shot.PNG');
-    expect(ensurePngFileName('shot.png')).toBe('shot.png');
     expect(ensureZipFileName('logs')).toBe('logs.zip');
     expect(ensureZipFileName('logs.zip')).toBe('logs.zip');
-  });
-});
-
-describe('normalizeCaptureRect', () => {
-  test('returns null for missing or zero-area rects', () => {
-    expect(normalizeCaptureRect(undefined)).toBeNull();
-    expect(normalizeCaptureRect(null)).toBeNull();
-    expect(normalizeCaptureRect({ x: 0, y: 0, width: 0, height: 10 })).toBeNull();
-    expect(normalizeCaptureRect({ x: 0, y: 0, width: 10, height: -1 })).toBeNull();
-  });
-
-  test('rounds and clamps values to non-negative integers', () => {
-    expect(normalizeCaptureRect({ x: -3.2, y: 4.7, width: 10.4, height: 5.5 })).toEqual({
-      x: 0,
-      y: 5,
-      width: 10,
-      height: 6,
-    });
-  });
-
-  test('fills missing coordinates with zero', () => {
-    expect(normalizeCaptureRect({ width: 10, height: 10 })).toEqual({
-      x: 0,
-      y: 0,
-      width: 10,
-      height: 10,
-    });
-  });
-});
-
-describe('getDefaultExportImageName', () => {
-  test('sanitizes and forces the png extension on a provided name', () => {
-    expect(getDefaultExportImageName('my shot:1')).toBe('my shot 1.png');
-    expect(getDefaultExportImageName('ready.png')).toBe('ready.png');
-  });
-
-  test('generates a timestamped name when none provided', () => {
-    expect(getDefaultExportImageName(undefined)).toMatch(/^cowork-session-\d+\.png$/);
-    expect(getDefaultExportImageName('   ')).toMatch(/^cowork-session-\d+\.png$/);
   });
 });
 

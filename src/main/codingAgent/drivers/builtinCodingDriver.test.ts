@@ -51,6 +51,24 @@ test('starts the in-process runtime while the room owns streamed event projectio
   expect(calls).toEqual([session.id, `cancel:${session.id}`]);
 });
 
+test('does not start a turn cancelled while Skill command choices load', async () => {
+  const loaded = Promise.withResolvers<{ skills: []; experts: []; mcpServers: [] }>();
+  const runtime = createRuntime({ listCommandChoices: () => loaded.promise });
+  const driver = new BuiltinCodingDriver(runtime);
+  let current = true;
+  const prompt = driver.prompt({
+    sessionId: 'session',
+    workspaceRoot: '/workspace',
+    prompt: 'work',
+    isCurrentTurn: () => current,
+  });
+  const pending = prompt[Symbol.asyncIterator]().next();
+  current = false;
+  loaded.resolve({ skills: [], experts: [], mcpServers: [] });
+  await expect(pending).resolves.toMatchObject({ done: true });
+  expect(runtime.start).not.toHaveBeenCalled();
+});
+
 test('never advertises session loading and refuses to load a remote session', async () => {
   const driver = new BuiltinCodingDriver(createRuntime());
 
@@ -102,9 +120,9 @@ test('advertises installed skills, experts and MCP servers on every projection',
   expect(names).toContain('skill');
   expect(names).toContain('expert');
   expect(names).toContain('mcp');
-  expect(driver.getSessionAvailableCommands(session.id).map(command => command.name)).toEqual(
-    names,
-  );
+  expect(
+    (await driver.getSessionAvailableCommands(session.id)).map(command => command.name),
+  ).toEqual(names);
 });
 
 test('reads the installed choices when a session is created, not per projection', async () => {
@@ -116,8 +134,8 @@ test('reads the installed choices when a session is created, not per projection'
   const driver = new BuiltinCodingDriver(createRuntime({ listCommandChoices }));
   const session = await driver.createSession({ workspaceRoot: '/workspace' });
 
-  driver.getSessionAvailableCommands(session.id);
-  driver.getSessionAvailableCommands(session.id);
+  await driver.getSessionAvailableCommands(session.id);
+  await driver.getSessionAvailableCommands(session.id);
   expect(listCommandChoices).toHaveBeenCalledTimes(1);
 });
 
@@ -132,18 +150,18 @@ test('re-reads the installed choices once the runtime bumps the catalog generati
     createRuntime({ listCommandChoices, commandCatalogGeneration: () => generation }),
   );
   const session = await driver.createSession({ workspaceRoot: '/workspace' });
-  expect(driver.getSessionAvailableCommands(session.id).map(command => command.name)).not.toContain(
-    'skill',
-  );
+  expect(
+    (await driver.getSessionAvailableCommands(session.id)).map(command => command.name),
+  ).not.toContain('skill');
 
   generation += 1;
-  expect(driver.getSessionAvailableCommands(session.id).map(command => command.name)).toContain(
-    'skill',
-  );
+  expect(
+    (await driver.getSessionAvailableCommands(session.id)).map(command => command.name),
+  ).toContain('skill');
   expect(listCommandChoices).toHaveBeenCalledTimes(2);
 });
 
-test('projects the default commands before any session exists', () => {
+test('projects the default commands before any session exists', async () => {
   const driver = new BuiltinCodingDriver(
     createRuntime({
       listCommandChoices: () => ({
@@ -154,7 +172,7 @@ test('projects the default commands before any session exists', () => {
     }),
   );
 
-  const names = driver.getDefaultAvailableCommands().map(command => command.name);
+  const names = (await driver.getDefaultAvailableCommands()).map(command => command.name);
   expect(names).toEqual(
     expect.arrayContaining(['plan', 'goal', 'skill', 'compact', 'status', 'mcp']),
   );
@@ -432,7 +450,7 @@ test('createSession advertises the built-in prompt and control commands', async 
   expect(
     session.availableCommands.filter(command => command.input?.hint).map(command => command.name),
   ).toEqual(['plan', 'goal', 'mcp']);
-  expect(driver.getSessionAvailableCommands('s1')).toEqual(session.availableCommands);
+  expect(await driver.getSessionAvailableCommands('s1')).toEqual(session.availableCommands);
 });
 
 test('prompt strips the goal command and requests the long-horizon goal loop', async () => {

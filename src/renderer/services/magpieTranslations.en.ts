@@ -343,7 +343,8 @@ export const magpieTranslationsEn = {
 
   // Provider add wizard & unified edit dialog
   providerWizardStep1Title: 'Choose a model provider',
-  providerWizardStep2Title: 'Enter API key & verify connection',
+  providerWizardStep2Title: 'Set up and test the connection',
+  providerWizardOptionalKey: 'API key (optional)',
   providerWizardStep3Title: 'Select models to enable',
   providerWizardStepProgress: 'Step {step} of {total}',
   providerWizardSearchPlaceholder: 'Search providers…',
@@ -353,7 +354,7 @@ export const magpieTranslationsEn = {
   providerWizardCustomCardDesc: 'Any OpenAI- or Anthropic-compatible relay or self-hosted endpoint',
   providerWizardPlanToggle: 'Use coding / token subscription plan key',
   providerWizardPlanHint: 'Automatically switches to the subscription plan endpoint.',
-  providerWizardTestingConnection: 'Verifying key and fetching available models…',
+  providerWizardTestingConnection: 'Testing the connection and fetching available models…',
   providerWizardAutoTestSuccess: 'Connected — {count} models available',
   providerWizardApiKeyNotice:
     'Your key stays strictly on this device and is stored encrypted in the OS keychain.',
@@ -397,7 +398,6 @@ export const magpieTranslationsEn = {
   modelsZeroOrgTitle: 'Connect organization platform',
   modelsZeroOrgDesc: 'Use models and policies managed by your organization.',
   modelsZeroOrgAction: 'Connect organization',
-  modelsZeroNoConfigNeeded: 'No key needed',
   modelsPickerSearchPlaceholder: 'Search models or providers…',
   modelsPickerRecentGroup: 'Recent',
   modelsPickerGroupsGroup: 'Model groups',

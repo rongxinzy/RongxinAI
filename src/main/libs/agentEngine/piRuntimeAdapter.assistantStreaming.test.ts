@@ -7,7 +7,12 @@
  * the Pi SDK mocks are registered before any module under test loads).
  */
 
-import { adapter, mockSession, setupPiRuntimeAdapterSuite } from './piRuntimeAdapter.testHarness';
+import {
+  createTestPiRuntime,
+  adapter,
+  mockSession,
+  setupPiRuntimeAdapterSuite,
+} from './piRuntimeAdapter.testHarness';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoworkStore } from '../../coworkStore';
@@ -168,21 +173,25 @@ describe('PiRuntimeAdapter', () => {
 
     it('persists a token reading only when the provider reported usage', async () => {
       const seededMessageIds: string[] = [];
+      const updateMessage = vi.fn<CoworkStore['messages']['updateMessage']>();
+      // Only the members this metadata path reads.
+      const adapter = createTestPiRuntime({
+        coworkStore: {
+          messages: {
+            addMessage: (_sessionId: string, message: unknown) => message,
+            getMessage: (_sessionId: string, messageId: string) =>
+              seededMessageIds.includes(messageId) ? { id: messageId, metadata: {} } : null,
+            updateMessage,
+          },
+          getSession: () => ({ messages: seededMessageIds.map(id => ({ id, metadata: {} })) }),
+          updateSession: vi.fn(),
+        } as unknown as CoworkStore,
+      });
       adapter.on('message', (_sid, msg) => {
         if ((msg as { type: string }).type === 'assistant') {
           seededMessageIds.push((msg as { id: string }).id);
         }
       });
-      const updateMessage = vi.fn();
-      // Only the members this metadata path reads.
-      adapter.setCoworkStore({
-        addMessage: (_sessionId: string, message: unknown) => message,
-        getMessage: (_sessionId: string, messageId: string) =>
-          seededMessageIds.includes(messageId) ? { id: messageId, metadata: {} } : null,
-        getSession: () => ({ messages: seededMessageIds.map(id => ({ id, metadata: {} })) }),
-        updateMessage,
-        updateSession: vi.fn(),
-      } as unknown as CoworkStore);
       mockSession.getContextUsage.mockReturnValue({ tokens: 1_200, contextWindow: 262_144 });
 
       await adapter.startSession('usage-session', 'Hi');
@@ -221,6 +230,11 @@ describe('PiRuntimeAdapter', () => {
       driveTurn({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 });
       await vi.waitFor(() => expect(usageWrites()).toHaveLength(1));
       expect(usageWrites()[0]).not.toHaveProperty('usage');
+      const settlementWrite = updateMessage.mock.calls
+        .map(call => call[2])
+        .find(update => update.metadata?.isFinalAnswer === true);
+      expect(settlementWrite).toBeDefined();
+      expect(settlementWrite).not.toHaveProperty('content');
 
       driveTurn({
         input: 900,

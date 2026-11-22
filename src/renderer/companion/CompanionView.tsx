@@ -30,7 +30,7 @@ import {
 import { companionSubmissionError } from '../services/companionSubmissionError';
 import { i18nService } from '../services/i18n';
 import { themeService } from '../services/theme';
-import { resolveThemePlugin } from '../theme/themes/plugins';
+import { resolveThemePresentation } from '../theme/themes/presentation';
 import { readCompanionDraft, writeCompanionDraft } from './draft';
 import { useTaskSnapshots } from './useTaskSnapshots';
 import { CompanionConversation } from './CompanionConversation';
@@ -39,7 +39,6 @@ import { CoworkInlineAttachments } from '../components/cowork/CoworkInlineAttach
 import { useCompanionFiles } from './useCompanionFiles';
 import { CompanionHeaderActions } from './CompanionHeaderActions';
 import { createCompanionRefreshQueue } from './refreshQueue';
-import { useCompanionAnswer } from './useCompanionAnswer';
 import { CompanionBubbleFrame } from './CompanionBubbleFrame';
 import { watchCompanionVisibility } from './visibility';
 import { usePromptFileDrop } from '../components/cowork/promptInput/usePromptFileDrop';
@@ -48,7 +47,7 @@ import { CompanionBubbleSide, type CompanionBubblePlacement } from '../../shared
 function applyContext(context: CompanionWindowContext): void {
   themeService.initialize();
   i18nService.setLanguage(context.language, { persist: false });
-  const style = resolveThemePlugin(context.themeStyle).id;
+  const style = resolveThemePresentation(context.themeStyle).id;
   if (themeService.getStyle() !== style) themeService.setStyle(style);
   if (themeService.getTheme() !== context.theme) themeService.setTheme(context.theme);
 }
@@ -181,7 +180,7 @@ export function CompanionView({ api = window.companion }: Props = {}) {
       unsubscribeFocus?.();
       document.removeEventListener('keydown', keydown);
     };
-  }, [api, load, cancelPendingLoad, updateTasks]);
+  }, [api, load, cancelPendingLoad, replaceDraft, updateTasks]);
 
   const pending = state?.conversation.pending;
   const waitingForModel = Boolean(
@@ -190,14 +189,6 @@ export function CompanionView({ api = window.companion }: Props = {}) {
   useEffect(() => {
     if (state?.activePetId && visible) textarea.current?.focus();
   }, [state?.activePetId, visible]);
-  useCompanionAnswer({
-    api,
-    pending,
-    visible,
-    waitingForModel,
-    reload: load,
-    onError: setError,
-  });
 
   const updateDraft = (text: string, patch: Partial<typeof draft> = {}) => {
     const next = { ...draftRef.current, ...patch, text, requestId: crypto.randomUUID() };

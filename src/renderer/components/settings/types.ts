@@ -39,6 +39,7 @@ export interface SettingsEnterpriseConfig {
 
 export interface SettingsPageProps extends SettingsOpenOptions {
   onClose: () => void;
+  onAskAi: (prompt: string) => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;

@@ -1,24 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
-import { CoworkErrorKind } from '../src/common/coworkError';
 import { setLanguage } from '../src/main/i18n';
-import {
-  LlamaCppAgentEligibilityReason,
-  type LlamaCppAgentModelEligibility,
-} from '../src/shared/llamacpp';
+import { assessLlamaCppAgentEligibility } from '../src/shared/llamacpp';
 import { ProviderName } from '../src/shared/providers';
 import type { NvidiaSmiSnapshot } from '../src/shared/hardware';
-
-// ── Hoisted mocks for LlamaCpp Running Model Registry ────────────────────────
-const hoistedRegistry = vi.hoisted(() => ({
-  isLlamaCppModelRunning: vi.fn(),
-  getLlamaCppModelAgentEligibility: vi.fn(),
-}));
-
-vi.mock('../src/main/libs/llamacppRunningModelRegistry', () => ({
-  isLlamaCppModelRunning: hoistedRegistry.isLlamaCppModelRunning,
-  getLlamaCppModelAgentEligibility: hoistedRegistry.getLlamaCppModelAgentEligibility,
-}));
 
 import {
   assertLlamaCppWorkModeContext,
@@ -26,17 +11,10 @@ import {
   WORK_MODE_MIN_CONTEXT_WINDOW,
 } from '../src/main/libs/llamacppWorkModeContextGuard';
 import { resolveAutomaticLlamaCppContextSize } from '../src/shared/llamacpp/defaults';
-import {
-  PiRuntimeTurnEvents,
-  type PiRuntimeTurnHost,
-} from '../src/main/libs/agentEngine/piRuntimeTurnEvents';
-import type { ActivePiSession } from '../src/main/libs/agentEngine/piRuntimeSessionState';
 
 describe('Empirical Verification Harness — Context Window Guard, Sizing & Auto-Retry', () => {
   beforeEach(() => {
     setLanguage('en');
-    hoistedRegistry.isLlamaCppModelRunning.mockReset();
-    hoistedRegistry.getLlamaCppModelAgentEligibility.mockReset();
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -99,28 +77,9 @@ describe('Empirical Verification Harness — Context Window Guard, Sizing & Auto
       },
     );
 
-    describe('assertLlamaCppWorkModeContext provider discrimination', () => {
-      it.each([ProviderName.OpenAI, ProviderName.Anthropic, ProviderName.Custom])(
-        'ignores non-LlamaCpp provider %s even when model is not running or context is small',
-        provider => {
-          hoistedRegistry.isLlamaCppModelRunning.mockReturnValue(false);
-          expect(() =>
-            assertLlamaCppWorkModeContext({
-              providerName: provider,
-              modelId: `${provider}/any-model`,
-            }),
-          ).not.toThrow();
-        },
-      );
-
+    describe('assertLlamaCppWorkModeContext', () => {
       it('throws when LlamaCpp model is not running', () => {
-        hoistedRegistry.isLlamaCppModelRunning.mockReturnValue(false);
-        expect(() =>
-          assertLlamaCppWorkModeContext({
-            providerName: ProviderName.LlamaCpp,
-            modelId: 'llamacpp/qwen-local',
-          }),
-        ).toThrow(/coworkLlamaCppModelNotRunning|not running/i);
+        expect(() => assertLlamaCppWorkModeContext(null)).toThrow(/not running/i);
       });
 
       it.each([
@@ -134,75 +93,30 @@ describe('Empirical Verification Harness — Context Window Guard, Sizing & Auto
       ])(
         'enforces 32768 runtime minimum for LlamaCpp: runtimeCtx=$runtimeCtx throws=$shouldThrow',
         ({ runtimeCtx, shouldThrow }) => {
-          hoistedRegistry.isLlamaCppModelRunning.mockReturnValue(true);
-          const eligible = runtimeCtx >= 32768;
-          const eligibility: LlamaCppAgentModelEligibility = eligible
-            ? {
-                eligible: true,
-                reason: LlamaCppAgentEligibilityReason.Eligible,
-                requiredContextWindow: 32768,
-                runtimeContextWindow: runtimeCtx,
-                canIncreaseContextWindow: false,
-              }
-            : {
-                eligible: false,
-                reason: LlamaCppAgentEligibilityReason.RuntimeContextTooSmall,
-                requiredContextWindow: 32768,
-                runtimeContextWindow: runtimeCtx,
-                canIncreaseContextWindow: true,
-              };
-
-          hoistedRegistry.getLlamaCppModelAgentEligibility.mockReturnValue(eligibility);
-
+          const eligibility = assessLlamaCppAgentEligibility({ runtimeContextWindow: runtimeCtx });
           if (shouldThrow) {
-            expect(() =>
-              assertLlamaCppWorkModeContext({
-                providerName: ProviderName.LlamaCpp,
-                modelId: 'llamacpp/qwen-local',
-              }),
-            ).toThrow(/too small a context window/i);
+            expect(() => assertLlamaCppWorkModeContext(eligibility)).toThrow(
+              /too small a context window/i,
+            );
           } else {
-            expect(() =>
-              assertLlamaCppWorkModeContext({
-                providerName: ProviderName.LlamaCpp,
-                modelId: 'llamacpp/qwen-local',
-              }),
-            ).not.toThrow();
+            expect(() => assertLlamaCppWorkModeContext(eligibility)).not.toThrow();
           }
         },
       );
 
       it('handles LlamaCpp Unknown and TrainedContextTooSmall eligibility reasons', () => {
-        hoistedRegistry.isLlamaCppModelRunning.mockReturnValue(true);
+        const unknown = assessLlamaCppAgentEligibility({});
+        expect(() => assertLlamaCppWorkModeContext(unknown)).toThrow(
+          /not report an effective context window|unknown/i,
+        );
 
-        // Unknown
-        hoistedRegistry.getLlamaCppModelAgentEligibility.mockReturnValue({
-          eligible: false,
-          reason: LlamaCppAgentEligibilityReason.RuntimeContextUnknown,
-          requiredContextWindow: 32768,
-          canIncreaseContextWindow: true,
-        });
-        expect(() =>
-          assertLlamaCppWorkModeContext({
-            providerName: ProviderName.LlamaCpp,
-            modelId: 'llamacpp/qwen-local',
-          }),
-        ).toThrow(/not report an effective context window|unknown/i);
-
-        // TrainedContextTooSmall
-        hoistedRegistry.getLlamaCppModelAgentEligibility.mockReturnValue({
-          eligible: false,
-          reason: LlamaCppAgentEligibilityReason.TrainedContextTooSmall,
-          requiredContextWindow: 32768,
+        const trainedContextTooSmall = assessLlamaCppAgentEligibility({
+          runtimeContextWindow: 16384,
           trainedContextWindow: 8192,
-          canIncreaseContextWindow: false,
         });
-        expect(() =>
-          assertLlamaCppWorkModeContext({
-            providerName: ProviderName.LlamaCpp,
-            modelId: 'llamacpp/qwen-local',
-          }),
-        ).toThrow(/trained for only \d+ context tokens|training/i);
+        expect(() => assertLlamaCppWorkModeContext(trainedContextTooSmall)).toThrow(
+          /trained for only \d+ context tokens|training/i,
+        );
       });
     });
   });
