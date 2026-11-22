@@ -153,15 +153,14 @@ test('wrapMagpieNativeApi rewrites 5xx llama.cpp overflow fetch responses to 400
   expect(isContextOverflow(result, 32768)).toBe(true);
 });
 
-test('wrapMagpieNativeApi keeps anthropic-messages reasoning request max_tokens within safeMaxTokens on small windows', async () => {
-  const capturedBodies: Array<{ max_tokens?: number; thinking?: { budget_tokens?: number } }> = [];
+test('wrapMagpieNativeApi enforces valid anthropic-messages thinking.budget_tokens and recovers when room is below 2048', async () => {
+  type CapturedAnthropicBody = {
+    max_tokens?: number;
+    thinking?: { type?: string; budget_tokens?: number };
+  };
+  const capturedBodies: CapturedAnthropicBody[] = [];
   const captureFetch = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-    capturedBodies.push(
-      JSON.parse(String(init?.body ?? '{}')) as {
-        max_tokens?: number;
-        thinking?: { budget_tokens?: number };
-      },
-    );
+    capturedBodies.push(JSON.parse(String(init?.body ?? '{}')) as CapturedAnthropicBody);
     return new Response(JSON.stringify({ error: { message: 'stopped in test' } }), {
       status: 400,
       headers: { 'content-type': 'application/json' },
@@ -182,22 +181,42 @@ test('wrapMagpieNativeApi keeps anthropic-messages reasoning request max_tokens 
     maxTokens: 4096,
   };
 
-  // Case 1 (PR #1487 review repro): 2,500 estimated input tokens -> safeMaxTokens = 981.
-  const tightContext = makeContext('a'.repeat(8750));
-  expect(estimateContextTokens(tightContext).tokens).toBe(2500);
-  expect(
-    clampMagpieMaxTokensToContext(anthropicModel, tightContext, anthropicModel.maxTokens),
-  ).toBe(981);
+  // Insufficient output room (< 2048) must trigger context-overflow recovery without hitting fetch.
+  for (const [chars, expectedInput, expectedSafe] of [
+    [8750, 2500, 981],
+    [7000, 2000, 1481],
+    [5019, 1434, 2047],
+  ] as const) {
+    const tightContext = makeContext('a'.repeat(chars));
+    expect(estimateContextTokens(tightContext).tokens).toBe(expectedInput);
+    expect(
+      clampMagpieMaxTokensToContext(anthropicModel, tightContext, anthropicModel.maxTokens),
+    ).toBe(expectedSafe);
+    const result = await wrapped
+      .streamSimple(anthropicModel, tightContext, {
+        apiKey: 'test-key',
+        reasoning: 'medium',
+        fetch: captureFetch as unknown as typeof fetch,
+      })
+      .result();
+    expect(result.stopReason).toBe('error');
+    expect(isContextOverflow(result, 4096)).toBe(true);
+  }
+  expect(captureFetch).not.toHaveBeenCalled();
+
+  // Sufficient room (>= 2048) must satisfy 1024 <= budget_tokens < max_tokens on the real request body.
+  const exactBoundaryContext = makeContext('a'.repeat(5015));
+  expect(estimateContextTokens(exactBoundaryContext).tokens).toBe(1433);
   await wrapped
-    .streamSimple(anthropicModel, tightContext, {
+    .streamSimple(anthropicModel, exactBoundaryContext, {
       apiKey: 'test-key',
       reasoning: 'medium',
       fetch: captureFetch as unknown as typeof fetch,
     })
     .result();
-  expect(capturedBodies[0]?.max_tokens).toBe(981);
+  expect(capturedBodies[0]?.max_tokens).toBe(2048);
+  expect(capturedBodies[0]?.thinking?.budget_tokens).toBe(1024);
 
-  // Case 2: 1,000 estimated input tokens -> safeMaxTokens = 2481, thinking budget clamped to 1457 (< 2481).
   const mediumContext = makeContext('a'.repeat(3500));
   expect(estimateContextTokens(mediumContext).tokens).toBe(1000);
   await wrapped
@@ -209,4 +228,27 @@ test('wrapMagpieNativeApi keeps anthropic-messages reasoning request max_tokens 
     .result();
   expect(capturedBodies[1]?.max_tokens).toBe(2481);
   expect(capturedBodies[1]?.thinking?.budget_tokens).toBe(1457);
+
+  for (const body of capturedBodies) {
+    const budget = body.thinking?.budget_tokens;
+    expect(budget).toBeTypeOf('number');
+    expect(budget!).toBeGreaterThanOrEqual(1024);
+    expect(budget!).toBeLessThan(body.max_tokens!);
+  }
+
+  // Adaptive thinking has no fixed budget floor and continues using proportional output clamping.
+  const adaptiveModel: Model<'anthropic-messages'> = {
+    ...anthropicModel,
+    compat: { forceAdaptiveThinking: true },
+  };
+  await wrapped
+    .streamSimple(adaptiveModel, makeContext('a'.repeat(8750)), {
+      apiKey: 'test-key',
+      reasoning: 'medium',
+      fetch: captureFetch as unknown as typeof fetch,
+    })
+    .result();
+  expect(capturedBodies[2]?.max_tokens).toBe(981);
+  expect(capturedBodies[2]?.thinking).toMatchObject({ type: 'adaptive' });
+  expect(capturedBodies[2]?.thinking?.budget_tokens).toBeUndefined();
 });

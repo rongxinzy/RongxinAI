@@ -26,6 +26,16 @@ const CONTEXT_SAFETY_TOKENS = 4096;
 const CONTEXT_SAFETY_RATIO = 0.15;
 const MIN_OUTPUT_WITH_RATIO_MARGIN = 32768;
 const MIN_MAX_TOKENS = 1;
+const MIN_ANTHROPIC_THINKING_BUDGET = 1024;
+const MIN_ANTHROPIC_ANSWER_TOKENS = 1024;
+const MIN_ANTHROPIC_BUDGETED_THINKING_MAX_TOKENS =
+  MIN_ANTHROPIC_THINKING_BUDGET + MIN_ANTHROPIC_ANSWER_TOKENS;
+const DEFAULT_THINKING_BUDGETS = {
+  minimal: 1024,
+  low: 2048,
+  medium: 8192,
+  high: 16384,
+} as const;
 const CHARS_PER_TOKEN = 3.5;
 const ESTIMATED_IMAGE_CHARS = 4800;
 
@@ -173,6 +183,32 @@ function clampWithInputAndFixedMargin(
     room = Math.min(MIN_OUTPUT_WITH_RATIO_MARGIN, contextWindow - input - fixedMargin);
   }
   return Math.min(maxTokens, Math.max(MIN_MAX_TOKENS, room));
+}
+
+function usesAnthropicBudgetedThinking(
+  model: { api: string; reasoning?: boolean; compat?: unknown },
+  options?: { reasoning?: string },
+): boolean {
+  const compat = model.compat as { forceAdaptiveThinking?: boolean } | undefined;
+  return (
+    model.api === 'anthropic-messages' &&
+    model.reasoning === true &&
+    Boolean(options?.reasoning) &&
+    compat?.forceAdaptiveThinking !== true
+  );
+}
+
+function resolveThinkingBudget(
+  reasoning: string,
+  customBudgets?: Partial<Record<keyof typeof DEFAULT_THINKING_BUDGETS, number>>,
+): number {
+  const clamped =
+    reasoning === 'xhigh' || reasoning === 'max'
+      ? 'high'
+      : (reasoning as keyof typeof DEFAULT_THINKING_BUDGETS);
+  return (
+    customBudgets?.[clamped] ?? DEFAULT_THINKING_BUDGETS[clamped] ?? DEFAULT_THINKING_BUDGETS.medium
+  );
 }
 
 function createLocalAssistantMessageEventStream(): AssistantMessageEventStream {
@@ -386,6 +422,7 @@ export function wrapMagpieNativeApi<TApi extends MagpieNativeApiSurface>(
       const requestedMaxTokens = options?.maxTokens ?? model.maxTokens;
       const estimatedInput = model.contextWindow > 0 ? estimatePiContextTokens(context) : 0;
       let safeMaxTokens: number;
+      let maxOutputCeiling: number;
       try {
         safeMaxTokens = clampMagpieMaxTokensToContext(
           model,
@@ -393,19 +430,41 @@ export function wrapMagpieNativeApi<TApi extends MagpieNativeApiSurface>(
           requestedMaxTokens,
           estimatedInput,
         );
+        maxOutputCeiling =
+          requestedMaxTokens === model.maxTokens
+            ? safeMaxTokens
+            : clampMagpieMaxTokensToContext(model, context, model.maxTokens, estimatedInput);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return createImmediateOverflowErrorStream(model, message, createEventStream);
       }
+      const budgetedAnthropicThinking = usesAnthropicBudgetedThinking(model, options);
+      const targetMaxTokens = budgetedAnthropicThinking
+        ? Math.min(
+            safeMaxTokens + resolveThinkingBudget(options!.reasoning!, options?.thinkingBudgets),
+            maxOutputCeiling,
+          )
+        : safeMaxTokens;
       const upstreamClamped = clampWithInputAndFixedMargin(
         model.contextWindow,
         estimatedInput,
         CONTEXT_SAFETY_TOKENS,
-        requestedMaxTokens,
+        targetMaxTokens,
       );
-      const bypassUpstreamFixedReserve = model.contextWindow > 0 && upstreamClamped < safeMaxTokens;
+      const bypassUpstreamFixedReserve =
+        model.contextWindow > 0 && upstreamClamped < targetMaxTokens;
+      if (budgetedAnthropicThinking && model.contextWindow > 0) {
+        const effectiveMaxTokens = bypassUpstreamFixedReserve ? targetMaxTokens : upstreamClamped;
+        if (effectiveMaxTokens < MIN_ANTHROPIC_BUDGETED_THINKING_MAX_TOKENS) {
+          return createImmediateOverflowErrorStream(
+            model,
+            `Context window exceeded: estimated input ${estimatedInput} leaves ${effectiveMaxTokens} output tokens in ${model.contextWindow} tokens, below the ${MIN_ANTHROPIC_BUDGETED_THINKING_MAX_TOKENS}-token minimum required for budgeted thinking`,
+            createEventStream,
+          );
+        }
+      }
       const upstreamModel = bypassUpstreamFixedReserve
-        ? { ...model, contextWindow: 0, maxTokens: safeMaxTokens }
+        ? { ...model, contextWindow: 0, maxTokens: targetMaxTokens }
         : model;
       const guardedFetch = wrapFetchWithOverflowNormalization(options?.fetch);
       const upstreamOptions = {
