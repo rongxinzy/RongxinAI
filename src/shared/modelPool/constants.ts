@@ -19,7 +19,3 @@ export const ZhiyuanModelPoolWorkload = {
 
 export type ZhiyuanModelPoolWorkload =
   (typeof ZhiyuanModelPoolWorkload)[keyof typeof ZhiyuanModelPoolWorkload];
-
-export const ZhiyuanModelPoolEvent = {
-  AuthChanged: 'zhiyuan:model-pool-auth-changed',
-} as const;

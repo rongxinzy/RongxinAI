@@ -1,8 +1,161 @@
-import { CHAT_TOOL_SELECTORS } from '../chat-tool-contract';
-import { SHELL_SIDEBAR_SELECTORS } from '../shell-sidebar-contract';
-import { HOME_STUDIO_SELECTORS } from '../home-studio-contract';
-import { QUIET_STUDIO_SELECTORS } from '../quiet-studio-contract';
-import { CONVERSATION_SELECTORS } from '../conversation-contract';
+/** Theme hooks for the existing AI Elements Tool composition. */
+const CHAT_TOOL_SELECTORS = {
+  'chat-tool': '.theme-chat-tool',
+  'chat-tool-trigger': '.theme-chat-tool-trigger',
+  'chat-tool-icon': '.theme-chat-tool-icon',
+  'chat-tool-title': '.theme-chat-tool-title',
+  'chat-tool-summary': '.theme-chat-tool-summary',
+  'chat-tool-status': '.theme-chat-tool-status',
+  'chat-tool-warning':
+    '.theme-chat-tool-status[data-tool-state="approval-requested"], .theme-chat-tool-status[data-tool-state="output-denied"]',
+  'chat-tool-error': '.theme-chat-tool-status[data-tool-state="output-error"]',
+  'chat-tool-chevron': '.theme-chat-tool-chevron',
+  'chat-tool-chevron-open':
+    '.theme-chat-tool-trigger[aria-expanded="true"] .theme-chat-tool-chevron',
+  'chat-tool-content': '.theme-chat-tool-content',
+  'chat-tool-label': '.theme-chat-tool-label',
+  'chat-tool-output-error': '.theme-chat-tool-output-error',
+} as const;
+
+/** Compositions refine existing primitives without introducing a second sidebar. */
+const SHELL_SIDEBAR_SELECTORS = {
+  'shell-sidebar': '.theme-shell-sidebar',
+  'shell-sidebar-header': '.theme-sidebar-header',
+  'shell-sidebar-logo': '.theme-sidebar-header img',
+  'shell-sidebar-section': '.theme-sidebar-section',
+  'shell-sidebar-scroll': '.theme-sidebar-scroll',
+  'shell-sidebar-footer': '.theme-sidebar-footer',
+  'shell-sidebar-nav':
+    '.theme-shell-sidebar .theme-button-navigation, .theme-shell-sidebar .chat-skill-shortcut',
+  'shell-sidebar-nav-selected':
+    '.theme-shell-sidebar .theme-button-navigation[data-active="true"], .theme-shell-sidebar .chat-skill-shortcut[data-active="true"]',
+  'shell-sidebar-task': '.theme-shell-sidebar .theme-surface-agent-row',
+  'shell-sidebar-task-selected': '.theme-shell-sidebar .theme-surface-agent-selected',
+  'shell-sidebar-task-idle': '.theme-shell-sidebar .theme-surface-agent-idle',
+  'shell-sidebar-task-main': '.theme-shell-sidebar .theme-sidebar-task-main',
+  'shell-sidebar-workspace': '.theme-sidebar-workspace',
+  'shell-sidebar-workspace-main': '.theme-sidebar-workspace-main',
+  'shell-sidebar-caption': '.theme-sidebar-caption',
+  'shell-sidebar-approval': '.theme-sidebar-approval',
+  'shell-sidebar-action': '.theme-shell-sidebar .theme-sidebar-row-action',
+  'shell-sidebar-resize': '.theme-sidebar-resize',
+  'shell-sidebar-resizing': '.theme-sidebar-resize[data-resizing="true"]',
+  'shell-sidebar-fade': '.theme-sidebar-fade',
+  'shell-sidebar-fade-top': '.theme-sidebar-fade-top',
+  'shell-sidebar-fade-bottom': '.theme-sidebar-fade-bottom',
+  'shell-mode': '.theme-switch[data-mode="work-chat"]',
+  'shell-mode-thumb': '.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]',
+  'shell-mode-label': '.theme-sidebar-mode-label',
+  'shell-mode-label-selected': '.theme-sidebar-mode-label[data-mode-selected="true"]',
+} as const;
+
+/** Home compositions keep stable hooks across editor and menu wrappers. */
+const HOME_STUDIO_SELECTORS = {
+  'companion-window': 'body[data-companion-window]',
+  'companion-bubble': '.theme-companion-bubble',
+  'companion-sketch': '.theme-companion-sketch',
+  'companion-sketch-xiaoyuan': '.theme-companion-sketch[data-character="xiaoyuan"]',
+  'companion-sketch-youli': '.theme-companion-sketch[data-character="youli"]',
+  'companion-sketch-tuantuan': '.theme-companion-sketch[data-character="tuantuan"]',
+  'companion-sketch-mianmian': '.theme-companion-sketch[data-character="mianmian"]',
+  'companion-sketch-zhuli': '.theme-companion-sketch[data-character="zhuli"]',
+  'companion-sketch-yunmo': '.theme-companion-sketch[data-character="yunmo"]',
+  'companion-sketch-maixiao': '.theme-companion-sketch[data-character="maixiao"]',
+  'companion-sketch-paper': '.theme-companion-sketch-paper',
+  'companion-paper-content': '.theme-companion-paper-content',
+  'companion-fluid-list': '.theme-companion-paper-content .theme-fluid-list',
+  'companion-fluid-indicator': '.theme-companion-paper-content .theme-fluid-indicator',
+  'companion-button': '.theme-companion-paper-content .theme-button',
+  'companion-message-body': '.theme-companion-message .theme-message-body',
+  'companion-message-user':
+    '.theme-companion-message[data-companion-message="user"] .theme-message-body',
+  'companion-paper-input': '.theme-input-group[data-variant="paper"]',
+  'companion-selector': '.theme-companion-selector',
+  'companion-name': '.theme-companion-name',
+  'welcome-screen': '.theme-welcome-screen',
+  'welcome-title': '.theme-welcome-title',
+  'welcome-art': '.theme-welcome-art',
+  'home-brand': '.theme-home-brand',
+  'home-caption': '.theme-home-caption',
+  'home-sticky': '.theme-home-sticky',
+  'home-prompt-editor': '.theme-home-prompt-editor',
+  'home-folder-warning': '.theme-home-folder-warning',
+  'home-status': '.theme-home-status',
+  'home-status-icon': '.theme-home-status-icon',
+  'home-status-fading': '.theme-home-status-fading',
+} as const;
+
+/**
+ * Stable hooks for the v4.0 Quiet Studio shell. Selectors describe composition
+ * roles only; every value still comes from the registered theme package.
+ */
+const QUIET_STUDIO_SELECTORS = {
+  'shell-main-panel': '.theme-main-panel',
+  'shell-brand': '.theme-shell-brand',
+  'shell-brand-mark': '.theme-shell-brand-mark',
+  'shell-kbd': '.theme-shell-kbd',
+  'shell-sidebar-time': '.theme-sidebar-time',
+  'shell-account-avatar': '.theme-shell-account-avatar',
+  'shell-account-name': '.theme-shell-account-name',
+  'shell-account-hint': '.theme-shell-account-hint',
+  'shell-status-dot': '.theme-shell-status-dot',
+  'shell-status-dot-warning': '.theme-shell-status-dot-warning',
+  'home-greeting': '.theme-home-greeting',
+} as const;
+
+/** Stable conversation hooks; state selectors describe UI state, never theme-owned behavior. */
+const CONVERSATION_SELECTORS = {
+  'conversation-meta': '.theme-conversation-meta',
+  'conversation-status': '.theme-conversation-status',
+  'conversation-heading': '.theme-conversation-heading',
+  'conversation-icon': '.theme-conversation-icon',
+  'thinking-indicator-inline': '.theme-thinking-indicator[data-variant="inline"]',
+  'thinking-indicator-companion': '.theme-thinking-indicator[data-variant="companion"]',
+  'conversation-avatar': '.theme-conversation-avatar',
+  'conversation-editor': '.theme-conversation-editor',
+  'conversation-editor-placeholder':
+    '.theme-conversation-editor .is-editor-empty:first-child::before',
+  'conversation-editor-shell': '.theme-conversation-editor-shell',
+  'conversation-skill-token': '.theme-conversation-skill-token',
+  'conversation-skill-chip': '.theme-conversation-skill-chip',
+  'conversation-mention-list': '.theme-conversation-mention-list',
+  'conversation-diff': '.theme-conversation-diff',
+  'conversation-code-fallback': '.theme-conversation-code-fallback',
+  'conversation-source': '.theme-conversation-source',
+  'conversation-steps': '.theme-conversation-steps',
+  'conversation-steps-trigger': '.theme-conversation-steps-trigger',
+  'conversation-steps-rail': '.theme-conversation-steps-rail',
+  'conversation-steps-item': '.theme-conversation-steps-item',
+  'conversation-actions': '.theme-conversation-actions',
+  'conversation-actions-visible': '.theme-conversation-actions[data-visible="true"]',
+  'conversation-actions-hover':
+    '.group\\/turn:is(:hover,:focus-within) .theme-conversation-actions',
+  'conversation-turn-marker': '.theme-conversation-turn-marker',
+  'conversation-turn-current': '[aria-current="step"] > .theme-conversation-turn-marker',
+  'conversation-turn-streaming': '[data-turn-state="streaming"] > .theme-conversation-turn-marker',
+  'conversation-turn-approval': '[data-turn-state="approval"] > .theme-conversation-turn-marker',
+  'conversation-turn-error': '[data-turn-state="error"] > .theme-conversation-turn-marker',
+  'conversation-approval': '.theme-conversation-approval',
+  'conversation-tool-error': '.theme-conversation-tool-error',
+  'conversation-tool-params': '.theme-conversation-tool-params',
+  'conversation-stats-trigger': '.theme-conversation-stats-trigger',
+  'conversation-image-action': '.theme-conversation-image-action',
+  'conversation-image': '.theme-conversation-image',
+  'conversation-image-status': '.theme-conversation-image-status',
+  'conversation-image-stage': '.theme-conversation-image-stage',
+  'html-preview-stage': '.theme-html-preview-stage[data-inset="true"]',
+  'html-preview-viewport': '.theme-html-preview-viewport[data-inset="true"]',
+  'conversation-notice': '.theme-conversation-notice',
+  'conversation-drop': '.theme-conversation-drop',
+  'conversation-toolbar-pending': '.theme-conversation-toolbar-pending',
+  'conversation-submit-empty': '.theme-conversation-submit-empty',
+  'fold-panel': '.theme-fold-panel',
+  'terminal-root': '.theme-terminal-root',
+  'terminal-header': '.theme-terminal-header',
+  'terminal-title': '.theme-terminal-title',
+  'terminal-content': '.theme-terminal-content',
+  'terminal-cursor': '.theme-terminal-cursor',
+} as const;
 
 /** App-level part, piece, surface, composition and tab hooks. */
 export const APP_SELECTORS = {

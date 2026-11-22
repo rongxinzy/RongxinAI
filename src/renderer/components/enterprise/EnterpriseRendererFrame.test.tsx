@@ -11,7 +11,7 @@ import {
   EnterpriseRendererSurface,
 } from '../../../shared/enterpriseRenderer';
 import type { EnterpriseSessionResult } from '../../../shared/enterpriseSession';
-import { EnterpriseSessionEvent } from '../../services/enterpriseSessionEvents';
+import { subscribeToEnterpriseSession } from '../../services/enterpriseSessionEvents';
 import { EnterpriseRendererFrame } from './EnterpriseRendererFrame';
 
 const snapshot = vi.fn<() => Promise<EnterpriseSessionResult>>();
@@ -248,42 +248,45 @@ describe('EnterpriseRendererFrame', () => {
   test('returns a normalized failure without publishing a false session transition', async () => {
     snapshot.mockRejectedValue(new Error('sensitive host failure'));
     const sessionChanged = vi.fn();
-    window.addEventListener(EnterpriseSessionEvent.Changed, sessionChanged);
-    render(
-      <EnterpriseRendererFrame
-        src="zhiyuan-enterprise-ui://renderer/settings/settings.html"
-        title="Enterprise account"
-        surface={EnterpriseRendererSurface.Settings}
-        session={signedOut()}
-      />,
-    );
+    const unsubscribe = subscribeToEnterpriseSession(sessionChanged);
+    try {
+      render(
+        <EnterpriseRendererFrame
+          src="zhiyuan-enterprise-ui://renderer/settings/settings.html"
+          title="Enterprise account"
+          surface={EnterpriseRendererSurface.Settings}
+          session={signedOut()}
+        />,
+      );
 
-    const frame = screen.getByTitle('Enterprise account') as HTMLIFrameElement;
-    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
-    window.dispatchEvent(
-      new MessageEvent('message', {
-        source: frame.contentWindow,
-        data: {
-          source: EnterpriseRendererMessageSource.Module,
-          apiVersion: 1,
-          type: EnterpriseRendererMessageType.SessionRequest,
-          requestId: 'request-failed',
-          operation: EnterpriseRendererSessionOperation.Snapshot,
-        },
-      }),
-    );
-
-    await waitFor(() =>
-      expect(postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          requestId: 'request-failed',
-          result: expect.objectContaining({ ok: false }),
+      const frame = screen.getByTitle('Enterprise account') as HTMLIFrameElement;
+      const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          source: frame.contentWindow,
+          data: {
+            source: EnterpriseRendererMessageSource.Module,
+            apiVersion: 1,
+            type: EnterpriseRendererMessageType.SessionRequest,
+            requestId: 'request-failed',
+            operation: EnterpriseRendererSessionOperation.Snapshot,
+          },
         }),
-        '*',
-      ),
-    );
-    expect(sessionChanged).not.toHaveBeenCalled();
-    window.removeEventListener(EnterpriseSessionEvent.Changed, sessionChanged);
+      );
+
+      await waitFor(() =>
+        expect(postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            requestId: 'request-failed',
+            result: expect.objectContaining({ ok: false }),
+          }),
+          '*',
+        ),
+      );
+      expect(sessionChanged).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
   });
 });
 

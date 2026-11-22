@@ -20,6 +20,7 @@ import {
   preparePiPrompt,
   type ActivePiSession,
   type PiEvent,
+  type PiSession,
   type PreparedPiPrompt,
 } from './piRuntimeSessionState';
 import type { PiContinueOptions } from './piRuntimeTypes';
@@ -40,8 +41,47 @@ export class PiRuntimeQueueController {
   private readonly queuedControlActions = new Map<string, Array<() => Promise<void>>>();
   private readonly nativeInputs = new Map<string, WeakMap<object, QueuedInput>>();
   private readonly pendingImageAdmissions = new Map<string, Promise<void>>();
+  private readonly hookedAgents = new WeakMap<
+    NonNullable<PiSession['agent']>,
+    {
+      steer: Array<(message: NonNullable<PiEvent['message']>) => void>;
+      followUp: Array<(message: NonNullable<PiEvent['message']>) => void>;
+    }
+  >();
 
   constructor(private readonly host: PiRuntimeAdapterHost) {}
+
+  private registerAgentQueueHook(
+    piSession: PiSession,
+    kind: 'steer' | 'followUp',
+    onQueued: (message: NonNullable<PiEvent['message']>) => void,
+  ): () => void {
+    const agent = piSession.agent;
+    if (!agent) return () => {};
+    let state = this.hookedAgents.get(agent);
+    if (!state) {
+      state = { steer: [], followUp: [] };
+      this.hookedAgents.set(agent, state);
+      const originalSteer = agent.steer.bind(agent);
+      const originalFollowUp = agent.followUp.bind(agent);
+      agent.steer = message => {
+        const callback = state!.steer.shift();
+        callback?.(message);
+        originalSteer(message);
+      };
+      agent.followUp = message => {
+        const callback = state!.followUp.shift();
+        callback?.(message);
+        originalFollowUp(message);
+      };
+    }
+    const list = state[kind];
+    list.push(onQueued);
+    return () => {
+      const index = list.indexOf(onQueued);
+      if (index !== -1) list.splice(index, 1);
+    };
+  }
 
   resetNativeDispatch(sessionId: string): void {
     this.nativeInputs.delete(sessionId);
@@ -266,21 +306,26 @@ export class PiRuntimeQueueController {
         typeof content === 'string' ? undefined : content.filter(part => part.type === 'image');
       const inputs = this.nativeInputs.get(sessionId) ?? new WeakMap<object, QueuedInput>();
       this.nativeInputs.set(sessionId, inputs);
+      let settled = false;
+      const onQueued = (message: NonNullable<PiEvent['message']>) => {
+        if (settled) return;
+        settled = true;
+        if (!isCurrent() || this.nativeInputs.get(sessionId) !== inputs) {
+          throw new Error(FollowUpEndedError);
+        }
+        inputs.set(message, { itemId: item.id, images: imagePreparation });
+      };
+      const unregister = this.registerAgentQueueHook(active.piSession, 'followUp', onQueued);
       // followUp queues even during initial prompt preparation, when Pi is still idle.
       void active.piSession
-        .followUp(promptText, images, {
-          onQueued: message => {
-            if (!isCurrent() || this.nativeInputs.get(sessionId) !== inputs) {
-              throw new Error(FollowUpEndedError);
-            }
-            inputs.set(message, { itemId: item.id, images: imagePreparation });
-          },
-        })
+        .followUp(promptText, images, { onQueued })
         .then(disposition => {
+          unregister();
           if (disposition === 'handled')
             throw new Error('The agent handled this input without adding a follow-up.');
         })
         .catch(error => {
+          unregister();
           if (
             this.host.activeSessions.get(sessionId) !== active ||
             active.aborted ||
@@ -324,14 +369,21 @@ export class PiRuntimeQueueController {
     try {
       const inputs = this.nativeInputs.get(sessionId) ?? new WeakMap<object, QueuedInput>();
       this.nativeInputs.set(sessionId, inputs);
-      await active.piSession.steer(text, undefined, {
-        onQueued: message => {
-          if (this.nativeInputs.get(sessionId) !== inputs || !active.isRunning) {
-            throw new Error('The Work session ended before Pi accepted the steering input.');
-          }
-          inputs.set(message, { steerText: text });
-        },
-      });
+      let settled = false;
+      const onQueued = (message: NonNullable<PiEvent['message']>) => {
+        if (settled) return;
+        settled = true;
+        if (this.nativeInputs.get(sessionId) !== inputs || !active.isRunning) {
+          throw new Error('The Work session ended before Pi accepted the steering input.');
+        }
+        inputs.set(message, { steerText: text });
+      };
+      const unregister = this.registerAgentQueueHook(active.piSession, 'steer', onQueued);
+      try {
+        await active.piSession.steer(text, undefined, { onQueued });
+      } finally {
+        unregister();
+      }
       return { success: true };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };

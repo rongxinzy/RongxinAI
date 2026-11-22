@@ -42,10 +42,9 @@ import WindowTitleBar from './components/window/WindowTitleBar';
 import { agentService } from './services/agent';
 import {
   refreshMagpieModels,
-  LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
   notifyLlamaCppRunningModelsChanged,
+  subscribeLlamaCppRunningModelsChanged,
 } from './services/availableModels';
-import { ZhiyuanModelPoolEvent } from '../shared/modelPool/constants';
 import { configService } from './services/config';
 import { coworkService } from './services/cowork';
 import { i18nService } from './services/i18n';
@@ -191,12 +190,10 @@ const App: React.FC = () => {
       void refreshAvailableModels();
     };
 
-    window.addEventListener('config-updated', handleConfigUpdated);
-    window.addEventListener(
-      LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
+    const unsubscribeConfig = configService.subscribe(handleConfigUpdated);
+    const unsubscribeRunningModels = subscribeLlamaCppRunningModelsChanged(
       handleLlamaCppRunningModelsChanged,
     );
-    window.addEventListener(ZhiyuanModelPoolEvent.AuthChanged, handleLlamaCppRunningModelsChanged);
     const unsubscribeModelBindings = window.electron.llamacpp.onModelBindingsChanged(
       handleLlamaCppModelBindingsChanged,
     );
@@ -204,15 +201,8 @@ const App: React.FC = () => {
       handleManagedProvidersChanged,
     );
     return () => {
-      window.removeEventListener('config-updated', handleConfigUpdated);
-      window.removeEventListener(
-        LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
-        handleLlamaCppRunningModelsChanged,
-      );
-      window.removeEventListener(
-        ZhiyuanModelPoolEvent.AuthChanged,
-        handleLlamaCppRunningModelsChanged,
-      );
+      unsubscribeConfig();
+      unsubscribeRunningModels();
       unsubscribeModelBindings();
       unsubscribeManagedProviders();
     };
@@ -464,15 +454,6 @@ const App: React.FC = () => {
     },
     [dispatch],
   );
-
-  useEffect(() => {
-    const handler = () => {
-      if (managedModelsOnly || !localInferenceEnabled) return;
-      setMainView(MainView.LocalInference);
-    };
-    window.addEventListener('app:show-local-inference', handler);
-    return () => window.removeEventListener('app:show-local-inference', handler);
-  }, [managedModelsOnly, localInferenceEnabled]);
 
   // 鐩戝惉鎵樼洏鑿滃崟鎵撳紑璁剧疆鐨?IPC 浜嬩欢
   useEffect(() => {

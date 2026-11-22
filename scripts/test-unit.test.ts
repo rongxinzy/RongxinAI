@@ -10,7 +10,6 @@ test.each([0, 17])(
     const root = mkdtempSync(path.join(os.tmpdir(), 'unit-runner-'));
     try {
       mkdirSync(path.join(root, 'scripts'));
-      mkdirSync(path.join(root, 'patches'));
       mkdirSync(path.join(root, 'node_modules/vitest'), { recursive: true });
       copyFileSync('scripts/test-unit.cjs', path.join(root, 'scripts/test-unit.cjs'));
       writeFileSync(path.join(root, 'scripts/ensure-node-native.cjs'), 'process.exit(0);');
@@ -42,7 +41,6 @@ test('local unit runs restore the original Electron addon and reuse the Node ABI
   try {
     for (const directory of [
       'scripts',
-      'patches',
       'node_modules/vitest',
       'node_modules/better-sqlite3/build/Release',
     ]) {

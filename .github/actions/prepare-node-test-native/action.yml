@@ -16,7 +16,7 @@ runs:
         path: |
           node_modules/better-sqlite3/build/Release
           node_modules/node-pty/build/Release
-        key: node-test-native-v1-${{ steps.runtime.outputs.identity }}-${{ hashFiles('bun.lock', 'patches/**', 'scripts/ensure-node-native.cjs') }}
+        key: node-test-native-v1-${{ steps.runtime.outputs.identity }}-${{ hashFiles('bun.lock', 'scripts/ensure-node-native.cjs') }}
     - name: Probe native modules and rebuild only missing or incompatible output
       shell: bash
       run: node scripts/ensure-node-native.cjs

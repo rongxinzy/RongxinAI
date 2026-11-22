@@ -39,7 +39,7 @@ export function matchesSendShortcut(
 
 /**
  * Track the configured send shortcut. Uses synced state (kept up-to-date via
- * the config-updated event) so that changes made in the Settings panel are
+ * configService subscriptions) so that changes made in the Settings panel are
  * reflected immediately without requiring a configService read at event time.
  */
 export function useSendShortcut(): string {
@@ -53,8 +53,7 @@ export function useSendShortcut(): string {
       const latest = configService.getConfig().shortcuts?.sendMessage ?? 'Enter';
       setCurrentSendShortcut(latest);
     };
-    window.addEventListener('config-updated', syncFromConfig);
-    return () => window.removeEventListener('config-updated', syncFromConfig);
+    return configService.subscribe(syncFromConfig);
   }, []);
 
   return currentSendShortcut;

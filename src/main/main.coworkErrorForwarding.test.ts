@@ -8,7 +8,7 @@ import { expect, test } from 'vitest';
 const readSource = (relativePath: string): string =>
   readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf8');
 
-const domainDirs = ['./appBootstrap', './coworkIpc'] as const;
+const domainDirs = ['./appBootstrap', './ipcHandlers/cowork'] as const;
 const domainSources = domainDirs
   .flatMap(dir => {
     const full = fileURLToPath(new URL(dir, import.meta.url));

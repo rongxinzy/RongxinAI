@@ -25,7 +25,7 @@ import {
   resolveSessionWorkingDirectory,
   resolveTaskWorkingDirectory,
 } from './workspacePaths';
-import type { CoworkSessionIpcDeps } from '../coworkIpc/sessionStart';
+import type { CoworkSessionIpcDeps } from '../ipcHandlers/cowork/sessionStart';
 import { ConversationHistoryService } from '../conversationHistory/service';
 import { PiRuntimeAdapter, type PiRuntimeDependencies } from '../libs/agentEngine/piRuntimeAdapter';
 import { WorkbenchTaskService } from '../workbenchTask/taskService';

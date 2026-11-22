@@ -42,7 +42,7 @@ test('keeps the saved cache and emits no update when persistence fails', async (
   const service = new ConfigService();
   await service.reload();
   const changed = vi.fn();
-  window.addEventListener('config-updated', changed);
+  const unsubscribe = service.subscribe(changed);
   vi.mocked(localStore.setItem).mockRejectedValueOnce(new Error('disk full'));
   try {
     await expect(service.updateConfig({ sqliteAutoBackupEnabled: true })).rejects.toThrow(
@@ -51,7 +51,7 @@ test('keeps the saved cache and emits no update when persistence fails', async (
     expect(service.getConfig().sqliteAutoBackupEnabled).toBe(false);
     expect(changed).not.toHaveBeenCalled();
   } finally {
-    window.removeEventListener('config-updated', changed);
+    unsubscribe();
   }
 });
 

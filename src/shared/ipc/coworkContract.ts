@@ -319,7 +319,7 @@ export const workspaceContract = defineIpcContract({
   },
 });
 
-/** Registered by `main/coworkIpc/session.ts`. */
+/** Registered by `main/ipcHandlers/cowork/session.ts`. */
 export const coworkSessionLifecycleContract = defineIpcContract({
   startSession: {
     channel: CoworkSessionIpc.Start,

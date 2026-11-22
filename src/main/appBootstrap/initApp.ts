@@ -53,7 +53,7 @@ import {
   getWorkbenchTaskService,
 } from './sessionServices';
 import type { CodingRoomRuntime } from './codingRoomRuntime';
-import { registerShellIpc } from '../shellIpc';
+import { registerShellIpc } from '../ipcHandlers/shell';
 import { CodingRoomRepository } from '../codingAgent/codingRoomRepository';
 import { initializeCompanionServices } from './companionTasks';
 import { getCoworkImageRoot } from './workspacePaths';

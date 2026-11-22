@@ -1,0 +1,186 @@
+/** Dialog IPC: directory/file pickers, screenshot capture, recent file roots. */
+import fs from 'fs';
+import path from 'path';
+
+import { app, BrowserWindow, dialog } from 'electron';
+
+import {
+  MAX_INLINE_ATTACHMENT_BYTES,
+  inferAttachmentExtension,
+  resolveInlineAttachmentDir,
+  sanitizeAttachmentFileName,
+} from '../cowork/fileExportHelpers';
+import { checkArtifactFile } from '../../artifactFileAvailability';
+import { appSystemContract } from '../../../shared/ipc/appSystemContract';
+import type { CoworkStore } from '../../coworkStore';
+import { handleIpcContractSubset } from '../../ipc/handleIpcContract';
+
+export const registerDialogIpc = (): void => {
+  handleIpcContractSubset(appSystemContract, {
+    dialogCheckArtifactFile: (_event, filePath) => checkArtifactFile(filePath),
+    dialogSelectDirectory: async (event, options) => {
+      const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+      const defaultPath = options?.defaultPath?.trim();
+      const dialogOptions = {
+        properties: ['openDirectory', 'createDirectory'] as ('openDirectory' | 'createDirectory')[],
+        ...(defaultPath ? { defaultPath } : {}),
+      };
+      const result = ownerWindow
+        ? await dialog.showOpenDialog(ownerWindow, dialogOptions)
+        : await dialog.showOpenDialog(dialogOptions);
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: true, path: null };
+      }
+      return { success: true, path: result.filePaths[0] };
+    },
+
+    dialogSelectFiles: async (event, options) => {
+      const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+      const dialogOptions: Electron.OpenDialogOptions = {
+        properties: options?.multiple === false ? ['openFile'] : ['openFile', 'multiSelections'],
+        title: options?.title,
+        filters: options?.filters,
+      };
+      const result = ownerWindow
+        ? await dialog.showOpenDialog(ownerWindow, dialogOptions)
+        : await dialog.showOpenDialog(dialogOptions);
+      return { success: true, paths: result.canceled ? [] : result.filePaths };
+    },
+
+    dialogSaveInlineFile: async (_event, options) => {
+      try {
+        const dataBase64 = typeof options.dataBase64 === 'string' ? options.dataBase64.trim() : '';
+        if (!dataBase64) {
+          return { success: false, path: null, error: 'Missing file data' };
+        }
+
+        const buffer = Buffer.from(dataBase64, 'base64');
+        if (!buffer.length) {
+          return { success: false, path: null, error: 'Invalid file data' };
+        }
+        if (buffer.length > MAX_INLINE_ATTACHMENT_BYTES) {
+          return {
+            success: false,
+            path: null,
+            error: `File too large (max ${Math.floor(MAX_INLINE_ATTACHMENT_BYTES / (1024 * 1024))}MB)`,
+          };
+        }
+
+        const dir = resolveInlineAttachmentDir(options?.cwd);
+        await fs.promises.mkdir(dir, { recursive: true });
+
+        const safeFileName = sanitizeAttachmentFileName(options?.fileName);
+        const extension = inferAttachmentExtension(safeFileName, options?.mimeType);
+        const baseName = extension ? safeFileName.slice(0, -extension.length) : safeFileName;
+        const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const finalName = `${baseName || 'attachment'}-${uniqueSuffix}${extension}`;
+        const outputPath = path.join(dir, finalName);
+
+        await fs.promises.writeFile(outputPath, buffer);
+        return { success: true, path: outputPath };
+      } catch (error) {
+        return {
+          success: false,
+          path: null,
+          error: error instanceof Error ? error.message : 'Failed to save inline file',
+        };
+      }
+    },
+
+    // Read a local file as a data URL (data:<mime>;base64,...)
+    dialogReadFileAsDataUrl: async (
+      _event,
+      filePath,
+    ): Promise<{
+      success: boolean;
+      dataUrl?: string;
+      error?: string;
+    }> => {
+      try {
+        if (typeof filePath !== 'string' || !filePath.trim()) {
+          return { success: false, error: 'Missing file path' };
+        }
+        const resolvedPath = path.resolve(filePath.trim());
+        const stat = await fs.promises.stat(resolvedPath);
+        if (!stat.isFile()) {
+          return { success: false, error: 'Not a file' };
+        }
+        if (stat.size > MAX_READ_AS_DATA_URL_BYTES) {
+          return {
+            success: false,
+            error: `File too large (max ${Math.floor(MAX_READ_AS_DATA_URL_BYTES / (1024 * 1024))}MB)`,
+          };
+        }
+        const buffer = await fs.promises.readFile(resolvedPath);
+        const ext = path.extname(resolvedPath).toLowerCase();
+        const mimeType = MIME_BY_EXT[ext] || 'application/octet-stream';
+        const base64 = buffer.toString('base64');
+        return { success: true, dataUrl: `data:${mimeType};base64,${base64}` };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to read file',
+        };
+      }
+    },
+  });
+
+  // Read a local file as a data URL (data:<mime>;base64,...)
+  const MAX_READ_AS_DATA_URL_BYTES = 20 * 1024 * 1024;
+  const MIME_BY_EXT: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
+    '.svg': 'image/svg+xml',
+    '.tiff': 'image/tiff',
+    '.tif': 'image/tiff',
+    '.ico': 'image/x-icon',
+    '.avif': 'image/avif',
+  };
+};
+
+export const getAllowedShellProbeRoots = (
+  getCoworkStore: () => CoworkStore,
+  getCodingWorkspaceRoots?: () => string[],
+): string[] => {
+  const roots: string[] = [];
+  try {
+    roots.push(app.getPath('userData'));
+    roots.push(app.getPath('documents'));
+    roots.push(app.getPath('downloads'));
+    roots.push(app.getPath('desktop'));
+    roots.push(app.getPath('temp'));
+  } catch {
+    // Ignore in environments where standard paths are not ready
+  }
+  try {
+    roots.push(app.getAppPath());
+  } catch {
+    // Ignore
+  }
+  try {
+    const workspaces = getCoworkStore().workspaces.listWorkspaces();
+    for (const ws of workspaces) {
+      if (ws.path) roots.push(ws.path);
+    }
+  } catch {
+    // Ignore
+  }
+  // Coding workspaces are user-selected project folders; the coding assistant
+  // surfaces file:// links under them, so the probe allowlist must cover them
+  // the same way it covers cowork workspaces.
+  if (getCodingWorkspaceRoots) {
+    try {
+      for (const root of getCodingWorkspaceRoots()) {
+        if (root) roots.push(root);
+      }
+    } catch {
+      // Ignore
+    }
+  }
+  roots.push(process.cwd());
+  return roots;
+};
