@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import {
   contentText,
   normalizeContext,
@@ -12,6 +12,7 @@ import {
 } from '@earendil-works/pi-ai';
 import { SessionManager, SettingsManager } from '@earendil-works/pi-coding-agent';
 import {
+  compactPiSessionIfOversizedBeforePrompt,
   completeBoundedSummary,
   computePiCompactionDefaults,
   installPiCompactionSettingsGuard,
@@ -231,4 +232,119 @@ test('completeBoundedSummary splits on word boundaries, rejects length-truncated
     ),
   ).rejects.toThrow('Summary instructions leave no room for source text in the model context');
   expect(newlineRequests).toBe(1);
+});
+
+test('getCompactionSettings avoids full-conversation scan until keepRecentTokens is accessed and caches by leaf', () => {
+  const manager = SessionManager.inMemory(process.cwd());
+  for (let i = 0; i < 16; i++) {
+    manager.appendMessage({
+      role: 'user',
+      content: '数据库事务日志索引调度一致性故障恢复'.repeat(30),
+      timestamp: 10,
+    });
+    manager.appendMessage(
+      makeAssistantMessage('已记录。', {
+        timestamp: 20,
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+      }),
+    );
+  }
+  const projectionSpy = vi.spyOn(manager, 'buildSessionProjection');
+  const branchSpy = vi.spyOn(manager, 'getBranch');
+  const settings = SettingsManager.inMemory();
+  installPiCompactionSettingsGuard(settings, () => manager);
+
+  const model = makeModel(32_768);
+  const resolved = settings.getCompactionSettings(model);
+  expect(resolved.enabled).toBe(true);
+  expect(resolved.reserveTokens).toBe(8192);
+  expect(projectionSpy).toHaveBeenCalledTimes(0);
+  expect(branchSpy).toHaveBeenCalledTimes(0);
+
+  expect(resolved.keepRecentTokens).toBeLessThan(6000);
+  expect(resolved.keepRecentTokens).toBeGreaterThan(0);
+  expect(settings.getCompactionSettings(model).keepRecentTokens).toBe(resolved.keepRecentTokens);
+  expect(projectionSpy).toHaveBeenCalledTimes(1);
+});
+
+test('compactPiSessionIfOversizedBeforePrompt skips fresh or single-turn sessions on long first prompt and compacts multi-turn oversized history', async () => {
+  const model = makeModel(65_536) as unknown as Record<string, unknown>;
+  const settings = SettingsManager.inMemory();
+  let activeManager = SessionManager.inMemory(process.cwd());
+  installPiCompactionSettingsGuard(settings, () => activeManager);
+
+  // 1. Fresh session with metadata entries only + 200,000-'a' first prompt (PR #1487 review repro).
+  activeManager.appendModelChange('magpie', 'budget-model');
+  activeManager.appendThinkingLevelChange('medium');
+  const freshCompact = vi.fn(async () => {
+    throw new Error('Nothing to compact (session too small)');
+  });
+  await expect(
+    compactPiSessionIfOversizedBeforePrompt({
+      session: { compact: freshCompact },
+      sessionManager: activeManager,
+      settingsManager: settings,
+      model,
+      promptText: 'a'.repeat(200_000),
+      active: {},
+    }),
+  ).resolves.toBeUndefined();
+  expect(freshCompact).not.toHaveBeenCalled();
+
+  // 2. Single short exchange (< keepRecentTokens) + 200,000-'a' prompt still has nothing to compact.
+  activeManager = SessionManager.inMemory(process.cwd());
+  activeManager.appendMessage({ role: 'user', content: 'hi', timestamp: 1 });
+  activeManager.appendMessage(makeAssistantMessage('hello', { timestamp: 2 }));
+  const shortCompact = vi.fn(async () => {
+    throw new Error('Nothing to compact (session too small)');
+  });
+  await compactPiSessionIfOversizedBeforePrompt({
+    session: { compact: shortCompact },
+    sessionManager: activeManager,
+    settingsManager: settings,
+    model,
+    promptText: 'a'.repeat(200_000),
+    active: {},
+  });
+  expect(shortCompact).not.toHaveBeenCalled();
+
+  // 3. Multi-turn oversized history compacts before prompt.
+  activeManager = SessionManager.inMemory(process.cwd());
+  for (let i = 0; i < 12; i++) {
+    activeManager.appendMessage({
+      role: 'user',
+      content: 'x'.repeat(24_000),
+      timestamp: i * 2 + 1,
+    });
+    activeManager.appendMessage(
+      makeAssistantMessage('y'.repeat(24_000), {
+        timestamp: i * 2 + 2,
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+      }),
+    );
+  }
+  const oversizedCompact = vi.fn(async () => ({}));
+  await compactPiSessionIfOversizedBeforePrompt({
+    session: { compact: oversizedCompact },
+    sessionManager: activeManager,
+    settingsManager: settings,
+    model,
+    promptText: 'continue',
+    active: {},
+  });
+  expect(oversizedCompact).toHaveBeenCalledTimes(1);
 });

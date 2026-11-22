@@ -3,7 +3,7 @@ import http from 'node:http';
 import net from 'node:net';
 import { isContextOverflow } from '@earendil-works/pi-ai/compat';
 import { expect, test, vi } from 'vitest';
-import { createLlamaCppModelGateway } from './llamacppModelGateway';
+import { createLlamaCppModelGateway, normalizeLlamaCppOverflowBody } from './llamacppModelGateway';
 
 test('a failed upstream stream closes the response and releases its model lease', async () => {
   const stream = Promise.withResolvers<http.ServerResponse>();
@@ -205,6 +205,107 @@ test('normalizes SSE mid-stream llama.cpp context overflow frames so isContextOv
           model: 'local',
           stopReason: 'error',
           errorMessage: body,
+          timestamp: Date.now(),
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+        },
+        32768,
+      ),
+    ).toBe(true);
+  } finally {
+    upstream.closeAllConnections();
+    upstream.close();
+    await gateway.stop();
+  }
+});
+
+test('preserves normal SSE assistant replies mentioning Context size has been exceeded as valid JSON', async () => {
+  const payload = JSON.stringify({
+    choices: [{ delta: { content: 'Context size has been exceeded.' } }],
+  });
+  expect(normalizeLlamaCppOverflowBody(payload)).toBe(payload);
+
+  const rawSse = `data: ${payload}\n\ndata: [DONE]\n\n`;
+  const upstream = http.createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'text/event-stream' });
+    response.end(rawSse);
+  });
+  upstream.listen(0, '127.0.0.1');
+  await once(upstream, 'listening');
+  const address = upstream.address();
+  if (!address || typeof address === 'string') throw new Error('Missing upstream port');
+
+  const gateway = createLlamaCppModelGateway({
+    acquireModel: async () => ({ baseUrl: `http://127.0.0.1:${address.port}`, release: vi.fn() }),
+    listModels: () => [{ id: 'local' }],
+    shutdownSignal: new AbortController().signal,
+  });
+  try {
+    await gateway.start(0);
+    const response = await fetch(`${gateway.baseUrl()}/chat/completions`, {
+      method: 'POST',
+      body: JSON.stringify({ model: 'local', stream: true }),
+    });
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toBe(rawSse);
+    const dataLine = body.split('\n').find(line => line.startsWith('data: {'))!;
+    const parsed = JSON.parse(dataLine.slice(6)) as {
+      choices: Array<{ delta: { content: string } }>;
+    };
+    expect(parsed.choices[0]?.delta.content).toBe('Context size has been exceeded.');
+  } finally {
+    upstream.closeAllConnections();
+    upstream.close();
+    await gateway.stop();
+  }
+});
+
+test('buffers and normalizes SSE structured error frames split across network chunks', async () => {
+  const upstream = http.createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'text/event-stream' });
+    response.write('data: {"error":{"message":"Context size ');
+    setTimeout(() => {
+      response.end('has been exceeded."}}\n\n');
+    }, 15);
+  });
+  upstream.listen(0, '127.0.0.1');
+  await once(upstream, 'listening');
+  const address = upstream.address();
+  if (!address || typeof address === 'string') throw new Error('Missing upstream port');
+
+  const gateway = createLlamaCppModelGateway({
+    acquireModel: async () => ({ baseUrl: `http://127.0.0.1:${address.port}`, release: vi.fn() }),
+    listModels: () => [{ id: 'local' }],
+    shutdownSignal: new AbortController().signal,
+  });
+  try {
+    await gateway.start(0);
+    const response = await fetch(`${gateway.baseUrl()}/chat/completions`, {
+      method: 'POST',
+      body: JSON.stringify({ model: 'local', stream: true }),
+    });
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    const dataLine = body.split('\n').find(line => line.startsWith('data:'))!;
+    const parsed = JSON.parse(dataLine.slice(5).trimStart()) as { error: { message: string } };
+    expect(parsed.error.message).toContain('exceeds the available context size');
+    expect(
+      isContextOverflow(
+        {
+          role: 'assistant',
+          content: [],
+          api: 'openai-completions',
+          provider: 'magpie',
+          model: 'local',
+          stopReason: 'error',
+          errorMessage: parsed.error.message,
           timestamp: Date.now(),
           usage: {
             input: 0,

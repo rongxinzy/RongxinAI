@@ -159,6 +159,7 @@ export async function resolvePiModel(
         : api === 'anthropic-messages'
           ? pi.anthropicMessagesApi()
           : pi.openAICompletionsApi(),
+      pi.createAssistantMessageEventStream,
     );
     modelRuntime.registerNativeProvider(
       pi.createProvider({

@@ -1,20 +1,14 @@
 /**
  * Bounded compaction, session-history normalization, and proportional budget
- * safeguards implemented inside RongxinAI on top of unpatched Pi 1.5.2.
+ * safeguards implemented inside the host runtime on top of unpatched Pi 1.5.2.
  */
 
-import {
-  contentText,
-  isContextOverflow,
-  normalizeContext,
-  retryAssistantCall,
-  uuidv7,
-  type AssistantMessage,
-  type Model,
-  type RetryPolicy,
-  type TextContent,
-  type TranscriptContext,
-  type Usage,
+import type {
+  AssistantMessage,
+  Model,
+  RetryPolicy,
+  TranscriptContext,
+  Usage,
 } from '@earendil-works/pi-ai';
 import type {
   CompactionSettings,
@@ -25,6 +19,57 @@ import type {
 import { clampMagpieMaxTokensToContext } from './piMagpieApiGuard';
 
 type CompactionPreparation = SessionBeforeCompactEvent['preparation'];
+type OverflowDetector = (message: AssistantMessage, contextWindow?: number) => boolean;
+
+let registeredOverflowDetector: OverflowDetector | undefined;
+let piAiModulePromise: Promise<typeof import('@earendil-works/pi-ai')> | undefined;
+
+export function registerPiOverflowDetector(detector: OverflowDetector): void {
+  registeredOverflowDetector = detector;
+}
+
+function loadPiAi(): Promise<typeof import('@earendil-works/pi-ai')> {
+  piAiModulePromise ??= import('@earendil-works/pi-ai').then(mod => {
+    if (typeof mod.isContextOverflow === 'function') {
+      registeredOverflowDetector ??= mod.isContextOverflow;
+    }
+    return mod;
+  });
+  return piAiModulePromise;
+}
+
+const FALLBACK_OVERFLOW_PATTERNS = [
+  /prompt (?:is )?too long/i,
+  /exceeds the context window/i,
+  /exceeds the available context size/i,
+  /context window exceeded/i,
+  /context[_ ]length[_ ]exceeded/i,
+  /exceeded model token limit/i,
+];
+
+function detectContextOverflowSync(message: AssistantMessage, contextWindow?: number): boolean {
+  if (registeredOverflowDetector) {
+    return registeredOverflowDetector(message, contextWindow);
+  }
+  if (message.stopReason === 'error' && message.errorMessage) {
+    return FALLBACK_OVERFLOW_PATTERNS.some(pattern => pattern.test(message.errorMessage!));
+  }
+  if (contextWindow && message.stopReason === 'stop' && message.usage) {
+    return message.usage.input + message.usage.cacheRead > contextWindow;
+  }
+  return false;
+}
+
+function extractContentText(
+  content: string | ReadonlyArray<{ type?: unknown; text?: unknown }>,
+  separator = '\n',
+): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter(block => block.type === 'text' && typeof block.text === 'string')
+    .map(block => block.text as string)
+    .join(separator);
+}
 
 function calculateUsageTokens(usage: Usage): number {
   return usage.totalTokens || usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
@@ -34,7 +79,7 @@ const DEFAULT_RESERVE_TOKENS = 16_384;
 const DEFAULT_KEEP_RECENT_TOKENS = 20_000;
 const ESTIMATED_IMAGE_CHARS = 4800;
 
-export const SUMMARIZATION_SYSTEM_PROMPT = `You are a context summarization assistant. Your task is to read a conversation between a user and an AI assistant, then produce a structured summary following the exact format specified.
+const SUMMARIZATION_SYSTEM_PROMPT = `You are a context summarization assistant. Your task is to read a conversation between a user and an AI assistant, then produce a structured summary following the exact format specified.
 
 Do NOT continue the conversation. Do NOT respond to any questions in the conversation. ONLY output the structured summary.`;
 
@@ -152,20 +197,36 @@ type SettingsManagerLike = {
 
 const guardedSessionManagers = new WeakSet<object>();
 const guardedSettingsManagers = new WeakSet<object>();
+const messageTokenMetricsCache = new WeakMap<
+  object,
+  { div4Tokens: number; weightedTokens: number }
+>();
+const keepRecentCalibrationCache = new WeakMap<object, { key: string; value: number }>();
+const CUT_POINT_ROLES = new Set([
+  'user',
+  'assistant',
+  'bashExecution',
+  'custom',
+  'branchSummary',
+  'compactionSummary',
+]);
 
 function normalizeSessionMessageObject(message: Record<string, unknown>): boolean {
   const role = message.role;
   if (role === 'assistant' && !Array.isArray(message.content)) {
     message.content =
       typeof message.content === 'string' ? [{ type: 'text', text: message.content }] : [];
+    messageTokenMetricsCache.delete(message);
     return true;
   }
   if ((role === 'user' || role === 'toolResult') && message.content == null) {
     message.content = [];
+    messageTokenMetricsCache.delete(message);
     return true;
   }
   if (role === 'system' && message.content == null) {
     message.content = '';
+    messageTokenMetricsCache.delete(message);
     return true;
   }
   return false;
@@ -324,6 +385,8 @@ function estimateMessageTokenMetrics(message: unknown): {
   weightedTokens: number;
 } {
   if (!message || typeof message !== 'object') return { div4Tokens: 0, weightedTokens: 0 };
+  const cached = messageTokenMetricsCache.get(message);
+  if (cached) return cached;
   const msg = message as {
     role?: unknown;
     content?: unknown;
@@ -363,10 +426,12 @@ function estimateMessageTokenMetrics(message: unknown): {
   } else if (typeof msg.summary === 'string') {
     addText(msg.summary);
   }
-  return {
+  const metrics = {
     div4Tokens: Math.ceil(chars / 4),
     weightedTokens: weighted,
   };
+  messageTokenMetricsCache.set(message, metrics);
+  return metrics;
 }
 
 function getLastValidUsageTokens(
@@ -404,11 +469,75 @@ function estimateProjectedDiv4Tokens(projection: SessionProjection): number {
   return total;
 }
 
+function calibrateKeepRecentTokens(
+  sessionManager: SessionManagerLike,
+  contextWindow: number,
+  reserveTokens: number,
+  baseKeepRecentTokens: number,
+): number {
+  const branch = sessionManager.getBranch?.() ?? [];
+  const lastId = branch[branch.length - 1]?.id ?? '';
+  const cacheKey = `${branch.length}:${lastId}:${contextWindow}:${reserveTokens}:${baseKeepRecentTokens}`;
+  const cached = keepRecentCalibrationCache.get(sessionManager);
+  if (cached?.key === cacheKey) {
+    return cached.value;
+  }
+
+  let keepRecentTokens = baseKeepRecentTokens;
+  const projection = sessionManager.buildSessionProjection?.();
+  if (projection) {
+    let estimatedNonSystemDiv4 = 0;
+    let weightedNonSystem = 0;
+    for (const message of projection.messages) {
+      if ((message as { role?: unknown }).role === 'system') continue;
+      const metrics = estimateMessageTokenMetrics(message);
+      estimatedNonSystemDiv4 += metrics.div4Tokens;
+      weightedNonSystem += metrics.weightedTokens;
+    }
+    const totalProjectionDiv4 = estimateProjectedDiv4Tokens(projection);
+    let branchPressureTokens = 0;
+    let hasOverflowed = false;
+    for (let i = branch.length - 1; i >= 0; i--) {
+      const entry = branch[i];
+      if (entry.type === 'compaction') break;
+      if (entry.type !== 'message' || entry.message.role !== 'assistant') continue;
+      const assistant = entry.message as AssistantMessage;
+      const usageTokens = assistant.usage ? calculateUsageTokens(assistant.usage) : 0;
+      const explicitOverflow =
+        assistant.stopReason === 'error' && detectContextOverflowSync(assistant, contextWindow);
+      if (usageTokens > 0 || explicitOverflow || assistant.stopReason === 'length') {
+        branchPressureTokens = Math.max(usageTokens, explicitOverflow ? contextWindow : 0);
+        hasOverflowed = explicitOverflow || assistant.stopReason === 'length';
+        break;
+      }
+    }
+    const effectivePressure = Math.max(
+      totalProjectionDiv4,
+      weightedNonSystem,
+      branchPressureTokens,
+    );
+    if (estimatedNonSystemDiv4 > 0 && effectivePressure > estimatedNonSystemDiv4) {
+      const tokenScale = effectivePressure / estimatedNonSystemDiv4;
+      keepRecentTokens = Math.max(1, Math.floor(keepRecentTokens / tokenScale));
+    }
+    if (
+      (effectivePressure > contextWindow - reserveTokens || hasOverflowed) &&
+      estimatedNonSystemDiv4 > 0 &&
+      estimatedNonSystemDiv4 <= keepRecentTokens
+    ) {
+      // Never let keepRecentTokens suppress a required compaction when history is small in chars/4.
+      keepRecentTokens = 0;
+    }
+  }
+
+  keepRecentCalibrationCache.set(sessionManager, { key: cacheKey, value: keepRecentTokens });
+  return keepRecentTokens;
+}
+
 /**
  * Scales default compaction budgets (`reserveTokens` and `keepRecentTokens`) to
- * the model's context window and calibrates `keepRecentTokens` against real
- * provider usage / non-ASCII token density so cut-point selection works on both
- * small windows and CJK-heavy sessions.
+ * the model's context window and calibrates `keepRecentTokens` lazily against
+ * provider usage / non-ASCII token density when cut-point selection runs.
  */
 export function installPiCompactionSettingsGuard(
   settingsManager: unknown,
@@ -440,7 +569,9 @@ export function installPiCompactionSettingsGuard(
       compactionConfig?.keepRecentTokens !== undefined;
 
     const reserveTokens = hasExplicitReserve ? raw.reserveTokens : defaults.reserveTokens;
-    let keepRecentTokens = hasExplicitKeepRecent ? raw.keepRecentTokens : defaults.keepRecentTokens;
+    const baseKeepRecentTokens = hasExplicitKeepRecent
+      ? raw.keepRecentTokens
+      : defaults.keepRecentTokens;
 
     const sessionManager = getSessionManager?.() as SessionManagerLike | undefined;
     const contextWindow = model?.contextWindow;
@@ -452,56 +583,27 @@ export function installPiCompactionSettingsGuard(
       typeof contextWindow === 'number' &&
       contextWindow > 0
     ) {
-      const projection = sessionManager.buildSessionProjection();
-      const nonSystemMessages = projection.messages.filter(
-        message => (message as { role?: unknown }).role !== 'system',
-      );
-      let estimatedNonSystemDiv4 = 0;
-      let weightedNonSystem = 0;
-      for (const message of nonSystemMessages) {
-        const metrics = estimateMessageTokenMetrics(message);
-        estimatedNonSystemDiv4 += metrics.div4Tokens;
-        weightedNonSystem += metrics.weightedTokens;
-      }
-      const totalProjectionDiv4 = estimateProjectedDiv4Tokens(projection);
-      let branchPressureTokens = 0;
-      const branch = sessionManager.getBranch();
-      for (let i = branch.length - 1; i >= 0; i--) {
-        const entry = branch[i];
-        if (entry.type === 'compaction') break;
-        if (entry.type !== 'message' || entry.message.role !== 'assistant') continue;
-        const assistant = entry.message as AssistantMessage;
-        const usageTokens = assistant.usage ? calculateUsageTokens(assistant.usage) : 0;
-        const explicitOverflow =
-          assistant.stopReason === 'error' && isContextOverflow(assistant, contextWindow);
-        if (usageTokens > 0 || explicitOverflow || assistant.stopReason === 'length') {
-          branchPressureTokens = Math.max(usageTokens, explicitOverflow ? contextWindow : 0);
-          break;
-        }
-      }
-      const effectivePressure = Math.max(
-        totalProjectionDiv4,
-        weightedNonSystem,
-        branchPressureTokens,
-      );
-      if (estimatedNonSystemDiv4 > 0 && effectivePressure > estimatedNonSystemDiv4) {
-        const tokenScale = effectivePressure / estimatedNonSystemDiv4;
-        keepRecentTokens = Math.max(1, Math.floor(keepRecentTokens / tokenScale));
-      }
-      if (
-        (effectivePressure > contextWindow - reserveTokens || branchPressureTokens > 0) &&
-        estimatedNonSystemDiv4 > 0 &&
-        estimatedNonSystemDiv4 <= keepRecentTokens
-      ) {
-        // Never let keepRecentTokens suppress a required compaction when history is small in chars/4.
-        keepRecentTokens = 0;
-      }
+      // Defer full-branch scanning until prepareCompaction or oversized pre-flight actually reads keepRecentTokens.
+      let computedKeepRecentTokens: number | undefined;
+      return {
+        enabled: raw.enabled,
+        reserveTokens,
+        get keepRecentTokens(): number {
+          computedKeepRecentTokens ??= calibrateKeepRecentTokens(
+            sessionManager,
+            contextWindow,
+            reserveTokens,
+            baseKeepRecentTokens,
+          );
+          return computedKeepRecentTokens;
+        },
+      };
     }
 
     return {
       enabled: raw.enabled,
       reserveTokens,
-      keepRecentTokens,
+      keepRecentTokens: baseKeepRecentTokens,
     };
   };
 }
@@ -537,16 +639,20 @@ function getSummarizationFailure(response: AssistantMessage, label: string): str
 }
 
 function buildSummarizationContext(promptText: string): TranscriptContext {
-  return normalizeContext({
-    systemPrompt: SUMMARIZATION_SYSTEM_PROMPT,
+  return {
     messages: [
+      {
+        role: 'system',
+        content: SUMMARIZATION_SYSTEM_PROMPT,
+        timestamp: 0,
+      },
       {
         role: 'user',
         content: [{ type: 'text', text: promptText }],
         timestamp: Date.now(),
       },
     ],
-  });
+  } as unknown as TranscriptContext;
 }
 
 function formatFileOperationsFromPreparation(fileOps: CompactionPreparation['fileOps']): {
@@ -585,6 +691,7 @@ export async function completeBoundedSummary(
   signal?: AbortSignal,
   label = 'Summarization',
 ): Promise<AssistantMessage> {
+  const { isContextOverflow } = await loadPiAi();
   let usage: Usage | undefined;
   const summarize = async (text: string, part = false): Promise<AssistantMessage> => {
     signal?.throwIfAborted();
@@ -622,7 +729,7 @@ export async function completeBoundedSummary(
         if (response.stopReason !== 'stop') {
           throw new Error(`${label} failed: ${response.stopReason}`);
         }
-        if (!contentText(response.content as TextContent[]).trim()) {
+        if (!extractContentText(response.content).trim()) {
           throw new Error(`${label} returned an empty summary`);
         }
         return response;
@@ -642,7 +749,7 @@ export async function completeBoundedSummary(
     }
     const left = await summarize(text.slice(0, middle), true);
     const right = await summarize(text.slice(middle), true);
-    const merged = `<earlier-summary>\n${contentText(left.content as TextContent[])}\n</earlier-summary>\n<later-summary>\n${contentText(right.content as TextContent[])}\n</later-summary>`;
+    const merged = `<earlier-summary>\n${extractContentText(left.content)}\n</earlier-summary>\n<later-summary>\n${extractContentText(right.content)}\n</later-summary>`;
     if (merged.length >= text.length) {
       throw new Error('Summarization did not reduce the oversized history');
     }
@@ -684,7 +791,8 @@ export async function runBoundedCompaction(params: {
   if (!firstKeptEntryId) {
     throw new Error('First kept entry has no UUID - session may need migration');
   }
-  const { convertToLlm, serializeConversation } = await import('@earendil-works/pi-coding-agent');
+  const [{ retryAssistantCall, uuidv7 }, { convertToLlm, serializeConversation }] =
+    await Promise.all([loadPiAi(), import('@earendil-works/pi-coding-agent')]);
   const complete = (context: TranscriptContext) => {
     const options: Record<string, unknown> = {
       signal,
@@ -718,7 +826,7 @@ export async function runBoundedCompaction(params: {
       signal,
       label,
     );
-    return { text: contentText(response.content as TextContent[]), usage: response.usage };
+    return { text: extractContentText(response.content), usage: response.usage };
   };
 
   let basePrompt = previousSummary ? UPDATE_SUMMARIZATION_PROMPT : SUMMARIZATION_PROMPT;
@@ -813,11 +921,42 @@ export async function compactPiSessionIfOversizedBeforePrompt(params: {
     return;
   }
   const projection = typedManager.buildSessionProjection();
+  const prevCompactionIndex = projection.entries.findIndex(
+    entry => entry.sourceEntry.type === 'compaction' && entry.messages.length > 0,
+  );
+  const boundaryStart = prevCompactionIndex >= 0 ? prevCompactionIndex + 1 : 0;
+  const activeEntries = projection.entries.slice(boundaryStart);
+  const cutPoints: number[] = [];
+  for (let i = 0; i < activeEntries.length; i++) {
+    const entry = activeEntries[i]!;
+    if (
+      entry.sourceEntry.type !== 'compaction' &&
+      entry.messages.some(message => CUT_POINT_ROLES.has((message as { role?: string }).role ?? ''))
+    ) {
+      cutPoints.push(i);
+    }
+  }
+  if (cutPoints.length < 2) {
+    return;
+  }
   const projectedTokens =
     estimateProjectedDiv4Tokens(projection) + Math.ceil(promptText.length / 4);
   const reserveTokens =
     settings?.reserveTokens ?? computePiCompactionDefaults(contextWindow).reserveTokens;
   if (projectedTokens <= contextWindow - reserveTokens) {
+    return;
+  }
+  const firstCutPointIndex = cutPoints[0]!;
+  let tokensAfterFirstCutPoint = 0;
+  for (let i = firstCutPointIndex + 1; i < activeEntries.length; i++) {
+    for (const message of activeEntries[i]!.messages) {
+      if ((message as { role?: unknown }).role === 'system') continue;
+      tokensAfterFirstCutPoint += estimateMessageTokenMetrics(message).div4Tokens;
+    }
+  }
+  const keepRecentTokens =
+    settings?.keepRecentTokens ?? computePiCompactionDefaults(contextWindow).keepRecentTokens;
+  if (tokensAfterFirstCutPoint === 0 || tokensAfterFirstCutPoint < keepRecentTokens) {
     return;
   }
   active.lastCompactionError = undefined;
@@ -826,6 +965,14 @@ export async function compactPiSessionIfOversizedBeforePrompt(params: {
   } catch (error) {
     const realError = active.lastCompactionError;
     active.lastCompactionError = undefined;
+    if (
+      !realError &&
+      error instanceof Error &&
+      (error.message === 'Nothing to compact (session too small)' ||
+        error.message === 'Already compacted')
+    ) {
+      return;
+    }
     throw realError ?? error;
   }
   if (active.lastCompactionError) {

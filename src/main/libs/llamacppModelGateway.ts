@@ -206,22 +206,40 @@ async function forwardRequest(
     }
     const reader = upstreamResponse.body.getReader();
     const decoder = isSse ? new TextDecoder() : null;
+    let sseBuffer = '';
+    const flushCompleteSseLines = (chunkText: string) => {
+      sseBuffer += chunkText;
+      const lastNewline = sseBuffer.lastIndexOf('\n');
+      if (lastNewline < 0) return;
+      const complete = sseBuffer.slice(0, lastNewline + 1);
+      sseBuffer = sseBuffer.slice(lastNewline + 1);
+      const output = complete
+        .split(/(?<=\n)/u)
+        .map(normalizeLlamaCppSseLine)
+        .join('');
+      if (output && !response.writableEnded) {
+        response.write(output);
+      }
+    };
     while (!response.writableEnded) {
       const { done, value } = await reader.read();
       if (done) break;
       if (decoder) {
         const text = decoder.decode(value, { stream: true });
         if (text) {
-          response.write(normalizeLlamaCppSseChunk(text));
+          flushCompleteSseLines(text);
         }
       } else {
         response.write(Buffer.from(value));
       }
     }
-    if (decoder) {
+    if (decoder && !response.writableEnded) {
       const trailing = decoder.decode();
-      if (trailing && !response.writableEnded) {
-        response.write(normalizeLlamaCppSseChunk(trailing));
+      if (trailing) {
+        flushCompleteSseLines(trailing);
+      }
+      if (sseBuffer && !response.writableEnded) {
+        response.write(normalizeLlamaCppSseLine(sseBuffer));
       }
     }
     response.end();
@@ -238,44 +256,81 @@ export function normalizeLlamaCppOverflowMessage(message: string): string {
   return `${message} (${PI_LLAMA_CPP_OVERFLOW_HINT})`;
 }
 
+function tryNormalizeStructuredErrorJson(text: string): { parsed: boolean; text: string } {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const record = parsed as { error?: unknown; choices?: unknown; message?: unknown };
+      if (record.error && typeof record.error === 'object' && !Array.isArray(record.error)) {
+        const errObj = record.error as { message?: unknown };
+        if (typeof errObj.message === 'string') {
+          const next = normalizeLlamaCppOverflowMessage(errObj.message);
+          if (next !== errObj.message) {
+            errObj.message = next;
+            return { parsed: true, text: JSON.stringify(record) };
+          }
+          return { parsed: true, text };
+        }
+      }
+      if (typeof record.error === 'string') {
+        const next = normalizeLlamaCppOverflowMessage(record.error);
+        if (next !== record.error) {
+          record.error = next;
+          return { parsed: true, text: JSON.stringify(record) };
+        }
+        return { parsed: true, text };
+      }
+      if (record.choices === undefined && typeof record.message === 'string') {
+        const next = normalizeLlamaCppOverflowMessage(record.message);
+        if (next !== record.message) {
+          record.message = next;
+          return { parsed: true, text: JSON.stringify(record) };
+        }
+      }
+    }
+    return { parsed: true, text };
+  } catch {
+    return { parsed: false, text };
+  }
+}
+
 export function normalizeLlamaCppOverflowBody(bodyText: string): string {
   if (!LLAMA_CPP_EXCEEDED_PATTERN.test(bodyText) || PI_LLAMA_CPP_OVERFLOW_PATTERN.test(bodyText)) {
     return bodyText;
   }
-  try {
-    const parsed = JSON.parse(bodyText) as { error?: { message?: unknown }; message?: unknown };
-    if (parsed && typeof parsed === 'object') {
-      if (
-        parsed.error &&
-        typeof parsed.error === 'object' &&
-        typeof parsed.error.message === 'string'
-      ) {
-        parsed.error.message = normalizeLlamaCppOverflowMessage(parsed.error.message);
-        return JSON.stringify(parsed);
-      }
-      if (typeof parsed.message === 'string') {
-        parsed.message = normalizeLlamaCppOverflowMessage(parsed.message);
-        return JSON.stringify(parsed);
-      }
-    }
-  } catch {
-    // Plain-text error bodies fall through to direct normalization below.
+  const structured = tryNormalizeStructuredErrorJson(bodyText);
+  if (structured.parsed) {
+    return structured.text;
   }
   return normalizeLlamaCppOverflowMessage(bodyText);
 }
 
-function normalizeLlamaCppSseChunk(chunk: string): string {
-  if (!LLAMA_CPP_EXCEEDED_PATTERN.test(chunk) || PI_LLAMA_CPP_OVERFLOW_PATTERN.test(chunk)) {
-    return chunk;
+function normalizeLlamaCppSseLine(line: string): string {
+  if (!LLAMA_CPP_EXCEEDED_PATTERN.test(line) || PI_LLAMA_CPP_OVERFLOW_PATTERN.test(line)) {
+    return line;
   }
-  return chunk
-    .split('\n')
-    .map(line =>
-      line.startsWith('data:') && LLAMA_CPP_EXCEEDED_PATTERN.test(line)
-        ? `data: ${normalizeLlamaCppOverflowBody(line.slice(5).trimStart())}`
-        : normalizeLlamaCppOverflowBody(line),
-    )
-    .join('\n');
+  const suffix = line.endsWith('\r\n')
+    ? '\r\n'
+    : line.endsWith('\n')
+      ? '\n'
+      : line.endsWith('\r')
+        ? '\r'
+        : '';
+  const body = suffix ? line.slice(0, -suffix.length) : line;
+  if (!body.startsWith('data:')) {
+    return line;
+  }
+  const afterColon = body.slice(5);
+  const payload = afterColon.trimStart();
+  if (!payload || payload === '[DONE]') {
+    return line;
+  }
+  const structured = tryNormalizeStructuredErrorJson(payload);
+  if (!structured.parsed || structured.text === payload) {
+    return line;
+  }
+  const leadingSpace = afterColon.slice(0, afterColon.length - payload.length);
+  return `data:${leadingSpace}${structured.text}${suffix}`;
 }
 
 function copyRequestHeaders(headers: http.IncomingHttpHeaders): Record<string, string> {

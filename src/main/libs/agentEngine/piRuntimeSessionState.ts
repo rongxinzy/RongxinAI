@@ -28,10 +28,13 @@ import type {
 import type { Provider } from '@earendil-works/pi-ai';
 import type {
   anthropicMessagesApi,
+  createAssistantMessageEventStream,
   createProvider,
+  isContextOverflow,
   openAICompletionsApi,
   openAIResponsesApi,
 } from '@earendil-works/pi-ai/compat';
+import { registerPiOverflowDetector } from './piBoundedCompaction';
 import {
   buildPiBackgroundCompletionContext,
   type PiBackgroundCompletionResult,
@@ -335,6 +338,7 @@ export interface PiModules {
   };
   getAgentDir: () => string;
   createProvider: typeof createProvider;
+  createAssistantMessageEventStream?: typeof createAssistantMessageEventStream;
   anthropicMessagesApi: typeof anthropicMessagesApi;
   openAICompletionsApi: typeof openAICompletionsApi;
   openAIResponsesApi: typeof openAIResponsesApi;
@@ -558,7 +562,18 @@ export async function getPiModules(): Promise<PiModules> {
       // Vite/esbuild resolves them correctly at build time, and NodeNext module resolution
       // resolves native type declarations from package exports for tsc --noEmit.
       const codingAgent = await import('@earendil-works/pi-coding-agent');
-      const compat = await import('@earendil-works/pi-ai/compat');
+      const compat = (await import('@earendil-works/pi-ai/compat')) as Awaited<
+        typeof import('@earendil-works/pi-ai/compat')
+      > & {
+        createAssistantMessageEventStream?: typeof createAssistantMessageEventStream;
+        isContextOverflow?: typeof isContextOverflow;
+      };
+      if (
+        Object.prototype.hasOwnProperty.call(compat, 'isContextOverflow') &&
+        typeof compat.isContextOverflow === 'function'
+      ) {
+        registerPiOverflowDetector(compat.isContextOverflow);
+      }
       _piModules = {
         createAgentSession:
           codingAgent.createAgentSession as unknown as PiModules['createAgentSession'],
@@ -603,6 +618,11 @@ export async function getPiModules(): Promise<PiModules> {
             ).createMcpExtension as PiModules['createMcpExtension'])
           : undefined,
         createProvider: compat.createProvider,
+        createAssistantMessageEventStream:
+          Object.prototype.hasOwnProperty.call(compat, 'createAssistantMessageEventStream') &&
+          typeof compat.createAssistantMessageEventStream === 'function'
+            ? compat.createAssistantMessageEventStream
+            : undefined,
         anthropicMessagesApi: compat.anthropicMessagesApi,
         openAICompletionsApi: compat.openAICompletionsApi,
         openAIResponsesApi: compat.openAIResponsesApi,
