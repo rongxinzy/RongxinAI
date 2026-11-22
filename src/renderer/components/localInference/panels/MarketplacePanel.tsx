@@ -1,10 +1,13 @@
 import { Alert, AlertDescription, AlertTitle } from '@shared/components/ui/alert';
 import { Button } from '@shared/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@shared/components/ui/input-group';
-import { Monitor, RefreshCw, Search } from 'lucide-react';
+import { Monitor, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { MarketplaceModelCardSkeleton } from '../components/MarketplaceCardLayout';
+import {
+  MarketplaceListHeader,
+  MarketplaceModelCardSkeleton,
+} from '../components/MarketplaceCardLayout';
 
 import {
   type MarketplaceModel,
@@ -31,9 +34,6 @@ import {
 import { ListPagination } from '../../common/ListPagination';
 import { localInferenceCompactButtonClass, MARKETPLACE_PAGE_SIZE } from '../constants';
 import { getInstallableMarketplaceModels } from '../utils/marketplace';
-
-const marketplaceGridClassName =
-  'grid w-full grid-cols-1 auto-rows-min content-start gap-4 @3xl/marketplace:grid-cols-2';
 
 export function MarketplacePanel({
   loading,
@@ -235,14 +235,13 @@ export function MarketplacePanel({
             className={`${localInferenceCompactButtonClass} self-center`}
             variant="outline"
           >
-            <RefreshCw data-icon="inline-start" />
             {i18nService.t('marketplaceSearch')}
           </Button>
         </div>
       </form>
 
       <div className="flex w-full shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <div className="shrink-0">
             <FluidTabs
               className="w-fit max-w-full"
@@ -262,8 +261,8 @@ export function MarketplacePanel({
               ]}
             />
           </div>
-          <div className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border-subtle bg-muted/40 px-2.5 py-0.5 text-xs text-muted-foreground">
-            <span className="font-medium text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="theme-control-caption-muted">
               {i18nService.t('marketplaceFilterFit')}
             </span>
             <Select
@@ -272,11 +271,7 @@ export function MarketplacePanel({
                 setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)
               }
             >
-              <SelectTrigger
-                size="sm"
-                aria-label={i18nService.t('marketplaceFilterFit')}
-                className="theme-page-marketplace-panel-select-trigger-1 h-7 min-w-28 border-0 bg-transparent px-2 text-xs shadow-none hover:bg-surface-raised"
-              >
+              <SelectTrigger size="sm" aria-label={i18nService.t('marketplaceFilterFit')}>
                 <SelectValue className="theme-part-marketplace-panel-select-value-1">
                   {fitFilterLabel}
                 </SelectValue>
@@ -360,7 +355,8 @@ export function MarketplacePanel({
           ref={marketplaceGridViewportRef}
           className="@container/marketplace relative min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable"
         >
-          <div className={marketplaceGridClassName}>
+          <div>
+            <MarketplaceListHeader />
             {visibleModels.map(model => {
               return (
                 <MarketplaceModelCard
@@ -396,7 +392,8 @@ export function MarketplacePanel({
 // not full-screen spinners).
 function MarketplaceGridSkeleton({ pageSize }: { pageSize: number }) {
   return (
-    <div aria-hidden="true" className={marketplaceGridClassName}>
+    <div aria-hidden="true">
+      <MarketplaceListHeader />
       {Array.from({ length: pageSize }, (_, index) => (
         <MarketplaceModelCardSkeleton key={index} />
       ))}

@@ -34,7 +34,6 @@ import { resolveSessionDisplayTitle } from '../../utils/sessionTitle';
 import { resolveSkillPlaceholderKey } from '../chat/constants';
 import { CoworkSessionLayout } from '../cowork/CoworkSessionLayout';
 import { CoworkConversationLoadingSkeleton } from '../cowork/CoworkSessionLoadingState';
-import SecurityStatusIndicator from '../cowork/SecurityStatusIndicator';
 import { useAgentSelectedModel } from '../cowork/agentModelSelection';
 import { CoworkRunStatus } from '../cowork/components/CoworkRunStatus';
 import { useCoworkSessionActions } from '../cowork/hooks/useCoworkSessionActions';
@@ -357,11 +356,6 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
     <CoworkSessionLayout
       mode={isHome ? 'home' : 'session'}
       divider={!isHome}
-      homeActions={
-        workMode === WorkMode.Chat ? undefined : (
-          <SecurityStatusIndicator permissionMode={config.permissionMode} />
-        )
-      }
       title={
         isHome
           ? i18nService.t(workMode === WorkMode.Chat ? 'newChat' : 'newTaskTitle')
@@ -398,21 +392,11 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
         >
           {isHome ? (
             <div className="w-full shrink-0">
-              <div aria-hidden className="min-h-[max(24px,calc(36vh-9.5rem))]" />
-              <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col items-center px-6 pb-8 pt-2">
-                <div className="flex flex-col items-center justify-center gap-3 text-center">
-                  <h1 className="theme-home-greeting max-w-2xl text-balance">
-                    {i18nService.t(homeGreetingKey())}
-                  </h1>
-                  <p
-                    className={cn(
-                      'theme-home-caption max-w-md px-2 text-pretty',
-                      workMode === WorkMode.Chat && 'invisible',
-                    )}
-                  >
-                    {i18nService.t('coworkHomeSubtitle')}
-                  </p>
-                </div>
+              <div aria-hidden className="min-h-[max(24px,calc(34vh-5rem))]" />
+              <div className="mx-auto w-full max-w-[calc(48rem+3rem)] px-6 pb-6">
+                <h1 className="theme-home-greeting text-balance">
+                  {i18nService.t(homeGreetingKey())}
+                </h1>
               </div>
             </div>
           ) : (
@@ -466,7 +450,7 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
           </div>
 
           {isHome ? (
-            <div className="mx-auto mt-8 flex w-full max-w-4xl shrink-0 flex-col gap-4 px-6 pb-8">
+            <div className="mx-auto mt-4 flex w-full max-w-[calc(48rem+3rem)] shrink-0 flex-col gap-4 px-6 pb-8">
               {!selectedAction ? (
                 <QuickActionBar actions={quickActions} onActionSelect={handleActionSelect} />
               ) : (

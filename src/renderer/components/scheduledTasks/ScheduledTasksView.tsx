@@ -1,4 +1,8 @@
-import { Badge } from '@shared/components/ui/badge';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@shared/components/ui/collapsible';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +14,7 @@ import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Spinner } from '@shared/components/ui/spinner';
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import { MessageCirclePlus, Plus } from 'lucide-react';
+import { LayoutTemplate, MessageCirclePlus, Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -34,7 +38,6 @@ interface ScheduledTasksViewProps {
 }
 
 const AUTO_TAB = {
-  Create: 'create',
   Tasks: 'tasks',
   History: 'history',
 } as const;
@@ -179,18 +182,17 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
                 {i18nService.t('scheduledTasksCreateByChat')}
               </span>
             </Button>
-            {activeTab !== AUTO_TAB.Create ? (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => openCreateModal()}
-                className="gap-1.5"
-                aria-label={i18nService.t('scheduledTasksNewTask')}
-              >
-                <Plus className="size-4" />
-                <span className="hidden xl:inline">{i18nService.t('scheduledTasksNewTask')}</span>
-              </Button>
-            ) : null}
+
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => openCreateModal()}
+              className="gap-1.5"
+              aria-label={i18nService.t('scheduledTasksNewTask')}
+            >
+              <Plus className="size-4" />
+              <span>{i18nService.t('scheduledTasksNewTask')}</span>
+            </Button>
           </div>
         }
         tabs={
@@ -201,10 +203,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
               {
                 value: AUTO_TAB.Tasks,
                 label: i18nService.t('scheduledTasksTabTasks'),
-                badge:
-                  tasks.length > 0 ? <Badge variant="secondary">{tasks.length}</Badge> : undefined,
               },
-              { value: AUTO_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
               { value: AUTO_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
             ]}
           />
@@ -231,21 +230,19 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
               activeTab === AUTO_TAB.History ? 'flex min-h-0 flex-1 flex-col' : 'min-h-full',
             )}
           >
-            {activeTab === AUTO_TAB.Create && (
-              <TaskTemplateGallery
-                onSelectTemplate={values => openCreateModal(values)}
-                onCustom={() => openCreateModal(undefined)}
-              />
-            )}
-
             {activeTab === AUTO_TAB.Tasks && (
-              <TaskList
-                onRequestDelete={handleRequestDelete}
-                onRequestEdit={handleRequestEdit}
-                onCreateTask={() => openCreateModal(undefined)}
-                onCreateByChat={handleCreateByChat}
-                onSelectTemplate={values => openCreateModal(values)}
-              />
+              <>
+                <TaskList onRequestDelete={handleRequestDelete} onRequestEdit={handleRequestEdit} />
+                <Collapsible className="mt-4">
+                  <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
+                    <LayoutTemplate />
+                    {i18nService.t('scheduledTasksFromTemplate')}
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <TaskTemplateGallery onSelectTemplate={values => openCreateModal(values)} />
+                  </CollapsibleContent>
+                </Collapsible>
+              </>
             )}
 
             {activeTab === AUTO_TAB.History && <AllRunsHistory />}

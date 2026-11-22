@@ -2,6 +2,7 @@
 
 import { configureStore } from '@reduxjs/toolkit';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { beforeEach, expect, test, vi } from 'vitest';
 
@@ -36,15 +37,10 @@ const renderView = (runs: readonly ActivityRun[], onShowScheduledTasks?: () => v
   );
 };
 
-/** Source filter uses PageTabs; status filter uses FluidTabs. */
-const clickStatusPill = (label: string): void => {
-  const tabs = screen.queryAllByRole('tab', { name: new RegExp(label) });
-  if (tabs.length > 0) {
-    fireEvent.click(tabs[tabs.length - 1]);
-    return;
-  }
-  const buttons = screen.getAllByRole('button', { name: new RegExp(label) });
-  fireEvent.click(buttons[buttons.length - 1]);
+const selectStatus = async (from: string, to: string) => {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: t(from) }));
+  await user.click(await screen.findByRole('menuitemradio', { name: t(to) }));
 };
 
 beforeEach(() => {
@@ -93,17 +89,17 @@ test('clears the source filter from the empty state instead of dead-ending the p
   expect(screen.getByText('回复内容')).toBeInTheDocument();
 });
 
-test('returns to every run through the explicit all status pill', () => {
+test('returns to every run through the status menu', async () => {
   renderView([
     run({ id: 'failed', status: ActivityStatus.Failed, errorMessage: '接口超时', updatedAt: 2 }),
     run({ id: 'ok', status: ActivityStatus.Completed, replyPreview: '回复内容', updatedAt: 1 }),
   ]);
 
-  clickStatusPill(t('activityStatusFailed'));
+  await selectStatus('activityAllStatuses', 'activityStatusFailed');
   expect(screen.getByText('接口超时')).toBeInTheDocument();
   expect(screen.queryByText('回复内容')).toBeNull();
 
-  clickStatusPill(t('activityFilterAll'));
+  await selectStatus('activityStatusFailed', 'activityAllStatuses');
   expect(screen.getByText('回复内容')).toBeInTheDocument();
 });
 
@@ -117,7 +113,6 @@ test('localizes an interrupted run instead of showing the persisted marker', () 
     }),
   ]);
 
-  clickStatusPill(t('activityFilterAll'));
   expect(screen.getByText(t('activityErrorInterrupted'))).toBeInTheDocument();
   expect(screen.queryByText(ActivityErrorCode.Interrupted)).toBeNull();
 });
@@ -133,6 +128,5 @@ test('shows the completed run reply preview', () => {
     }),
   ]);
 
-  clickStatusPill(t('activityFilterAll'));
   expect(screen.getByText('已经处理好了')).toBeInTheDocument();
 });

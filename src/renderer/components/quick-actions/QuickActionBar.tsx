@@ -1,16 +1,12 @@
 import { Button } from '@shared/components/ui/button';
 import {
-  ChartColumn,
-  FileText,
-  Globe,
-  GraduationCap,
-  Presentation,
-  Smartphone,
-  Telescope,
-  type LucideIcon,
-} from 'lucide-react';
-import React from 'react';
-
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@shared/components/ui/dropdown-menu';
+import { Ellipsis } from 'lucide-react';
+import { i18nService } from '../../services/i18n';
 import type { LocalizedQuickAction } from '../../types/quickAction';
 
 interface QuickActionBarProps {
@@ -18,46 +14,52 @@ interface QuickActionBarProps {
   onActionSelect: (actionId: string) => void;
 }
 
-// 图标映射
-const iconMap: Record<string, LucideIcon> = {
-  Presentation,
-  Globe,
-  Smartphone,
-  ChartColumn,
-  GraduationCap,
-  Telescope,
-  FileText,
-};
+const featuredIds = new Set(['pptx', 'data-analysis', 'docs']);
 
-const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, onActionSelect }) => {
-  if (actions.length === 0) {
-    return null;
-  }
-
+export default function QuickActionBar({ actions, onActionSelect }: QuickActionBarProps) {
+  if (!actions.length) return null;
+  const featured = [
+    ...actions.filter(action => featuredIds.has(action.id)),
+    ...actions.filter(action => !featuredIds.has(action.id)),
+  ].slice(0, 3);
+  const remaining = actions.filter(action => !featured.includes(action));
   return (
-    // One centered row on wide screens; below the composer width the actions
-    // become a balanced grid so a wrapped tail never leaves a lonely pill.
-    <div className="@container mx-auto w-full max-w-3xl">
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:flex xl:flex-wrap xl:items-center xl:justify-center">
-        {actions.map(action => {
-          const IconComponent = iconMap[action.icon];
-
-          return (
-            <Button
-              key={action.id}
-              type="button"
-              variant="outline"
-              onClick={() => onActionSelect(action.id)}
-              className="theme-page-quick-action-bar-button-1 flex items-center justify-center whitespace-nowrap"
-            >
-              {IconComponent && <IconComponent className="size-4" strokeWidth={1.5} />}
-              <span>{action.label}</span>
-            </Button>
-          );
-        })}
-      </div>
+    <div className="mx-auto flex w-full flex-wrap items-center justify-center gap-x-2">
+      {featured.map(action => (
+        <Button
+          key={action.id}
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onActionSelect(action.id)}
+        >
+          {action.label}
+        </Button>
+      ))}
+      {remaining.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={i18nService.t('homeMoreSuggestions')}
+                title={i18nService.t('homeMoreSuggestions')}
+              />
+            }
+          >
+            <Ellipsis />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {remaining.map(action => (
+              <DropdownMenuItem key={action.id} onClick={() => onActionSelect(action.id)}>
+                {action.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
-};
-
-export default QuickActionBar;
+}

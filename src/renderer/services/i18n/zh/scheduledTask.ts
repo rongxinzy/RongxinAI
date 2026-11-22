@@ -143,6 +143,8 @@ export const zhScheduledTask: Record<string, string> = {
   scheduledTasksRun: '立即运行',
   scheduledTasksRunPreemptWarning: '手动执行可能抢占定时执行，后者将被跳过',
   scheduledTasksStop: '停止',
+  scheduledTasksFromTemplate: '从模板创建',
+  scheduledTasksToggleTask: '启用或暂停「{name}」',
   scheduledTasksEnabled: '已启用',
   scheduledTasksDisabled: '已禁用',
   scheduledTasksDetail: '任务详情',

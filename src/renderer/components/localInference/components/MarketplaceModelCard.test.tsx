@@ -188,10 +188,10 @@ describe('MarketplaceModelCard', () => {
     );
   });
 
-  test('shows the quantization selector for single-file repos', () => {
+  test('shows the only quantization inline for single-file repos', () => {
     renderCard(makeModel());
-    const selector = screen.getByRole('combobox', { name: '选择量化版本' });
-    expect(selector).toBeInTheDocument();
+    expect(screen.getByText('Q4_K_M')).toBeVisible();
+    expect(screen.queryByRole('combobox', { name: '选择量化版本' })).toBeNull();
   });
 
   test('split-only repos are installable and install the first part', async () => {
@@ -220,8 +220,7 @@ describe('MarketplaceModelCard', () => {
 
     // A single split variant has nothing to choose, but it must be installable
     // (previously such repos were dropped entirely as "pending").
-    const selector = screen.getByRole('combobox', { name: '选择量化版本' });
-    expect(selector).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: '选择量化版本' })).toBeNull();
     const installButton = screen.getByRole('button', { name: /安装/ });
     expect(installButton).toBeEnabled();
 

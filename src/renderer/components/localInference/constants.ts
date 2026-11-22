@@ -11,7 +11,6 @@ export const LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS = 3_000;
 export const LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS = 400;
 export const LOCAL_INFERENCE_SESSION_STORAGE_KEY = 'zhiyuan:llamacpp-inference-session';
 export const LOCAL_INFERENCE_MODEL_ORDER_STORAGE_KEY = 'zhiyuan:llamacpp-model-order';
-export const localInferenceMutedTextClass = 'text-muted-foreground';
 
 export const localInferenceCompactButtonClass =
   'theme-local-compact-action min-w-16 cursor-pointer';

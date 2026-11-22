@@ -5,6 +5,7 @@ export const enTodoActivity: Record<string, string> = {
   activityHeroDesc: 'Every run from channel messages and scheduled tasks',
   activityTriggerChannel: 'Channel',
   activityTriggerCron: 'Scheduled',
+  activityAllStatuses: 'All statuses',
   activityFilterAll: 'All',
   activityStatusRunning: 'Running',
   activityStatusCompleted: 'Completed',

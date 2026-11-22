@@ -145,6 +145,8 @@ export const enScheduledTask: Record<string, string> = {
   scheduledTasksRun: 'Run Now',
   scheduledTasksRunPreemptWarning: 'Manual run may preempt scheduled execution',
   scheduledTasksStop: 'Stop',
+  scheduledTasksFromTemplate: 'Create from template',
+  scheduledTasksToggleTask: 'Enable or disable {name}',
   scheduledTasksEnabled: 'Enabled',
   scheduledTasksDisabled: 'Disabled',
   scheduledTasksDetail: 'Task Detail',
