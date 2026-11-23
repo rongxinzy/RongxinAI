@@ -35,8 +35,6 @@ type UseLocalModelActionsResult = {
   loadingModelName: string | null;
   cancellingModelLoad: boolean;
   unloadingModelName: string | null;
-  startedModelName: string | null;
-  setStartedModelName: Dispatch<SetStateAction<string | null>>;
   handleLoadModel: (model: LlamaCppModel) => void;
   handleCancelModelLoad: () => void;
   handleUnload: (modelName: string) => void;
@@ -63,7 +61,6 @@ export function useLocalModelActions(input: UseLocalModelActionsInput): UseLocal
   const [cancellingModelLoad, setCancellingModelLoad] = useState(false);
   const cancelledModelLoadRef = useRef(false);
   const [unloadingModelName, setUnloadingModelName] = useState<string | null>(null);
-  const [startedModelName, setStartedModelName] = useState<string | null>(null);
   const loadingModelNameRef = useRef<string | null>(null);
 
   const waitForUnloadSettle = useCallback(
@@ -100,8 +97,6 @@ export function useLocalModelActions(input: UseLocalModelActionsInput): UseLocal
           const result = await window.electron.llamacpp.loadModel(launchInput);
           setRunningModels(result.runningModels);
           notifyLlamaCppRunningModelsChanged();
-          // Only direct user launches prompt for configuration; background restoration remains silent.
-          setStartedModelName(modelName);
           if (result.warning) {
             showToast(result.warning, LocalInferenceToastKind.Info);
           }
@@ -211,8 +206,6 @@ export function useLocalModelActions(input: UseLocalModelActionsInput): UseLocal
     loadingModelName,
     cancellingModelLoad,
     unloadingModelName,
-    startedModelName,
-    setStartedModelName,
     handleLoadModel,
     handleCancelModelLoad,
     handleUnload,

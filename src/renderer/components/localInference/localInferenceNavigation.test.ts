@@ -12,14 +12,8 @@ const settingsPageSource = readSource('../settings/SettingsPage.tsx');
 const modelsPageSource = readSource('../settings/model/ModelsPage.tsx');
 const localInferenceSource = readSource('./LocalInferenceView.tsx');
 
-test('opens the unified model settings after starting a local model', () => {
-  expect(appSource).toContain('const handleOpenLocalModelSettings = useCallback(() =>');
-  expect(appSource).toContain("handleShowSettings({ initialTab: 'models' });");
-  expect(appSource).toContain('onOpenModelSettings={handleOpenLocalModelSettings}');
-  expect(mainViewCanvasSource).toContain('initialTab={settingsOptions.initialTab}');
-});
-
 test('routes model settings to the unified catalog and default selection', () => {
+  expect(mainViewCanvasSource).toContain('initialTab={settingsOptions.initialTab}');
   expect(settingsPageSource).toContain("activeTab === 'models' && (");
   expect(settingsPageSource).toContain('<ModelsPage');
   expect(modelsPageSource).toContain('await refreshMagpieModels()');

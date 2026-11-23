@@ -180,11 +180,6 @@ export const enLocalInferenceCatalog: Record<string, string> = {
   localInferenceModelLaunchStarting: 'Starting',
   localInferenceModelLaunchSucceeded: 'Started',
   localInferenceModelLaunchFailed: 'Startup failed',
-  localInferenceModelStartedTitle: 'Model started',
-  localInferenceModelStartedDescription:
-    '“{name}” has started and was added to Model Settings. Configure its details now?',
-  localInferenceConfigureLater: 'Configure later',
-  localInferenceOpenModelSettings: 'Open Model Settings',
   localInferenceInfer: 'Infer',
   localInferencePresetSaved: 'Inference parameters saved',
   localInferenceGenerationCancelled: 'Generation cancelled',

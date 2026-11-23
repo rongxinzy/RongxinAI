@@ -20,7 +20,6 @@ import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceA
 import { LocalInferenceMemorySettingsDialog } from './components/LocalInferenceMemorySettingsDialog';
 import { LocalInferenceSettingsMenu } from './components/LocalInferenceSettingsMenu';
 import { ModelInspectorSidebar, ModelInspectorTab } from './components/ModelInspectorSidebar';
-import { ModelStartedDialog } from './components/ModelStartedDialog';
 import { MarketplaceDownloadSidebar } from './components/MarketplaceDownloadSidebar';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
 import { RuntimeInstallCard } from './components/RuntimeInstallCard';
@@ -64,7 +63,6 @@ interface LocalInferenceViewProps {
   isVisible?: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
-  onOpenModelSettings?: () => void;
   updateBadge?: React.ReactNode;
 }
 
@@ -78,7 +76,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   isVisible = true,
   onToggleSidebar,
   onNewChat,
-  onOpenModelSettings,
   updateBadge,
 }) => {
   const restoredSessionRef = useRef<LocalInferenceSessionState | null>(null);
@@ -227,8 +224,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     loadingModelName,
     cancellingModelLoad,
     unloadingModelName,
-    startedModelName,
-    setStartedModelName,
     handleLoadModel,
     handleCancelModelLoad,
     handleUnload,
@@ -661,12 +656,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           />
         </div>
       </Tabs>
-
-      <ModelStartedDialog
-        startedModelName={startedModelName}
-        onClose={() => setStartedModelName(null)}
-        onOpenModelSettings={() => onOpenModelSettings?.()}
-      />
 
       <Dialog open={runtimeSettingsOpen} onOpenChange={handleRuntimeSettingsOpenChange}>
         <DialogContent className="w-[min(48rem,calc(100%-2rem))] max-h-[85vh] gap-4 overflow-y-auto sm:max-w-2xl">
