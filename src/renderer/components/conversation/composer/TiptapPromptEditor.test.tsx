@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import React from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const reduxState = vi.hoisted(() => ({
@@ -31,7 +32,7 @@ vi.mock('react-redux', () => ({
     }),
 }));
 
-import { TiptapPromptEditor } from './TiptapPromptEditor';
+import { TiptapPromptEditor, type TiptapPromptEditorHandle } from './TiptapPromptEditor';
 
 beforeEach(() => {
   reduxState.dispatch.mockClear();
@@ -142,5 +143,39 @@ describe('TiptapPromptEditor', () => {
     const restored = document.querySelector('[data-mention-kind="file"]');
     expect(restored?.getAttribute('data-id')).toBe('/tmp/report.png');
     expect(restored?.getAttribute('data-label')).toBe('report.png');
+  });
+
+  test('clears editor content under React.StrictMode after initial abandoned instance is destroyed', async () => {
+    const ref = React.createRef<TiptapPromptEditorHandle>();
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <React.StrictMode>
+        <TiptapPromptEditor
+          ref={ref}
+          value="hello strict mode"
+          externalVersion={0}
+          onChange={onChange}
+        />
+      </React.StrictMode>,
+    );
+
+    const textbox = screen.getByRole('textbox');
+    expect(textbox.textContent).toContain('hello strict mode');
+
+    // Wait >1ms for the discarded StrictMode EditorInstanceManager's scheduleDestroy timer to fire
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 30));
+    });
+
+    act(() => {
+      ref.current?.clear();
+    });
+    rerender(
+      <React.StrictMode>
+        <TiptapPromptEditor ref={ref} value="" externalVersion={1} onChange={onChange} />
+      </React.StrictMode>,
+    );
+
+    expect(textbox.textContent).toBe('');
   });
 });

@@ -88,7 +88,6 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
     const lastSeedRef = useRef({ value, draftDoc, externalVersion });
     const lastPropsValueRef = useRef(value);
     const pendingSelfValuesRef = useRef<string[]>([]);
-    const mountedRef = useRef(false);
     const clearingRef = useRef(false);
     const placeholderRef = useRef(placeholder);
     placeholderRef.current = placeholder;
@@ -240,16 +239,12 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
           },
         },
         onMount: ({ editor: activeEditor }) => {
-          mountedRef.current = true;
           const dom = activeEditor.view.dom;
           dom.setAttribute('aria-label', placeholderRef.current);
           const firstChild = dom.firstElementChild;
           if (firstChild && firstChild.classList.contains('is-empty')) {
             firstChild.setAttribute('data-placeholder', placeholderRef.current);
           }
-        },
-        onDestroy: () => {
-          mountedRef.current = false;
         },
         onUpdate: ({ editor: activeEditor }) => {
           if (clearingRef.current) return;
@@ -276,7 +271,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
     });
 
     useEffect(() => {
-      if (editor && mountedRef.current && !editor.isDestroyed && editor.view.dom.isConnected) {
+      if (editor && !editor.isDestroyed && editor.view.dom.isConnected) {
         onReady?.();
       }
     }, [editor, onReady]);
@@ -289,7 +284,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
     }, [disabled, editor]);
 
     useEffect(() => {
-      if (!editor || !mountedRef.current || editor.isDestroyed) return;
+      if (!editor || editor.isDestroyed) return;
       const dom = editor.view.dom;
       dom.setAttribute('aria-label', placeholder);
       const firstChild = dom.firstElementChild;
@@ -307,7 +302,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
         };
         lastPropsValueRef.current = nextText;
         pendingSelfValuesRef.current = [];
-        if (!editor || editor.isDestroyed || !mountedRef.current) return;
+        if (!editor || editor.isDestroyed) return;
         if (!nextText && !nextDoc) {
           clearingRef.current = true;
           try {
@@ -353,7 +348,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
       ref,
       () => ({
         focus: () => {
-          if (editor && mountedRef.current && !editor.isDestroyed) {
+          if (editor && !editor.isDestroyed) {
             editor.commands.focus();
           }
         },
@@ -365,7 +360,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
           };
           if (!editor || editor.isDestroyed) return;
           const resetToEmpty = () => {
-            if (!editor || editor.isDestroyed || !mountedRef.current) return;
+            if (!editor || editor.isDestroyed) return;
             if (lastSeedRef.current.value !== '') return;
             clearingRef.current = true;
             try {
