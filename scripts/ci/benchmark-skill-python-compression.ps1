@@ -150,10 +150,15 @@ $solidExtractedRoot = ''
 
 try {
   New-Item -ItemType Directory -Path $benchmarkRoot -Force | Out-Null
+  $listPath = Join-Path $benchmarkRoot 'files.txt'
+  $resourcePackPath = Join-Path $PSScriptRoot '..\windows-resource-pack.cjs'
+  # Compare compression profiles over the same filtered files as the production archive.
+  & node -e "const fs = require('node:fs'); const pack = require(process.argv[1]); const files = pack.listWindowsResourceComponentFiles({dir: process.argv[2], label: 'Skill Python'}); fs.writeFileSync(process.argv[3], files.map(file => 'skill-python/' + file).join('\n') + '\n');" $resourcePackPath $sourceRoot $listPath
+  if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve packaged Skill Python file list' }
   Push-Location (Join-Path $ProjectRoot 'resources')
   try {
     Invoke-SevenZip @(
-      'a', '-t7z', '-mx=5', '-m0=lzma2', '-ms=off', '-mmt=on', $baselineArchive, 'skill-python'
+      'a', '-t7z', '-spd', '-scsUTF-8', '-mx=5', '-m0=lzma2', '-ms=off', '-mmt=on', $baselineArchive, "@$listPath"
     ) 'Skill Python non-solid baseline archive creation'
   } finally {
     Pop-Location

@@ -8,6 +8,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 const temporaryDirectories: string[] = [];
 const scriptPath = path.join(__dirname, 'benchmark-skill-python-compression.ps1');
 const sevenZipPath = require.resolve('7zip-bin/win/x64/7za.exe');
+const { packWindowsResourceComponent7z } = require('../electron-builder-hooks.cjs');
 
 function createFixture(changeSourceAfterBaseline = false) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-skill-python-benchmark-test-'));
@@ -20,14 +21,19 @@ function createFixture(changeSourceAfterBaseline = false) {
     fs.writeFileSync(path.join(sourceRoot, `module-${index}.txt`), 'shared-content-'.repeat(500));
   }
   fs.writeFileSync(path.join(sourceRoot, 'layers', 'shared', 'Scripts', 'python.exe'), 'fixture');
+  fs.writeFileSync(path.join(sourceRoot, '说明 [1].txt'), 'literal filename');
+  for (const excluded of ['__pycache__/module.pyc', '.cache/probe', 'module.js.map', '.env.test']) {
+    const filename = path.join(sourceRoot, excluded);
+    fs.mkdirSync(path.dirname(filename), { recursive: true });
+    fs.writeFileSync(filename, 'excluded from production archives');
+  }
 
   const archivePath = path.join(componentsRoot, 'skill-python.7z');
-  const archive = spawnSync(
+  packWindowsResourceComponent7z(
+    { key: 'skill-python', label: 'Skill Python', dir: sourceRoot, prefix: 'skill-python' },
+    archivePath,
     sevenZipPath,
-    ['a', '-t7z', '-mx=5', '-m0=lzma2', '-ms=on', archivePath, 'skill-python'],
-    { cwd: path.join(root, 'resources'), encoding: 'utf8' },
   );
-  expect(archive.status, archive.stderr || archive.stdout).toBe(0);
   fs.writeFileSync(
     path.join(componentsRoot, 'manifest.json'),
     JSON.stringify({
