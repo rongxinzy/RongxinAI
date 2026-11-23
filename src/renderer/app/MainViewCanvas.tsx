@@ -62,7 +62,6 @@ export interface MainViewCanvasProps {
   hasMountedLocalInference: boolean;
   isLocalInferenceDormant: boolean;
   localInferenceRefreshRequestId: number;
-  onOpenModelSettings: () => void;
   onOpenLocalModels?: () => void;
   /** Cowork inline permission prompts */
   currentSessionId: string | null;
@@ -108,7 +107,6 @@ export function MainViewCanvas({
   hasMountedLocalInference,
   isLocalInferenceDormant,
   localInferenceRefreshRequestId,
-  onOpenModelSettings,
   onOpenLocalModels,
   currentSessionId,
   pendingPermission,
@@ -139,7 +137,6 @@ export function MainViewCanvas({
                     isVisible={mainView === MainView.LocalInference}
                     onToggleSidebar={onToggleSidebar}
                     onNewChat={onNewChat}
-                    onOpenModelSettings={onOpenModelSettings}
                     updateBadge={null}
                   />
                 </React.Suspense>

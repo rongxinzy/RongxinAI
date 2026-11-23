@@ -228,10 +228,6 @@ const App: React.FC = () => {
     setMainView(MainView.Settings);
   }, []);
 
-  const handleOpenLocalModelSettings = useCallback(() => {
-    handleShowSettings({ initialTab: 'models' });
-  }, [handleShowSettings]);
-
   const handleShowSkills = useCallback(() => {
     setMainView(MainView.Skills);
   }, []);
@@ -588,7 +584,6 @@ const App: React.FC = () => {
             hasMountedLocalInference={hasMountedLocalInference}
             isLocalInferenceDormant={isLocalInferenceDormant}
             localInferenceRefreshRequestId={localInferenceRefreshRequestId}
-            onOpenModelSettings={handleOpenLocalModelSettings}
             onOpenLocalModels={handleShowLocalInference}
             currentSessionId={currentSessionId}
             pendingPermission={pendingPermission}
