@@ -53,6 +53,17 @@ Example:
 
 - **Full OpenXML path:** use the pipelines below when .NET 8+ is available; it supports structural editing and templates.
 - **Bundled Markdown fallback:** when the environment check reports `LIMITED`, use only for a new, simple document. Write the content to Markdown, then run `scripts/markdown_to_docx.mjs content.md output.docx` through `run_skill_script`. It supports headings, paragraphs, basic inline emphasis, lists, quotes, code blocks, and simple tables. Do not use it for preserving an existing document's formatting, filling templates, tracked changes, or images. Previews are optional when useful to the task.
+- **Python stdlib fallback:** when .NET and Node are both unavailable but Python 3 is present, run `scripts/make_docx.py content.md output.docx` through `run_skill_script`. It supports headings, paragraphs, bullet lines and `**bold**` only; no tables, images, comments, tracked changes, templates or page-number fields. It verifies the ZIP and XML structure itself but does not render the document; report that limitation.
+
+Probe before choosing:
+
+```bash
+python3 -c "import docx" 2>/dev/null && echo has-python-docx
+node -e "require('docx')" 2>/dev/null && echo has-node-docx
+command -v dotnet; command -v node; command -v python3; command -v soffice
+```
+
+Never run `npm install` or `dotnet restore` when the runtime has no network; use a fallback and state its limitations.
 
 ## Quick Start: Direct C# Path
 
