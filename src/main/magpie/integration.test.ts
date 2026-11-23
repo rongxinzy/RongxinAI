@@ -43,6 +43,8 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
   async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-magpie-integration-'));
     const resourcesRoot = path.resolve(process.env.ZHIYUAN_MAGPIE_RESOURCES || 'resources/magpie');
+    const fixtureBin = path.join(root, 'bin');
+    await fs.mkdir(fixtureBin);
     const config = path.join(root, '.codex', 'config.toml');
     await fs.mkdir(path.dirname(config));
     await fs.writeFile(config, 'model = "fixture-before"\n');
@@ -54,6 +56,7 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
     );
     let windowsChild: ChildProcess | undefined;
     const spawnWindowsHelper = ((...args: Parameters<typeof spawn>) => {
+      expect(args[2]?.env?.PATH).toBe(fixtureBin);
       expect(args[0]).toBe(
         path.join(path.dirname(resourcesRoot), 'python-runtime', 'job-runner.exe'),
       );
@@ -62,6 +65,15 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
     }) as typeof spawn;
     const manager = new MagpieManager({
       resourcesRoot,
+      fetch: async (url, init) => {
+        try {
+          return await fetch(url, init);
+        } catch (cause) {
+          throw new Error(`Native gateway request failed: ${new URL(String(url)).pathname}`, {
+            cause,
+          });
+        }
+      },
       spawn: process.platform === 'win32' ? spawnWindowsHelper : undefined,
       parseCatalog: async bytes =>
         projectMagpieCatalog(JSON.parse(new TextDecoder().decode(bytes))),
@@ -71,7 +83,8 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
         USERPROFILE: root,
         APPDATA: path.join(root, 'appdata'),
         LOCALAPPDATA: path.join(root, 'local'),
-        PATH: process.env.PATH,
+        // Keep installed host CLIs and their daemon probes out of this config-only fixture.
+        PATH: fixtureBin,
         SystemRoot: process.env.SystemRoot,
         TEMP: root,
         TMP: root,
@@ -94,9 +107,8 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
           signalCode: null,
         });
       }
-      const field = (await manager.agents()).agents
-        .find(a => a.id === 'codex')
-        ?.models.find(f => f.key === 'model');
+      const codex = (await manager.agents()).agents.find(a => a.id === 'codex');
+      const field = codex?.models.find(f => f.key === 'model');
       expect(field?.value).toBe('fixture-before');
       const chosen = field?.options.find(
         option => option.value && option.value !== 'fixture-before',

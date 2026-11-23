@@ -115,6 +115,7 @@ for (const language of ['zh', 'en'])
       await page.evaluate(() => {
         window.modelRecovery.available = true;
       });
+      const readsBeforeResume = await page.evaluate(() => window.modelRecovery.reads);
       if (language === 'zh') {
         await page.getByRole('button', { name: '继续回复', exact: true }).click();
       } else {
@@ -126,7 +127,10 @@ for (const language of ['zh', 'en'])
       await expect(input).toHaveValue('Keep the next draft while the old request waits');
       expect(await page.evaluate(() => window.modelRecovery.submits)).toBe(0);
       expect(await page.evaluate(() => window.modelRecovery.receipt.submissionId)).toBe(41);
-      await expect.poll(() => page.evaluate(() => window.modelRecovery.polls)).toBeGreaterThan(0);
+      expect(await page.evaluate(() => window.modelRecovery.reads)).toBeGreaterThan(
+        readsBeforeResume,
+      );
+      expect(await page.evaluate(() => window.modelRecovery.polls)).toBe(0);
       await page
         .getByRole('button', {
           name: language === 'zh' ? '停止回复' : 'Stop replying',
