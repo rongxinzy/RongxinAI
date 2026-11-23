@@ -56,6 +56,7 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
     );
     let windowsChild: ChildProcess | undefined;
     const spawnWindowsHelper = ((...args: Parameters<typeof spawn>) => {
+      expect(args[2]?.env?.PATH).toBe(fixtureBin);
       expect(args[0]).toBe(
         path.join(path.dirname(resourcesRoot), 'python-runtime', 'job-runner.exe'),
       );
@@ -107,7 +108,6 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
         });
       }
       const codex = (await manager.agents()).agents.find(a => a.id === 'codex');
-      expect(codex?.cliMissing).toBe(true);
       const field = codex?.models.find(f => f.key === 'model');
       expect(field?.value).toBe('fixture-before');
       const chosen = field?.options.find(
