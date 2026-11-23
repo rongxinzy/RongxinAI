@@ -4,7 +4,7 @@ import path from 'node:path';
 import { expect, test, vi } from 'vitest';
 import { Type } from 'typebox';
 import { createAssistantMessageEventStream, type AssistantMessage } from '@earendil-works/pi-ai';
-// Exercise the installed SDK, without the adapter's test doubles or a live provider.
+// Exercise the installed SDK with production session guards and no live provider.
 import {
   DefaultResourceLoader,
   ModelRuntime,
@@ -13,6 +13,10 @@ import {
   createAgentSession,
 } from '@earendil-works/pi-coding-agent';
 import { createPiPromptOverrides, getZhiyuanProductPreamble } from './piPromptOverrides';
+import {
+  installPiCompactionSettingsGuard,
+  installPiSessionManagerGuards,
+} from './piBoundedCompaction';
 
 test.each(['threshold', 'overflow', 'missing usage'] as const)(
   'native SDK finishes 32 tool steps across %s compaction without harness continuation',
@@ -63,13 +67,16 @@ test.each(['threshold', 'overflow', 'missing usage'] as const)(
     const events: string[] = [];
     const compactions: string[] = [];
     const tokensAfterCompaction: Array<number | null | undefined> = [];
+    const sessionManager = SessionManager.inMemory(cwd);
+    installPiSessionManagerGuards(sessionManager);
+    installPiCompactionSettingsGuard(settings, () => sessionManager);
     const { session } = await createAgentSession({
       cwd,
       model,
       modelRuntime: runtime,
       resourceLoader: loader,
       settingsManager: settings,
-      sessionManager: SessionManager.inMemory(cwd),
+      sessionManager,
       tools: ['record_step'],
       customTools: [
         {
