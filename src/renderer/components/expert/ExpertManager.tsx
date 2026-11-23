@@ -1,3 +1,4 @@
+import { AgentId } from '@shared/agent';
 import { Button } from '@shared/components/ui/button';
 import { Card } from '@shared/components/ui/card';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
@@ -163,13 +164,15 @@ const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }) => {
     }
   };
 
-  // Filter custom experts (source: 'custom' or not package preset)
+  // Filter custom experts (exclude the built-in default main agent and package presets)
   const customAgents = useMemo(() => {
     return agents.filter(
       agent =>
-        agent.source === 'custom' ||
-        (agent.source !== CoworkSessionExpertSource.Package &&
-          agent.source !== CoworkSessionExpertSource.Member),
+        !agent.isDefault &&
+        agent.id !== AgentId.Main &&
+        (agent.source === 'custom' ||
+          (agent.source !== CoworkSessionExpertSource.Package &&
+            agent.source !== CoworkSessionExpertSource.Member)),
     );
   }, [agents]);
 
