@@ -127,7 +127,9 @@ for (const language of ['zh', 'en'])
       await expect(input).toHaveValue('Keep the next draft while the old request waits');
       expect(await page.evaluate(() => window.modelRecovery.submits)).toBe(0);
       expect(await page.evaluate(() => window.modelRecovery.receipt.submissionId)).toBe(41);
-      expect(await page.evaluate(() => window.modelRecovery.reads)).toBeGreaterThan(readsBeforeResume);
+      expect(await page.evaluate(() => window.modelRecovery.reads)).toBeGreaterThan(
+        readsBeforeResume,
+      );
       expect(await page.evaluate(() => window.modelRecovery.polls)).toBe(0);
       await page
         .getByRole('button', {
