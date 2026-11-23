@@ -62,6 +62,15 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
     }) as typeof spawn;
     const manager = new MagpieManager({
       resourcesRoot,
+      fetch: async (url, init) => {
+        try {
+          return await fetch(url, init);
+        } catch (cause) {
+          throw new Error(`Native gateway request failed: ${new URL(String(url)).pathname}`, {
+            cause,
+          });
+        }
+      },
       spawn: process.platform === 'win32' ? spawnWindowsHelper : undefined,
       parseCatalog: async bytes =>
         projectMagpieCatalog(JSON.parse(new TextDecoder().decode(bytes))),
