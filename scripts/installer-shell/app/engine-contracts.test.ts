@@ -100,7 +100,7 @@ test('install and uninstall reject foreign directories before stopping any proce
   );
   const ownership = transaction.slice(
     transaction.indexOf('public void ValidateOwnership('),
-    transaction.indexOf('public void Begin()'),
+    transaction.indexOf('public void Begin('),
   );
   expect(ownership).toContain('ReadState()');
   expect(ownership).not.toMatch(/Directory\.(Move|Delete)|File\.(Write|Delete)/);
@@ -131,7 +131,7 @@ test('upgrade rollback removes partial new files before restoring the previous a
     'DeleteTreeWithoutFollowingLinks(installDir);',
     transaction.indexOf('else if (Directory.Exists(pending.BackupDir))'),
   );
-  const restore = transaction.indexOf('Directory.Move(pending.BackupDir, installDir);');
+  const restore = transaction.indexOf('MoveDirectory(pending.BackupDir, installDir);');
   expect(partialRemoval).toBeGreaterThan(0);
   expect(restore).toBeGreaterThan(partialRemoval);
   expect(transaction).toContain('Guid.TryParseExact');
@@ -405,6 +405,55 @@ try {
     Check(!File.Exists(Path.Combine(install, "partial.txt")), "partial upgrade survived rollback");
     Check(File.ReadAllText(Path.Combine(data, "sessions.sqlite")) == "personal", "personal data changed");
 
+    if (OperatingSystem.IsWindows()) {
+        var previousWorkingDirectory = Environment.CurrentDirectory;
+        var locked = new InstallDirectoryTransaction(install);
+        Environment.CurrentDirectory = install;
+        var releaseLock = new Thread(() => {
+            Thread.Sleep(300);
+            Environment.CurrentDirectory = previousWorkingDirectory;
+        });
+        releaseLock.Start();
+        try { locked.Begin(); }
+        finally { releaseLock.Join(); Environment.CurrentDirectory = previousWorkingDirectory; }
+        Check(!Directory.Exists(install) && Directory.Exists(locked.BackupDir), "temporary directory lock prevented detach");
+        Directory.CreateDirectory(install);
+        File.WriteAllText(Path.Combine(install, "partial.txt"), "partial");
+        Environment.CurrentDirectory = locked.BackupDir!;
+        releaseLock = new Thread(() => {
+            Thread.Sleep(300);
+            Environment.CurrentDirectory = previousWorkingDirectory;
+        });
+        releaseLock.Start();
+        try { locked.Rollback(); }
+        finally { releaseLock.Join(); Environment.CurrentDirectory = previousWorkingDirectory; }
+        Check(File.ReadAllText(Path.Combine(install, InstallerEngine.AppExeName)) == "old", "temporary backup lock prevented rollback");
+        Check(!File.Exists(Path.Combine(install, "partial.txt")), "locked rollback retained partial files");
+
+        using var cancelRename = new CancellationTokenSource(200);
+        var cancelledRename = false;
+        var renameClock = System.Diagnostics.Stopwatch.StartNew();
+        Environment.CurrentDirectory = install;
+        try { new InstallDirectoryTransaction(install).Begin(cancelRename.Token); }
+        catch (OperationCanceledException) { cancelledRename = true; }
+        finally { Environment.CurrentDirectory = previousWorkingDirectory; }
+        Check(cancelledRename && renameClock.Elapsed < TimeSpan.FromSeconds(2), "locked rename ignored cancellation");
+        new InstallDirectoryTransaction(install).Rollback();
+
+        var refusedLockedRename = false;
+        renameClock.Restart();
+        Environment.CurrentDirectory = install;
+        try { new InstallDirectoryTransaction(install).Begin(); }
+        catch (IOException) { refusedLockedRename = true; }
+        catch (UnauthorizedAccessException) { refusedLockedRename = true; }
+        finally { Environment.CurrentDirectory = previousWorkingDirectory; }
+        Check(refusedLockedRename && renameClock.Elapsed < TimeSpan.FromSeconds(10), "persistent directory lock was ignored or unbounded");
+        new InstallDirectoryTransaction(install).Rollback();
+        Check(File.ReadAllText(Path.Combine(install, InstallerEngine.AppExeName)) == "old", "locked rename failure changed the previous installation");
+        Check(File.ReadAllText(Path.Combine(data, "sessions.sqlite")) == "personal", "locked rename changed personal data");
+        Console.WriteLine("PASS: temporary directory locks recover during detach and rollback; cancellation and persistent locks preserve the old installation");
+    }
+
     var emptyInstall = Path.Combine(root, "empty-install");
     Directory.CreateDirectory(emptyInstall);
     new InstallDirectoryTransaction(emptyInstall).Begin();
@@ -624,6 +673,9 @@ sealed class ContractProgress(Action<EngineEvent> report) : IProgress<EngineEven
       expect(result.stdout).toContain('PASS: admission cancellation reaches the queued worker');
       expect(result.stdout).toContain('PASS: 100000 payload reads produce 101 ordered updates');
       if (process.platform === 'win32') {
+        expect(result.stdout).toContain(
+          'PASS: temporary directory locks recover during detach and rollback',
+        );
         expect(result.stdout).toContain(
           'PASS: actual Windows install/uninstall stop waits for exit before rename',
         );
