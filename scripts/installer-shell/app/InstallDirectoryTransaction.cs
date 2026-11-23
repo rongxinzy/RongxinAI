@@ -44,15 +44,16 @@ internal sealed class InstallDirectoryTransaction
         }
     }
 
-    public void Begin()
+    public void Begin(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (HasPendingState) throw new EngineException("上次安装尚未恢复，请重试安装。");
         ValidateOwnership();
         var exists = Directory.Exists(installDir);
         var backup = exists ? installDir + ".old." + Guid.NewGuid().ToString("n") : null;
         state = new TransactionState(installDir, backup, false);
         WriteState(); // Persist before the rename so a crash never loses the old tree.
-        if (backup is not null) Directory.Move(installDir, backup);
+        if (backup is not null) MoveDirectory(installDir, backup, cancellationToken);
     }
 
     public void MarkCommitted()
@@ -80,10 +81,27 @@ internal sealed class InstallDirectoryTransaction
             // Extraction creates a new directory at the original path. Remove
             // that partial tree before moving the previous installation back.
             DeleteTreeWithoutFollowingLinks(installDir);
-            Directory.Move(pending.BackupDir, installDir);
+            MoveDirectory(pending.BackupDir, installDir);
         }
         // With no backup, the rename never happened: leave the original alone.
         if (!preserveJournal) Finish();
+    }
+
+    private static void MoveDirectory(string source, string destination, CancellationToken cancellationToken = default)
+    {
+        // Process exit can precede the release of directory handles on Windows.
+        for (var attempt = 0; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try { Directory.Move(source, destination); return; }
+            catch (Exception ex) when (attempt < 49 &&
+                (ex is IOException or UnauthorizedAccessException) &&
+                ((ex.HResult & 0xffff) is 5 or 32 or 33) &&
+                Directory.Exists(source) && !Directory.Exists(destination))
+            {
+                if (cancellationToken.WaitHandle.WaitOne(100)) cancellationToken.ThrowIfCancellationRequested();
+            }
+        }
     }
 
     private TransactionState? ReadState()

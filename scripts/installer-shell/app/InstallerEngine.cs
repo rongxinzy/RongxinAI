@@ -482,7 +482,7 @@ public sealed class InstallerEngine
         try
         {
             transactionOwned = true;
-            transaction.Begin();
+            transaction.Begin(ct);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
