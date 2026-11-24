@@ -26,6 +26,7 @@
         "@babel/plugin-transform-runtime": "8.0.1",
         "@babel/runtime": "8.0.0",
         "@base-ui/react": "^1.6.0",
+        "@copilotkit/aimock": "^1.48.1",
         "@earendil-works/pi-ai": "1.5.2",
         "@earendil-works/pi-coding-agent": "1.5.2",
         "@firecrawl/anydoc-wasm": "0.2.4",
@@ -316,6 +317,8 @@
     "@bramus/specificity": ["@bramus/specificity@2.4.2", "https://registry.npmjs.org/@bramus/specificity/-/specificity-2.4.2.tgz", { "dependencies": { "css-tree": "^3.0.0" }, "bin": { "specificity": "bin/cli.js" } }, "sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw=="],
 
     "@chevrotain/types": ["@chevrotain/types@11.1.2", "https://registry.npmjs.org/@chevrotain/types/-/types-11.1.2.tgz", {}, "sha512-U+HFai5+zmJCkK86QsaJtoITlboZHBqrVketcO2ROv865xfCMSFpELQoz1GkX5GzME8pTa+3kbKrZHQtI0gdbw=="],
+
+    "@copilotkit/aimock": ["@copilotkit/aimock@1.48.1", "https://registry.npmjs.org/@copilotkit/aimock/-/aimock-1.48.1.tgz", { "peerDependencies": { "jest": ">=29", "vitest": ">=3" }, "optionalPeers": ["jest", "vitest"], "bin": { "aimock": "dist/aimock-cli.js", "llmock": "dist/cli.js" } }, "sha512-qaHJElsWsLyF+QFCYBORd5kg4TJFUBLWg/c79/r33Ct3DcJhm61jtN0wcQ8H/lVqw/o7V9fH2mLyQepTg+ks+w=="],
 
     "@csstools/color-helpers": ["@csstools/color-helpers@6.1.0", "https://registry.npmjs.org/@csstools/color-helpers/-/color-helpers-6.1.0.tgz", {}, "sha512-064IFJdjTfUqnjpCVpMOdbr8FLQBhinbZj6yRv2An2E41O/pLEXqfFRWqGq/SxlE5PEUYTlvWsG2r8MswAVvkg=="],
 

@@ -17,9 +17,12 @@ export function createTestMagpie(options?: {
   gatewayUrl?: string;
   defaultModelId?: string;
   acceptUnknownModels?: boolean;
+  /** Bearer the adapter sends upstream; override when proxying a real gateway. */
+  workKey?: string;
 }): TestMagpieGateway {
   const models = new Map<string, MagpieModel>();
   const gatewayUrl = options?.gatewayUrl ?? TEST_MAGPIE_GATEWAY;
+  const workKey = options?.workKey ?? TEST_MAGPIE_WORK_KEY;
   let defaultModelId = options?.defaultModelId ?? 'qwen-local';
   const acceptUnknown = options?.acceptUnknownModels !== false;
 
@@ -42,7 +45,7 @@ export function createTestMagpie(options?: {
     {
       status: () => ({ state: 'running', version: 'test', gatewayUrl }),
       ensureRunning: async () => ({ state: 'running', version: 'test', gatewayUrl }),
-      workKeyResolver: () => () => TEST_MAGPIE_WORK_KEY,
+      workKeyResolver: () => () => workKey,
       models: async () =>
         [...models.values()].flatMap(model =>
           model.canonical_id

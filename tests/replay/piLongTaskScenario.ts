@@ -31,6 +31,7 @@ import { SqliteStore } from '../../src/main/sqliteStore';
 import { initializeWorkbenchTaskSchema } from '../../src/main/workbenchTask/schema';
 import { WorkbenchTaskService } from '../../src/main/workbenchTask/taskService';
 import { PiProviderTapeServer } from './piProviderTape';
+import { startAimockProvider, type AimockProviderHandle } from './aimockProvider';
 
 // The shared electron mock drifts behind app.* usage in main-process code;
 // patch only what this scenario triggers (legacy memory migration in SqliteStore).
@@ -46,7 +47,9 @@ export const LONGTASK_DOC_COUNT = 32;
 // window and no cross-request prefix caching. AB_LONGTASK_UPSTREAM points a
 // recording run at a different origin without touching the tape semantics.
 const LONGTASK_LIVE_UPSTREAM = process.env.AB_LONGTASK_UPSTREAM ?? 'http://172.18.6.119:8080';
-const LONGTASK_MODEL_ID = 'qwen3.8-flash-next';
+// Record runs may target any model the upstream gateway serves (AB_LONGTASK_MODEL);
+// the id enters requests and therefore the recorded tape/fixtures.
+const LONGTASK_MODEL_ID = process.env.AB_LONGTASK_MODEL ?? 'qwen3.8-flash-next';
 
 const PROVIDER_NAME = 'custom_ab';
 const ARTIFACT_NAMES = ['summaries.md', 'index.csv', 'report.md'] as const;
@@ -143,7 +146,11 @@ function seedLongTaskWorkspace(workDir: string): void {
 export interface LongTaskScenarioOptions {
   mode: 'live' | 'record' | 'replay';
   workDir: string;
-  /** Required for record/replay. */
+  /** Provider endpoint backing: tape (seq+hash) or aimock fixtures. Default tape. */
+  provider?: 'tape' | 'aimock';
+  /** aimock provider: fixtures directory (loaded on replay, written on record). */
+  aimockFixturesDir?: string;
+  /** Required for record/replay with the tape provider. */
   tapePath?: string;
   /** Replay only: strict (seq+hash) by default; sequential tolerates drift. */
   tapeMatchMode?: 'strict' | 'sequential';
@@ -195,29 +202,45 @@ export async function runLongTaskScenario(
   };
 
   let tapeServer: PiProviderTapeServer | null = null;
+  let aimockServer: AimockProviderHandle | null = null;
   let store: SqliteStore | null = null;
   let adapter: PiRuntimeAdapter | null = null;
   try {
     if (options.mode !== 'live') {
-      if (!options.tapePath) throw new Error(`${options.mode} mode requires tapePath`);
-      tapeServer = await PiProviderTapeServer.start({
-        mode: options.mode,
-        scenario: LONGTASK_SCENARIO_ID,
-        workDir: options.workDir,
-        upstream: options.mode === 'record' ? LONGTASK_LIVE_UPSTREAM : undefined,
-        // The bearer token lives only in forwarded request headers; it never
-        // reaches the tape, so replays stay credential-free.
-        upstreamApiKey:
-          options.mode === 'record' ? process.env.AB_LONGTASK_UPSTREAM_API_KEY : undefined,
-        tapePath: options.tapePath,
-        matchMode: options.tapeMatchMode ?? 'strict',
-        debugDumpDir: options.tapeDebugDumpDir,
-        dumpAllRequestsDir: options.tapeDumpAllRequestsDir,
-      });
-      emit('tapeServer', `${options.mode} ${tapeServer.baseUrl}`);
+      if ((options.provider ?? 'tape') === 'aimock') {
+        if (!options.aimockFixturesDir)
+          throw new Error('aimock provider requires aimockFixturesDir');
+        aimockServer = await startAimockProvider({
+          fixturesDir: options.aimockFixturesDir,
+          recordUpstream: options.mode === 'record' ? LONGTASK_LIVE_UPSTREAM : undefined,
+          recordApiKey:
+            options.mode === 'record' ? process.env.AB_LONGTASK_UPSTREAM_API_KEY : undefined,
+        });
+        emit('aimockServer', `${options.mode} ${aimockServer.baseUrl}`);
+      } else {
+        if (!options.tapePath) throw new Error(`${options.mode} mode requires tapePath`);
+        tapeServer = await PiProviderTapeServer.start({
+          mode: options.mode,
+          scenario: LONGTASK_SCENARIO_ID,
+          workDir: options.workDir,
+          upstream: options.mode === 'record' ? LONGTASK_LIVE_UPSTREAM : undefined,
+          // The bearer token lives only in forwarded request headers; it never
+          // reaches the tape, so replays stay credential-free.
+          upstreamApiKey:
+            options.mode === 'record' ? process.env.AB_LONGTASK_UPSTREAM_API_KEY : undefined,
+          tapePath: options.tapePath,
+          matchMode: options.tapeMatchMode ?? 'strict',
+          debugDumpDir: options.tapeDebugDumpDir,
+          dumpAllRequestsDir: options.tapeDumpAllRequestsDir,
+        });
+        emit('tapeServer', `${options.mode} ${tapeServer.baseUrl}`);
+      }
     }
+    const providerPort = tapeServer?.port ?? aimockServer?.port;
     const providerBaseUrl =
-      options.mode === 'live' ? `${LONGTASK_LIVE_UPSTREAM}/v1` : tapeServer!.baseUrl;
+      options.mode === 'live'
+        ? `${LONGTASK_LIVE_UPSTREAM}/v1`
+        : (tapeServer?.baseUrl ?? aimockServer!.baseUrl);
 
     seedLongTaskWorkspace(options.workDir);
 
@@ -260,13 +283,19 @@ export async function runLongTaskScenario(
       useSystemProxy: false,
       app: { port: 0, isDevelopment: false },
     });
-    if (!tapeServer) {
+    if (providerPort == null) {
       throw new Error('Live long-task runs must go through the local model gateway.');
     }
     const gateway = createTestMagpie({
-      gatewayUrl: `http://127.0.0.1:${tapeServer.port}`,
+      gatewayUrl: `http://127.0.0.1:${providerPort}`,
       defaultModelId: LONGTASK_MODEL_ID,
       acceptUnknownModels: false,
+      // aimock record proxies the live gateway: the session bearer must
+      // authenticate there (fixtures never carry auth headers).
+      workKey:
+        options.provider === 'aimock' && options.mode === 'record'
+          ? process.env.AB_LONGTASK_UPSTREAM_API_KEY
+          : undefined,
     });
     gateway.upsert(LONGTASK_MODEL_ID, {
       context_window: 65_536,
@@ -394,6 +423,7 @@ export async function runLongTaskScenario(
   } finally {
     if (adapter) await adapter.stopAllSessions();
     if (tapeServer) await tapeServer.close();
+    if (aimockServer) await aimockServer.stop();
     if (store) store.close();
     vi.useRealTimers();
   }
