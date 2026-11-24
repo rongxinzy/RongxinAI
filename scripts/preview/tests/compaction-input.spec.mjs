@@ -11,7 +11,9 @@ for (const theme of ['light', 'dark']) {
     attachConsoleGuards(page, errors, 'compaction');
     await home(page, baseURL, previewSearch());
     await page.evaluate(async theme => {
-      const { themeService } = await import('/src/renderer/services/theme.ts');
+      const { themeService } = await import(
+        new URL('/src/renderer/services/theme.ts', window.location.href).href
+      );
       themeService.setTheme(theme);
     }, theme);
     await installConversation(page, historyMessages(1, 1));
@@ -19,9 +21,15 @@ for (const theme of ['light', 'dark']) {
     await editor.fill('Keep this unsent draft');
     const original = await editor.elementHandle();
     await page.evaluate(async () => {
-      const { store } = await import('/src/renderer/store/index.ts');
-      const { receiveRunSnapshot } = await import('/src/renderer/store/slices/coworkRunSlice.ts');
-      const { CoworkRunPhase } = await import('/src/shared/cowork/runState.ts');
+      const { store } = await import(
+        new URL('/src/renderer/store/index.ts', window.location.href).href
+      );
+      const { receiveRunSnapshot } = await import(
+        new URL('/src/renderer/store/slices/coworkRunSlice.ts', window.location.href).href
+      );
+      const { CoworkRunPhase } = await import(
+        new URL('/src/shared/cowork/runState.ts', window.location.href).href
+      );
       const sessionId = store.getState().cowork.currentSession.id;
       const now = Date.now();
       const snapshot = {
@@ -79,9 +87,15 @@ for (const theme of ['light', 'dark']) {
     await expect(editor).toHaveText('Keep this unsent draft');
 
     await page.evaluate(async () => {
-      const { store } = await import('/src/renderer/store/index.ts');
-      const { receiveRunSnapshot } = await import('/src/renderer/store/slices/coworkRunSlice.ts');
-      const { CoworkRunPhase } = await import('/src/shared/cowork/runState.ts');
+      const { store } = await import(
+        new URL('/src/renderer/store/index.ts', window.location.href).href
+      );
+      const { receiveRunSnapshot } = await import(
+        new URL('/src/renderer/store/slices/coworkRunSlice.ts', window.location.href).href
+      );
+      const { CoworkRunPhase } = await import(
+        new URL('/src/shared/cowork/runState.ts', window.location.href).href
+      );
       const sessionId = store.getState().cowork.currentSession.id;
       const current = store.getState().coworkRun.bySession[sessionId];
       store.dispatch(
@@ -99,9 +113,15 @@ for (const theme of ['light', 'dark']) {
     await expect(editor).toHaveAttribute('contenteditable', 'false');
 
     await page.evaluate(async () => {
-      const { store } = await import('/src/renderer/store/index.ts');
-      const { receiveRunSnapshot } = await import('/src/renderer/store/slices/coworkRunSlice.ts');
-      const { CoworkRunPhase } = await import('/src/shared/cowork/runState.ts');
+      const { store } = await import(
+        new URL('/src/renderer/store/index.ts', window.location.href).href
+      );
+      const { receiveRunSnapshot } = await import(
+        new URL('/src/renderer/store/slices/coworkRunSlice.ts', window.location.href).href
+      );
+      const { CoworkRunPhase } = await import(
+        new URL('/src/shared/cowork/runState.ts', window.location.href).href
+      );
       const sessionId = store.getState().cowork.currentSession.id;
       const current = store.getState().coworkRun.bySession[sessionId];
       store.dispatch(
