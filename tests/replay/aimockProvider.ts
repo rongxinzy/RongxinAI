@@ -10,6 +10,7 @@
 
 import fs from 'node:fs';
 import http from 'node:http';
+import https from 'node:https';
 import path from 'node:path';
 
 import { LLMock } from '@copilotkit/aimock';
@@ -57,11 +58,11 @@ export async function startAimockProvider(
     // Recorded fixtures gate on the record-time model id; the scenario's model
     // is env-dependent, so drop the model predicate at load (single-model
     // scenario — turnIndex still discriminates requests).
-    for (const file of fs.readdirSync(options.fixturesDir)) {
+    for (const file of fs.readdirSync(options.fixturesDir).sort()) {
       if (!file.endsWith('.json')) continue;
-      const raw = JSON.parse(
-        fs.readFileSync(path.join(options.fixturesDir, file), 'utf8'),
-      ) as { fixtures?: Array<{ match?: Record<string, unknown> }> };
+      const raw = JSON.parse(fs.readFileSync(path.join(options.fixturesDir, file), 'utf8')) as {
+        fixtures?: Array<{ match?: Record<string, unknown> }>;
+      };
       const entries = raw.fixtures ?? [];
       for (const entry of entries) delete entry.match?.model;
       mock.addFixtures(entries as never);
@@ -98,13 +99,15 @@ function startModelRewriteProxy(target: string): Promise<http.Server> {
           // Non-JSON or unexpected body: forward untouched.
         }
       }
-      const upstreamReq = http.request(
+      const { 'transfer-encoding': _te, ...forwardHeaders } = req.headers;
+      const requester = targetUrl.protocol === 'https:' ? https : http;
+      const upstreamReq = requester.request(
         {
           hostname: targetUrl.hostname,
-          port: targetUrl.port,
+          port: targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80),
           path: req.url,
           method: req.method,
-          headers: { ...req.headers, host: targetUrl.host, 'content-length': body.length },
+          headers: { ...forwardHeaders, host: targetUrl.host, 'content-length': body.length },
         },
         upstreamRes => {
           res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers);
@@ -112,7 +115,7 @@ function startModelRewriteProxy(target: string): Promise<http.Server> {
         },
       );
       upstreamReq.on('error', error => {
-        res.writeHead(502);
+        if (!res.headersSent) res.writeHead(502);
         res.end(String(error));
       });
       upstreamReq.end(body);

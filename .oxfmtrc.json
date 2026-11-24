@@ -49,6 +49,7 @@
     ".claude/",
     "scripts/case-previews/",
     "src/renderer/theme/css/",
+    "tests/replay/generated/",
     "*.md",
     "*.html",
     "*.yml",

@@ -23,27 +23,23 @@ const WORK_DIR = path.join(os.tmpdir(), 'pi-longtask-aimock-work');
 const HARD_CAP_MS = 15 * 60 * 1000;
 
 describe('Pi long-task replay (aimock fixtures)', () => {
-  it(
-    'completes the recorded 32-document task',
-    { timeout: HARD_CAP_MS + 120_000 },
-    async () => {
-      const summary = await runLongTaskScenario({
-        mode: 'replay',
-        provider: 'aimock',
-        aimockFixturesDir: FIXTURES_DIR,
-        workDir: WORK_DIR,
-        hardCapMs: HARD_CAP_MS,
-      });
+  it('completes the recorded 32-document task', { timeout: HARD_CAP_MS + 120_000 }, async () => {
+    const summary = await runLongTaskScenario({
+      mode: 'replay',
+      provider: 'aimock',
+      aimockFixturesDir: FIXTURES_DIR,
+      workDir: WORK_DIR,
+      hardCapMs: HARD_CAP_MS,
+    });
 
-      expect(summary.outcome.status).toBe('complete');
-      expect(summary.errors).toEqual([]);
-      expect(summary.counts.byType['agent_settled']).toBe(1);
-      expect(summary.counts.byType['turn_start']).toBeGreaterThanOrEqual(LONGTASK_DOC_COUNT);
-      expect(summary.workbenchTaskStatus).toBe('settled');
-      for (const [name, size] of Object.entries(summary.artifacts)) {
-        expect(size, `${name} should exist`).not.toBeNull();
-      }
-      expect(inspectLongTaskArtifacts(WORK_DIR, LONGTASK_DOC_COUNT)).toEqual([]);
-    },
-  );
+    expect(summary.outcome.status).toBe('complete');
+    expect(summary.errors).toEqual([]);
+    expect(summary.counts.byType['agent_settled']).toBe(1);
+    expect(summary.counts.byType['turn_start']).toBeGreaterThanOrEqual(LONGTASK_DOC_COUNT);
+    expect(summary.workbenchTaskStatus).toBe('settled');
+    for (const [name, size] of Object.entries(summary.artifacts)) {
+      expect(size, `${name} should exist`).not.toBeNull();
+    }
+    expect(inspectLongTaskArtifacts(WORK_DIR, LONGTASK_DOC_COUNT)).toEqual([]);
+  });
 });

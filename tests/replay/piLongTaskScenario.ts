@@ -208,7 +208,8 @@ export async function runLongTaskScenario(
   try {
     if (options.mode !== 'live') {
       if ((options.provider ?? 'tape') === 'aimock') {
-        if (!options.aimockFixturesDir) throw new Error('aimock provider requires aimockFixturesDir');
+        if (!options.aimockFixturesDir)
+          throw new Error('aimock provider requires aimockFixturesDir');
         aimockServer = await startAimockProvider({
           fixturesDir: options.aimockFixturesDir,
           recordUpstream: options.mode === 'record' ? LONGTASK_LIVE_UPSTREAM : undefined,

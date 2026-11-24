@@ -51,7 +51,11 @@ export interface AdapterProbeResult {
 export async function runAdapterProbe(options: AdapterProbeOptions): Promise<AdapterProbeResult> {
   fs.rmSync(options.workDir, { recursive: true, force: true });
   fs.mkdirSync(path.join(options.workDir, 'data'), { recursive: true });
-  fs.writeFileSync(path.join(options.workDir, 'data', 'probe.txt'), '探针文件内容：混沌测试。', 'utf8');
+  fs.writeFileSync(
+    path.join(options.workDir, 'data', 'probe.txt'),
+    '探针文件内容：混沌测试。',
+    'utf8',
+  );
 
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'aimock-probe-store-'));
   const store = await SqliteStore.create(userData);
@@ -139,22 +143,30 @@ export async function runAdapterProbe(options: AdapterProbeOptions): Promise<Ada
     );
 
     const outcome: AdapterProbeResult['outcome'] = await new Promise(resolve => {
+      let settled = false;
+      let errorGraceTimer: ReturnType<typeof setTimeout> | null = null;
+      const finish = (result: AdapterProbeResult['outcome']) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(capTimer);
+        if (errorGraceTimer) clearTimeout(errorGraceTimer);
+        resolve(result);
+      };
       const capTimer = setTimeout(() => {
-        resolve({ status: 'timeout', reason: `hard cap ${options.hardCapMs}ms reached` });
+        finish({ status: 'timeout', reason: `hard cap ${options.hardCapMs}ms reached` });
       }, options.hardCapMs);
       adapter!.on('complete', completedSessionId => {
         if (completedSessionId !== session.id) return;
-        clearTimeout(capTimer);
-        resolve({ status: 'complete' });
+        finish({ status: 'complete' });
       });
       adapter!.on('error', erroredSessionId => {
         if (erroredSessionId !== session.id) return;
         // Mid-run errors can be recovered by the stall auto-resume; only
         // settle as failed once the session stays down through a grace window.
-        setTimeout(() => {
+        if (errorGraceTimer) clearTimeout(errorGraceTimer);
+        errorGraceTimer = setTimeout(() => {
           if (!adapter!.isSessionRunning(session.id)) {
-            clearTimeout(capTimer);
-            resolve({ status: 'error', reason: 'session stopped after an error' });
+            finish({ status: 'error', reason: 'session stopped after an error' });
           }
         }, 2000);
       });
@@ -168,8 +180,7 @@ export async function runAdapterProbe(options: AdapterProbeOptions): Promise<Ada
           approvalMode: WorkbenchApprovalMode.Ask,
         })
         .catch((error: unknown) => {
-          clearTimeout(capTimer);
-          resolve({ status: 'start_rejected', reason: String(error) });
+          finish({ status: 'start_rejected', reason: String(error) });
         });
     });
 
@@ -183,5 +194,6 @@ export async function runAdapterProbe(options: AdapterProbeOptions): Promise<Ada
   } finally {
     if (adapter) await adapter.stopAllSessions();
     store.close();
+    fs.rmSync(userData, { recursive: true, force: true });
   }
 }
