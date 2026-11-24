@@ -23,8 +23,36 @@ import { startCoworkSession } from './sessionStart';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
 import { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { WorkbenchExecutionStatus } from '../../../shared/workbenchTask';
+import { CoworkSubmissionErrorCode } from '../../../shared/cowork/constants';
 
 vi.mock('../../ipc/handleIpcContract', () => ({ handleIpcContract: vi.fn() }));
+
+test('rejects a stale frontend submission during native compaction without mutating or failing the run', async () => {
+  const runtime = {
+    isSessionReservedForDelivery: () => false,
+    isSessionCompacting: () => true,
+    continueSession: vi.fn(),
+    recovery: { reportRejectedSubmission: vi.fn() },
+  };
+  const getCoworkStore = vi.fn();
+  registerCoworkSessionIpc({
+    getPiRuntimeAdapter: () => runtime,
+    getCoworkStore,
+  } as unknown as CoworkSessionIpcDeps);
+  const handlers = vi.mocked(handleIpcContract).mock.lastCall?.[1];
+  await expect(
+    handlers!.continueSession({} as never, { sessionId: 'work', prompt: 'Retry' }),
+  ).resolves.toEqual({ success: false, code: CoworkSubmissionErrorCode.Compacting });
+  expect(getCoworkStore).not.toHaveBeenCalled();
+  expect(runtime.continueSession).not.toHaveBeenCalled();
+  expect(runtime.recovery.reportRejectedSubmission).not.toHaveBeenCalled();
+
+  registerCoworkQueueIpc({ getPiRuntimeAdapter: () => runtime } as unknown as CoworkQueueIpcDeps);
+  const queueHandlers = vi.mocked(handleIpcContract).mock.lastCall?.[1];
+  await expect(
+    queueHandlers!.enqueuePendingMessage({} as never, { sessionId: 'work', text: 'Retry' }),
+  ).resolves.toMatchObject({ success: false, error: expect.any(String) });
+});
 vi.mock('../../appBootstrap/sessionExperts', async importOriginal => ({
   ...(await importOriginal<typeof import('../../appBootstrap/sessionExperts')>()),
   resolveCoworkPromptLanguage: () => 'en',
@@ -182,6 +210,7 @@ test('an expert switch rolls back if its composed prompt cannot be persisted', a
       getPiRuntimeAdapter: () => ({
         continueSession: dispatch,
         isSessionReservedForDelivery: () => false,
+        isSessionCompacting: () => false,
         isSessionRunning: () => false,
       }),
     } as unknown as CoworkSessionIpcDeps);
@@ -217,6 +246,7 @@ test('rechecks scheduled delivery ownership after loading a changed expert', asy
     .mockReturnValue(pending.promise);
   const runtime = {
     isSessionReservedForDelivery: vi.fn(() => false),
+    isSessionCompacting: () => false,
     continueSession: vi.fn(),
     emit: vi.fn(),
   };
@@ -504,7 +534,11 @@ test('restart publishes committed initial images and only discards unowned stage
 });
 
 test('a stale continuation with an image is rejected before opening the image root', async () => {
-  const runtime = { isSessionReservedForDelivery: () => false, continueSession: vi.fn() };
+  const runtime = {
+    isSessionReservedForDelivery: () => false,
+    isSessionCompacting: () => false,
+    continueSession: vi.fn(),
+  };
   const getCoworkImageRoot = vi.fn(() => {
     throw new Error('image root accessed');
   });
@@ -532,7 +566,10 @@ test('a stale continuation with an image is rejected before opening the image ro
 
 test('queue IPC leaves image persistence to the runtime after queue admission', async () => {
   const rejection = { success: false, error: 'The Work session is not running.' };
-  const runtime = { enqueuePendingMessage: vi.fn().mockResolvedValue(rejection) };
+  const runtime = {
+    isSessionCompacting: () => false,
+    enqueuePendingMessage: vi.fn().mockResolvedValue(rejection),
+  };
   const getCoworkImageRoot = vi.fn(() => {
     throw new Error('image root accessed');
   });

@@ -98,6 +98,7 @@ type PiQueueOptions = Parameters<AgentSession['steer']>[2] & {
 
 /** Minimal type for the Pi AgentSession — only the methods used by this adapter. */
 export interface PiSession {
+  readonly isCompacting?: boolean;
   readonly messages?: readonly unknown[];
   readonly thinkingLevel?: string;
   readonly agent?: {

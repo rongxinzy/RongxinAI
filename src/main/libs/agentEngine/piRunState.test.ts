@@ -8,6 +8,25 @@ import {
 import { getToolProgressPreview, PiRunStateTracker } from './piRunState';
 
 afterEach(() => vi.useRealTimers());
+
+test('projects pre-run compaction and preserves its identity and elapsed time when generation starts', () => {
+  vi.useFakeTimers();
+  const tracker = new PiRunStateTracker(() => {});
+  tracker.observe('a', { type: PiRunEvent.CompactStart });
+  const compacting = tracker.snapshot('a')!;
+  expect(compacting).toMatchObject({ phase: CoworkRunPhase.Compacting, running: true });
+  vi.advanceTimersByTime(40_000);
+  tracker.observe('a', { type: PiRunEvent.CompactEnd });
+  expect(tracker.snapshot('a')?.phase).toBe(CoworkRunPhase.Waiting);
+  tracker.observe('a', { type: PiRunEvent.AgentStart });
+  expect(tracker.snapshot('a')).toMatchObject({
+    runId: compacting.runId,
+    startedAt: compacting.startedAt,
+    running: true,
+  });
+  tracker.finish('a', CoworkRunPhase.Stopped);
+  expect(tracker.snapshot('a')?.running).toBe(false);
+});
 test('confirms a silent running tool without inventing new progress', () => {
   vi.useFakeTimers();
   const tracker = new PiRunStateTracker(() => {});

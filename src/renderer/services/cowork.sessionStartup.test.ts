@@ -1,4 +1,4 @@
-import { CoworkExecutionMode } from '../../shared/cowork/constants';
+import { CoworkExecutionMode, CoworkSubmissionErrorCode } from '../../shared/cowork/constants';
 import { configureStore, type UnknownAction } from '@reduxjs/toolkit';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -23,6 +23,7 @@ vi.mock('./workspace', () => ({
   },
 }));
 vi.mock('./i18n', () => ({ i18nService: { t: (key: string) => key } }));
+vi.mock('./toastNotification', () => ({ showAppToast: vi.fn() }));
 vi.mock('./coworkSessionRenderPreparation', () => ({ prepareCoworkSessionRender: vi.fn() }));
 
 const makeStore = () =>
@@ -59,6 +60,25 @@ const listIds = () => {
   const state = testStore.getState().cowork;
   return [...state.sessions, ...state.chatSessions].map(session => session.id);
 };
+
+test('returns a compaction rejection to restore the draft without adding a terminal error', async () => {
+  const session = makeSession('compacting', CoworkSessionMode.Work);
+  testStore.dispatch(addSession(session));
+  vi.stubGlobal('window', {
+    electron: {
+      cowork: {
+        continueSession: vi.fn().mockResolvedValue({
+          success: false,
+          code: CoworkSubmissionErrorCode.Compacting,
+        }),
+      },
+    },
+  });
+  await expect(
+    coworkService.continueSession({ sessionId: session.id, prompt: 'Unsent draft' }),
+  ).resolves.toBe(false);
+  expect(testStore.getState().cowork.currentSession?.messages).toEqual(session.messages);
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

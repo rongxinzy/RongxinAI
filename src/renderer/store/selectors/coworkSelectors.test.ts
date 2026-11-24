@@ -1,12 +1,26 @@
 import { expect, test } from 'vitest';
 
 import { CoworkSessionStatusValue } from '../../types/cowork';
+import { CoworkRunPhase } from '../../../shared/cowork/runState';
 import {
   resolveDisplayedSessionId,
   selectHasPendingPermissionForSession,
   selectIsStreaming,
+  selectIsSessionCompacting,
   selectPendingPermissionForSession,
 } from './coworkSelectors';
+
+test('treats native compaction before agent_start as busy only for its own session', () => {
+  const state = {
+    cowork: { currentSession: { id: 'a' }, streamingSessionIds: [] },
+    coworkRun: { bySession: { a: { running: true, phase: CoworkRunPhase.Compacting } } },
+  };
+  expect(selectIsStreaming(state as never)).toBe(true);
+  expect(selectIsSessionCompacting(state as never, 'a')).toBe(true);
+  expect(selectIsSessionCompacting(state as never, 'b')).toBe(false);
+  state.coworkRun.bySession.a.running = false;
+  expect(selectIsStreaming(state as never)).toBe(false);
+});
 
 test('selectIsStreaming follows the active session stream registry', () => {
   const state = {

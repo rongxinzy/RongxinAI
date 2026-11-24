@@ -1,4 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { CoworkRunPhase } from '../../../shared/cowork/runState';
 
 import type { RootState } from '../index';
 
@@ -15,10 +16,18 @@ export const selectLoadingSessionId = (state: RootState) => state.cowork.loading
 export const selectStreamingSessionIds = (state: RootState) => state.cowork.streamingSessionIds;
 const selectToolActivitiesBySession = (state: RootState) => state.cowork.toolActivitiesBySession;
 
+export const selectIsSessionCompacting = (state: RootState, sessionId: string | null) => {
+  const snapshot = sessionId ? state.coworkRun?.bySession[sessionId] : undefined;
+  return snapshot?.running === true && snapshot.phase === CoworkRunPhase.Compacting;
+};
+
 export const selectIsStreaming = (state: RootState) => {
   const session = state.cowork.currentSession;
   if (!session) return false;
-  return state.cowork.streamingSessionIds.includes(session.id);
+  return (
+    state.cowork.streamingSessionIds.includes(session.id) ||
+    state.coworkRun?.bySession[session.id]?.running === true
+  );
 };
 export const selectRemoteManaged = (state: RootState) =>
   state.cowork.currentSession?.remoteManaged ?? false;

@@ -4,6 +4,27 @@ import { expect, test, vi } from 'vitest';
 import { CoworkSessionIpc } from '../shared/ipc/channels';
 import type { PiRuntimeAdapter } from './libs/agentEngine/piRuntimeAdapter';
 import { bindCoworkRunBridge } from './coworkRunBridge';
+import { CoworkRunPhase, PiRunEvent } from '../shared/cowork/runState';
+
+test('closes idle manual compaction but keeps pre-run automatic compaction busy', () => {
+  const runtime = Object.assign(new EventEmitter(), { isSessionRunning: vi.fn(() => false) });
+  const publish = vi.fn();
+  bindCoworkRunBridge(runtime as unknown as PiRuntimeAdapter, vi.fn(), publish);
+  runtime.emit('executionEvent', 'session', { type: PiRunEvent.CompactStart });
+  expect(publish.mock.lastCall?.[0]).toMatchObject({
+    running: true,
+    phase: CoworkRunPhase.Compacting,
+  });
+  runtime.emit('executionEvent', 'session', { type: PiRunEvent.CompactEnd });
+  expect(publish.mock.lastCall?.[0]).toMatchObject({ running: false });
+  runtime.isSessionRunning.mockReturnValue(true);
+  runtime.emit('executionEvent', 'session', { type: PiRunEvent.CompactStart });
+  runtime.emit('executionEvent', 'session', { type: PiRunEvent.CompactEnd });
+  expect(publish.mock.lastCall?.[0]).toMatchObject({
+    running: true,
+    phase: CoworkRunPhase.Waiting,
+  });
+});
 
 test('run snapshot read returns tracker state without side-channel content pushes', async () => {
   const runtime = Object.assign(new EventEmitter(), { isSessionRunning: () => false });

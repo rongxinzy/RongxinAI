@@ -55,6 +55,9 @@ export async function continuePiRuntimeSession(
   const explicitExpertIds = normalizeSingleExpertIds(options.expertIds);
   const nextUnattended = options.unattended === true;
   const active = host.activeSessions.get(sessionId);
+  if (active && !active.aborted && active.piSession.isCompacting) {
+    throw new Error('Cannot submit a prompt while compaction is in progress.');
+  }
   if (
     active?.revalidatingModelScope ||
     (host.isSessionRunning(sessionId) &&

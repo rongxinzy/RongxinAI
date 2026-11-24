@@ -552,6 +552,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
     );
   }
 
+  isSessionCompacting(sessionId: string): boolean {
+    const active = this.activeSessions.get(sessionId);
+    return Boolean(active && !active.aborted && active.piSession.isCompacting);
+  }
+
   getRunningSessionIds(): string[] {
     const sessionIds = new Set(this.initializingSessions.keys());
     for (const sessionId of this.activeSessions.keys()) {

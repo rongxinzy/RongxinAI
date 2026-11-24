@@ -120,6 +120,7 @@ export const zhMain3 = {
   communityAuthLoginIncomplete: '登录未完成，请重试。',
   communityAuthServiceUnavailable: '登录服务暂时不可用，请稍后重试。',
   modelPoolSessionBusy: '当前会话仍在处理，请稍后再试。',
+  coworkRunCompacting: '正在压缩上下文，请稍候',
   modelPoolStreamInterrupted: '回答意外中断，已保留收到的内容。请重试或要求继续。',
 
   aisphereMissingModel: '所选模型不在当前 AISphere 平台列表中，请刷新后重新选择。',

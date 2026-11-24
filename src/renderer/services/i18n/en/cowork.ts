@@ -235,7 +235,7 @@ export const enCowork: Record<string, string> = {
   coworkRunWriting: 'Generating the response',
   coworkRunTool: 'Running a tool',
   coworkRunRetry: 'Retrying',
-  coworkRunCompacting: 'Organizing context',
+  coworkRunCompacting: 'Compressing conversation context, please wait',
   coworkRunApproval: 'Waiting for your approval',
   coworkRunFinishing: 'Preparing and verifying results',
   coworkRunCompleted: 'Task completed',
