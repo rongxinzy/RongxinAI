@@ -40,6 +40,19 @@ beforeEach(() => {
 });
 
 describe('TiptapPromptEditor', () => {
+  test('disables editing during compaction and restores the same draft and editor afterwards', () => {
+    const onChange = vi.fn();
+    const view = render(<TiptapPromptEditor value="Unsent draft" onChange={onChange} />);
+    const editor = screen.getByRole('textbox');
+    view.rerender(<TiptapPromptEditor value="Unsent draft" onChange={onChange} disabled />);
+    expect(editor.getAttribute('contenteditable')).toBe('false');
+    expect(editor.textContent).toBe('Unsent draft');
+    view.rerender(<TiptapPromptEditor value="Unsent draft" onChange={onChange} />);
+    expect(screen.getByRole('textbox')).toBe(editor);
+    expect(editor.getAttribute('contenteditable')).toBe('true');
+    expect(editor.textContent).toBe('Unsent draft');
+    expect(onChange).not.toHaveBeenCalled();
+  });
   test('renders textbox with aria-multiline and syncs external value changes', () => {
     const onChange = vi.fn();
     const { rerender } = render(

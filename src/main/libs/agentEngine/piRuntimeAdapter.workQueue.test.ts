@@ -50,6 +50,28 @@ describe('PiRuntimeAdapter', () => {
   setupPiRuntimeAdapterSuite();
 
   describe('pending Work messages', () => {
+    it('rejects continuation during compaction without resetting the active turn and still allows stop', async () => {
+      await adapter.startSession('compacting', 'Start', { sessionMode: 'work' });
+      const active = adapter.activeSessions.get('compacting')!;
+      active.answerText = 'Preserved answer';
+      const submissionToken = active.submissionToken;
+      Object.defineProperty(mockSession, 'isCompacting', { configurable: true, value: true });
+      try {
+        expect(adapter.isSessionCompacting('compacting')).toBe(true);
+        await expect(adapter.continueSession('compacting', 'Duplicate')).rejects.toThrow(
+          /compaction/,
+        );
+        expect(active.submissionToken).toBe(submissionToken);
+        expect(active.answerText).toBe('Preserved answer');
+        expect(active.isRunning).toBe(true);
+        expect(mockSession.prompt).toHaveBeenCalledTimes(1);
+        adapter.stopSession('compacting');
+        expect(adapter.isSessionCompacting('compacting')).toBe(false);
+        expect(mockSession.abort).toHaveBeenCalled();
+      } finally {
+        Reflect.deleteProperty(mockSession, 'isCompacting');
+      }
+    });
     it('delivers explicit steering directly without rebuilding accepted follow-ups', async () => {
       await adapter.startSession('native-queue', 'Start', { sessionMode: 'work' });
       adapter.enqueuePendingMessage('native-queue', 'Follow-up');

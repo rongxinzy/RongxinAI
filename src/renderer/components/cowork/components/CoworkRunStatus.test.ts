@@ -68,3 +68,12 @@ test('does not claim the background is alive when confirmations stop', () => {
     'coworkRunIndicatorReconnecting',
   );
 });
+
+test('keeps the explicit compaction notice during a long summary request', () => {
+  expect(
+    getRunStatusText(
+      { ...snapshot, phase: CoworkRunPhase.Compacting },
+      snapshot.confirmedAt + 40_000,
+    ),
+  ).toBe('coworkRunCompacting');
+});

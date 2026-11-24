@@ -1,6 +1,7 @@
 import {
   CoworkRunPhase,
   CoworkRunPolicy,
+  PiRunEvent,
   type CoworkContentPatch,
   type CoworkRunSnapshot,
 } from '../shared/cowork/runState';
@@ -17,9 +18,13 @@ export function bindCoworkRunBridge(
 ): CoworkContentProjection {
   const projection = new CoworkContentProjection();
   const tracker = new PiRunStateTracker(publishSnapshot);
-  runtime.on('executionEvent', (sessionId, event, workbenchRunId) =>
-    tracker.observe(sessionId, event, workbenchRunId),
-  );
+  runtime.on('executionEvent', (sessionId, event, workbenchRunId) => {
+    tracker.observe(sessionId, event, workbenchRunId);
+    // Manual compaction on an idle session has no subsequent agent_settled.
+    if (event.type === PiRunEvent.CompactEnd && !runtime.isSessionRunning(sessionId)) {
+      tracker.finish(sessionId, CoworkRunPhase.Completed);
+    }
+  });
   runtime.on('permissionRequest', sessionId =>
     tracker.setPhase(sessionId, CoworkRunPhase.Approval),
   );

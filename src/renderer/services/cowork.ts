@@ -11,6 +11,7 @@ import {
   COWORK_MESSAGE_HISTORY_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
   CoworkSessionMode,
+  CoworkSubmissionErrorCode,
   type CoworkSessionSource,
 } from '../../shared/cowork/constants';
 import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
@@ -378,6 +379,10 @@ class CoworkService {
       fileAttachments: options.fileAttachments,
     });
     if (!result.success) {
+      if (result.code === CoworkSubmissionErrorCode.Compacting) {
+        showAppToast(i18nService.t('coworkRunCompacting'));
+        return false;
+      }
       const terminalError = result.error
         ? resolveCoworkTerminalError(result.error, result.code)
         : null;

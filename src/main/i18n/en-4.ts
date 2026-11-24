@@ -3,6 +3,7 @@ export const enMain4 = {
   modelPoolStreamInterrupted:
     'The response was interrupted. Received content is preserved. Retry or ask to continue.',
 
+  coworkRunCompacting: 'Compressing conversation context, please wait',
   aisphereMissingModel:
     'The selected model is not available on AISphere. Refresh and select a platform model.',
   aisphereUnavailable:

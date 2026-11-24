@@ -291,7 +291,7 @@ export const zhCowork: Record<string, string> = {
   coworkRunWriting: '正在生成回复',
   coworkRunTool: '正在执行工具',
   coworkRunRetry: '正在重试',
-  coworkRunCompacting: '正在整理上下文',
+  coworkRunCompacting: '正在压缩上下文，请稍候',
   coworkRunApproval: '等待你的确认',
   coworkRunFinishing: '正在整理和校验结果',
   coworkRunCompleted: '任务已完成',

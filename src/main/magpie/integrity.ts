@@ -135,7 +135,8 @@ async function defaultVerifyOsSignature(
         ],
         {
           windowsHide: true,
-          timeout: 5_000,
+          // Cold PowerShell startup and certificate-chain checks can exceed five seconds.
+          timeout: 30_000,
           signal,
           env: { ...process.env, ZHIYUAN_MAGPIE_BIN: file },
         },
@@ -149,7 +150,13 @@ async function defaultVerifyOsSignature(
             return resolve();
           }
           const detail = stderr?.trim() || error.message;
-          reject(new Error(`Model service Authenticode signature verification failed: ${detail}`));
+          const processError = error as typeof error & { killed?: boolean; signal?: string };
+          const diagnostics = `code=${String(code)}, signal=${processError.signal ?? 'none'}, killed=${processError.killed === true}`;
+          reject(
+            new Error(
+              `Model service Authenticode signature verification failed (${diagnostics}): ${detail}`,
+            ),
+          );
         },
       );
     });

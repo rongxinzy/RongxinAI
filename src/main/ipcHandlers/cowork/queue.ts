@@ -6,6 +6,7 @@ import { handleIpcContract } from '../../ipc/handleIpcContract';
 import { coworkQueueContract } from '../../../shared/ipc/coworkContract';
 import { slimQueuedMessagesForIpc } from '../../coworkImageAttachments';
 import type { PiRuntimeAdapter } from '../../libs/agentEngine/piRuntimeAdapter';
+import { t } from '../../i18n';
 
 export interface CoworkQueueIpcDeps {
   getPiRuntimeAdapter: () => PiRuntimeAdapter;
@@ -31,6 +32,9 @@ export const registerCoworkQueueIpc = (deps: CoworkQueueIpcDeps): void => {
 
     enqueuePendingMessage: async (_event, input) => {
       try {
+        if (deps.getPiRuntimeAdapter().isSessionCompacting(input.sessionId)) {
+          return { success: false as const, error: t('coworkRunCompacting') };
+        }
         return await deps
           .getPiRuntimeAdapter()
           .enqueuePendingMessage(

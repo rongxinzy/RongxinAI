@@ -375,7 +375,7 @@ export function useCoworkSessionActions({
       const isChatMode = workMode === WorkMode.Chat;
       const baseSystemPrompt = isChatMode ? '' : agentSystemPrompt || config.systemPrompt || '';
 
-      await coworkService.continueSession({
+      return await coworkService.continueSession({
         sessionId: currentSession.id,
         prompt,
         systemPrompt: isChatMode

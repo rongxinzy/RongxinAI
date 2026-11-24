@@ -11,6 +11,7 @@ import type { RootState } from '../../../store';
 
 export function getRunStatusText(snapshot: CoworkRunSnapshot | undefined, now: number): string {
   if (!snapshot?.running) return i18nService.t('coworkRunIndicatorStarting');
+  if (snapshot.phase === CoworkRunPhase.Compacting) return i18nService.t('coworkRunCompacting');
   if (now - snapshot.confirmedAt > CoworkRunPolicy.UnconfirmedMs)
     return i18nService.t('coworkRunIndicatorReconnecting');
   if (snapshot.phase === CoworkRunPhase.Approval) return i18nService.t('coworkRunApproval');
@@ -54,7 +55,9 @@ export function CoworkRunStatus({
       className="theme-run-indicator flex shrink-0 items-center justify-center gap-2 overflow-hidden"
     >
       <Spinner aria-hidden="true" role="presentation" className="shrink-0" />
-      <span className="truncate">{status}</span>
+      <span className="truncate" aria-live="polite">
+        {status}
+      </span>
       <time
         className="theme-run-indicator-elapsed shrink-0"
         dateTime={`PT${elapsed}S`}

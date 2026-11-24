@@ -11,7 +11,7 @@ import { handleIpcContract } from '../../ipc/handleIpcContract';
 import { coworkSessionLifecycleContract } from '../../../shared/ipc/coworkContract';
 import { projectCoworkSessionRuntimeState } from '../../coworkSessionRuntimeState';
 import { t } from '../../i18n';
-import { CoworkSessionMode } from '../../../shared/cowork/constants';
+import { CoworkSessionMode, CoworkSubmissionErrorCode } from '../../../shared/cowork/constants';
 import { resolveCoworkApprovalMode } from './approvalMode';
 
 import {
@@ -46,6 +46,9 @@ export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
         if (runtime.isSessionReservedForDelivery(options.sessionId)) {
           return { success: false, error: t('modelPoolSessionBusy') };
         }
+        if (runtime.isSessionCompacting(options.sessionId)) {
+          return { success: false, code: CoworkSubmissionErrorCode.Compacting };
+        }
         const localStore = deps.getCoworkStore();
         let existingSession = localStore.getSession(options.sessionId, 0, {
           includeArtifacts: false,
@@ -68,6 +71,9 @@ export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
           if (!existingSession) return { success: false, error: t('coworkSessionNotFound') };
         }
         const previousExpertSnapshots = existingSession.experts;
+        if (runtime.isSessionCompacting(options.sessionId)) {
+          return { success: false, code: CoworkSubmissionErrorCode.Compacting };
+        }
         const expertSnapshots = replacement ?? previousExpertSnapshots.slice(0, 1);
         const nextSystemPrompt =
           existingSession.mode === CoworkSessionMode.Chat

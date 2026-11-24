@@ -3,9 +3,11 @@ import { useSelector } from 'react-redux';
 
 import { CoworkSessionMode, type CoworkPermissionMode } from '../../../../shared/cowork/constants';
 import { i18nService } from '../../../services/i18n';
+import type { RootState } from '../../../store';
 import {
   selectCurrentSession,
   selectIsStreaming,
+  selectIsSessionCompacting,
   selectLoadingSessionId,
   selectRemoteManaged,
 } from '../../../store/selectors/coworkSelectors';
@@ -39,6 +41,9 @@ export function StageComposer({
   const currentSession = useSelector(selectCurrentSession);
   const loadingSessionId = useSelector(selectLoadingSessionId);
   const isStreaming = useSelector(selectIsStreaming);
+  const isCompacting = useSelector((state: RootState) =>
+    selectIsSessionCompacting(state, displayedSessionId),
+  );
   const remoteManaged = useSelector(selectRemoteManaged);
   const workMode = useSelector(selectWorkMode);
   const switching = Boolean(
@@ -58,13 +63,15 @@ export function StageComposer({
           ) : null,
         isStreaming: !switching && isStreaming,
         sessionContextPending: switching,
-        disabled: !switching && (managed || awaitingQuestion || awaitingPermission),
+        disabled: !switching && (managed || awaitingQuestion || awaitingPermission || isCompacting),
         placeholder: i18nService.t(
-          managed
-            ? 'coworkRemoteManagedPlaceholder'
-            : workMode === CoworkSessionMode.Chat
-              ? 'chatPlaceholder'
-              : 'coworkContinuePlaceholder',
+          isCompacting
+            ? 'coworkRunCompacting'
+            : managed
+              ? 'coworkRemoteManagedPlaceholder'
+              : workMode === CoworkSessionMode.Chat
+                ? 'chatPlaceholder'
+                : 'coworkContinuePlaceholder',
         ),
         remoteManaged: managed,
         showFolderSelector: false,
