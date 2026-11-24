@@ -22,11 +22,24 @@ vi.mock('../../workbenchTask/artifactWorkerPool', () => ({
     runTextWorkerOperation(input),
 }));
 
-const Scenario = { Threshold: 'threshold', RepeatedLength: 'repeated-length' } as const;
+const Scenario = {
+  Threshold: 'threshold',
+  RepeatedLength: 'repeated-length',
+  RecoveredLength: 'recovered-length',
+} as const;
+const Failure = { Length: 'length', Http400: 'http400', Http500: 'http500', Sse: 'sse' } as const;
 
-test.each([Scenario.Threshold, Scenario.RepeatedLength])(
-  'full adapter preserves native context recovery and honest completion on unpatched Pi: %s',
-  async scenario => {
+test.each(
+  [
+    { scenario: Scenario.Threshold, failure: Failure.Length, thinkingOnly: false },
+    ...[Scenario.RepeatedLength, Scenario.RecoveredLength].flatMap(scenario => [
+      ...Object.values(Failure).map(failure => ({ scenario, failure, thinkingOnly: false })),
+      { scenario, failure: Failure.Length, thinkingOnly: true },
+    ]),
+  ].flatMap(configuration => [4096, 65536].map(maxTokens => ({ ...configuration, maxTokens }))),
+)(
+  'native recovery: $scenario $failure thinkingOnly=$thinkingOnly output=$maxTokens',
+  async ({ scenario, failure, thinkingOnly, maxTokens }) => {
     const root = await mkdtemp(path.join(tmpdir(), 'pi-adapter-pressure-'));
     const sessionId = 'context-pressure';
     const modelId = 'context-pressure-model';
@@ -36,6 +49,7 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
       'report.md',
     ];
     let calls = 0;
+    let truncatedResponses = 0;
     let summaries = 0;
     let callsAtSummary = 0;
     const requests: Array<{ summary: boolean; maxTokens: number }> = [];
@@ -55,7 +69,26 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
           summaries++;
           callsAtSummary = calls;
         }
-        const truncated = !summary && scenario === Scenario.RepeatedLength;
+        const truncated =
+          !summary &&
+          (scenario === Scenario.RepeatedLength ||
+            (scenario === Scenario.RecoveredLength && summaries === 0));
+        if (truncated) {
+          truncatedResponses++;
+          if (failure !== Failure.Length) {
+            const error = { message: 'Context size has been exceeded.' };
+            if (failure === Failure.Sse) {
+              res.writeHead(200, { 'content-type': 'text/event-stream' });
+              res.end(`data: ${JSON.stringify({ error })}\n\n`);
+            } else {
+              res.writeHead(failure === Failure.Http400 ? 400 : 500, {
+                'content-type': 'application/json',
+              });
+              res.end(JSON.stringify({ error }));
+            }
+            return;
+          }
+        }
         const tool = !summary && !truncated && calls < artifacts.length;
         const file = artifacts[calls];
         const delta = tool
@@ -75,11 +108,15 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
             }
           : {
               role: 'assistant',
-              content: summary
-                ? `Written ${calls} files. Continue with file ${calls + 1}, finish all 34.`
-                : truncated
-                  ? '.'
-                  : 'All artifacts written.',
+              ...(truncated && thinkingOnly
+                ? { reasoning_content: 'Still thinking, no answer yet.' }
+                : {
+                    content: summary
+                      ? `Written ${calls} files. Continue with file ${calls + 1}, finish all 34.`
+                      : truncated
+                        ? '.'
+                        : 'All artifacts written.',
+                  }),
             };
         const input =
           summaries === 0 ? 63455 : summary ? 16000 : 3000 + (calls - callsAtSummary) * 7000;
@@ -122,7 +159,7 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
         defaultModelId: modelId,
         acceptUnknownModels: false,
       });
-      gateway.upsert(modelId, { context_window: 65536, max_output_tokens: 4096 });
+      gateway.upsert(modelId, { context_window: 65536, max_output_tokens: maxTokens });
       gateway.setImage(modelId, false);
       const mutableApp = app as unknown as Record<string, unknown>;
       mutableApp.getAppPath ??= () => process.cwd();
@@ -202,7 +239,8 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
       expect(requests.every(request => request.maxTokens > 1)).toBe(true);
       const persisted = SessionManager.open(manager.getSessionFile()!);
       expect(persisted.getBranch().some(entry => entry.type === 'compaction')).toBe(true);
-      if (scenario === Scenario.Threshold) {
+      if (scenario !== Scenario.RepeatedLength) {
+        if (scenario === Scenario.RecoveredLength) expect(truncatedResponses).toBe(1);
         expect(errors).toEqual([]);
         expect(complete).toBe(1);
         expect(summaries).toBeGreaterThan(2);
@@ -211,7 +249,11 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
         }
       } else {
         expect(complete).toBe(0);
-        expect(errors).not.toHaveLength(0);
+        expect(errors).toHaveLength(1);
+        expect(truncatedResponses).toBe(2);
+        expect(
+          cowork.getSession(sessionId)!.messages.filter(message => message.metadata?.error),
+        ).toHaveLength(1);
         expect(persisted.getBranch().filter(entry => entry.type === 'compaction')).toHaveLength(1);
         expect(requests.filter(request => !request.summary)).toHaveLength(2);
         expect((await readdir(root)).filter(name => artifacts.includes(name))).toEqual([]);

@@ -18,7 +18,12 @@ import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { handlePiCompactionEvent } from './piCompactionEvents';
 import { PiAssistantEventType } from './piStreamConstants';
-import { invalidatesPiFinalResponse, isPiFinalResponse } from './piFinalResponse';
+import {
+  invalidatesPiFinalResponse,
+  isPiFinalResponse,
+  isPiThinkingOnlyResponse,
+} from './piFinalResponse';
+import { PiAssistantStopReason } from './piToolConstants';
 import { getPiPreparingToolActivity, toToolActivityInput } from './toolActivity';
 import type { PiAssistantTranscript } from './piAssistantTranscript';
 import { clonePiStreamMessage } from './piStreamMessageClone';
@@ -741,14 +746,20 @@ export class PiRuntimeTurnEvents {
       active.lastCompletedAnswerMessageId,
     );
     // Pi has exhausted its own continuations. A truncated/aborted/tool-only
-    // final attempt is an interruption, never a successful task completion.
+    // or thinking-only final attempt is never a successful task completion.
     if (
       active.lastAssistantMessage &&
       invalidatesPiFinalResponse(active.lastAssistantMessage) &&
       !active.pendingError &&
       !active.errorSurfaced
     ) {
-      const message = t('modelPoolStreamInterrupted');
+      const message =
+        active.lastAssistantMessage.stopReason === PiAssistantStopReason.Length
+          ? t('coworkOutputTruncated')
+          : active.lastAssistantMessage.stopReason === PiAssistantStopReason.Stop &&
+              isPiThinkingOnlyResponse(active.lastAssistantMessage)
+            ? t('taskThinkingOnly')
+            : t('modelPoolStreamInterrupted');
       active.pendingError = {
         message,
         classified: makeCoworkError(CoworkErrorKind.StreamInterrupted, message),

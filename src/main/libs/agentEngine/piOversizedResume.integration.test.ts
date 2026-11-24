@@ -30,14 +30,18 @@ const markers = Array.from(
   (_, index) => `EVIDENCE_${String(index).padStart(3, '0')}`,
 );
 
-test.each([
-  { window: 65536, scenario: Scenario.Restore, terminal: PiAssistantStopReason.Stop },
-  { window: 262144, scenario: Scenario.Restore, terminal: PiAssistantStopReason.Stop },
-  { window: 65536, scenario: Scenario.Restore, terminal: PiAssistantStopReason.Error },
-  { window: 65536, scenario: Scenario.SummaryFailure, terminal: PiAssistantStopReason.Stop },
-  { window: 65536, scenario: Scenario.SummaryFailure, terminal: PiAssistantStopReason.Length },
-])(
-  'resumes a genuinely oversized persisted session on unpatched Pi: $window $scenario $terminal',
+test.each(
+  [
+    { window: 65536, scenario: Scenario.Restore, terminal: PiAssistantStopReason.Stop },
+    { window: 262144, scenario: Scenario.Restore, terminal: PiAssistantStopReason.Stop },
+    { window: 65536, scenario: Scenario.Restore, terminal: PiAssistantStopReason.Error },
+    { window: 65536, scenario: Scenario.SummaryFailure, terminal: PiAssistantStopReason.Stop },
+    { window: 65536, scenario: Scenario.SummaryFailure, terminal: PiAssistantStopReason.Length },
+  ].flatMap(configuration =>
+    [4096, configuration.window].map(maxTokens => ({ ...configuration, maxTokens })),
+  ),
+)(
+  'resumes a genuinely oversized persisted session on unpatched Pi: $window $scenario $terminal output=$maxTokens',
   async configuration => {
     const root = await mkdtemp(path.join(tmpdir(), 'pi-oversized-resume-'));
     const workspace = path.join(root, 'workspace');
@@ -135,7 +139,10 @@ test.each([
         defaultModelId: modelId,
         acceptUnknownModels: false,
       });
-      gateway.upsert(modelId, { context_window: configuration.window, max_output_tokens: 4096 });
+      gateway.upsert(modelId, {
+        context_window: configuration.window,
+        max_output_tokens: configuration.maxTokens,
+      });
       gateway.setImage(modelId, false);
       const mutableApp = app as unknown as Record<string, unknown>;
       mutableApp.getAppPath ??= () => process.cwd();

@@ -16,6 +16,7 @@ import {
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoworkStore } from '../../coworkStore';
+import { t } from '../../i18n';
 import {
   PiAssistantStopReason,
   PiBuiltinFileToolName,
@@ -351,8 +352,12 @@ describe('PiRuntimeAdapter', () => {
       ).toBe(2);
     });
 
-    it.each([PiAssistantStopReason.Stop, PiAssistantStopReason.Aborted])(
-      'preserves the latest answer only when trailing thinking ends normally (%s)',
+    it.each([
+      PiAssistantStopReason.Stop,
+      PiAssistantStopReason.Aborted,
+      PiAssistantStopReason.Length,
+    ])(
+      'does not reuse an earlier answer when the final turn has only thinking (%s)',
       async stopReason => {
         const error = vi.fn();
         adapter.on('error', error);
@@ -392,8 +397,17 @@ describe('PiRuntimeAdapter', () => {
               update.content === 'Answer before trailing reasoning' &&
               update.metadata?.isFinalAnswer === true,
           ),
-        ).toBe(stopReason === PiAssistantStopReason.Stop);
-        expect(error).toHaveBeenCalledTimes(stopReason === PiAssistantStopReason.Stop ? 0 : 1);
+        ).toBe(false);
+        expect(error).toHaveBeenCalledOnce();
+        expect(error.mock.calls[0][1].message).toBe(
+          t(
+            stopReason === PiAssistantStopReason.Stop
+              ? 'taskThinkingOnly'
+              : stopReason === PiAssistantStopReason.Length
+                ? 'coworkOutputTruncated'
+                : 'modelPoolStreamInterrupted',
+          ),
+        );
       },
     );
 

@@ -40,14 +40,27 @@ test('retains a TERM-resistant model until confirmed exit and shares concurrent 
   mocks.spawn.mockReturnValue(child);
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({ ok: true })),
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ default_generation_settings: { n_ctx: 4096 } }),
+    })),
   );
   const manager = new LlamaCppModelProcessManager({
     getExecutablePath: async () => '/mock/llama-server',
     getServiceConfig: () => ({}),
     startupTimeoutMs: () => 1000,
   });
-  await manager.ensureRunning({ model: 'test', modelPath: '/mock/test.gguf' });
+  const loaded = await manager.ensureRunning({
+    model: 'test',
+    modelPath: '/mock/test.gguf',
+    options: { ctxSize: 32768 },
+  });
+  expect(loaded.runtimeContextLength).toBe(4096);
+  expect(manager.list()[0]?.runtimeContextLength).toBe(4096);
+  expect(
+    (await manager.ensureRunning({ model: 'test', modelPath: '/mock/test.gguf' }))
+      .runtimeContextLength,
+  ).toBe(4096);
   const first = manager.stop('test');
   const concurrent = manager.stopAll();
   expect(manager.list()).toHaveLength(1);
@@ -76,14 +89,27 @@ test('failed termination stays tracked and can be retried', async () => {
   mocks.spawn.mockReturnValue(child);
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({ ok: true })),
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ default_generation_settings: { n_ctx: 4096 } }),
+    })),
   );
   const manager = new LlamaCppModelProcessManager({
     getExecutablePath: async () => '/mock/llama-server',
     getServiceConfig: () => ({}),
     startupTimeoutMs: () => 1000,
   });
-  await manager.ensureRunning({ model: 'test', modelPath: '/mock/test.gguf' });
+  const loaded = await manager.ensureRunning({
+    model: 'test',
+    modelPath: '/mock/test.gguf',
+    options: { ctxSize: 32768 },
+  });
+  expect(loaded.runtimeContextLength).toBe(4096);
+  expect(manager.list()[0]?.runtimeContextLength).toBe(4096);
+  expect(
+    (await manager.ensureRunning({ model: 'test', modelPath: '/mock/test.gguf' }))
+      .runtimeContextLength,
+  ).toBe(4096);
   const secondChild = Object.assign(new EventEmitter(), {
     pid: 12346,
     exitCode: null,
@@ -132,7 +158,10 @@ test('daemon shutdown releases a model port reserved after stop-all and never sp
   mocks.spawn.mockReturnValue(child);
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({ ok: true })),
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ default_generation_settings: { n_ctx: 4096 } }),
+    })),
   );
   const manager = new LlamaCppModelProcessManager({
     getExecutablePath: async () => '/mock/llama-server',
@@ -151,4 +180,35 @@ test('daemon shutdown releases a model port reserved after stop-all and never sp
   expect(mocks.spawn.mock.calls.length).toBe(0);
   expect(mocks.release).toHaveBeenCalledExactlyOnceWith('test');
   expect(manager.list()).toEqual([]);
+});
+
+test('rejects a healthy runtime with unknown capacity instead of advertising the requested context', async () => {
+  const child = Object.assign(new EventEmitter(), {
+    exitCode: null,
+    signalCode: null,
+    stdout: new EventEmitter(),
+    stderr: new EventEmitter(),
+    kill: vi.fn(() => {
+      queueMicrotask(() => child.emit('exit', 0, null));
+      return true;
+    }),
+  });
+  mocks.spawn.mockReturnValue(child);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ default_generation_settings: { n_ctx: 0 } }),
+    })),
+  );
+  const manager = new LlamaCppModelProcessManager({
+    getExecutablePath: async () => '/mock/llama-server',
+    getServiceConfig: () => ({ ctxSize: '32768' }),
+    startupTimeoutMs: () => 1000,
+  });
+  await expect(
+    manager.ensureRunning({ model: 'test', modelPath: '/mock/test.gguf' }),
+  ).rejects.toThrow('valid context window');
+  expect(manager.list()).toEqual([]);
+  expect(mocks.release).toHaveBeenCalledExactlyOnceWith('test');
 });

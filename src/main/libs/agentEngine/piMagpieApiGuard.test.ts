@@ -79,6 +79,18 @@ test('normalizeContextOverflowErrorMessage makes llama.cpp error match isContext
   expect(isContextOverflow(makeAssistantError(normalized), 32768)).toBe(true);
 });
 
+test('keeps tokenizer headroom when a local model advertises its full window as output ceiling', () => {
+  const model = makeModel(65536, 65536);
+  const context = makeContext('a'.repeat(41016 * 3.5));
+  const estimatedInput = estimateContextTokens(context).tokens;
+  const output = clampMagpieMaxTokensToContext(model, context, model.maxTokens);
+  expect(output).toBeGreaterThan(4096);
+  expect(estimatedInput + Math.ceil(estimatedInput * 0.15) + output).toBe(65536);
+  // The stricter tokenizer fixture from oversized resume counts this request as 45,249 tokens.
+  expect(45249 + output).toBeLessThanOrEqual(model.contextWindow);
+  expect(clampMagpieMaxTokensToContext(model, makeContext('Hello'), 1024)).toBe(1024);
+});
+
 test('wrapMagpieNativeApi handles undefined mocks and prevents 1-token futile requests on overflow', async () => {
   expect(wrapMagpieNativeApi(undefined as never)).toBeUndefined();
 

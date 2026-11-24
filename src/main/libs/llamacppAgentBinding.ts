@@ -12,10 +12,6 @@ export {
   LlamaCppAgentEligibilityReason,
 } from '../../shared/llamacpp';
 
-const LLAMACPP_MIN_AGENT_MAX_TOKENS = 512;
-const LLAMACPP_MAX_AGENT_MAX_TOKENS = 4096;
-const LLAMACPP_OUTPUT_TOKEN_RATIO = 0.25;
-
 export type LlamaCppRunningModelBinding = {
   id: string;
   name: string;
@@ -59,10 +55,7 @@ export function buildLlamaCppRunningModelBinding(
     ...(contextWindow
       ? {
           contextWindow,
-          maxTokens: Math.min(
-            preference?.maxTokens ?? deriveLlamaCppAgentMaxTokens(contextWindow),
-            contextWindow,
-          ),
+          maxTokens: Math.min(preference?.maxTokens ?? contextWindow, contextWindow),
         }
       : {}),
     agentEligibility: assessLlamaCppAgentEligibility({
@@ -79,18 +72,4 @@ export function buildLlamaCppRunningModelBindings(
   return models
     .map(model => buildLlamaCppRunningModelBinding(model, preferences))
     .filter((model): model is LlamaCppRunningModelBinding => model !== null);
-}
-
-export function deriveLlamaCppAgentMaxTokens(runtimeContextLength: number): number {
-  if (!Number.isFinite(runtimeContextLength) || runtimeContextLength <= 0) {
-    return LLAMACPP_MIN_AGENT_MAX_TOKENS;
-  }
-
-  return Math.max(
-    LLAMACPP_MIN_AGENT_MAX_TOKENS,
-    Math.min(
-      LLAMACPP_MAX_AGENT_MAX_TOKENS,
-      Math.floor(runtimeContextLength * LLAMACPP_OUTPUT_TOKEN_RATIO),
-    ),
-  );
 }

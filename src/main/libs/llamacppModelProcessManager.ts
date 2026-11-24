@@ -106,9 +106,6 @@ export class LlamaCppModelProcessManager extends EventEmitter {
       modelPath,
       port: lease.port,
       baseUrl: `http://${LOCAL_MODEL_HOST}:${lease.port}`,
-      ...(resolveRuntimeContextLength(input, config)
-        ? { runtimeContextLength: resolveRuntimeContextLength(input, config) }
-        : {}),
       ...(child.pid ? { pid: child.pid } : {}),
     };
     const startup = this.waitUntilHealthy(snapshot, child);
@@ -132,7 +129,9 @@ export class LlamaCppModelProcessManager extends EventEmitter {
     });
 
     try {
-      return await startup;
+      const ready = await startup;
+      record.runtimeContextLength = ready.runtimeContextLength;
+      return ready;
     } catch (error) {
       await this.stop(modelName).catch((): undefined => undefined);
       throw error;
@@ -196,24 +195,32 @@ export class LlamaCppModelProcessManager extends EventEmitter {
       if (child.exitCode !== null || child.signalCode !== null) {
         throw new Error(`Model process exited before becoming ready: ${snapshot.modelName}.`);
       }
+      let healthy = false;
       try {
-        const response = await fetch(`${snapshot.baseUrl}/health`, {
-          signal: AbortSignal.timeout(500),
-        });
-        if (response.ok) return snapshot;
+        healthy = (
+          await fetch(`${snapshot.baseUrl}/health`, {
+            signal: AbortSignal.timeout(500),
+          })
+        ).ok;
       } catch {
         // The process has not bound its local port yet.
+      }
+      if (healthy) {
+        const propsResponse = await fetch(`${snapshot.baseUrl}/props`, {
+          signal: AbortSignal.timeout(1000),
+        });
+        if (!propsResponse.ok) throw new Error('Model runtime properties are unavailable.');
+        const props = (await propsResponse.json()) as {
+          default_generation_settings?: { n_ctx?: unknown };
+        };
+        const actual = props?.default_generation_settings?.n_ctx;
+        if (typeof actual !== 'number' || !Number.isSafeInteger(actual) || actual <= 0) {
+          throw new Error('Model runtime did not report a valid context window.');
+        }
+        return { ...snapshot, runtimeContextLength: actual };
       }
       await new Promise(resolve => setTimeout(resolve, STARTUP_POLL_INTERVAL_MS));
     }
     throw new Error(`Model process did not become ready before timeout: ${snapshot.modelName}.`);
   }
-}
-
-function resolveRuntimeContextLength(
-  input: LlamaCppModelLaunchInput,
-  config: LlamaCppServiceConfig,
-): number | undefined {
-  const configured = input.options?.ctxSize ?? Number.parseInt(config.ctxSize ?? '', 10);
-  return Number.isSafeInteger(configured) && configured > 0 ? configured : undefined;
 }

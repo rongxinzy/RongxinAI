@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { t } from '../../i18n';
 import { PiAssistantTranscript } from './piAssistantTranscript';
 import type { ActivePiSession } from './piRuntimeSessionState';
 import {
@@ -516,7 +515,7 @@ describe('PiAssistantTranscript', () => {
     );
   });
 
-  it('provides an informative notice when CoT reasoning exhausts max_tokens with empty answer', () => {
+  it('does not inject a truncation notice before native recovery settles', () => {
     const updateMessage = vi.fn();
     const emitMessageUpdate = vi.fn();
     const row = {
@@ -551,18 +550,11 @@ describe('PiAssistantTranscript', () => {
 
     local.closeIdlePlaceholders('session', active, { finalize: true });
 
-    expect(updateMessage).toHaveBeenCalledWith(
+    expect(active.assistantMessageId).toBeNull();
+    expect(emitMessageUpdate).not.toHaveBeenCalledWith(
       'session',
       row.id,
-      expect.objectContaining({
-        content: t('coworkReasoningOutputTruncated'),
-      }),
-      expect.anything(),
-    );
-    expect(emitMessageUpdate).toHaveBeenCalledWith(
-      'session',
-      row.id,
-      t('coworkReasoningOutputTruncated'),
+      expect.stringMatching(/.+/),
       expect.anything(),
     );
   });
