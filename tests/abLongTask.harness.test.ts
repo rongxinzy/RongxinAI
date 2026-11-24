@@ -24,6 +24,10 @@ import { LONGTASK_DOC_COUNT, runLongTaskScenario } from './replay/piLongTaskScen
 import { inspectLongTaskArtifacts } from './replay/piLongTaskAcceptance';
 
 const MODE = process.env.AB_LONGTASK;
+// AB_PROVIDER=aimock swaps the seq+hash tape server for aimock fixtures
+// (semantic matching; fixtures live under tests/replay/generated/aimock-longtask).
+const PROVIDER = process.env.AB_PROVIDER === 'aimock' ? 'aimock' : 'tape';
+const AIMOCK_FIXTURES_DIR = path.resolve(__dirname, 'replay/generated/aimock-longtask');
 const TAPE_PATH = path.resolve(__dirname, 'replay/tapes/longtask-32doc.jsonl.gz');
 const WORK_DIR = path.join(os.tmpdir(), 'pi-longtask-replay-work');
 const HARD_CAP_MS = 180 * 60 * 1000;
@@ -36,8 +40,10 @@ describe.skipIf(!MODE || MODE === '0')('A/B long-task manual driver', () => {
       const mode = MODE === 'record' ? 'record' : MODE?.startsWith('replay') ? 'replay' : 'live';
       const summary = await runLongTaskScenario({
         mode,
+        provider: PROVIDER,
+        aimockFixturesDir: PROVIDER === 'aimock' ? AIMOCK_FIXTURES_DIR : undefined,
         workDir: WORK_DIR,
-        tapePath: mode === 'live' ? undefined : TAPE_PATH,
+        tapePath: mode === 'live' || PROVIDER === 'aimock' ? undefined : TAPE_PATH,
         tapeMatchMode: MODE === 'replay-sequential' ? 'sequential' : 'strict',
         tapeDumpAllRequestsDir:
           MODE === 'replay-dump' ? path.join(os.tmpdir(), 'pi-longtask-request-dump') : undefined,

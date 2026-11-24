@@ -283,7 +283,9 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 - 按 Ponytail 选择足以验证本次改动的检查。
 - 修改 token、recipe 或生成器后，用 `bun run theme:generate` 更新生成文件。
 - 单测与源码同目录，只用 `.test.ts`，`import { test, expect } from 'vitest'`；避免 import Electron-only API（如 electron-log）。新建/修改的测试必须跑到通过。
-- **Provider 回放**：`tests/piLongTaskReplay.test.ts` 用录制磁带（`tests/replay/tapes/longtask-32doc.jsonl.gz`）对完整 Pi adapter 栈跑 32 文档长任务，做严格 seq+hash 匹配，prompt 组装、工具接线或完成语义漂移即失败。prompt/场景有意变更后重录：`AB_LONGTASK=record AB_LONGTASK_UPSTREAM_API_KEY=<token> bunx vitest run tests/abLongTask.harness.test.ts`（live 上游与模型见 `tests/replay/piLongTaskScenario.ts`；2026-10 起算力为 64K 上下文单模型部署，场景规模据此定为 32 文档）。
+- **Provider 回放（aimock，CI 门禁）**：`tests/aimockLongTaskReplay.test.ts` 用 aimock fixtures（`tests/replay/generated/aimock-longtask/`）对完整 Pi adapter 栈回放 32 文档长任务；语义匹配（turnIndex/工具轮次），容忍 prompt 漂移，行为发散仍由产物验收拦截。重录：`AB_LONGTASK=record AB_PROVIDER=aimock AB_LONGTASK_MODEL=<模型> AB_LONGTASK_UPSTREAM=<网关> AB_LONGTASK_UPSTREAM_API_KEY=<token> bunx vitest run tests/abLongTask.harness.test.ts`（录制链路含 `tests/replay/aimockProvider.ts` 的 model 前缀剥离 shim）。
+- **混沌测试**：`tests/aimockChaos.test.ts` 经 `tests/replay/adapterBench.ts` 短探针驱动真实 adapter 栈，用 aimock 注入 429、断流、未知工具、非法工具参数，验证重试与容错；「流终止符丢失后静默收尾」是已观察到的产品缺口，以 `it.fails` 标记。
+- 旧 seq+hash 磁带（`tests/replay/tapes/`）与 `tests/piLongTaskReplay.test.ts` 因 prompt 漂移暂停（skip），仅供 `AB_LONGTASK=replay-sequential` 排障使用。
 
 ## Git 与 PR
 

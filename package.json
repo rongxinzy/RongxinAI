@@ -247,6 +247,7 @@
     "@babel/plugin-transform-runtime": "8.0.1",
     "@babel/runtime": "8.0.0",
     "@base-ui/react": "^1.6.0",
+    "@copilotkit/aimock": "^1.48.1",
     "@earendil-works/pi-ai": "1.5.2",
     "@earendil-works/pi-coding-agent": "1.5.2",
     "@firecrawl/anydoc-wasm": "0.2.4",
