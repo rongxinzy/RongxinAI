@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, test, vi } from 'vitest';
 import { app } from 'electron';
-import { CoworkExecutionMode } from '../../src/shared/cowork/constants';
+import { CoworkExecutionMode, CoworkSessionStatus } from '../../src/shared/cowork/constants';
 import { CoworkStore } from '../../src/main/coworkStore';
 import { SqliteStore } from '../../src/main/sqliteStore';
 import { PiRuntimeAdapter } from '../../src/main/libs/agentEngine/piRuntimeAdapter';
@@ -13,13 +13,22 @@ import { initializeWorkbenchTaskSchema } from '../../src/main/workbenchTask/sche
 import { WorkbenchTaskService } from '../../src/main/workbenchTask/taskService';
 import { createTestMagpie } from '../helpers/createTestMagpie';
 import { PiAssistantStopReason } from '../../src/main/libs/agentEngine/piToolConstants';
+import { t } from '../../src/main/i18n';
 
 const mutableApp = app as unknown as Record<string, unknown>;
 if (typeof mutableApp.getAppPath !== 'function') mutableApp.getAppPath = () => process.cwd();
 
-test.each([PiAssistantStopReason.Length, PiAssistantStopReason.Stop])(
-  'real adapter and HTTP provider distinguish terminal %s',
-  async finishReason => {
+test.each([
+  ...[
+    { finishReason: PiAssistantStopReason.Length, thinkingOnly: false },
+    { finishReason: PiAssistantStopReason.Length, thinkingOnly: true },
+    { finishReason: PiAssistantStopReason.Stop, thinkingOnly: false },
+    { finishReason: PiAssistantStopReason.Stop, thinkingOnly: true },
+    { finishReason: PiAssistantStopReason.Error, thinkingOnly: true },
+  ].map(configuration => ({ ...configuration, prompt: 'Respond once.' })),
+])(
+  'real adapter terminal $finishReason thinkingOnly=$thinkingOnly input=$prompt.length',
+  async ({ finishReason, thinkingOnly, prompt }) => {
     const directory = await mkdtemp(path.join(tmpdir(), 'pi-http-terminal-'));
     const model = 'offline-terminal';
     let requests = 0;
@@ -28,8 +37,13 @@ test.each([PiAssistantStopReason.Length, PiAssistantStopReason.Stop])(
       requests += 1;
       res.writeHead(200, { 'content-type': 'text/event-stream' });
       res.write(
-        `data: ${JSON.stringify({ id: 'offline', object: 'chat.completion.chunk', model, choices: [{ index: 0, delta: { role: 'assistant', content: 'Recorded response.' }, finish_reason: null }] })}\n\n`,
+        `data: ${JSON.stringify({ id: 'offline', object: 'chat.completion.chunk', model, choices: [{ index: 0, delta: { role: 'assistant', ...(thinkingOnly ? { reasoning_content: 'Thinking without an answer.' } : { content: 'Recorded response.' }) }, finish_reason: null }] })}\n\n`,
       );
+      if (finishReason === PiAssistantStopReason.Error) {
+        // Clean EOF with no finish_reason is still an interrupted thinking stream.
+        res.end();
+        return;
+      }
       res.end(
         `data: ${JSON.stringify({ id: 'offline', object: 'chat.completion.chunk', model, choices: [{ index: 0, delta: {}, finish_reason: finishReason }], usage: { prompt_tokens: 32, completion_tokens: finishReason === PiAssistantStopReason.Length ? 4096 : 12, total_tokens: finishReason === PiAssistantStopReason.Length ? 4128 : 44 } })}\n\ndata: [DONE]\n\n`,
       );
@@ -60,14 +74,41 @@ test.each([PiAssistantStopReason.Length, PiAssistantStopReason.Stop])(
         '',
         CoworkExecutionMode.Local,
       );
-      await adapter.startSession(session.id, 'Respond once.', {
+      await adapter.startSession(session.id, prompt, {
         workspaceRoot: directory,
         sessionMode: 'work',
       });
-      expect(error).not.toHaveBeenCalled();
-      expect(complete).toHaveBeenCalledOnce();
-      expect(complete).toHaveBeenCalledWith(session.id);
-      expect(requests).toBe(1);
+      if (finishReason === PiAssistantStopReason.Error) {
+        expect(error).toHaveBeenCalledOnce();
+        expect(coworkStore.getSession(session.id)!.status).toBe(CoworkSessionStatus.Error);
+        expect(complete).not.toHaveBeenCalled();
+        expect(coworkStore.getSession(session.id)!.status).toBe(CoworkSessionStatus.Error);
+        const persistedErrors = coworkStore
+          .getSession(session.id)!
+          .messages.filter(message => message.metadata?.error);
+        expect(persistedErrors).toHaveLength(1);
+        expect(String(persistedErrors[0].metadata?.error)).toContain('finish_reason');
+        expect(requests).toBeGreaterThan(0);
+        expect(requests).toBeLessThanOrEqual(4);
+      } else if (finishReason === PiAssistantStopReason.Length || thinkingOnly) {
+        const message = t(
+          finishReason === PiAssistantStopReason.Length
+            ? 'coworkOutputTruncated'
+            : 'taskThinkingOnly',
+        );
+        expect(error).toHaveBeenCalledWith(session.id, expect.objectContaining({ message }));
+        expect(complete).not.toHaveBeenCalled();
+        expect(
+          coworkStore
+            .getSession(session.id)!
+            .messages.some(persisted => persisted.metadata?.error === message),
+        ).toBe(true);
+      } else {
+        expect(error).not.toHaveBeenCalled();
+        expect(complete).toHaveBeenCalledOnce();
+        expect(complete).toHaveBeenCalledWith(session.id);
+      }
+      if (finishReason !== PiAssistantStopReason.Error) expect(requests).toBe(1);
     } finally {
       adapter.stopAllSessions();
       await store.close();

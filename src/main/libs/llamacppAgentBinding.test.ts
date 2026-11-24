@@ -3,7 +3,6 @@ import { expect, test } from 'vitest';
 import {
   assessLlamaCppAgentEligibility,
   buildLlamaCppRunningModelBinding,
-  deriveLlamaCppAgentMaxTokens,
   LLAMACPP_AGENT_MIN_CONTEXT_WINDOW,
   LlamaCppAgentEligibilityReason,
 } from './llamacppAgentBinding';
@@ -20,7 +19,7 @@ test('buildLlamaCppRunningModelBinding uses runtime context length for Agent con
     id: 'qwen-local',
     name: 'qwen-local',
     contextWindow: 32768,
-    maxTokens: 4096,
+    maxTokens: 32768,
     agentEligibility: {
       eligible: true,
       reason: LlamaCppAgentEligibilityReason.Eligible,
@@ -32,12 +31,14 @@ test('buildLlamaCppRunningModelBinding uses runtime context length for Agent con
   });
 });
 
-test('buildLlamaCppRunningModelBinding caps Agent maxTokens below the runtime context window', () => {
-  expect(deriveLlamaCppAgentMaxTokens(4096)).toBe(1024);
-  expect(deriveLlamaCppAgentMaxTokens(8192)).toBe(2048);
-  expect(deriveLlamaCppAgentMaxTokens(16384)).toBe(4096);
-  expect(deriveLlamaCppAgentMaxTokens(32768)).toBe(4096);
-});
+test.each([4096, 8192, 16384, 32768, 65536])(
+  'uses Pi native default output ceiling for a %i-token runtime',
+  window => {
+    expect(
+      buildLlamaCppRunningModelBinding({ name: 'local', runtime_context_length: window }),
+    ).toMatchObject({ contextWindow: window, maxTokens: window });
+  },
+);
 
 test('publishes model preferences without advertising capacity beyond the loaded runtime', () => {
   const running = { name: 'qwen-local', runtime_context_length: 32768 };
@@ -98,7 +99,7 @@ test('buildLlamaCppRunningModelBinding keeps smaller runtime contexts but marks 
     id: 'qwen-local',
     name: 'qwen-local',
     contextWindow: 4096,
-    maxTokens: 1024,
+    maxTokens: 4096,
     agentEligibility: {
       eligible: false,
       reason: LlamaCppAgentEligibilityReason.RuntimeContextTooSmall,

@@ -1,9 +1,9 @@
 export const enMain2 = {
+  coworkOutputTruncated:
+    'The response reached its output or context limit before completion. Shorten the request or adjust the model context and output settings, then try again.',
   coworkSessionNotFound: 'This conversation no longer exists.',
   coworkWorkContextWindowTooSmall:
     'Model "{model}" context window ({current} tokens) is below the minimum {required} required for Work mode. Choose a model with a larger context window or switch to Chat mode.',
-  coworkReasoningOutputTruncated:
-    'The model reached its output limit during reasoning before it could answer. Increase the maximum output tokens or lower the reasoning effort.',
   coworkErrorGatewayDraining: 'AI engine is restarting. Please wait a moment and try again.',
   coworkErrorNetworkError: 'Network connection failed. Please check your network settings.',
   coworkErrorRateLimit: 'Too many requests. Please try again later.',

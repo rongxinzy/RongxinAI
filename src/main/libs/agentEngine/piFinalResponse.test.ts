@@ -33,7 +33,22 @@ test('tool responses and interrupted responses invalidate an earlier final answe
       content: [{ type: PiContentBlockType.ToolCall }],
     }),
   ).toBe(true);
-  expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.Length })).toBe(false);
+  expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.Length })).toBe(true);
   expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.Aborted })).toBe(true);
   expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.Error })).toBe(true);
+});
+
+test.each(['', '   '])('thinking with only %j text cannot be a successful final answer', text => {
+  const message = {
+    stopReason: PiAssistantStopReason.Stop,
+    content: [
+      { type: PiContentBlockType.Thinking, thinking: 'Still thinking.' },
+      { type: PiContentBlockType.Text, text },
+    ],
+  };
+  expect(isPiFinalResponse(message)).toBe(false);
+  expect(invalidatesPiFinalResponse(message)).toBe(true);
+  message.content[1]!.text = 'A visible answer';
+  expect(isPiFinalResponse(message)).toBe(true);
+  expect(invalidatesPiFinalResponse(message)).toBe(false);
 });

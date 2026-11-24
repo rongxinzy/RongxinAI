@@ -15,6 +15,7 @@ export const PiBuiltinFileToolName = {
 
 export const PiContentBlockType = {
   Text: 'text',
+  Thinking: 'thinking',
   ToolCall: 'toolCall',
 } as const;
 

@@ -288,10 +288,8 @@ export function clampMagpieMaxTokensToContext(
     Math.ceil(model.contextWindow * CONTEXT_SAFETY_RATIO),
   );
   const margin = Math.max(fixedMargin, Math.ceil(input * CONTEXT_SAFETY_RATIO));
-  let room = model.contextWindow - input - margin;
-  if (room < MIN_OUTPUT_WITH_RATIO_MARGIN) {
-    room = Math.min(MIN_OUTPUT_WITH_RATIO_MARGIN, model.contextWindow - input - fixedMargin);
-  }
+  // Retain the estimate margin even when output room is small; dropping it can overflow a full-window output ceiling.
+  const room = model.contextWindow - input - margin;
   if (room < MIN_MAX_TOKENS) {
     throw new Error(
       `Context window exceeded: estimated input ${input} leaves no output budget in ${model.contextWindow} tokens`,
