@@ -6,5 +6,6 @@
 | --- | --- |
 | [overview.zh-CN.md](overview.zh-CN.md) | 进程边界、目录导览、Pi 引擎、本地推理、IPC、发版与代码门禁 |
 | [streaming.md](streaming.md) | Cowork 流式链路：Pi 事件 → UIMessageChunk 增量 → 16ms 单点合并 → 序列化 IPC → rAF 批处理 → LiveTextStore，快照仅限异常路径与终态 |
+| [target-execution-architecture.zh-CN.md](target-execution-architecture.zh-CN.md) | 会话生命周期、命令仲裁、单一运行态投影、能力实测契约与终态结算的目标架构及分阶段收敛路线 |
 
 Agent 编码规则仍以 [AGENTS.md](../../AGENTS.md) 为准；PR 流程见 [DEVOPS.md](../../DEVOPS.md)、[CONTRIBUTING.md](../../CONTRIBUTING.md)。发版细节见 [RELEASING.md](../../RELEASING.md)。
