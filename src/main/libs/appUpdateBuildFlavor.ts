@@ -7,6 +7,7 @@
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { InferenceEdition, normalizeInferenceEdition } from '../../shared/inferenceEdition';
 
 type AppPackageJson = {
   zhiyuanUpdateVariant?: unknown;
@@ -23,15 +24,18 @@ function readAppPackageJson(): AppPackageJson | null {
   }
 }
 
-/** `lite`, `cpu`, `cuda` or `full`; unknown builds fall back to `lite`. */
+/** Match the edition and package format registered by the release feed. */
 export function resolveBuildVariant(): string {
-  if (process.platform === 'linux') return process.env.APPIMAGE ? 'appimage' : 'deb';
-  if (process.platform !== 'win32') return 'default';
+  if (process.platform === 'darwin') return InferenceEdition.Cpu;
   const variant = readAppPackageJson()?.zhiyuanUpdateVariant;
-  if (typeof variant !== 'string') return 'lite';
-  const normalized = variant.trim().toLowerCase();
-  if (normalized === 'full' || normalized === 'cpu' || normalized === 'cuda') return normalized;
-  return 'lite';
+  const edition = normalizeInferenceEdition(typeof variant === 'string' ? variant : undefined);
+  if (process.platform === 'linux') {
+    if (edition !== InferenceEdition.Cuda) {
+      throw new Error('Linux online updates require a packaged CUDA edition');
+    }
+    return `${process.env.APPIMAGE ? 'appimage' : 'deb'}-${edition}`;
+  }
+  return edition;
 }
 
 /**

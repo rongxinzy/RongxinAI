@@ -37,7 +37,7 @@ import {
 import { readInstallResult } from './appUpdateInstallReceipt';
 import { AppUpdateReleaseChannel, toUpdateInfo, type UpdateTarget } from './appUpdateManifest';
 import {
-  electronUpdaterFeedUrl,
+  electronUpdaterFeedOptions,
   manifestCacheKeyForChannel,
   readChannelPreference,
   writeChannelPreference,
@@ -791,10 +791,7 @@ export class AppUpdateCoordinator {
   }
 
   private configureUpdater(target: UpdateTarget): void {
-    this.updater.setFeedURL({
-      provider: 'generic',
-      url: electronUpdaterFeedUrl(this.resolveReleaseChannel(), target),
-    });
+    this.updater.setFeedURL(electronUpdaterFeedOptions(this.resolveReleaseChannel(), target));
   }
 
   private clearTransientUpdateState(): void {

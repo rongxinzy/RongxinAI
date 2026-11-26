@@ -1,11 +1,17 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { isPreviousReleaseProtected, RETENTION_MS } from './cleanup-retention.mjs';
+import {
+  isDifferentialBaseObject,
+  isPreviousReleaseProtected,
+  RETENTION_MS,
+} from './cleanup-retention.mjs';
 import {
   loadTrustedReleaseKey,
   readAndVerifyCollection,
   referencedObjectKeys,
+  collectionVersion,
+  compareVersions,
 } from './update-manifest-lib.mjs';
 
 const [
@@ -41,6 +47,10 @@ const cutoff = now - RETENTION_MS;
 const trustedKey = loadTrustedReleaseKey();
 const stableEntries = await readAndVerifyCollection(stablePath, trustedKey);
 const referencedKeys = referencedObjectKeys(stableEntries);
+const currentVersion = collectionVersion(stableEntries);
+const minimumVersion = stableEntries
+  .map(entry => entry.payload.minimumSupportedVersion ?? currentVersion)
+  .sort(compareVersions)[0];
 const protectedGenerationPrefixes = new Set();
 if (activeGeneration !== '-') {
   protectedGenerationPrefixes.add(`generations/${activeGeneration}/`);
@@ -66,6 +76,7 @@ const keysToDelete = objects
       typeof object.Key !== 'string' ||
       (!object.Key.startsWith('releases/') && !object.Key.startsWith('generations/')) ||
       referencedKeys.has(object.Key) ||
+      isDifferentialBaseObject(object.Key, minimumVersion, currentVersion) ||
       [...protectedGenerationPrefixes].some(prefix => object.Key.startsWith(prefix))
     ) {
       return false;

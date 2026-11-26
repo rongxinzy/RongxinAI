@@ -135,8 +135,8 @@ if ($components.Count -ne 1) {
   throw "Expected exactly one skill-python component; found $($components.Count)"
 }
 $component = $components[0]
-if ($component.archiveCompression -ne 'lzma2-mx5-solid-v1') {
-  throw "Skill Python component must use lzma2-mx5-solid-v1; found $($component.archiveCompression)"
+if ($component.archiveCompression -ne 'lzma2-mx5-solid-v2') {
+  throw "Skill Python component must use lzma2-mx5-solid-v2; found $($component.archiveCompression)"
 }
 $solidArchive = Join-Path $ComponentsDir $component.archive
 Assert-Path $solidArchive 'solid Skill Python component archive'
@@ -158,7 +158,7 @@ try {
   Push-Location (Join-Path $ProjectRoot 'resources')
   try {
     Invoke-SevenZip @(
-      'a', '-t7z', '-spd', '-scsUTF-8', '-mx=5', '-m0=lzma2', '-ms=off', '-mmt=on', $baselineArchive, "@$listPath"
+      'a', '-t7z', '-spd', '-scsUTF-8', '-mx=5', '-m0=lzma2', '-ms=off', '-mmt=on', '-mtm=off', '-mtc=off', '-mta=off', $baselineArchive, "@$listPath"
     ) 'Skill Python non-solid baseline archive creation'
   } finally {
     Pop-Location

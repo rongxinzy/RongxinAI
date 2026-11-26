@@ -67,12 +67,12 @@ describe('Windows offline component identity', () => {
     );
 
     expect(compressionByKey).toMatchObject({
-      'channel-runtime': 'lzma2-mx5-nonsolid-v1',
-      skills: 'lzma2-mx5-solid-v1',
-      mcps: 'lzma2-mx5-solid-v1',
-      python: 'lzma2-mx5-solid-v1',
-      'skill-python': 'lzma2-mx5-solid-v1',
-      uv: 'lzma2-mx5-nonsolid-v1',
+      'channel-runtime': 'lzma2-mx5-nonsolid-v2',
+      skills: 'lzma2-mx5-solid4m-dict1m-v2',
+      mcps: 'lzma2-mx5-solid4m-dict1m-v2',
+      python: 'lzma2-mx5-solid-v2',
+      'skill-python': 'lzma2-mx5-solid-v2',
+      uv: 'lzma2-mx5-nonsolid-v2',
     });
   });
 
@@ -148,7 +148,7 @@ describe('Windows offline component identity', () => {
     );
     expect(manifest.archive).toBe('runtime.7z');
     expect(manifest.archiveFormat).toBe('7z');
-    expect(manifest.archiveCompression).toBe('lzma2-mx5-nonsolid-v1');
+    expect(manifest.archiveCompression).toBe('lzma2-mx5-nonsolid-v2');
   });
 
   test('does not reuse an archive created with a different compression profile', () => {

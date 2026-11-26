@@ -41,7 +41,7 @@ function createFixture(changeSourceAfterBaseline = false) {
         {
           key: 'skill-python',
           archive: 'skill-python.7z',
-          archiveCompression: 'lzma2-mx5-solid-v1',
+          archiveCompression: 'lzma2-mx5-solid-v2',
         },
       ],
     }),
@@ -81,7 +81,14 @@ function runBenchmark(
       '-SkipPythonProbe',
       ...(options.requireQualified ? ['-RequireQualified'] : []),
     ],
-    { encoding: 'utf8', timeout: 60_000 },
+    {
+      encoding: 'utf8',
+      timeout: 60_000,
+      // Windows PowerShell must rebuild its module path instead of inheriting PowerShell 7's.
+      env: Object.fromEntries(
+        Object.entries(process.env).filter(([name]) => name.toLowerCase() !== 'psmodulepath'),
+      ),
+    },
   );
 }
 

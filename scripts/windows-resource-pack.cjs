@@ -34,17 +34,26 @@ const WINDOWS_RESOURCE_ARCHIVE_FORMAT = '7z';
 // extra ratio bought by mx=9 only slows packaging down.
 const WINDOWS_RESOURCE_ARCHIVE_COMPRESSION = {
   NonSolid: {
-    id: 'lzma2-mx5-nonsolid-v1',
+    id: 'lzma2-mx5-nonsolid-v2',
     sevenZipArgs: ['-mx=5', '-m0=lzma2', '-ms=off', '-mmt=on'],
   },
   Solid: {
-    id: 'lzma2-mx5-solid-v1',
+    id: 'lzma2-mx5-solid-v2',
     sevenZipArgs: ['-mx=5', '-m0=lzma2', '-ms=on', '-mmt=on'],
   },
+  BoundedSolid: {
+    id: 'lzma2-mx5-solid4m-dict1m-v2',
+    sevenZipArgs: ['-mx=5', '-m0=lzma2', '-ms=4m', '-md=1m', '-mmt=on'],
+  },
 };
-const SOLID_ARCHIVE_COMPONENT_KEYS = new Set(['skills', 'mcps', 'python', 'skill-python']);
+const SOLID_ARCHIVE_COMPONENT_KEYS = new Set(['python', 'skill-python']);
+const BOUNDED_SOLID_ARCHIVE_COMPONENT_KEYS = new Set(['skills', 'mcps']);
 
 function getWindowsResourceArchiveCompression(component) {
+  // Four-MiB blocks isolate frequent content edits without losing cross-file compression.
+  if (BOUNDED_SOLID_ARCHIVE_COMPONENT_KEYS.has(component.key)) {
+    return WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.BoundedSolid;
+  }
   return SOLID_ARCHIVE_COMPONENT_KEYS.has(component.key)
     ? WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.Solid
     : WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.NonSolid;

@@ -39,13 +39,18 @@ export const manifestCacheKeyForChannel = (
   return `${MANIFEST_CACHE_KEY_PREFIX}:${channel}:${platform}:${arch}:${variant}`;
 };
 
-export const electronUpdaterFeedUrl = (
+export const electronUpdaterFeedOptions = (
   channel: AppUpdateReleaseChannel,
   target: UpdateTarget,
-): string => {
+) => {
   const feedUrl = new URL(
     `${target.platform}/${target.arch}/${target.variant}/`,
     `${ELECTRON_UPDATE_FEED_BASE}/${channel}/`,
   );
-  return feedUrl.toString();
+  return {
+    provider: 'generic' as const,
+    url: feedUrl.toString(),
+    // The CDN does not consistently return multipart ranges for large installers.
+    useMultipleRangeRequest: false,
+  };
 };

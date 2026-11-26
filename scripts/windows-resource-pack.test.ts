@@ -47,8 +47,12 @@ describe('Windows resource archive compression', () => {
   const compressionFor = (key: string) =>
     getWindowsResourceArchiveCompression(components.find(component => component.key === key));
 
-  test.each(['skills', 'mcps', 'python', 'skill-python'])('uses solid LZMA2 for %s', key => {
+  test.each(['python', 'skill-python'])('uses solid LZMA2 for %s', key => {
     expect(compressionFor(key)).toBe(WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.Solid);
+  });
+
+  test.each(['skills', 'mcps'])('bounds solid compression for frequently changed %s', key => {
+    expect(compressionFor(key)).toBe(WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.BoundedSolid);
   });
 
   test.each(['channel-runtime', 'uv'])('uses non-solid LZMA2 for %s', key => {
@@ -104,6 +108,12 @@ test('hashes and archives the same exact files with the bundled 7za', () => {
   write('added-after-listing.txt');
 
   packWindowsResourceComponent7z(component, archive, sevenZip, files);
+  const digest = sha256File(archive);
+  for (const file of files) {
+    fs.utimesSync(path.join(component.dir, file), new Date(0), new Date('2026-01-01'));
+  }
+  packWindowsResourceComponent7z(component, archive, sevenZip, files);
+  expect(sha256File(archive)).toBe(digest);
   const output = path.join(root, 'expanded');
   execFileSync(sevenZip, ['x', '-y', `-o${output}`, archive]);
   const extracted = path.join(output, component.prefix);

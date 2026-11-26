@@ -199,7 +199,8 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
     expect(updaterMocks.autoUpdater.setFeedURL).toHaveBeenCalledWith({
       provider: 'generic',
-      url: 'https://updates.rongxzyai.com/v2/electron/stable/darwin/arm64/default/',
+      url: 'https://updates.rongxzyai.com/v2/electron/stable/darwin/arm64/cpu/',
+      useMultipleRangeRequest: false,
     });
     expect(updaterMocks.autoUpdater.downloadUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ cancel: expect.any(Function) }),
@@ -642,7 +643,7 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
 
     await coordinator.retryDownload();
     expect(electronMocks.openExternal).toHaveBeenCalledWith(
-      'https://downloads.rongxzyai.com/releases/2026.7.2/darwin-arm64-default/ZhiYuan.dmg',
+      'https://downloads.rongxzyai.com/releases/2026.7.2/darwin-arm64-cpu/ZhiYuan.dmg',
     );
   });
 
