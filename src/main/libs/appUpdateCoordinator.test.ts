@@ -74,6 +74,7 @@ vi.mock('electron', () => ({
     },
   },
   BrowserWindow: { getAllWindows: () => [electronMocks.window] },
+  net: { fetch: (...args: Parameters<typeof fetch>) => fetch(...args) },
   shell: { openExternal: electronMocks.openExternal },
 }));
 

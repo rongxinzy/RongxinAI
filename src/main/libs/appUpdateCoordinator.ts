@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, net, shell } from 'electron';
 import {
   autoUpdater,
   CancellationToken,
@@ -878,7 +878,7 @@ export class AppUpdateCoordinator {
     url.searchParams.set('arch', arch);
     url.searchParams.set('variant', variant);
 
-    const response = await fetch(url, {
+    const response = await net.fetch(url.toString(), {
       headers: cachedManifest
         ? { 'if-none-match': cachedManifest.etag, accept: 'application/json' }
         : { accept: 'application/json' },

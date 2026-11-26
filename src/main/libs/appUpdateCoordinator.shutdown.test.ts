@@ -13,6 +13,7 @@ import {
 vi.mock('electron', () => ({
   app: { getVersion: () => '2026.7.1', getAppPath: () => process.cwd() },
   BrowserWindow: { getAllWindows: () => [] },
+  net: { fetch: (...args: Parameters<typeof fetch>) => fetch(...args) },
 }));
 vi.mock('electron-updater', () => ({}));
 vi.mock('./appUpdateInstallReceipt', () => ({ readInstallResult: () => null }));
