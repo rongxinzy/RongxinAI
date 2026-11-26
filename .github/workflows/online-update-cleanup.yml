@@ -139,6 +139,27 @@ jobs:
           done
           jq -s '{Contents: [.[].Contents[]?]}' "${inventory_files[@]}" \
             > manifest/r2-objects.json
+      - name: Read active beta manifest
+        id: beta
+        run: |
+          set +e
+          aws s3api head-object --bucket "$R2_BUCKET" --key channels/beta-pointer.json \
+            > manifest/beta-pointer-head.json 2> manifest/beta-pointer-head.err
+          beta_status=$?
+          set -e
+          if [[ $beta_status -eq 0 ]]; then
+            aws s3api get-object --bucket "$R2_BUCKET" --key channels/beta-pointer.json \
+              manifest/beta-pointer.json > /dev/null
+            generation="$(jq -er 'select(.schemaVersion == 1) | .generation | select(type == "string" and test("^[A-Za-z0-9._-]+$"))' manifest/beta-pointer.json)"
+            aws s3api get-object --bucket "$R2_BUCKET" \
+              --key "generations/${generation}/legacy/beta.json" manifest/beta.json > /dev/null
+            echo "generation=$generation" >> "$GITHUB_OUTPUT"
+          elif grep -Eq '404|Not Found|NoSuchKey' manifest/beta-pointer-head.err; then
+            echo 'generation=-' >> "$GITHUB_OUTPUT"
+          else
+            cat manifest/beta-pointer-head.err >&2
+            exit "$beta_status"
+          fi
       - name: Plan expired object cleanup
         run: |
           previous_path='-'
@@ -147,6 +168,10 @@ jobs:
             previous_path='manifest/previous.json'
             previous_head_path='manifest/previous-head.json'
           fi
+          beta_path='-'
+          if [[ '${{ steps.beta.outputs.generation }}' != '-' ]]; then
+            beta_path='manifest/beta.json'
+          fi
           node scripts/release/plan-r2-cleanup.mjs \
             manifest/stable.json \
             "$previous_path" \
@@ -154,7 +179,9 @@ jobs:
             '${{ steps.inventory.outputs.generation }}' \
             '${{ steps.inventory.outputs.previous_generation }}' \
             manifest/r2-objects.json \
-            manifest/cleanup
+            manifest/cleanup \
+            "$beta_path" \
+            '${{ steps.beta.outputs.generation }}'
       - name: Delete expired unreferenced objects
         run: |
           for batch in manifest/cleanup/delete-*.json; do

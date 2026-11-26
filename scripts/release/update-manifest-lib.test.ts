@@ -335,7 +335,17 @@ describe('online update release tools', () => {
 
     const result = runScript(
       'plan-r2-cleanup.mjs',
-      [stableManifest, '-', '-', 'active-opaque-id', '-', objectListPath, cleanupDirectory],
+      [
+        stableManifest,
+        '-',
+        '-',
+        'active-opaque-id',
+        '-',
+        objectListPath,
+        cleanupDirectory,
+        '-',
+        '-',
+      ],
       releaseEnvironment,
     );
     expect(result.stderr).toBe('');
@@ -346,6 +356,54 @@ describe('online update release tools', () => {
     );
     expect(deletePlan.Objects).toEqual([{ Key: 'releases/2026.7.1/win32-x64-lite/expired.exe' }]);
   });
+
+  test.each([false, true])(
+    'protects active beta updates and rejects tampered beta metadata: %s',
+    tampered => {
+      const stable = createManifest('2026.7.3', 'stable');
+      releaseEnvironment.UPDATE_RELEASE_CHANNEL = 'beta';
+      const beta = createManifest('2026.7.5', 'beta');
+      if (tampered) {
+        const collection = JSON.parse(fs.readFileSync(beta, 'utf8'));
+        collection.manifests[0].signature = Buffer.alloc(64).toString('base64url');
+        fs.writeFileSync(beta, JSON.stringify(collection));
+      }
+      const objectListPath = path.join(temporaryDirectory, 'objects.json');
+      const cleanupDirectory = path.join(temporaryDirectory, 'cleanup');
+      const keys = [
+        'releases/2026.7.5/win32-x64-lite/beta-win32-x64-lite.exe',
+        'generations/2026.7.5/legacy/beta.json',
+        'generations/2026.7.4/electron/win32-x64-lite/latest.yml',
+        'releases/2026.7.4/win32-x64-lite/old.exe.blockmap',
+        'releases/2026.7.4/win32-x64-lite/old.exe',
+      ];
+      fs.writeFileSync(
+        objectListPath,
+        JSON.stringify({
+          Contents: keys.map(Key => ({
+            Key,
+            LastModified: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+          })),
+        }),
+      );
+      const result = runScript(
+        'plan-r2-cleanup.mjs',
+        [stable, '-', '-', '2026.7.3', '-', objectListPath, cleanupDirectory, beta, '2026.7.5'],
+        releaseEnvironment,
+      );
+      if (tampered) {
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('signature verification failed');
+        expect(fs.existsSync(cleanupDirectory)).toBe(false);
+      } else {
+        expect(result.status, result.stderr).toBe(0);
+        const plan = JSON.parse(
+          fs.readFileSync(path.join(cleanupDirectory, 'delete-001.json'), 'utf8'),
+        );
+        expect(plan.Objects).toEqual([{ Key: keys.at(-1) }]);
+      }
+    },
+  );
 
   test('normalizes a multi-file Linux feed to a versioned AppImage Worker URL', () => {
     const inputPath = path.join(temporaryDirectory, 'latest-linux.yml');
