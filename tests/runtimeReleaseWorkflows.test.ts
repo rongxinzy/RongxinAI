@@ -95,7 +95,8 @@ test('Windows release workflow runs the clean-path bundled runtime gate', () => 
   assert.match(smoke, /packaged Electron Node runtime/);
   assert.doesNotMatch(smoke, /node_modules\\electron\\dist\\electron\.exe/);
   assert.match(smoke, /ELECTRON_RUN_AS_NODE/);
-  assert.match(smoke, /Start-Process[\s\S]*-Wait[\s\S]*-PassThru/);
+  assert.match(smoke, /\[Diagnostics\.Process\]::Start\(\$startInfo\)/);
+  assert.match(smoke, /\$process\.WaitForExit\(\)/);
   assert.match(smoke, /DOCX Markdown conversion/);
   assert.match(smoke, /validate-docx-smoke\.mjs/);
   assert.match(smoke, /generated DOCX validation/);

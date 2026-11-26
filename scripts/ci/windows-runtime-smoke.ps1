@@ -36,18 +36,27 @@ function Invoke-PackagedElectronChecked {
     [string]$Label = $FilePath
   )
   # The packaged Electron binary is a Windows GUI executable even when
-  # ELECTRON_RUN_AS_NODE is set. Start-Process -Wait provides deterministic
-  # process-tree completion and an explicit exit code on Windows PowerShell 5.1.
+  # ELECTRON_RUN_AS_NODE is set. Keep the process handle through WaitForExit;
+  # Start-Process -Wait can return a null ExitCode for fast exits on PowerShell 5.1.
   $quotedArguments = @($ArgumentList | ForEach-Object {
     if ($_ -match '"') {
       throw "$Label received an argument containing an unsupported double quote: $_"
     }
     '"' + $_ + '"'
   })
-  $process = Start-Process -FilePath $FilePath -ArgumentList $quotedArguments `
-    -NoNewWindow -Wait -PassThru
-  if ($process.ExitCode -ne 0) {
-    throw "$Label failed with exit code $($process.ExitCode)"
+  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+  $startInfo.FileName = $FilePath
+  $startInfo.Arguments = $quotedArguments -join ' '
+  $startInfo.UseShellExecute = $false
+  $startInfo.CreateNoWindow = $true
+  $process = [Diagnostics.Process]::Start($startInfo)
+  try {
+    $process.WaitForExit()
+    if ($process.ExitCode -ne 0) {
+      throw "$Label failed with exit code $($process.ExitCode)"
+    }
+  } finally {
+    $process.Dispose()
   }
 }
 
