@@ -30,6 +30,16 @@ describe('verifyWindowsPackagedComponents', () => {
     }
 
     const projectRoot = tempRoot();
+    const fixtureSevenZip = path.join(
+      projectRoot,
+      'node_modules',
+      '7zip-bin',
+      'win',
+      'x64',
+      '7za.exe',
+    );
+    fs.mkdirSync(path.dirname(fixtureSevenZip), { recursive: true });
+    fs.copyFileSync(sevenZipPath, fixtureSevenZip);
     const sidecarBytes = Buffer.from('pinned sidecar');
     const checksum = crypto.createHash('sha256').update(sidecarBytes).digest('hex');
     const componentRoot = path.join(projectRoot, 'vendor', 'channel-runtime', 'current');
@@ -77,7 +87,7 @@ describe('verifyWindowsPackagedComponents', () => {
         contentId: 'a'.repeat(64),
         archive: 'channel-runtime.7z',
         archiveFormat: '7z',
-        archiveCompression: 'lzma2-mx5-nonsolid-v1',
+        archiveCompression: 'lzma2-mx5-nonsolid-v2',
         archiveSha256,
         archiveSizeBytes: fs.statSync(archivePath).size,
         sentinelSha256: checksum,

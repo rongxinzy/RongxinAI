@@ -1,11 +1,17 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { isPreviousReleaseProtected, RETENTION_MS } from './cleanup-retention.mjs';
+import {
+  isDifferentialBaseObject,
+  isPreviousReleaseProtected,
+  RETENTION_MS,
+} from './cleanup-retention.mjs';
 import {
   loadTrustedReleaseKey,
   readAndVerifyCollection,
   referencedObjectKeys,
+  collectionVersion,
+  compareVersions,
 } from './update-manifest-lib.mjs';
 
 const [
@@ -16,6 +22,8 @@ const [
   previousGeneration,
   objectListPath,
   outputDirectory,
+  betaPath,
+  betaGeneration,
 ] = process.argv.slice(2);
 if (
   !stablePath ||
@@ -24,13 +32,15 @@ if (
   !activeGeneration ||
   !previousGeneration ||
   !objectListPath ||
-  !outputDirectory
+  !outputDirectory ||
+  !betaPath ||
+  !betaGeneration
 ) {
   throw new Error(
-    'usage: plan-r2-cleanup.mjs <stable> <previous-or-dash> <previous-head-or-dash> <active-generation-or-dash> <previous-generation-or-dash> <object-list> <output-dir>',
+    'usage: plan-r2-cleanup.mjs <stable> <previous-or-dash> <previous-head-or-dash> <active-generation-or-dash> <previous-generation-or-dash> <object-list> <output-dir> <beta-or-dash> <beta-generation-or-dash>',
   );
 }
-for (const generation of [activeGeneration, previousGeneration]) {
+for (const generation of [activeGeneration, previousGeneration, betaGeneration]) {
   if (generation !== '-' && !/^[A-Za-z0-9._-]+$/.test(generation)) {
     throw new Error(`Invalid generation identifier: ${generation}`);
   }
@@ -40,10 +50,21 @@ const now = Date.now();
 const cutoff = now - RETENTION_MS;
 const trustedKey = loadTrustedReleaseKey();
 const stableEntries = await readAndVerifyCollection(stablePath, trustedKey);
-const referencedKeys = referencedObjectKeys(stableEntries);
+const activeCollections = [stableEntries];
+if (betaPath !== '-') activeCollections.push(await readAndVerifyCollection(betaPath, trustedKey));
+const referencedKeys = new Set(
+  activeCollections.flatMap(entries => [...referencedObjectKeys(entries)]),
+);
+const differentialRanges = activeCollections.map(entries => {
+  const currentVersion = collectionVersion(entries);
+  const minimumVersion = entries
+    .map(entry => entry.payload.minimumSupportedVersion ?? currentVersion)
+    .sort(compareVersions)[0];
+  return { minimumVersion, currentVersion };
+});
 const protectedGenerationPrefixes = new Set();
-if (activeGeneration !== '-') {
-  protectedGenerationPrefixes.add(`generations/${activeGeneration}/`);
+for (const generation of [activeGeneration, betaGeneration]) {
+  if (generation !== '-') protectedGenerationPrefixes.add(`generations/${generation}/`);
 }
 
 if (previousPath !== '-' && previousHeadPath !== '-') {
@@ -66,6 +87,9 @@ const keysToDelete = objects
       typeof object.Key !== 'string' ||
       (!object.Key.startsWith('releases/') && !object.Key.startsWith('generations/')) ||
       referencedKeys.has(object.Key) ||
+      differentialRanges.some(({ minimumVersion, currentVersion }) =>
+        isDifferentialBaseObject(object.Key, minimumVersion, currentVersion),
+      ) ||
       [...protectedGenerationPrefixes].some(prefix => object.Key.startsWith(prefix))
     ) {
       return false;

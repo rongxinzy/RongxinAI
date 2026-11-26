@@ -76,7 +76,7 @@ describe('online update release tools', () => {
         `${filename}-${platform}-${arch}-${variant.replace(/-/g, '_')}${extension}`,
       );
       fs.writeFileSync(artifactPath, `artifact for ${target}`);
-      return `${artifactPath}:${target}`;
+      return `${path.relative(process.cwd(), artifactPath)}:${target}`;
     });
 
     const result = runScript(
@@ -150,12 +150,14 @@ describe('online update release tools', () => {
       JSON.parse(Buffer.from(envelope.payload, 'base64url').toString('utf8')),
     );
     expect(payloads.map(payload => payload.artifact.sha256)).toEqual(
-      artifacts.filter(artifact => !artifact.kind || artifact.kind === 'installer').map(artifact => artifact.sha256),
+      artifacts
+        .filter(artifact => !artifact.kind || artifact.kind === 'installer')
+        .map(artifact => artifact.sha256),
     );
     expect(payloads.every(payload => payload.source.pipelineId === '123456789')).toBe(true);
-    expect(payloads.find(payload => payload.artifact.platform === 'darwin').artifact.updater.filename).toBe(
-      'installer.zip',
-    );
+    expect(
+      payloads.find(payload => payload.artifact.platform === 'darwin').artifact.updater.filename,
+    ).toBe('installer.zip');
   });
 
   test('rejects uploaded metadata with a missing, duplicate, or unexpected release target', () => {
@@ -292,15 +294,19 @@ describe('online update release tools', () => {
       JSON.stringify({
         Contents: [
           {
-            Key: 'releases/2026.7.3/win32-x64-lite/current.exe',
+            Key: 'releases/2026.7.3/win32-x64-lite/current-win32-x64-lite.exe',
             LastModified: new Date(now - 48 * 60 * 60 * 1000).toISOString(),
           },
           {
-            Key: 'releases/2026.7.3/win32-x64-lite/current.exe.blockmap',
+            Key: 'releases/2026.7.3/win32-x64-lite/current-win32-x64-lite.exe.blockmap',
             LastModified: new Date(now - 48 * 60 * 60 * 1000).toISOString(),
           },
           {
             Key: 'releases/2026.7.1/win32-x64-lite/expired.exe',
+            LastModified: new Date(now - 48 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            Key: 'releases/2026.7.1/win32-x64-lite/expired.exe.blockmap',
             LastModified: new Date(now - 48 * 60 * 60 * 1000).toISOString(),
           },
           {
@@ -329,7 +335,17 @@ describe('online update release tools', () => {
 
     const result = runScript(
       'plan-r2-cleanup.mjs',
-      [stableManifest, '-', '-', 'active-opaque-id', '-', objectListPath, cleanupDirectory],
+      [
+        stableManifest,
+        '-',
+        '-',
+        'active-opaque-id',
+        '-',
+        objectListPath,
+        cleanupDirectory,
+        '-',
+        '-',
+      ],
       releaseEnvironment,
     );
     expect(result.stderr).toBe('');
@@ -338,15 +354,56 @@ describe('online update release tools', () => {
     const deletePlan = JSON.parse(
       fs.readFileSync(path.join(cleanupDirectory, 'delete-001.json'), 'utf8'),
     );
-    expect(deletePlan.Objects).toEqual(
-      expect.arrayContaining([
-        { Key: 'releases/2026.7.1/win32-x64-lite/expired.exe' },
-        { Key: 'generations/2026.7.3/legacy/stable.json' },
-        { Key: 'generations/2026.7.1/electron/win32-x64-lite/latest.yml' },
-      ]),
-    );
-    expect(deletePlan.Objects.length).toBeGreaterThanOrEqual(3);
+    expect(deletePlan.Objects).toEqual([{ Key: 'releases/2026.7.1/win32-x64-lite/expired.exe' }]);
   });
+
+  test.each([false, true])(
+    'protects active beta updates and rejects tampered beta metadata: %s',
+    tampered => {
+      const stable = createManifest('2026.7.3', 'stable');
+      releaseEnvironment.UPDATE_RELEASE_CHANNEL = 'beta';
+      const beta = createManifest('2026.7.5', 'beta');
+      if (tampered) {
+        const collection = JSON.parse(fs.readFileSync(beta, 'utf8'));
+        collection.manifests[0].signature = Buffer.alloc(64).toString('base64url');
+        fs.writeFileSync(beta, JSON.stringify(collection));
+      }
+      const objectListPath = path.join(temporaryDirectory, 'objects.json');
+      const cleanupDirectory = path.join(temporaryDirectory, 'cleanup');
+      const keys = [
+        'releases/2026.7.5/win32-x64-lite/beta-win32-x64-lite.exe',
+        'generations/2026.7.5/legacy/beta.json',
+        'generations/2026.7.4/electron/win32-x64-lite/latest.yml',
+        'releases/2026.7.4/win32-x64-lite/old.exe.blockmap',
+        'releases/2026.7.4/win32-x64-lite/old.exe',
+      ];
+      fs.writeFileSync(
+        objectListPath,
+        JSON.stringify({
+          Contents: keys.map(Key => ({
+            Key,
+            LastModified: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+          })),
+        }),
+      );
+      const result = runScript(
+        'plan-r2-cleanup.mjs',
+        [stable, '-', '-', '2026.7.3', '-', objectListPath, cleanupDirectory, beta, '2026.7.5'],
+        releaseEnvironment,
+      );
+      if (tampered) {
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('signature verification failed');
+        expect(fs.existsSync(cleanupDirectory)).toBe(false);
+      } else {
+        expect(result.status, result.stderr).toBe(0);
+        const plan = JSON.parse(
+          fs.readFileSync(path.join(cleanupDirectory, 'delete-001.json'), 'utf8'),
+        );
+        expect(plan.Objects).toEqual([{ Key: keys.at(-1) }]);
+      }
+    },
+  );
 
   test('normalizes a multi-file Linux feed to a versioned AppImage Worker URL', () => {
     const inputPath = path.join(temporaryDirectory, 'latest-linux.yml');
@@ -396,7 +453,14 @@ describe('online update release tools', () => {
     );
     const result = runScript(
       'normalize-electron-updater-metadata.mjs',
-      ['2026.7.6', 'linux', 'x64', 'appimage-cuda', inputPath, path.join(temporaryDirectory, 'out.yml')],
+      [
+        '2026.7.6',
+        'linux',
+        'x64',
+        'appimage-cuda',
+        inputPath,
+        path.join(temporaryDirectory, 'out.yml'),
+      ],
       releaseEnvironment,
     );
     expect(result.status).not.toBe(0);
@@ -428,16 +492,15 @@ describe('online update release tools', () => {
       const targetDirectory = path.join(temporaryDirectory, `${platform}-${arch}-${variant}`);
       fs.mkdirSync(targetDirectory);
       const metadataPath = path.join(targetDirectory, metadataName);
-      const sha512 = crypto
-        .createHash('sha512')
-        .update(`${platform}-${variant}`)
-        .digest('base64');
+      const sha512 = crypto.createHash('sha512').update(`${platform}-${variant}`).digest('base64');
       const url = `https://updates.rongxzyai.com/v2/electron/releases/${version}/${platform}/${arch}/${variant}/${filename}`;
       fs.writeFileSync(
         metadataPath,
         yaml.dump({ version, files: [{ url, sha512 }], path: url, sha512 }),
       );
-      metadataSpecs.push(`${metadataPath}:${platform}:${arch}:${variant}`);
+      metadataSpecs.push(
+        `${path.relative(process.cwd(), metadataPath)}:${platform}:${arch}:${variant}`,
+      );
       artifacts.push({ platform, arch, variant, kind: 'updater', filename, sha512 });
     }
     fs.writeFileSync(

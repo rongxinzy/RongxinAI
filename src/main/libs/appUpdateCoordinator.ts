@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, net, shell } from 'electron';
 import {
   autoUpdater,
   CancellationToken,
@@ -37,7 +37,7 @@ import {
 import { readInstallResult } from './appUpdateInstallReceipt';
 import { AppUpdateReleaseChannel, toUpdateInfo, type UpdateTarget } from './appUpdateManifest';
 import {
-  electronUpdaterFeedUrl,
+  electronUpdaterFeedOptions,
   manifestCacheKeyForChannel,
   readChannelPreference,
   writeChannelPreference,
@@ -791,10 +791,7 @@ export class AppUpdateCoordinator {
   }
 
   private configureUpdater(target: UpdateTarget): void {
-    this.updater.setFeedURL({
-      provider: 'generic',
-      url: electronUpdaterFeedUrl(this.resolveReleaseChannel(), target),
-    });
+    this.updater.setFeedURL(electronUpdaterFeedOptions(this.resolveReleaseChannel(), target));
   }
 
   private clearTransientUpdateState(): void {
@@ -881,7 +878,7 @@ export class AppUpdateCoordinator {
     url.searchParams.set('arch', arch);
     url.searchParams.set('variant', variant);
 
-    const response = await fetch(url, {
+    const response = await net.fetch(url.toString(), {
       headers: cachedManifest
         ? { 'if-none-match': cachedManifest.etag, accept: 'application/json' }
         : { accept: 'application/json' },

@@ -46,7 +46,7 @@ export function signedManifest(
   const version = options.version ?? '2026.7.2';
   const platform = options.platform ?? 'darwin';
   const arch = options.arch ?? 'arm64';
-  const variant = options.variant ?? 'default';
+  const variant = options.variant ?? 'cpu';
   const updaterFilename = options.updaterFilename ?? 'ZhiYuan.zip';
   const payload = {
     channel: 'stable',
