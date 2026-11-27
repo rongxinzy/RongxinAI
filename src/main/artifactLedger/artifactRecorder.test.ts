@@ -49,6 +49,67 @@ function capturePublishes(): ArtifactUpsertEvent[] {
   return events;
 }
 
+test.each(
+  [
+    { tool: 'python_execute', readOnlyPeer: false, peerEndsFirst: true },
+    { tool: 'python_execute', readOnlyPeer: true, peerEndsFirst: false },
+    { tool: 'run_skill_script', readOnlyPeer: false, peerEndsFirst: false },
+    { tool: 'run_skill_script', readOnlyPeer: true, peerEndsFirst: true },
+  ].flatMap(scenario =>
+    [false, true].map(writerStartsFirst => ({ ...scenario, writerStartsFirst })),
+  ),
+)(
+  '$tool captures PPTX with a read-only peer=$readOnlyPeer ending first=$peerEndsFirst writer first=$writerStartsFirst',
+  async ({ tool, readOnlyPeer, peerEndsFirst, writerStartsFirst }) => {
+    const { root, ledger, recorder } = await createWorkspace();
+    const events = capturePublishes();
+    const peer = new ArtifactRecorder({ sessionId: 'peer', workspaceRoot: root, ledger });
+    recorder.onRunStart('run-1');
+    if (writerStartsFirst) recorder.onToolStart('compile', tool, {});
+    peer.onRunStart('peer-1');
+    await Promise.all([recorder.flushDiffs(), peer.flushDiffs()]);
+    if (readOnlyPeer) {
+      peer.onToolStart('read', 'read', { path: 'outline.md' });
+      peer.onToolEnd({
+        toolCallId: 'read',
+        toolName: 'read',
+        isError: false,
+        resultMessageId: 'peer-read',
+      });
+    }
+    if (peerEndsFirst) await peer.onRunSettled('peer-answer');
+
+    if (!writerStartsFirst) recorder.onToolStart('compile', tool, {});
+    const output = path.join(root, 'course', 'output', 'presentation.pptx');
+    await fs.mkdir(path.dirname(output), { recursive: true });
+    await fs.writeFile(output, Buffer.from('compiled presentation'));
+    recorder.onToolEnd({
+      toolCallId: 'compile',
+      toolName: tool,
+      isError: false,
+      resultMessageId: 'compile-result',
+    });
+    await recorder.flushDiffs();
+    if (!peerEndsFirst) await peer.onRunSettled('peer-answer');
+    await recorder.onRunSettled('final-answer');
+
+    expect(ledger.list('session-1')).toEqual([
+      expect.objectContaining({
+        filePath: output.replace(/\\/g, '/'),
+        type: 'document',
+        role: 'deliverable',
+        declared: true,
+        messageId: 'compile-result',
+        runId: 'run-1',
+      }),
+    ]);
+    expect(ledger.list('peer')).toEqual([]);
+    expect(events).toHaveLength(1);
+    recorder.dispose();
+    peer.dispose();
+  },
+);
+
 test('retains explicit writes and withholds overlapping workspace diffs from both runs', async () => {
   const { root, ledger, recorder } = await createWorkspace();
   const child = path.join(root, 'child');
@@ -58,6 +119,8 @@ test('retains explicit writes and withholds overlapping workspace diffs from bot
   peer.onRunStart('peer-1');
   await Promise.all([recorder.flushDiffs(), peer.flushDiffs()]);
 
+  recorder.onToolStart('own-script', 'python_execute', {});
+  peer.onToolStart('peer-script', 'run_skill_script', {});
   const known = path.join(child, 'known.md');
   await fs.writeFile(known, 'Explicit write');
   await fs.writeFile(path.join(child, 'ambiguous.md'), 'Unowned change');
@@ -74,15 +137,64 @@ test('retains explicit writes and withholds overlapping workspace diffs from bot
   // A peer settling first does not make its earlier writes attributable to the other run.
   expect(await peer.onRunSettled('peer-answer')).toBe(1);
   expect(await recorder.onRunSettled('answer')).toBe(1);
-  expect(ledger.list('session-1').map(artifact => artifact.filePath)).toEqual([own]);
+  expect(ledger.list('session-1').map(artifact => artifact.filePath)).toEqual([
+    own.replace(/\\/g, '/'),
+  ]);
   expect(ledger.list('peer').map(artifact => artifact.filePath)).toEqual([known]);
 
   peer.onRunStart('peer-2');
   await peer.flushDiffs();
+  peer.onToolStart('solo-script', 'python_execute', {});
   const solo = path.join(child, 'solo.md');
   await fs.writeFile(solo, 'Isolated scan');
   expect(await peer.onRunSettled('solo-answer')).toBe(1);
-  expect(ledger.list('peer').map(artifact => artifact.filePath)).toEqual([known, solo]);
+  expect(ledger.list('peer').map(artifact => artifact.filePath)).toEqual([
+    known,
+    solo.replace(/\\/g, '/'),
+  ]);
+  recorder.dispose();
+  peer.dispose();
+});
+
+test('a read-only peer cannot later claim files from a writer that already settled', async () => {
+  const { root, ledger, recorder } = await createWorkspace();
+  const peer = new ArtifactRecorder({ sessionId: 'peer', workspaceRoot: root, ledger });
+  peer.onRunStart('peer-1');
+  recorder.onRunStart('run-1');
+  await Promise.all([peer.flushDiffs(), recorder.flushDiffs()]);
+  recorder.onToolStart('compile', 'python_execute', {});
+  const output = path.join(root, 'presentation.pptx');
+  await fs.writeFile(output, Buffer.from('compiled presentation'));
+  await recorder.onRunSettled('answer');
+
+  peer.onToolStart('late-script', 'python_execute', {});
+  await peer.onRunSettled('peer-answer');
+
+  expect(ledger.list('session-1')).toMatchObject([{ fileName: 'presentation.pptx' }]);
+  expect(ledger.list('peer')).toEqual([]);
+  recorder.dispose();
+  peer.dispose();
+});
+
+test('a failed script still blocks ambiguous diffs after partially writing files', async () => {
+  const { root, ledger, recorder } = await createWorkspace();
+  const peer = new ArtifactRecorder({ sessionId: 'peer', workspaceRoot: root, ledger });
+  recorder.onRunStart('run-1');
+  peer.onRunStart('peer-1');
+  await Promise.all([recorder.flushDiffs(), peer.flushDiffs()]);
+  peer.onToolStart('failed-script', 'python_execute', {});
+  await fs.writeFile(path.join(root, 'partial.pptx'), Buffer.from('partial output'));
+  peer.onToolEnd({
+    toolCallId: 'failed-script',
+    toolName: 'python_execute',
+    isError: true,
+    resultMessageId: 'failed-result',
+  });
+  await peer.onRunSettled('peer-answer');
+  recorder.onToolStart('compile', 'run_skill_script', {});
+  await recorder.onRunSettled('answer');
+
+  expect(ledger.list('session-1')).toEqual([]);
   recorder.dispose();
   peer.dispose();
 });
@@ -180,7 +292,7 @@ test('a bash-made document is caught by the debounced workspace diff', async () 
   expect(artifacts).toHaveLength(1);
   expect(artifacts[0]).toMatchObject({
     type: 'document',
-    filePath: path.join(root, 'export.docx'),
+    filePath: path.join(root, 'export.docx').replace(/\\/g, '/'),
     content: '',
     role: 'deliverable',
     declared: true,
@@ -391,7 +503,7 @@ test('coding lane events record under the lane scope', async () => {
   const artifacts = ledger.list('lane-1');
   expect(artifacts).toHaveLength(1);
   expect(artifacts[0]).toMatchObject({
-    filePath: '/repo/worktree/out/report.html',
+    filePath: path.resolve('/repo/worktree/out/report.html'),
     content: '<h1>x</h1>',
     messageId: '',
     toolCallId: 'call-1',
@@ -549,7 +661,7 @@ test('native read-only tools leave workspace scanning to the final capture', asy
 
   await recorder.onRunSettled('answer');
   expect(ledger.listForRun('session-1', 'run-1')).toMatchObject([
-    { filePath, messageId: 'answer' },
+    { filePath: filePath.replace(/\\/g, '/'), messageId: 'answer' },
   ]);
   recorder.dispose();
 });
@@ -570,7 +682,7 @@ test('a native continuation preserves pending outputs for the same Workbench run
   await expect(recorder.onRunSettled('final-answer')).resolves.toBe(1);
 
   expect(ledger.listForRun('session-1', 'run-1')).toEqual([
-    expect.objectContaining({ filePath: target, messageId: 'final-answer' }),
+    expect.objectContaining({ filePath: target.replace(/\\/g, '/'), messageId: 'final-answer' }),
   ]);
   recorder.dispose();
 });
@@ -612,8 +724,14 @@ test('final capture waits for an in-flight scan before reading the latest worksp
   expect(ledger.listForRun('session-1', 'run-1')).toHaveLength(2);
   expect(ledger.listForRun('session-1', 'run-1')).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ filePath: firstPath, messageId: 'tool-result' }),
-      expect.objectContaining({ filePath: lastPath, messageId: 'final-answer' }),
+      expect.objectContaining({
+        filePath: firstPath.replace(/\\/g, '/'),
+        messageId: 'tool-result',
+      }),
+      expect.objectContaining({
+        filePath: lastPath.replace(/\\/g, '/'),
+        messageId: 'final-answer',
+      }),
     ]),
   );
 });
