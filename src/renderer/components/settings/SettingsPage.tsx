@@ -400,7 +400,7 @@ export default function SettingsPage({
           {navGroups.map((group, groupIndex) => (
             <div
               key={group.title ?? groupIndex}
-              className="flex shrink-0 flex-row flex-wrap gap-1 lg:w-full lg:flex-col lg:gap-1"
+              className="flex max-w-full shrink-0 flex-row flex-wrap gap-1 lg:w-full lg:flex-col lg:gap-1"
             >
               {group.title ? (
                 <div className="theme-shell-sidebar-section hidden items-center lg:flex">
@@ -431,7 +431,7 @@ export default function SettingsPage({
         <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           {noticeMessage && (
             <div className="px-4 pt-4 sm:px-6">
-              <div className={cn('w-full', contentWidthClass)}>
+              <div className={cn('mx-auto w-full', contentWidthClass)}>
                 <ErrorMessage message={noticeMessage} onClose={() => setNoticeMessage(null)} />
               </div>
             </div>
@@ -439,7 +439,7 @@ export default function SettingsPage({
 
           {error && (
             <div className="px-4 pt-4 sm:px-6">
-              <div className={cn('w-full', contentWidthClass)}>
+              <div className={cn('mx-auto w-full', contentWidthClass)}>
                 <ErrorMessage message={error} onClose={() => setError(null)} />
               </div>
             </div>
@@ -457,11 +457,11 @@ export default function SettingsPage({
                   ? 'overflow-hidden'
                   : 'overflow-y-auto px-4 py-6 sm:px-6',
               )}
-              style={{ scrollbarGutter: 'stable' }}
+              style={{ scrollbarGutter: 'stable both-edges' }}
             >
               <div
                 className={cn(
-                  'w-full min-w-0',
+                  'mx-auto w-full min-w-0',
                   contentWidthClass,
                   activeTab === 'models' ? 'block h-full' : 'hidden',
                 )}
@@ -476,7 +476,10 @@ export default function SettingsPage({
               </div>
               {activeTab !== 'models' && (
                 <div
-                  className={cn('w-full min-w-0', !isEnterpriseTab(activeTab) && contentWidthClass)}
+                  className={cn(
+                    'mx-auto w-full min-w-0',
+                    !isEnterpriseTab(activeTab) && contentWidthClass,
+                  )}
                 >
                   {renderTabContent()}
                 </div>
