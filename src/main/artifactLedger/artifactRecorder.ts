@@ -123,6 +123,7 @@ export class ArtifactRecorder {
   /** Tool execution begins: cache tool inputs so tool_execution_end has full context. */
   onToolStart(toolCallId: string, toolName: string, args: unknown): void {
     if (this.disposed) return;
+    if (!NATIVE_READ_ONLY_TOOLS.has(normalizeToolName(toolName))) this.observation?.markWrites();
     const input = asToolInput(args);
     this.toolStartInfo.set(toolCallId, { toolName, args: input });
   }
@@ -134,6 +135,7 @@ export class ArtifactRecorder {
     this.toolStartInfo.delete(input.toolCallId);
     const toolName = input.toolName ?? startInfo?.toolName ?? '';
     const normalized = normalizeToolName(toolName);
+    if (!NATIVE_READ_ONLY_TOOLS.has(normalized)) this.observation?.markWrites();
     const args = asToolInput(input.args ?? startInfo?.args);
 
     const rawPath = extractFilePath(args);
@@ -154,7 +156,7 @@ export class ArtifactRecorder {
     }
 
     // Shell, Python and other tools may write files without a known target.
-    if (!NATIVE_READ_ONLY_TOOLS.has(toolName)) this.scheduleDiff(input.resultMessageId);
+    if (!NATIVE_READ_ONLY_TOOLS.has(normalized)) this.scheduleDiff(input.resultMessageId);
   }
 
   /** Run settled: flush the final workspace diff anchored to the final answer. */

@@ -126,7 +126,7 @@ test('resolveArtifactInputPath accepts file urls, tildes, and relative paths', (
     path.resolve(root, 'notes/report.md'),
   );
   expect(resolveArtifactInputPath('file:///work/reports/a%20b.md', '/other')).toBe(
-    '/work/reports/a b.md',
+    path.resolve('/work/reports/a b.md'),
   );
   expect(resolveArtifactInputPath('~/x.md', root)).toBe(
     path.resolve(path.join(os.homedir(), 'x.md')),
